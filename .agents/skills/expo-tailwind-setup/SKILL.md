@@ -53,7 +53,7 @@ const { withNativewind } = require("nativewind/metro");
 /** @type {import('expo/metro-config').MetroConfig} */
 const config = getDefaultConfig(__dirname);
 
-module.exports = withNativewind(config, {
+module.exports = withNativeWind(config, {
   // inline variables break PlatformColor in CSS variables
   inlineVariables: false,
   // We add className support manually
@@ -456,7 +456,7 @@ function MyComponent() {
 3. **CSS imports** - Use `@import "tailwindcss/..."` instead of `@tailwind` directives
 4. **Theme config** - Use `@theme` in CSS instead of `tailwind.config.js`
 5. **Component wrappers** - Must wrap components with `useCssElement` for className support
-6. **Metro config** - Use `withNativewind` with different options (`inlineVariables: false`)
+6. **Metro config** - Use `withNativeWind` with different options (`inlineVariables: false`)
 
 ## Troubleshooting
 
