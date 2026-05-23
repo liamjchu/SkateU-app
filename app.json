@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "skateYourSchoolApp",
-    "slug": "skateYourSchoolApp",
+    "name": "SkateU",
+    "slug": "SkateU",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "skateyourschoolapp",
+    "scheme": "skateu",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon"
@@ -39,6 +39,7 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "newArchEnabled": false
   }
 }
