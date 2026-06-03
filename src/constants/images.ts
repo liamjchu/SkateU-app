@@ -1,5 +1,5 @@
 const images = {
-  layers: require('../../assets/images/tabIcons/layers.svg'),
+  layers: require('../../assets/images/tabIcons/layers.png'),
 };
 
 export default images;

@@ -1,13 +1,12 @@
 ﻿import { useLocalSearchParams } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 import { Image, Pressable, StyleSheet, View } from 'react-native';
-import { WebView, WebViewMessageEvent } from 'react-native-webview';
+import { WebView } from 'react-native-webview';
 import images from '../constants/images';
 
 export default function MapScreen() {
   const webViewRef = useRef<WebView>(null);
   const searchParams = useLocalSearchParams();
-  const [isSatellite, setIsSatellite] = useState(false);
 
   const lat = Number(searchParams.lat ?? '41.8268');
   const lng = Number(searchParams.lng ?? '-71.4010');
@@ -61,52 +60,12 @@ export default function MapScreen() {
   </html>
   `;
 
-  const injectedJavaScript = `
-    (function () {
-      window.addMapMarker = function (lat, lng) {
-        if (!window.map) return;
-        const latlng = L.latLng(lat, lng);
-        L.marker(latlng).addTo(window.map);
-      };
-    })();
-    true; // Absolute requirement: Injected strings must evaluate to true
-  `;
-
-  const handleWebViewMessage = (event: WebViewMessageEvent) => {
-    try {
-      const rawData = event?.nativeEvent?.data;
-      if (!rawData) return;
-
-      const data = JSON.parse(rawData);
-
-      if (data.type === 'MAP_TAP') {
-        const { lat: eventLat, lng: eventLng } = data.latlng;
-        const js = `window.addMapMarker(${eventLat}, ${eventLng}); true;`;
-        webViewRef.current?.injectJavaScript(js);
-      }
-
-      if (data.type === 'LAYER_TOGGLED') {
-        // optional: sync native UI state if webview reports a layer change
-        // postMessage payload: { type: 'LAYER_TOGGLED', layer: 'satellite'|'default' }
-        // We update local optimistic state via RN onPress, but accept webview truth here.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const layer = (data as any).layer;
-        // send a small JS snippet back to React Native is not needed here; we'll just update state if possible
-        // We can't directly set React state from here; instead rely on optimistic toggle.
-      }
-    } catch (err) {
-      console.error('Error handling WebView message:', err);
-    }
-  };
-
   return (
     <View style={{ flex: 1 }}>
       <Pressable
         style={styles.toggleButton}
         onPress={() => {
           webViewRef.current?.injectJavaScript(`window.toggleLayer(); true;`);
-          // optimistic UI change handled by local state
-          setIsSatellite((s) => !s);
         }}
       >
         <Image source={images.layers} style={styles.icon} />
@@ -115,8 +74,6 @@ export default function MapScreen() {
         ref={webViewRef}
         originWhitelist={['*']}
         source={{ html }}
-        injectedJavaScript={injectedJavaScript}
-        onMessage={handleWebViewMessage}
       />
     </View>
   );
