@@ -1,6 +1,6 @@
-﻿import { View } from 'react-native'; 
-import { WebView, WebViewMessageEvent } from 'react-native-webview'; 
-import { useRef } from 'react'; 
+﻿import { useRef } from 'react';
+import { View } from 'react-native';
+import { WebView, WebViewMessageEvent } from 'react-native-webview';
 
 const html = `
 <!DOCTYPE html>
@@ -32,16 +32,6 @@ const html = `
     window.map.setMaxBounds(bounds);
     window.map.on('drag', () => window.map.panInsideBounds(bounds));
     window.bounds = bounds;
-
-    // LEAFLET HANDLES THE CLICKS: Calculates precise latitude/longitude automatically
-    window.map.on('click', function(e) {
-      const payload = {
-        type: 'MAP_TAP',
-        latlng: e.latlng
-      };
-      // Sends data cleanly out to React Native
-      window.ReactNativeWebView.postMessage(JSON.stringify(payload));
-    });
   </script>
 </body>
 </html>
