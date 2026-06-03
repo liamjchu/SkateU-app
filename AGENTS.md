@@ -14,8 +14,8 @@ The app includes:
  - each map holds skate spots already added as pins that user can interact with,
    pops up ratings of the spot as well as images, videos, and comments, similar
    to Google Maps
- - option to add spots yourself and add media to or comment on or rate existing spots
-
+ - option to add spots yourself
+ 
 Keep the implementation simple and readable.
 ---
 ## Tech Stack
