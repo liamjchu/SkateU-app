@@ -1,90 +1,74 @@
-﻿import { useRef } from 'react';
-import { View } from 'react-native';
-import { WebView, WebViewMessageEvent } from 'react-native-webview';
+﻿import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import { Pressable, Text, View } from 'react-native';
 
-const html = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <style>
-    html, body { margin: 0; padding: 0; background: #0b0f14; }
-    #map { height: 100vh; width: 100vw; }
-    .leaflet-popup-content-wrapper { background: #111827; color: white; border-radius: 12px; }
-    .leaflet-popup-tip { background: #111827; }
-    .leaflet-control-attribution { display: none; }
-  </style>
-</head>
-<body>
-  <div id="map"></div>
-  <script>
-    const center = [41.8268, -71.4010];
-    window.map = L.map('map', { zoomControl: false, minZoom: 14.5 }).setView(center, 15.5);
+const SCHOOLS_DATABASE = [
+  { id: '1', name: 'Brown University', lat: 41.8268, lng: -71.4010 },
+  { id: '2', name: 'James W Robinson, Jr. Secondary School', lat: 38.8167, lng: -77.3025 },
+  { id: '3', name: 'Trinity Christian School', lat: 38.8339, lng: -77.3324 },
+  { id: '4', name: 'Bonnie Brae Elementary School', lat: 38.8035, lng: -77.3103 },
+];
 
-    L.tileLayer(
-      'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', 
-      { subdomains: 'abcd' }
-    ).addTo(window.map);
+export default function HomeScreen() {
+  const router = useRouter();
+  const [selectedSchoolId, setSelectedSchoolId] = useState<string>('');
+  const [isOpen, setIsOpen] = useState(false);
 
-    const bounds = L.latLngBounds([41.8068, -71.4210], [41.8468, -71.3810]);
-    window.map.setMaxBounds(bounds);
-    window.map.on('drag', () => window.map.panInsideBounds(bounds));
-    window.bounds = bounds;
-  </script>
-</body>
-</html>
-`;
+  const selectedSchool = SCHOOLS_DATABASE.find((school) => school.id === selectedSchoolId);
 
-// Clean injected script for adding markers dynamically
-const injectedJavaScript = `
-  (function () {
-    window.addMapMarker = function (lat, lng) {
-      if (!window.map || !window.bounds) return;
-      const latlng = L.latLng(lat, lng);
-      
-      if (!window.bounds.contains(latlng)) return;
-      
-      L.marker(latlng).addTo(window.map);
-    };
-  })();
-  true; // Absolute requirement: Injected strings must evaluate to true
-`;
-
-export default function Index() {
-  const webViewRef = useRef<WebView>(null);
-
-  // Catches precise coordinate data sent from Leaflet
-  const handleWebViewMessage = (event: WebViewMessageEvent) => {
-    try {
-      const rawData = event?.nativeEvent?.data;
-      if (!rawData) return;
-
-      const data = JSON.parse(rawData);
-
-      if (data.type === 'MAP_TAP') {
-        const { lat, lng } = data.latlng;
-        
-        // This is where you would open your NativeWind modal form!
-        // For now, we instantly inject it back to draw the marker:
-        const js = `window.addMapMarker(${lat}, ${lng}); true;`;
-        webViewRef.current?.injectJavaScript(js);
-      }
-    } catch (err) {
-      console.error("Error handling WebView message:", err);
+  const handleGoPress = () => {
+    if (!selectedSchool) {
+      return;
     }
+
+    router.push({
+      pathname: '/map',
+      params: {
+        lat: selectedSchool.lat.toString(),
+        lng: selectedSchool.lng.toString(),
+      },
+    });
   };
 
   return (
-    <View style={{ flex: 1 }}>
-      <WebView 
-        ref={webViewRef}
-        originWhitelist={['*']}
-        source={{ html }} 
-        injectedJavaScript={injectedJavaScript}
-        onMessage={handleWebViewMessage} // Safely handles incoming map coordinates
-      />
+    <View className="flex-1 justify-between bg-white px-4 pt-20 pb-8">
+      <View className="w-full max-w-md mx-auto">
+        <Text className="mb-3 text-base font-semibold text-slate-900">Select your school</Text>
+
+        <Pressable
+          onPress={() => setIsOpen((value) => !value)}
+          className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4"
+        >
+          <Text className="text-base text-slate-900">
+            {selectedSchool ? selectedSchool.name : 'Choose a school'}
+          </Text>
+        </Pressable>
+
+        {isOpen ? (
+          <View className="mt-2 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            {SCHOOLS_DATABASE.map((school) => (
+              <Pressable
+                key={school.id}
+                onPress={() => {
+                  setSelectedSchoolId(school.id);
+                  setIsOpen(false);
+                }}
+                className="border-b border-slate-100 px-4 py-4"
+              >
+                <Text className="text-base text-slate-900">{school.name}</Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+      </View>
+
+      <Pressable
+        onPress={handleGoPress}
+        disabled={!selectedSchool}
+        className={`mx-auto w-full max-w-md rounded-2xl px-6 py-4 ${selectedSchool ? 'bg-slate-900' : 'bg-slate-400'}`}
+      >
+        <Text className="text-center text-base font-semibold text-white">Go</Text>
+      </Pressable>
     </View>
   );
 }
