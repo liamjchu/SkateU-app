@@ -1,12 +1,13 @@
-﻿import { useLocalSearchParams } from 'expo-router';
+﻿import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef } from 'react';
-import { Image, Pressable, StyleSheet, View } from 'react-native';
-import { WebView } from 'react-native-webview';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import images from '../constants/images';
 
 export default function MapScreen() {
   const webViewRef = useRef<WebView>(null);
   const searchParams = useLocalSearchParams();
+  const router = useRouter();
 
   const lat = Number(searchParams.lat ?? '41.8268');
   const lng = Number(searchParams.lng ?? '-71.4010');
@@ -55,10 +56,35 @@ export default function MapScreen() {
           }
         } catch (e) { console.error(e); }
       };
+
+      window.sendCenter = function () {
+        try {
+          if (!window.map || !window.ReactNativeWebView || !window.ReactNativeWebView.postMessage) return;
+          const center = window.map.getCenter();
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'CURRENT_CENTER',
+            latitude: center.lat,
+            longitude: center.lng,
+            layer: window.currentLayer === satelliteLayer ? 'satellite' : 'default',
+          }));
+        } catch (e) { console.error(e); }
+      };
     </script>
   </body>
   </html>
   `;
+
+  const handleWebViewMessage = (event: WebViewMessageEvent) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data) as { type: string; latitude?: number; longitude?: number; layer?: string };
+      if (data.type === 'CURRENT_CENTER' && typeof data.latitude === 'number' && typeof data.longitude === 'number') {
+        const layer = data.layer === 'satellite' ? 'satellite' : 'default';
+        router.push(`/add-spot?lat=${data.latitude}&lng=${data.longitude}&layer=${layer}`);
+      }
+    } catch (error) {
+      console.error('MapScreen message parse error', error);
+    }
+  };
 
   return (
     <View style={{ flex: 1 }}>
@@ -70,10 +96,20 @@ export default function MapScreen() {
       >
         <Image source={images.layers} style={styles.icon} />
       </Pressable>
+      <Pressable
+        className="absolute bottom-6 right-4 bg-sky-600 w-14 h-14 rounded-full items-center justify-center shadow-lg z-50"
+        onPress={() => {
+          webViewRef.current?.injectJavaScript(`window.sendCenter(); true;`);
+        }}
+        accessibilityLabel="Add new spot"
+      >
+        <Text className="text-white text-2xl">+</Text>
+      </Pressable>
       <WebView
         ref={webViewRef}
         originWhitelist={['*']}
         source={{ html }}
+        onMessage={handleWebViewMessage}
       />
     </View>
   );

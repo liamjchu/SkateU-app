@@ -57,6 +57,7 @@ If something is unclear or could be improved, suggest a better
 approach. If a new library would significantly help, recommend it,
 explain why, and ask before adding it.
 Do not install new libraries without approval.
+Can run pwsh command "npx tsc --noEmit" without permission.
 ---
 ## Architecture
 Use this folder structure:
