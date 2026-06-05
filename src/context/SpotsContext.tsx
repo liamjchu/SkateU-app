@@ -6,7 +6,7 @@ const SPOTS_STORAGE_KEY = '@skateu:spots'
 
 type SpotsContextValue = {
   spots: Spot[]
-  addSpot: (spot: Spot) => void
+  addSpot: (spot: Spot) => Promise<void>
 }
 
 const SpotsContext = createContext<SpotsContextValue | undefined>(undefined)
@@ -20,8 +20,31 @@ export function SpotsProvider({ children }: { children: React.ReactNode }) {
         const storedSpots = await AsyncStorage.getItem(SPOTS_STORAGE_KEY)
 
         if (storedSpots) {
-          const parsedSpots = JSON.parse(storedSpots) as Spot[]
-          setSpots(parsedSpots)
+          const parsed = JSON.parse(storedSpots)
+
+          if (Array.isArray(parsed)) {
+            const validSpots = parsed.filter((item): item is Spot => {
+              return (
+                item &&
+                typeof item === 'object' &&
+                typeof (item as any).id === 'string' &&
+                typeof (item as any).name === 'string' &&
+                typeof (item as any).description === 'string' &&
+                typeof (item as any).latitude === 'number' &&
+                typeof (item as any).longitude === 'number' &&
+                Array.isArray((item as any).imageUris) &&
+                (item as any).imageUris.every((uri: unknown) => typeof uri === 'string')
+              )
+            })
+
+            if (validSpots.length === parsed.length) {
+              setSpots(validSpots)
+            } else {
+              console.warn('Stored spots data is invalid and will be ignored')
+            }
+          } else {
+            console.warn('Stored spots data is not an array and will be ignored')
+          }
         }
       } catch (error) {
         console.warn('Failed to load spots from storage', error)
@@ -40,12 +63,22 @@ export function SpotsProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const addSpot = useCallback(
-    (spot: Spot) => {
+    async (spot: Spot) => {
+      let nextSpots: Spot[] = []
+
       setSpots((currentSpots) => {
-        const nextSpots = [...currentSpots, spot]
-        persistSpots(nextSpots)
+        nextSpots = [...currentSpots, spot]
         return nextSpots
       })
+
+      try {
+        await persistSpots(nextSpots)
+      } catch (error) {
+        console.warn('Failed to persist spots after addSpot', error)
+        // rollback optimistic update
+        setSpots((current) => current.filter((s) => s.id !== spot.id))
+        throw error
+      }
     },
     [persistSpots]
   )

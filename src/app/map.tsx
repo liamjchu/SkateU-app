@@ -80,6 +80,16 @@ export default function MapScreen() {
 
       window.markers = {};
 
+      function escapeHtml(text) {
+        return String(text)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;')
+          .replace(/\//g, '&#x2F;');
+      }
+
       window.renderSpots = function (spotsData) {
         try {
           // Clear existing markers
@@ -100,7 +110,7 @@ export default function MapScreen() {
 
             // Create popup content with only marker information
             const popupContent = '<div style="color: white; max-width: 200px;">' +
-              '<h3 style="margin: 0 0 8px 0; font-size: 16px;">' + spot.name + '</h3>' +
+              '<h3 style="margin: 0 0 8px 0; font-size: 16px;">' + escapeHtml(spot.name) + '</h3>' +
               '</div>';
 
             marker.bindPopup(popupContent);
@@ -120,13 +130,19 @@ export default function MapScreen() {
   </html>
   `;
 
+  const sendMarkers = () => {
+    if (!webViewRef.current) return;
+
+    const markerData = spots.map(({ id, latitude, longitude, name }) => ({ id, latitude, longitude, name }));
+    const markerJson = JSON.stringify(markerData);
+    webViewRef.current.injectJavaScript(`window.renderSpots(${markerJson}); true;`);
+  };
+
   // Inject marker-only spot data into the map when spots change,
   // but only after the WebView has finished loading and signaled readiness.
   useEffect(() => {
     if (webViewRef.current && webViewReadyRef.current) {
-      const markerData = spots.map(({ id, latitude, longitude, name }) => ({ id, latitude, longitude, name }));
-      const markerJson = JSON.stringify(markerData);
-      webViewRef.current.injectJavaScript(`window.renderSpots(${markerJson}); true;`);
+      sendMarkers();
     }
   }, [spots]);
 
@@ -143,11 +159,7 @@ export default function MapScreen() {
       // When the WebView finishes loading, it will notify us so we can send markers
       if (data.type === 'WEBVIEW_READY') {
         webViewReadyRef.current = true;
-        if (webViewRef.current) {
-          const markerData = spots.map(({ id, latitude, longitude, name }) => ({ id, latitude, longitude, name }));
-          const markerJson = JSON.stringify(markerData);
-          webViewRef.current.injectJavaScript(`window.renderSpots(${markerJson}); true;`);
-        }
+        sendMarkers();
         return;
       }
 

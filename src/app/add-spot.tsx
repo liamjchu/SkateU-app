@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LocationPicker from '../components/LocationPicker';
@@ -10,6 +10,16 @@ import type { Spot } from '../types/spot';
 type Coordinates = {
   latitude: number;
   longitude: number;
+};
+
+const generateSpotId = () => {
+  const webCrypto = globalThis.crypto as { randomUUID?: () => string } | undefined;
+
+  if (webCrypto?.randomUUID) {
+    return webCrypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 };
 
 export default function AddSpotScreen() {
@@ -26,14 +36,18 @@ export default function AddSpotScreen() {
 
   const [scrollEnabled, setScrollEnabled] = useState(true);
   const interactionTimeoutRef = useRef<number | null>(null);
-  const { spots, addSpot } = useSpots();
+  const { addSpot } = useSpots();
+  const isFormValid = !!imageUri && name.trim().length > 0 && description.trim().length > 0;
 
-  const handleSave = () => {
-    const isValid = !!imageUri && name.trim().length > 0 && description.trim().length > 0;
-    if (!isValid) return;
+  const handleLocationChange = useCallback((latitude: number, longitude: number) => {
+    setSelectedLocation({ latitude, longitude });
+  }, []);
+
+  const handleSave = async () => {
+    if (!isFormValid) return;
 
     const newSpot: Spot = {
-      id: String(Date.now()),
+      id: generateSpotId(),
       name: name.trim(),
       description: description.trim(),
       latitude: selectedLocation.latitude,
@@ -41,8 +55,12 @@ export default function AddSpotScreen() {
       imageUris: imageUri ? [imageUri] : [],
     };
 
-    addSpot(newSpot);
-    router.back();
+    try {
+      await addSpot(newSpot);
+      router.back();
+    } catch (error) {
+      console.warn('Failed to save spot', error);
+    }
   };
 
   useEffect(() => {
@@ -93,7 +111,7 @@ export default function AddSpotScreen() {
           initialLatitude={selectedLocation.latitude}
           initialLongitude={selectedLocation.longitude}
           initialLayer={layer}
-          onLocationChange={(latitude, longitude) => setSelectedLocation({ latitude, longitude })}
+          onLocationChange={handleLocationChange}
           onInteractionChange={(isInteracting: boolean) => {
             if (interactionTimeoutRef.current) {
               clearTimeout(interactionTimeoutRef.current as unknown as number);
@@ -112,18 +130,13 @@ export default function AddSpotScreen() {
           }}
         />
 
-        {(() => {
-          const isValid = !!imageUri && name.trim().length > 0 && description.trim().length > 0;
-          return (
-            <Pressable
-              className={`py-3 rounded-md items-center ${isValid ? 'bg-sky-600' : 'bg-gray-300'}`}
-              onPress={handleSave}
-              disabled={!isValid}
-            >
-              <Text className={`${isValid ? 'text-white' : 'text-gray-600'} font-semibold`}>Save Spot</Text>
-            </Pressable>
-          );
-        })()}
+        <Pressable
+          className={`py-3 rounded-md items-center ${isFormValid ? 'bg-sky-600' : 'bg-gray-300'}`}
+          onPress={handleSave}
+          disabled={!isFormValid}
+        >
+          <Text className={`${isFormValid ? 'text-white' : 'text-gray-600'} font-semibold`}>Save Spot</Text>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
