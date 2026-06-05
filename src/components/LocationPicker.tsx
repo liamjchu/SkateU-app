@@ -9,9 +9,10 @@ type LocationPickerProps = {
   initialLongitude: number;
   initialLayer: LayerType;
   onLocationChange: (latitude: number, longitude: number) => void;
+  onInteractionChange?: (isInteracting: boolean) => void;
 };
 
-export default function LocationPicker({ initialLatitude, initialLongitude, initialLayer, onLocationChange }: LocationPickerProps) {
+export default function LocationPicker({ initialLatitude, initialLongitude, initialLayer, onLocationChange, onInteractionChange }: LocationPickerProps) {
   const webViewRef = useRef<WebView>(null);
   const [selectedLatitude, setSelectedLatitude] = useState<number>(initialLatitude);
   const [selectedLongitude, setSelectedLongitude] = useState<number>(initialLongitude);
@@ -24,7 +25,7 @@ export default function LocationPicker({ initialLatitude, initialLongitude, init
   <!DOCTYPE html>
   <html>
   <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -51,7 +52,26 @@ export default function LocationPicker({ initialLatitude, initialLongitude, init
         window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'CENTER_CHANGED', latitude: center.lat, longitude: center.lng }));
       }
 
-      window.map.on('moveend', postCenter);
+      function postInteractionStart() {
+        if (!window.ReactNativeWebView || !window.ReactNativeWebView.postMessage) return;
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'INTERACTION_START' }));
+      }
+
+      function postInteractionEnd() {
+        if (!window.ReactNativeWebView || !window.ReactNativeWebView.postMessage) return;
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'INTERACTION_END' }));
+      }
+
+      // Pan and zoom events
+      window.map.on('movestart', postInteractionStart);
+      window.map.on('moveend', function () { postCenter(); postInteractionEnd(); });
+      window.map.on('zoomstart', postInteractionStart);
+      window.map.on('zoomend', function () { postCenter(); postInteractionEnd(); });
+
+      // Touch events as a fallback for some platforms
+      document.addEventListener('touchstart', postInteractionStart, { passive: true });
+      document.addEventListener('touchend', postInteractionEnd, { passive: true });
+
       postCenter();
     </script>
   </body>
@@ -64,6 +84,14 @@ export default function LocationPicker({ initialLatitude, initialLongitude, init
       if (data.type === 'CENTER_CHANGED' && typeof data.latitude === 'number' && typeof data.longitude === 'number') {
         setSelectedLatitude(data.latitude);
         setSelectedLongitude(data.longitude);
+      }
+
+      if (data.type === 'INTERACTION_START') {
+        onInteractionChange?.(true);
+      }
+
+      if (data.type === 'INTERACTION_END') {
+        onInteractionChange?.(false);
       }
     } catch (error) {
       console.error('LocationPicker message parse error', error);

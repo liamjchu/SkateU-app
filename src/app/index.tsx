@@ -26,6 +26,7 @@ export default function HomeScreen() {
       params: {
         lat: selectedSchool.lat.toString(),
         lng: selectedSchool.lng.toString(),
+        schoolName: selectedSchool.name,
       },
     });
   };
