@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { Spot } from '../types/spot'
 
 const SPOTS_STORAGE_KEY = '@skateu:spots'
@@ -23,7 +23,7 @@ export function SpotsProvider({ children }: { children: React.ReactNode }) {
           const parsed = JSON.parse(storedSpots)
 
           if (Array.isArray(parsed)) {
-            const validSpots = parsed.filter((item): item is Spot => {
+            const isValid = (item: unknown): item is Spot => {
               return (
                 item &&
                 typeof item === 'object' &&
@@ -35,12 +35,31 @@ export function SpotsProvider({ children }: { children: React.ReactNode }) {
                 Array.isArray((item as any).imageUris) &&
                 (item as any).imageUris.every((uri: unknown) => typeof uri === 'string')
               )
-            })
+            }
+
+            const validSpots = parsed.filter(isValid)
 
             if (validSpots.length === parsed.length) {
               setSpots(validSpots)
+            } else if (validSpots.length > 0) {
+              const skipped = parsed
+                .map((item: unknown, index: number) => ({ item, index }))
+                .filter(({ item }) => !isValid(item))
+                .map(({ index, item }) => ({
+                  index,
+                  id: item && typeof (item as any).id === 'string' ? (item as any).id : undefined,
+                }))
+
+              console.warn(
+                `Stored spots contained invalid entries; persisted ${validSpots.length}/${parsed.length}. Skipped entries:`,
+                skipped
+              )
+
+              setSpots(validSpots)
             } else {
+              // fully invalid: keep the original warning but still persist empty array
               console.warn('Stored spots data is invalid and will be ignored')
+              setSpots(validSpots)
             }
           } else {
             console.warn('Stored spots data is not an array and will be ignored')
@@ -59,8 +78,11 @@ export function SpotsProvider({ children }: { children: React.ReactNode }) {
       await AsyncStorage.setItem(SPOTS_STORAGE_KEY, JSON.stringify(nextSpots))
     } catch (error) {
       console.warn('Failed to persist spots to storage', error)
+      throw error
     }
   }, [])
+
+  const pendingPersistPromise = useRef<Promise<void>>(Promise.resolve())
 
   const addSpot = useCallback(
     async (spot: Spot) => {
@@ -71,14 +93,24 @@ export function SpotsProvider({ children }: { children: React.ReactNode }) {
         return nextSpots
       })
 
-      try {
-        await persistSpots(nextSpots)
-      } catch (error) {
-        console.warn('Failed to persist spots after addSpot', error)
-        // rollback optimistic update
-        setSpots((current) => current.filter((s) => s.id !== spot.id))
-        throw error
+      const persistOperation = async () => {
+        try {
+          await persistSpots(nextSpots)
+        } catch (error) {
+          console.warn('Failed to persist spots after addSpot', error)
+          setSpots((current) => current.filter((s) => s.id !== spot.id))
+          throw error
+        }
       }
+
+      const nextPromise = pendingPersistPromise.current.then(
+        () => persistOperation(),
+        () => persistOperation()
+      )
+
+      pendingPersistPromise.current = nextPromise.catch(() => {})
+
+      return nextPromise
     },
     [persistSpots]
   )

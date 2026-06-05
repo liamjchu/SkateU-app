@@ -26,12 +26,13 @@ export default function MapScreen() {
   <!DOCTYPE html>
   <html>
   <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
     <style>
-      html, body { margin: 0; padding: 0; background: #0b0f14; }
-      #map { height: 100vh; width: 100vw; }
+      /* FIXED: Changed 100vh/100vw to 100%. WebViews often collapse vh/vw units to 0 */
+      html, body { margin: 0; padding: 0; background: #0b0f14; width: 100%; height: 100%; }
+      #map { height: 100%; width: 100%; }
       .leaflet-popup-content-wrapper { background: #111827; color: white; border-radius: 12px; }
       .leaflet-popup-tip { background: #111827; }
       .leaflet-control-attribution { display: none; }
@@ -40,15 +41,26 @@ export default function MapScreen() {
   <body>
     <div id="map"></div>
     <script>
-      const center = [${validLat}, ${validLng}];
-      window.map = L.map('map', { zoomControl: false }).setView(center, 15.5);
-      const defaultLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png');
-      const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}.png');
+      // 1. ERROR CATCHER: Send any JS errors inside the WebView back to React Native
+      window.onerror = function(message, source, lineno, colno, error) {
+        if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'CONSOLE_ERROR',
+            message: message + ' at line ' + lineno
+          }));
+        }
+        return true;
+      };
 
-      window.currentLayer = defaultLayer.addTo(window.map);
+      try {
+        const center = [${validLat}, ${validLng}];
+        window.map = L.map('map', { zoomControl: false }).setView(center, 15.5);
+        const defaultLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png');
+        const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}.png');
 
-      window.toggleLayer = function () {
-        try {
+        window.currentLayer = defaultLayer.addTo(window.map);
+
+        window.toggleLayer = function () {
           if (!window.map) return;
           if (window.currentLayer === defaultLayer) {
             window.map.removeLayer(defaultLayer);
@@ -62,11 +74,9 @@ export default function MapScreen() {
           if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
             window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'LAYER_TOGGLED', layer: window.currentLayer === satelliteLayer ? 'satellite' : 'default' }));
           }
-        } catch (e) { console.error(e); }
-      };
+        };
 
-      window.sendCenter = function () {
-        try {
+        window.sendCenter = function () {
           if (!window.map || !window.ReactNativeWebView || !window.ReactNativeWebView.postMessage) return;
           const center = window.map.getCenter();
           window.ReactNativeWebView.postMessage(JSON.stringify({
@@ -75,28 +85,24 @@ export default function MapScreen() {
             longitude: center.lng,
             layer: window.currentLayer === satelliteLayer ? 'satellite' : 'default',
           }));
-        } catch (e) { console.error(e); }
-      };
+        };
 
-      window.markers = {};
+        window.markers = {};
 
-      function escapeHtml(text) {
-        return String(text)
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;')
-          .replace(/'/g, '&#39;')
-          .replace(/\//g, '&#x2F;');
-      }
+        function escapeHtml(text) {
+          return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;')
+            .replace(/\\//g, '&#x2F;');
+        }
 
-      window.renderSpots = function (spotsData) {
-        try {
-          // Clear existing markers
+        window.renderSpots = function (spotsData) {
           Object.values(window.markers).forEach(marker => marker.remove());
           window.markers = {};
 
-          // Create new markers for each spot
           spotsData.forEach(spot => {
             const marker = L.marker([spot.latitude, spot.longitude], {
               title: spot.name,
@@ -108,7 +114,6 @@ export default function MapScreen() {
               }
             });
 
-            // Create popup content with only marker information
             const popupContent = '<div style="color: white; max-width: 200px;">' +
               '<h3 style="margin: 0 0 8px 0; font-size: 16px;">' + escapeHtml(spot.name) + '</h3>' +
               '</div>';
@@ -116,16 +121,21 @@ export default function MapScreen() {
             marker.bindPopup(popupContent);
             window.markers[spot.id] = marker;
           });
-        } catch (e) { console.error('Error rendering spots:', e); }
         };
 
-        // Notify React Native that the WebView has finished setting up
-        try {
-          if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-            window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'WEBVIEW_READY' }));
-          }
-        } catch (e) { console.error('Error posting WEBVIEW_READY', e); }
-      </script>
+        if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'WEBVIEW_READY' }));
+        }
+      } catch (e) {
+        // Catch initialization errors (like 'L is not defined')
+        if (window.ReactNativeWebView) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'CONSOLE_ERROR',
+            message: 'Init Error: ' + e.message
+          }));
+        }
+      }
+    </script>
   </body>
   </html>
   `;
@@ -210,8 +220,19 @@ export default function MapScreen() {
       </Pressable>
       <WebView
         ref={webViewRef}
+        style={{ flex: 1, backgroundColor: 'transparent' }}
         originWhitelist={['*']}
-        source={{ html }}
+        source={{ 
+          html: html,
+          // The baseUrl is the magic fix. It gives the HTML an HTTP origin, 
+          // allowing it to successfully bypass CORS/security blocks to fetch Leaflet.
+          baseUrl: 'https://localhost' 
+        }}
+        // Explicitly enable JS and DOM Storage (critical for map libraries)
+        javaScriptEnabled={true}
+        domStorageEnabled={true}
+        // Allow mixed content so HTTPS tiles can load over the base URL
+        mixedContentMode="always"
         onMessage={handleWebViewMessage}
       />
     </View>
