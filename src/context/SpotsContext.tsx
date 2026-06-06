@@ -27,19 +27,23 @@ export function SpotsProvider({ children }: { children: React.ReactNode }) {
 
           if (Array.isArray(parsed)) {
             const isValid = (item: unknown): item is Spot => {
+              if (typeof item !== 'object' || item === null) {
+                return false
+              }
+
+              const record = item as Record<string, unknown>
+
               return (
-                item &&
-                typeof item === 'object' &&
-                typeof (item as any).id === 'string' &&
-                typeof (item as any).name === 'string' &&
-                typeof (item as any).description === 'string' &&
-                typeof (item as any).latitude === 'number' &&
-                typeof (item as any).longitude === 'number' &&
-                Array.isArray((item as any).imageUris) &&
-                (item as any).imageUris.every((uri: unknown) => typeof uri === 'string') &&
-                typeof (item as any).city === 'string' &&
-                typeof (item as any).state === 'string' &&
-                ((item as any).schoolId === undefined || typeof (item as any).schoolId === 'string')
+                typeof record.id === 'string' &&
+                typeof record.name === 'string' &&
+                typeof record.description === 'string' &&
+                typeof record.latitude === 'number' &&
+                typeof record.longitude === 'number' &&
+                Array.isArray(record.imageUris) &&
+                record.imageUris.every((uri: unknown) => typeof uri === 'string') &&
+                typeof record.city === 'string' &&
+                typeof record.state === 'string' &&
+                (record.schoolId === undefined || typeof record.schoolId === 'string')
               )
             }
 
@@ -51,10 +55,19 @@ export function SpotsProvider({ children }: { children: React.ReactNode }) {
               const skipped = parsed
                 .map((item: unknown, index: number) => ({ item, index }))
                 .filter(({ item }) => !isValid(item))
-                .map(({ index, item }) => ({
-                  index,
-                  id: item && typeof (item as any).id === 'string' ? (item as any).id : undefined,
-                }))
+                .map(({ index, item }) => {
+                  let id: string | undefined
+
+                  if (typeof item === 'object' && item !== null) {
+                    const record = item as Record<string, unknown>
+
+                    if (typeof record.id === 'string') {
+                      id = record.id
+                    }
+                  }
+
+                  return { index, id }
+                })
 
               console.warn(
                 `Stored spots contained invalid entries; persisted ${validSpots.length}/${parsed.length}. Skipped entries:`,
@@ -63,7 +76,6 @@ export function SpotsProvider({ children }: { children: React.ReactNode }) {
 
               setSpots(validSpots)
             } else {
-              // fully invalid: keep the original warning but still persist empty array
               console.warn('Stored spots data is invalid and will be ignored')
               setSpots(validSpots)
             }
@@ -128,12 +140,12 @@ export function SpotsProvider({ children }: { children: React.ReactNode }) {
   const removeSpot = useCallback(
     async (spotId: string) => {
       let nextSpots: Spot[] = []
-      let previousSpots: Spot[] = []
       let removedSpot: Spot | undefined
+      let removedIndex = -1
 
       setSpots((currentSpots) => {
-        previousSpots = currentSpots
-        removedSpot = currentSpots.find((spot) => spot.id === spotId)
+        removedIndex = currentSpots.findIndex((spot) => spot.id === spotId)
+        removedSpot = removedIndex >= 0 ? currentSpots[removedIndex] : undefined
         nextSpots = currentSpots.filter((spot) => spot.id !== spotId)
         return nextSpots
       })
@@ -147,7 +159,14 @@ export function SpotsProvider({ children }: { children: React.ReactNode }) {
           }
         } catch (error) {
           console.warn('Failed to persist spots after removeSpot', error)
-          setSpots(previousSpots)
+            if (removedSpot && removedIndex >= 0) {
+              setSpots((current) => {
+              if (current.some((spot) => spot.id === removedSpot!.id)) return current
+                const restored = [...current]
+                restored.splice(Math.min(removedIndex, restored.length), 0, removedSpot!)
+                return restored
+              })
+            }
           throw error
         }
       }
