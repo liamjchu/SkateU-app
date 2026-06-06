@@ -1,15 +1,39 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback } from 'react';
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSpots } from '../../context/SpotsContext';
 
 export default function SpotDetailsScreen() {
   const router = useRouter();
   const searchParams = useLocalSearchParams();
-  const { spots } = useSpots();
+  const { spots, removeSpot } = useSpots();
   const spotId = searchParams.id as string | undefined;
   const spot = spots.find((item) => item.id === spotId);
+
+  const handleDeleteSpot = useCallback(() => {
+    if (!spot) return
+
+    Alert.alert(
+      'Delete spot',
+      'Are you sure you want to permanently delete this spot?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await removeSpot(spot.id)
+              router.back()
+            } catch (error) {
+              console.warn('Failed to delete spot', error)
+            }
+          },
+        },
+      ]
+    )
+  }, [removeSpot, router, spot])
 
   if (!spot) {
     return (
@@ -51,6 +75,13 @@ export default function SpotDetailsScreen() {
           <Text className="mt-2 text-sm text-slate-600">Latitude: {spot.latitude.toFixed(6)}</Text>
           <Text className="text-sm text-slate-600">Longitude: {spot.longitude.toFixed(6)}</Text>
         </View>
+
+        <Pressable
+          onPress={handleDeleteSpot}
+          className="mt-6 rounded-3xl bg-red-600 py-4 items-center justify-center"
+        >
+          <Text className="text-white font-semibold">Delete Spot</Text>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );

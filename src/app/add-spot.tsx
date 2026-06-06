@@ -29,6 +29,9 @@ export default function AddSpotScreen() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const layer = searchParams.layer === 'satellite' ? 'satellite' : 'default';
+  const schoolId = Array.isArray(searchParams.schoolId)
+    ? searchParams.schoolId[0]
+    : searchParams.schoolId;
   const [selectedLocation, setSelectedLocation] = useState<Coordinates>({
     latitude: Number.isFinite(Number(searchParams.lat)) ? Number(searchParams.lat) : 41.8268,
     longitude: Number.isFinite(Number(searchParams.lng)) ? Number(searchParams.lng) : -71.4010,
@@ -53,6 +56,9 @@ export default function AddSpotScreen() {
       latitude: selectedLocation.latitude,
       longitude: selectedLocation.longitude,
       imageUris: imageUri ? [imageUri] : [],
+      city: '',
+      state: '',
+      schoolId: schoolId || undefined,
     };
 
     try {

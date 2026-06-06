@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { useSchools } from '../store/schoolsStore'
 import type { Spot } from '../types/spot'
 
 const SPOTS_STORAGE_KEY = '@skateu:spots'
@@ -7,12 +8,14 @@ const SPOTS_STORAGE_KEY = '@skateu:spots'
 type SpotsContextValue = {
   spots: Spot[]
   addSpot: (spot: Spot) => Promise<void>
+  removeSpot: (spotId: string) => Promise<void>
 }
 
 const SpotsContext = createContext<SpotsContextValue | undefined>(undefined)
 
 export function SpotsProvider({ children }: { children: React.ReactNode }) {
   const [spots, setSpots] = useState<Spot[]>([])
+  const { incrementSpotCount, decrementSpotCount } = useSchools()
 
   useEffect(() => {
     async function loadSpots() {
@@ -24,16 +27,23 @@ export function SpotsProvider({ children }: { children: React.ReactNode }) {
 
           if (Array.isArray(parsed)) {
             const isValid = (item: unknown): item is Spot => {
+              if (typeof item !== 'object' || item === null) {
+                return false
+              }
+
+              const record = item as Record<string, unknown>
+
               return (
-                item &&
-                typeof item === 'object' &&
-                typeof (item as any).id === 'string' &&
-                typeof (item as any).name === 'string' &&
-                typeof (item as any).description === 'string' &&
-                typeof (item as any).latitude === 'number' &&
-                typeof (item as any).longitude === 'number' &&
-                Array.isArray((item as any).imageUris) &&
-                (item as any).imageUris.every((uri: unknown) => typeof uri === 'string')
+                typeof record.id === 'string' &&
+                typeof record.name === 'string' &&
+                typeof record.description === 'string' &&
+                typeof record.latitude === 'number' &&
+                typeof record.longitude === 'number' &&
+                Array.isArray(record.imageUris) &&
+                record.imageUris.every((uri: unknown) => typeof uri === 'string') &&
+                typeof record.city === 'string' &&
+                typeof record.state === 'string' &&
+                (record.schoolId === undefined || typeof record.schoolId === 'string')
               )
             }
 
@@ -45,10 +55,19 @@ export function SpotsProvider({ children }: { children: React.ReactNode }) {
               const skipped = parsed
                 .map((item: unknown, index: number) => ({ item, index }))
                 .filter(({ item }) => !isValid(item))
-                .map(({ index, item }) => ({
-                  index,
-                  id: item && typeof (item as any).id === 'string' ? (item as any).id : undefined,
-                }))
+                .map(({ index, item }) => {
+                  let id: string | undefined
+
+                  if (typeof item === 'object' && item !== null) {
+                    const record = item as Record<string, unknown>
+
+                    if (typeof record.id === 'string') {
+                      id = record.id
+                    }
+                  }
+
+                  return { index, id }
+                })
 
               console.warn(
                 `Stored spots contained invalid entries; persisted ${validSpots.length}/${parsed.length}. Skipped entries:`,
@@ -57,7 +76,6 @@ export function SpotsProvider({ children }: { children: React.ReactNode }) {
 
               setSpots(validSpots)
             } else {
-              // fully invalid: keep the original warning but still persist empty array
               console.warn('Stored spots data is invalid and will be ignored')
               setSpots(validSpots)
             }
@@ -96,6 +114,10 @@ export function SpotsProvider({ children }: { children: React.ReactNode }) {
       const persistOperation = async () => {
         try {
           await persistSpots(nextSpots)
+          // Only increment school count if persistence succeeded
+          if (spot.schoolId) {
+            incrementSpotCount(spot.schoolId)
+          }
         } catch (error) {
           console.warn('Failed to persist spots after addSpot', error)
           setSpots((current) => current.filter((s) => s.id !== spot.id))
@@ -112,10 +134,56 @@ export function SpotsProvider({ children }: { children: React.ReactNode }) {
 
       return nextPromise
     },
-    [persistSpots]
+    [persistSpots, incrementSpotCount]
   )
 
-  const value = useMemo(() => ({ spots, addSpot }), [spots, addSpot])
+  const removeSpot = useCallback(
+    async (spotId: string) => {
+      let nextSpots: Spot[] = []
+      let removedSpot: Spot | undefined
+      let removedIndex = -1
+
+      setSpots((currentSpots) => {
+        removedIndex = currentSpots.findIndex((spot) => spot.id === spotId)
+        removedSpot = removedIndex >= 0 ? currentSpots[removedIndex] : undefined
+        nextSpots = currentSpots.filter((spot) => spot.id !== spotId)
+        return nextSpots
+      })
+
+      const persistOperation = async () => {
+        try {
+          await persistSpots(nextSpots)
+          // Only decrement school count if persistence succeeded
+          if (removedSpot?.schoolId) {
+            decrementSpotCount(removedSpot.schoolId)
+          }
+        } catch (error) {
+          console.warn('Failed to persist spots after removeSpot', error)
+            if (removedSpot && removedIndex >= 0) {
+              setSpots((current) => {
+              if (current.some((spot) => spot.id === removedSpot!.id)) return current
+                const restored = [...current]
+                restored.splice(Math.min(removedIndex, restored.length), 0, removedSpot!)
+                return restored
+              })
+            }
+          throw error
+        }
+      }
+
+      const nextPromise = pendingPersistPromise.current.then(
+        () => persistOperation(),
+        () => persistOperation()
+      )
+
+      pendingPersistPromise.current = nextPromise.catch(() => {})
+
+      return nextPromise
+    },
+    [persistSpots, decrementSpotCount]
+  )
+
+  const value = useMemo(() => ({ spots, addSpot, removeSpot }), [spots, addSpot, removeSpot])
 
   return <SpotsContext.Provider value={value}>{children}</SpotsContext.Provider>
 }
