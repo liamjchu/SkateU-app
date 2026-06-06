@@ -12,6 +12,9 @@ export default function MapScreen() {
   const { spots } = useSpots();
   const webViewReadyRef = useRef(false);
 
+  const schoolId = Array.isArray(searchParams.schoolId)
+    ? searchParams.schoolId[0]
+    : searchParams.schoolId;
   const schoolName = Array.isArray(searchParams.schoolName)
     ? searchParams.schoolName[0]
     : searchParams.schoolName;
@@ -175,7 +178,12 @@ export default function MapScreen() {
 
       if (data.type === 'CURRENT_CENTER' && typeof data.latitude === 'number' && typeof data.longitude === 'number') {
         const layer = data.layer === 'satellite' ? 'satellite' : 'default';
-        router.push(`/add-spot?lat=${data.latitude}&lng=${data.longitude}&layer=${layer}`);
+        const params = new URLSearchParams();
+        params.set('lat', data.latitude.toString());
+        params.set('lng', data.longitude.toString());
+        params.set('layer', layer);
+        if (schoolId) params.set('schoolId', schoolId);
+        router.push(`/add-spot?${params.toString()}`);
         return;
       }
 

@@ -5,4 +5,7 @@ export type Spot = {
   latitude: number
   longitude: number
   imageUris: string[]
+  city: string
+  state: string
+  schoolId?: string
 }

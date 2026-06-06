@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { useSchools } from '../store/schoolsStore'
 import type { Spot } from '../types/spot'
 
 const SPOTS_STORAGE_KEY = '@skateu:spots'
@@ -7,12 +8,14 @@ const SPOTS_STORAGE_KEY = '@skateu:spots'
 type SpotsContextValue = {
   spots: Spot[]
   addSpot: (spot: Spot) => Promise<void>
+  removeSpot: (spotId: string) => Promise<void>
 }
 
 const SpotsContext = createContext<SpotsContextValue | undefined>(undefined)
 
 export function SpotsProvider({ children }: { children: React.ReactNode }) {
   const [spots, setSpots] = useState<Spot[]>([])
+  const { incrementSpotCount, decrementSpotCount } = useSchools()
 
   useEffect(() => {
     async function loadSpots() {
@@ -33,7 +36,10 @@ export function SpotsProvider({ children }: { children: React.ReactNode }) {
                 typeof (item as any).latitude === 'number' &&
                 typeof (item as any).longitude === 'number' &&
                 Array.isArray((item as any).imageUris) &&
-                (item as any).imageUris.every((uri: unknown) => typeof uri === 'string')
+                (item as any).imageUris.every((uri: unknown) => typeof uri === 'string') &&
+                typeof (item as any).city === 'string' &&
+                typeof (item as any).state === 'string' &&
+                ((item as any).schoolId === undefined || typeof (item as any).schoolId === 'string')
               )
             }
 
@@ -96,6 +102,10 @@ export function SpotsProvider({ children }: { children: React.ReactNode }) {
       const persistOperation = async () => {
         try {
           await persistSpots(nextSpots)
+          // Only increment school count if persistence succeeded
+          if (spot.schoolId) {
+            incrementSpotCount(spot.schoolId)
+          }
         } catch (error) {
           console.warn('Failed to persist spots after addSpot', error)
           setSpots((current) => current.filter((s) => s.id !== spot.id))
@@ -112,10 +122,49 @@ export function SpotsProvider({ children }: { children: React.ReactNode }) {
 
       return nextPromise
     },
-    [persistSpots]
+    [persistSpots, incrementSpotCount]
   )
 
-  const value = useMemo(() => ({ spots, addSpot }), [spots, addSpot])
+  const removeSpot = useCallback(
+    async (spotId: string) => {
+      let nextSpots: Spot[] = []
+      let previousSpots: Spot[] = []
+      let removedSpot: Spot | undefined
+
+      setSpots((currentSpots) => {
+        previousSpots = currentSpots
+        removedSpot = currentSpots.find((spot) => spot.id === spotId)
+        nextSpots = currentSpots.filter((spot) => spot.id !== spotId)
+        return nextSpots
+      })
+
+      const persistOperation = async () => {
+        try {
+          await persistSpots(nextSpots)
+          // Only decrement school count if persistence succeeded
+          if (removedSpot?.schoolId) {
+            decrementSpotCount(removedSpot.schoolId)
+          }
+        } catch (error) {
+          console.warn('Failed to persist spots after removeSpot', error)
+          setSpots(previousSpots)
+          throw error
+        }
+      }
+
+      const nextPromise = pendingPersistPromise.current.then(
+        () => persistOperation(),
+        () => persistOperation()
+      )
+
+      pendingPersistPromise.current = nextPromise.catch(() => {})
+
+      return nextPromise
+    },
+    [persistSpots, decrementSpotCount]
+  )
+
+  const value = useMemo(() => ({ spots, addSpot, removeSpot }), [spots, addSpot, removeSpot])
 
   return <SpotsContext.Provider value={value}>{children}</SpotsContext.Provider>
 }
