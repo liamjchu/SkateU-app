@@ -1,5 +1,13 @@
-﻿import { useRouter } from 'expo-router';
-import { useState } from 'react';
+﻿import {
+  Outfit_400Regular,
+  Outfit_500Medium,
+  Outfit_600SemiBold,
+  Outfit_700Bold,
+  Outfit_900Black,
+  useFonts
+} from '@expo-google-fonts/outfit';
+import { useRouter } from 'expo-router';
+import { useState } from 'react'; // Added useEffect
 import {
   Image,
   Keyboard,
@@ -10,19 +18,14 @@ import {
   View,
   type GestureResponderEvent,
 } from 'react-native';
-// 1. IMPORT FONTS DIRECTLY HERE
-import {
-  Outfit_400Regular,
-  Outfit_500Medium,
-  Outfit_600SemiBold,
-  Outfit_700Bold,
-  Outfit_900Black,
-  useFonts
-} from '@expo-google-fonts/outfit';
+// 1. IMPORT SPLASH SCREEN HERE
 import IMAGES from '../constants/images';
 import { useFavorites } from '../store/favoritesStore';
 import { useSchools } from '../store/schoolsStore';
 import type { School } from '../types/school';
+
+// Prevent the splash screen from auto-hiding early
+//SplashScreen.preventAutoHideAsync().catch(() => {});
 
 type SchoolRowProps = {
   school: School;
@@ -104,8 +107,8 @@ export default function HomeScreen() {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // 2. TRIGGER THE FONT HOOK DIRECTLY INSIDE HOMESCREEN
-  const [fontsLoaded] = useFonts({
+  // 2. LOAD FONTS
+  const [fontsLoaded, fontError] = useFonts({
     Outfit_400Regular,
     Outfit_500Medium,
     Outfit_600SemiBold,
@@ -192,19 +195,14 @@ export default function HomeScreen() {
     });
   };
 
-  // 3. RENDER NOTHING UNTIL FONTS ARE LOADED FOR THIS SPECIFIC FILE
-  if (!fontsLoaded) {
-    return null;
-  }
-
   return (
     <View className="flex-1 bg-white">
       {/* Top Header Banner Section */}
-      <View className="bg-[#1B3B36] pt-16 pb-8 px-6 flex-row items-center justify-between">
+      <View className="bg-[#1B3B36] pt-20 pb-8 px-6 flex-row items-center justify-between">
         <View className="flex-row items-center space-x-3">
           <Image 
             source={IMAGES.logo} 
-            className="h-15 w-15 rounded-2xl"
+            className="h-12 w-12 rounded-2xl" // Fixed explicitly layout dimensions
             resizeMode="contain"
           />
           <Text 
@@ -241,7 +239,7 @@ export default function HomeScreen() {
 
         {/* Input Bar Area */}
         <View className="relative mb-6">
-          <View className="absolute left-3 top-2 z-10">
+          <View className="absolute left-3 top-3 z-10">
             <Text className="text-lg text-slate-400">🔍</Text>
           </View>
           <TextInput
@@ -282,7 +280,7 @@ export default function HomeScreen() {
               </Text>
             </View>
 
-            <View className="flex-1 overflow-hidden rounded-2xl border border-slate-100 bg-white">
+            <View className="h-80 overflow-hidden rounded-2xl border border-slate-100 bg-white">
               <ScrollView
                 nestedScrollEnabled
                 showsVerticalScrollIndicator
@@ -346,6 +344,17 @@ export default function HomeScreen() {
                 </Text>
               )}
             </ScrollView>
+          </View>
+        )}
+
+        {/* LANDSCAPE IMAGE BANNER: Full screen edge-to-edge width */}
+        {!isOpen && (
+          <View style={{ width: '100%', height: 140, marginTop: 15, marginBottom: 15 }} className="-mx-5">
+            <Image 
+              source={IMAGES.landscape} 
+              style={{ width: '110%', height: '111%' }} 
+              resizeMode="cover"
+            />
           </View>
         )}
       </View>

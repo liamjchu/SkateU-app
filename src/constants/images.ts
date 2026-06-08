@@ -1,6 +1,8 @@
 const images = {
   layers: require('../../assets/images/tabIcons/layers.png'),
-  logo: require('../../assets/images/icon.png'),
+  //logo on home screen header
+  logo: require('../../assets/images/header-icon.png'),
+  landscape: require('../../assets/images/landscape.png')
 };
 
 export default images;

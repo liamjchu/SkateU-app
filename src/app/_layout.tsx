@@ -8,9 +8,11 @@ import {
 } from '@expo-google-fonts/outfit';
 import { SplashScreen, Stack } from 'expo-router';
 import { useEffect } from 'react';
-import { Text } from 'react-native'; // Ensure Text is imported
+import { Text } from 'react-native';
+import '../../global.css';
+import { SpotsProvider } from '../context/SpotsContext';
 
-SplashScreen.preventAutoHideAsync();
+//SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
@@ -37,5 +39,10 @@ export default function RootLayout() {
     return null;
   }
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  // 3. FIXED: Wrapped Stack inside SpotsProvider so all screens can access spots data
+  return (
+    <SpotsProvider>
+      <Stack screenOptions={{ headerShown: false }} />
+    </SpotsProvider>
+  );
 }
