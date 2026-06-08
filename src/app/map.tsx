@@ -39,6 +39,14 @@ export default function MapScreen() {
       .leaflet-popup-content-wrapper { background: #111827; color: white; border-radius: 12px; }
       .leaflet-popup-tip { background: #111827; }
       .leaflet-control-attribution { display: none; }
+
+      /*brightness of the map, darken it so the pin can show*/
+      #map:not(.satellite) .leaflet-tile {
+        filter: brightness(.9);
+      }
+      #map.satellite .leaflet-tile {
+        filter: brightness(.8);
+      }
     </style>
   </head>
   <body>
@@ -57,6 +65,16 @@ export default function MapScreen() {
 
       try {
         const center = [${validLat}, ${validLng}];
+        const spotIcon = L.icon({
+          iconUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 22s7-6.4 7-12a7 7 0 1 0-14 0c0 5.6 7 12 7 12z" fill="%23FFFFFF" stroke="%23FFFFFF" stroke-width="0"/><circle cx="12" cy="10" r="2.5" fill="%2342625C"/></svg>',
+          iconSize: [50, 50],
+          iconAnchor: [25, 50],
+
+          shadowUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-shadow.png',
+          shadowSize: [41, 41],
+          shadowAnchor: [13, 41],
+        });
+
         window.map = L.map('map', { zoomControl: false }).setView(center, 15.5);
         const defaultLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png');
         const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}.png');
@@ -69,10 +87,12 @@ export default function MapScreen() {
             window.map.removeLayer(defaultLayer);
             satelliteLayer.addTo(window.map);
             window.currentLayer = satelliteLayer;
+            document.getElementById('map').classList.add('satellite');
           } else {
             window.map.removeLayer(satelliteLayer);
             defaultLayer.addTo(window.map);
             window.currentLayer = defaultLayer;
+            document.getElementById('map').classList.remove('satellite');
           }
           if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
             window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'LAYER_TOGGLED', layer: window.currentLayer === satelliteLayer ? 'satellite' : 'default' }));
@@ -109,6 +129,7 @@ export default function MapScreen() {
           spotsData.forEach(spot => {
             const marker = L.marker([spot.latitude, spot.longitude], {
               title: spot.name,
+              icon: spotIcon,
             }).addTo(window.map);
 
             marker.on('click', () => {
@@ -117,11 +138,6 @@ export default function MapScreen() {
               }
             });
 
-            const popupContent = '<div style="color: white; max-width: 200px;">' +
-              '<h3 style="margin: 0 0 8px 0; font-size: 16px;">' + escapeHtml(spot.name) + '</h3>' +
-              '</div>';
-
-            marker.bindPopup(popupContent);
             window.markers[spot.id] = marker;
           });
         };
