@@ -7,7 +7,7 @@
   useFonts
 } from '@expo-google-fonts/outfit';
 import { useRouter } from 'expo-router';
-import { useState } from 'react'; // Added useEffect
+import { useState } from 'react';
 import {
   Image,
   Keyboard,
@@ -18,14 +18,10 @@ import {
   View,
   type GestureResponderEvent,
 } from 'react-native';
-// 1. IMPORT SPLASH SCREEN HERE
 import IMAGES from '../constants/images';
 import { useFavorites } from '../store/favoritesStore';
 import { useSchools } from '../store/schoolsStore';
 import type { School } from '../types/school';
-
-// Prevent the splash screen from auto-hiding early
-//SplashScreen.preventAutoHideAsync().catch(() => {});
 
 type SchoolRowProps = {
   school: School;
@@ -45,29 +41,66 @@ function SchoolRow({
   onFavoritePress,
   isDropdownItem = false,
 }: SchoolRowProps) {
+  if (!isDropdownItem) {
+    return (
+      <Pressable
+        onPress={() => onSelect(school)}
+        className="flex-row items-center justify-between p-2 mb-3 rounded-3xl border border-slate-200/60 bg-[#F0F5F4]"
+      >
+        <View className="flex-row items-center flex-1 pr-2">
+          <Pressable
+            onPress={(event) => onFavoritePress(event, school.id)}
+            className="h-11 w-11 items-center justify-center rounded-2xl bg-white"
+          >
+            <Text className={`-mt-1 text-xl ${isFavorite ? 'text-[#1B3B36]' : 'text-slate-400'}`}>
+              {isFavorite ? '★' : '☆'}
+            </Text>
+          </Pressable>
+
+          <View className="ml-4 flex-1">
+            <Text 
+              className="text-lg text-[#1B3B36]"
+              style={{ fontFamily: 'Outfit_700Bold' }}
+            >
+              {school.name}
+            </Text>
+            <Text 
+              className="text-sm text-slate-400 mt-0.5"
+              style={{ fontFamily: 'Outfit_500Medium' }}
+            >
+              {school.city}, {school.state}
+            </Text>
+          </View>
+        </View>
+
+        <View className="flex-row items-center space-x-1.5 bg-white/50 px-3 py-1.5 rounded-xl">
+          <Text className="text-sm">📍</Text>
+          <Text 
+            className="text-base text-[#1B3B36]"
+            style={{ fontFamily: 'Outfit_700Bold' }}
+          >
+            {school.numSpots ?? 0}
+          </Text>
+        </View>
+      </Pressable>
+    );
+  }
+
   return (
     <Pressable
       onPress={() => onSelect(school)}
       className="flex-row items-center justify-between py-3 px-4 border-b border-slate-100 bg-white"
     >
       <View className="flex-row items-center flex-1 pr-2">
-        {/* Leading Left Icon */}
         <Pressable
           onPress={(event) => onFavoritePress(event, school.id)}
-          className={`h-11 w-11 items-center justify-center rounded-2xl ${
-            isDropdownItem ? 'bg-[#F0F5F4]' : 'bg-[#EBF2F0]'
-          }`}
+          className="h-11 w-11 items-center justify-center rounded-2xl bg-[#F0F5F4]"
         >
-          <Text
-            className={`text-xl ${
-              isFavorite ? 'text-[#1B3B36]' : 'text-slate-400'
-            }`}
-          >
+          <Text className={`-mt-1 text-xl ${isFavorite ? 'text-[#1B3B36]' : 'text-slate-400'}`}>
             {isFavorite ? '★' : '☆'}
           </Text>
         </Pressable>
 
-        {/* Text Details */}
         <View className="ml-3 flex-1">
           <Text 
             className="text-base text-[#1B3B36]"
@@ -84,7 +117,6 @@ function SchoolRow({
         </View>
       </View>
 
-      {/* Pins Count Right Side Marker */}
       <View className="flex-row items-center space-x-1.5">
         <Text className="text-sm">📍</Text>
         <Text 
@@ -107,7 +139,6 @@ export default function HomeScreen() {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // 2. LOAD FONTS
   const [fontsLoaded, fontError] = useFonts({
     Outfit_400Regular,
     Outfit_500Medium,
@@ -144,10 +175,10 @@ export default function HomeScreen() {
   const hour = new Date().getHours();
   const greeting =
     hour < 12
-      ? 'Good morning 🖐️'
+      ? 'Good morning 👋'
       : hour < 18
-        ? 'Good afternoon 🖐️'
-        : 'Good evening 🖐️';
+        ? 'Good afternoon 👋'
+        : 'Good evening 👋';
 
   const handleSearchChange = (text: string) => {
     setSearchQuery(text);
@@ -198,11 +229,11 @@ export default function HomeScreen() {
   return (
     <View className="flex-1 bg-white">
       {/* Top Header Banner Section */}
-      <View className="bg-[#1B3B36] pt-20 pb-8 px-6 flex-row items-center justify-between">
+      <View className="bg-[#1B3B36] pt-25 pb-8 px-6 flex-row items-center justify-between">
         <View className="flex-row items-center space-x-3">
           <Image 
             source={IMAGES.logo} 
-            className="h-12 w-12 rounded-2xl" // Fixed explicitly layout dimensions
+            className="h-12 w-12 rounded-2xl"
             resizeMode="contain"
           />
           <Text 
@@ -216,31 +247,31 @@ export default function HomeScreen() {
 
       <View className="flex-1 px-5 pt-6 relative">
         {/* Welcome Message Card */}
-        <View className="bg-[#EBF2F0] rounded-3xl p-5 mb-5">
+        <View className="bg-[#EBF2F0] rounded-3xl p-6 mb-5">
           <Text 
-            className="text-sm text-slate-500 mb-1"
+            className="text-base text-slate-500 mb-1"
             style={{ fontFamily: 'Outfit_500Medium' }}
           >
             {greeting}
           </Text>
           <Text 
-            className="text-2xl text-[#1B3B36] mb-1"
+            className="text-3xl text-[#1B3B36] mb-1.5"
             style={{ fontFamily: 'Outfit_900Black' }}
           >
             Welcome back!
           </Text>
           <Text 
-            className="text-sm text-slate-500"
+            className="text-base text-slate-500/90"
             style={{ fontFamily: 'Outfit_500Medium' }}
           >
-            Find your next college skating adventure.
+            Find a new campus skate spot.
           </Text>
         </View>
 
         {/* Input Bar Area */}
         <View className="relative mb-6">
-          <View className="absolute left-3 top-3 z-10">
-            <Text className="text-lg text-slate-400">🔍</Text>
+          <View className="absolute left-4 top-2.5 z-10">
+            <Text className="text-xl text-slate-400">🔍</Text>
           </View>
           <TextInput
             value={searchQuery}
@@ -249,59 +280,74 @@ export default function HomeScreen() {
             onPressIn={() => setIsOpen(true)}
             placeholder="Search all schools..."
             placeholderTextColor="#8E9AA6"
-            className="rounded-2xl bg-[#F0F3F5] py-4 pl-12 pr-12 text-base text-[#1B3B36]"
+            className="rounded-2xl bg-[#F0F3F5] py-5 pl-14 pr-12 text-lg text-[#1B3B36]"
             style={{ fontFamily: 'Outfit_600SemiBold' }}
           />
 
           <Pressable
             onPress={handleClearSearch}
-            className="absolute right-3 top-2 h-8 w-8 items-center justify-center rounded-full bg-slate-200/50"
+            className="absolute right-4 top-2.5 h-8 w-8 items-center justify-center rounded-full bg-[#F0F3F5]"
           >
-            <Text className="text-sm font-bold text-slate-500">✕</Text>
+            <Text className="text-sm font-bold text-slate-400">✕</Text>
           </Pressable>
         </View>
 
-        {/* Favorites Header & Content List */}
-        {!isOpen && favoriteSchools.length > 0 && (
-          <View className="flex-1">
-            <View className="mb-3 flex-row items-center justify-between px-1">
-              <Text 
-                className="text-lg text-[#1B3B36]"
-                style={{ fontFamily: 'Outfit_900Black' }}
-              >
-                Favorites
-              </Text>
-              <Text 
-                className="text-sm text-slate-400"
-                style={{ fontFamily: 'Outfit_700Bold' }}
-              >
-                {favoriteSchools.length}{' '}
-                {favoriteSchools.length === 1 ? 'school' : 'schools'}
-              </Text>
-            </View>
+        {/* BACKGROUND SECTION: Stays visible but blocks touch interactions when dropdown is open */}
+        <View 
+          className="flex-1" 
+          pointerEvents={isOpen ? 'none' : 'auto'}
+        >
+          {/* Favorites Header & Content List */}
+          {favoriteSchools.length > 0 && (
+            <View className="flex-1">
+              <View className="mb-3 flex-row items-center justify-between px-1">
+                <Text 
+                  className="text-lg text-[#1B3B36]"
+                  style={{ fontFamily: 'Outfit_900Black' }}
+                >
+                  Favorites
+                </Text>
+                <Text 
+                  className="text-sm text-slate-400"
+                  style={{ fontFamily: 'Outfit_700Bold' }}
+                >
+                  {favoriteSchools.length}{' '}
+                  {favoriteSchools.length === 1 ? 'school' : 'schools'}
+                </Text>
+              </View>
 
-            <View className="h-80 overflow-hidden rounded-2xl border border-slate-100 bg-white">
-              <ScrollView
-                nestedScrollEnabled
-                showsVerticalScrollIndicator
-              >
-                {favoriteSchools.map((school: School) => (
-                  <SchoolRow
-                    key={school.id}
-                    school={school}
-                    isFavorite
-                    onSelect={handleSchoolSelect}
-                    onFavoritePress={handleFavoritePress}
-                  />
-                ))}
-              </ScrollView>
+              <View className="h-70 overflow-hidden">
+                <ScrollView
+                  nestedScrollEnabled
+                  showsVerticalScrollIndicator={false}
+                >
+                  {favoriteSchools.map((school: School) => (
+                    <SchoolRow
+                      key={school.id}
+                      school={school}
+                      isFavorite
+                      onSelect={handleSchoolSelect}
+                      onFavoritePress={handleFavoritePress}
+                    />
+                  ))}
+                </ScrollView>
+              </View>
             </View>
+          )}
+
+          {/* LANDSCAPE IMAGE BANNER */}
+          <View style={{ width: '100%', height: 140, marginTop: 15, marginBottom: 15 }} className="-mx-5">
+            <Image 
+              source={IMAGES.landscape} 
+              style={{ width: '110%', height: '100%' }} 
+              resizeMode="cover"
+            />
           </View>
-        )}
+        </View>
 
         {/* Dropdown Overlay Menu Results Container */}
         {isOpen && (
-          <View className="absolute left-5 right-5 top-[195px] max-h-60 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-xl z-50">
+          <View className="absolute left-5 right-5 top-[225px] max-h-80 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-xl z-50">
             <View className="px-4 py-2 bg-slate-50 border-b border-slate-100">
               <Text 
                 className="text-xs text-slate-400"
@@ -346,25 +392,14 @@ export default function HomeScreen() {
             </ScrollView>
           </View>
         )}
-
-        {/* LANDSCAPE IMAGE BANNER: Full screen edge-to-edge width */}
-        {!isOpen && (
-          <View style={{ width: '100%', height: 140, marginTop: 15, marginBottom: 15 }} className="-mx-5">
-            <Image 
-              source={IMAGES.landscape} 
-              style={{ width: '110%', height: '111%' }} 
-              resizeMode="cover"
-            />
-          </View>
-        )}
       </View>
 
       {/* Sticky Bottom Action Trigger */}
-      <View className="p-5 bg-white border-t border-slate-50">
+      <View className="p-5 bg-white pb-6" pointerEvents={isOpen ? 'none' : 'auto'}>
         <Pressable
           onPress={handleGoPress}
           disabled={!selectedSchool}
-          className={`w-full rounded-2xl py-4 flex-row items-center justify-center space-x-2 ${
+          className={`w-full rounded-2xl py-4 flex-row items-center justify-center space-x-2 relative -top-4 ${
             selectedSchool ? 'bg-[#1B3B36]' : 'bg-slate-300'
           }`}
         >
