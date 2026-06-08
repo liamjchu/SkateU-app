@@ -1,12 +1,4 @@
-﻿import {
-  Outfit_400Regular,
-  Outfit_500Medium,
-  Outfit_600SemiBold,
-  Outfit_700Bold,
-  Outfit_900Black,
-  useFonts
-} from '@expo-google-fonts/outfit';
-import { useRouter } from 'expo-router';
+﻿import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   Image,
@@ -138,14 +130,6 @@ export default function HomeScreen() {
   const [selectedSchoolId, setSelectedSchoolId] = useState<string>('');
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-
-  const [fontsLoaded, fontError] = useFonts({
-    Outfit_400Regular,
-    Outfit_500Medium,
-    Outfit_600SemiBold,
-    Outfit_700Bold,
-    Outfit_900Black,
-  });
 
   const selectedSchool = schools.find(
     (school: School) => school.id === selectedSchoolId
@@ -298,7 +282,6 @@ export default function HomeScreen() {
           pointerEvents={isOpen ? 'none' : 'auto'}
         >
           {/* Favorites Header & Content List */}
-          {favoriteSchools.length > 0 && (
             <View className="flex-1">
               <View className="mb-3 flex-row items-center justify-between px-1">
                 <Text 
@@ -316,27 +299,26 @@ export default function HomeScreen() {
                 </Text>
               </View>
 
-              <View className="h-70 overflow-hidden">
-                <ScrollView
-                  nestedScrollEnabled
-                  showsVerticalScrollIndicator={false}
-                >
-                  {favoriteSchools.map((school: School) => (
-                    <SchoolRow
-                      key={school.id}
-                      school={school}
-                      isFavorite
-                      onSelect={handleSchoolSelect}
-                      onFavoritePress={handleFavoritePress}
-                    />
-                  ))}
-                </ScrollView>
-              </View>
+            <View className="h-70 overflow-hidden">
+              <ScrollView
+                nestedScrollEnabled
+                showsVerticalScrollIndicator={false}
+              >
+                {favoriteSchools.map((school: School) => (
+                  <SchoolRow
+                    key={school.id}
+                    school={school}
+                    isFavorite
+                    onSelect={handleSchoolSelect}
+                    onFavoritePress={handleFavoritePress}
+                  />
+                ))}
+              </ScrollView>
             </View>
-          )}
+          </View>
 
           {/* LANDSCAPE IMAGE BANNER */}
-          <View style={{ width: '100%', height: 140, marginTop: 15, marginBottom: 15 }} className="-mx-5">
+          <View className="w-full h-35 mt-4 mb-4 -mx-5">            
             <Image 
               source={IMAGES.landscape} 
               style={{ width: '110%', height: '100%' }} 

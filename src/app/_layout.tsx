@@ -12,7 +12,7 @@ import { Text } from 'react-native';
 import '../../global.css';
 import { SpotsProvider } from '../context/SpotsContext';
 
-//SplashScreen.preventAutoHideAsync();
+SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
