@@ -34,10 +34,10 @@ export default function MapScreen() {
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
     <style>
       /* FIXED: Changed 100vh/100vw to 100%. WebViews often collapse vh/vw units to 0 */
-      html, body { margin: 0; padding: 0; background: #0b0f14; width: 100%; height: 100%; }
+      html, body { margin: 0; padding: 0; background: #21473f; width: 100%; height: 100%; }
       #map { height: 100%; width: 100%; }
-      .leaflet-popup-content-wrapper { background: #111827; color: white; border-radius: 12px; }
-      .leaflet-popup-tip { background: #111827; }
+      .leaflet-popup-content-wrapper { background: #21473f; color: white; border-radius: 12px; }
+      .leaflet-popup-tip { background: #21473f; }
       .leaflet-control-attribution { display: none; }
 
       /*brightness of the map, darken it so the pin can show*/
@@ -234,7 +234,7 @@ export default function MapScreen() {
         <Image source={images.layers} style={styles.icon} />
       </Pressable>
       <Pressable
-        className="absolute bottom-6 right-4 bg-sky-600 w-14 h-14 rounded-full items-center justify-center shadow-lg z-50"
+        className="absolute bottom-6 right-4 bg-[#21473f] w-14 h-14 rounded-full items-center justify-center shadow-lg z-50"
         onPress={() => {
           webViewRef.current?.injectJavaScript(`window.sendCenter(); true;`);
         }}
