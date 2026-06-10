@@ -236,7 +236,7 @@ export default function MapScreen() {
           <Text className="text-white text-xl">❮</Text>
         </Pressable>
 
-        <View className="flex-1 items-center">
+        <View className="flex-1 max-w-80 items-center">
           <Text
             style={{ fontFamily: 'Outfit_700Bold' }}
             className="text-2xl text-white"
