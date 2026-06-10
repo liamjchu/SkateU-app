@@ -16,6 +16,12 @@ module.exports = {
         'outfit-bold': ['Outfit_700Bold'],
         'outfit-black': ['Outfit_900Black'],
       },
+      colors: {
+        'darkGreen': "#21473f",
+        'logoGreen': "#3c5853",
+        'lightGreen': "#e8f0ee",
+        'lightGray': "#eff3f2",
+      }
     },
   },
   plugins: [],

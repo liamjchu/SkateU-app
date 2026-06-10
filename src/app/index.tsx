@@ -206,6 +206,8 @@ export default function HomeScreen() {
         lng: selectedSchool.lng.toString(),
         schoolName: selectedSchool.name,
         schoolId: selectedSchool.id,
+        schoolCity: selectedSchool.city,
+        schoolState: selectedSchool.state,
       },
     });
   };
