@@ -18,6 +18,12 @@ export default function MapScreen() {
   const schoolName = Array.isArray(searchParams.schoolName)
     ? searchParams.schoolName[0]
     : searchParams.schoolName;
+  const schoolCity = Array.isArray(searchParams.schoolCity)
+    ? searchParams.schoolCity[0]
+    : searchParams.schoolCity;
+  const schoolState = Array.isArray(searchParams.schoolState)
+    ? searchParams.schoolState[0]
+    : searchParams.schoolState;
   const displayedSchoolName = schoolName ?? 'Campus map';
 
   const lat = Number(searchParams.lat ?? '41.8268');
@@ -66,7 +72,7 @@ export default function MapScreen() {
       try {
         const center = [${validLat}, ${validLng}];
         const spotIcon = L.icon({
-          iconUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 22s7-6.4 7-12a7 7 0 1 0-14 0c0 5.6 7 12 7 12z" fill="%23FFFFFF" stroke="%23FFFFFF" stroke-width="0"/><circle cx="12" cy="10" r="2.5" fill="%2342625C"/></svg>',
+          iconUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 22s7-6.4 7-12a7 7 0 1 0-14 0c0 5.6 7 12 7 12z" fill="%23FFFFFF" stroke="%23FFFFFF" stroke-width="0"/><circle cx="12" cy="10" r="2.5" fill="%2321473f"/></svg>',
           iconSize: [50, 50],
           iconAnchor: [25, 50],
 
@@ -214,15 +220,41 @@ export default function MapScreen() {
   return (
     <View style={{ flex: 1 }}>
       <View
-        className="absolute left-0 right-0 z-50 bg-slate-950/95 border-b border-white/10 px-4 pb-3 flex-row items-center justify-between"
-        style={{ top: 0, paddingTop: 48 }}
+        className="absolute left-0 right-0 z-50 bg-[#3c5853] border-b border-white/10 px-4 pb-3 flex-row items-center justify-between"
+        style={{
+          top: 0, paddingTop: 70,
+          
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.25,
+          shadowRadius: 8,
+
+          elevation: 12,
+        }}
       >
         <Pressable onPress={() => router.push('/')} className="rounded-full p-2">
-          <Text className="text-white text-lg">←</Text>
+          <Text className="text-white text-xl">❮</Text>
         </Pressable>
-        <Text className="flex-1 px-2 text-center text-base font-semibold text-white" numberOfLines={1} ellipsizeMode="tail">
-          {displayedSchoolName}
-        </Text>
+
+        <View className="flex-1 items-center">
+          <Text
+            style={{ fontFamily: 'Outfit_700Bold' }}
+            className="text-2xl text-white"
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {displayedSchoolName}
+          </Text>
+
+          <Text
+            style={{ fontFamily: 'Outfit_500Medium' }}
+            className="text-m text-[#e8f0ee]"
+            numberOfLines={1}
+          >
+            {schoolCity}, {schoolState}
+          </Text>
+        </View>
+
         <View className="w-8" />
       </View>
       <Pressable
@@ -234,13 +266,13 @@ export default function MapScreen() {
         <Image source={images.layers} style={styles.icon} />
       </Pressable>
       <Pressable
-        className="absolute bottom-6 right-4 bg-[#21473f] w-14 h-14 rounded-full items-center justify-center shadow-lg z-50"
+        className="absolute bottom-6 right-4 bg-[#3c5853] w-18 h-18 rounded-full items-center justify-center shadow-lg z-50"
         onPress={() => {
           webViewRef.current?.injectJavaScript(`window.sendCenter(); true;`);
         }}
         accessibilityLabel="Add new spot"
       >
-        <Text className="text-white text-2xl">+</Text>
+        <Text className="text-white text-4xl">+</Text>
       </Pressable>
       <WebView
         ref={webViewRef}
@@ -269,14 +301,21 @@ const styles = StyleSheet.create({
     top: '6.3%',
     right: 10,
     zIndex: 999,
-    backgroundColor: 'rgb(0, 0, 0)',
+    backgroundColor: 'rgba(0, 0, 0, .4)',
     padding: 8,
     borderRadius: 999,
-    transform: [{translateY: -20}],
+    transform: [{translateY: 80}],
+
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+
+    elevation: 10,
   },
   icon: {
-    width: 40,
-    height: 40,
+    width: 30,
+    height: 30,
     tintColor: 'white',
   },
 });
