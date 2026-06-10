@@ -25,6 +25,9 @@ export default function MapScreen() {
     ? searchParams.schoolState[0]
     : searchParams.schoolState;
   const displayedSchoolName = schoolName ?? 'Campus map';
+  const locationSubtitle = schoolCity && schoolState 
+          ? `${schoolCity}, ${schoolState}` 
+          : '';
 
   const lat = Number(searchParams.lat ?? '41.8268');
   const lng = Number(searchParams.lng ?? '-71.4010');
@@ -76,7 +79,7 @@ export default function MapScreen() {
           iconSize: [50, 50],
           iconAnchor: [25, 50],
 
-          shadowUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-shadow.png',
+          shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
           shadowSize: [41, 41],
           shadowAnchor: [13, 41],
         });
@@ -245,14 +248,15 @@ export default function MapScreen() {
           >
             {displayedSchoolName}
           </Text>
-
-          <Text
-            style={{ fontFamily: 'Outfit_500Medium' }}
-            className="text-m text-[#e8f0ee]"
-            numberOfLines={1}
-          >
-            {schoolCity}, {schoolState}
-          </Text>
+          {locationSubtitle && (
+            <Text
+              style={{ fontFamily: 'Outfit_500Medium' }}
+              className="text-m text-[`#e8f0ee`]"
+              numberOfLines={1}
+            >
+              {locationSubtitle}
+            </Text>
+          )}
         </View>
 
         <View className="w-8" />
