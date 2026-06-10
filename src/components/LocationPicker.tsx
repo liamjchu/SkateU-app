@@ -32,6 +32,14 @@ export default function LocationPicker({ initialLatitude, initialLongitude, init
       html, body { margin: 0; padding: 0; background: #0b0f14; }
       #map { height: 100vh; width: 100vw; }
       .leaflet-control-attribution { display: none; }
+
+      /*brightness of the map, darken it so the pin can show*/
+      #map:not(.satellite) .leaflet-tile {
+        filter: brightness(.9);
+      }
+      #map.satellite .leaflet-tile {
+        filter: brightness(.8);
+      }
     </style>
   </head>
   <body>
