@@ -223,7 +223,7 @@ export default function MapScreen() {
   return (
     <View style={{ flex: 1 }}>
       <View
-        className="absolute left-0 right-0 z-50 bg-[#3c5853] border-b border-white/10 px-4 pb-3 flex-row items-center justify-between"
+        className="absolute left-0 right-0 z-50 bg-[#21473f] border-b border-white/10 px-4 pb-3 flex-row items-center justify-between"
         style={{
           top: 0, paddingTop: 70,
           
@@ -270,7 +270,7 @@ export default function MapScreen() {
         <Image source={images.layers} style={styles.icon} />
       </Pressable>
       <Pressable
-        className="absolute bottom-6 right-4 bg-[#3c5853] w-18 h-18 rounded-full items-center justify-center shadow-lg z-50"
+        className="absolute bottom-6 right-4 bg-[#21473f] w-18 h-18 rounded-full items-center justify-center shadow-lg z-50"
         onPress={() => {
           webViewRef.current?.injectJavaScript(`window.sendCenter(); true;`);
         }}

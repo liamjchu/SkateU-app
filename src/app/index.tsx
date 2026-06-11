@@ -215,7 +215,7 @@ export default function HomeScreen() {
   return (
     <View className="flex-1 bg-white">
       {/* Top Header Banner Section */}
-      <View className="bg-[#1B3B36] pt-25 pb-8 px-6 flex-row items-center justify-between">
+      <View className="bg-[#21473f] pt-25 pb-8 px-6 flex-row items-center justify-between">
         <View className="flex-row items-center space-x-3">
           <Image 
             source={IMAGES.logo} 
