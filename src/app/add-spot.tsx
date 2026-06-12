@@ -46,10 +46,6 @@ export default function AddSpotScreen() {
     ? searchParams.schoolId[0]
     : searchParams.schoolId;
 
-  const schoolName = Array.isArray(searchParams.schoolName)
-    ? searchParams.schoolName[0]
-    : searchParams.schoolName;
-
   const [selectedLocation, setSelectedLocation] = useState<Coordinates>({
     latitude: Number.isFinite(Number(searchParams.lat))
       ? Number(searchParams.lat)
@@ -110,14 +106,10 @@ export default function AddSpotScreen() {
   }, []);
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safe}>
+    <SafeAreaView edges={['left', 'right']} style={styles.safe}>
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.schoolLabel}>
-            {schoolName || 'School'}
-          </Text>
-
           <Text style={styles.headerTitle}>
             Add New Spot
           </Text>
@@ -138,7 +130,7 @@ export default function AddSpotScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* PHOTO */}
-        <Text style={styles.sectionLabel}>PHOTO</Text>
+        <Text style={[styles.sectionLabel, { marginTop: 0 }]}>PHOTO</Text>
 
         <View style={styles.photoWrapper}>
           <SpotImagePicker
@@ -148,7 +140,7 @@ export default function AddSpotScreen() {
         </View>
 
         {/* NAME */}
-        <Text style={styles.sectionLabel}>SPOT NAME</Text>
+        <Text style={[styles.sectionLabel, { marginTop: 0 }]}>SPOT NAME</Text>
 
         <TextInput
           style={styles.input}
@@ -215,9 +207,18 @@ export default function AddSpotScreen() {
           onPress={handleSave}
           disabled={!isFormValid}
         >
-          <Text style={styles.saveButtonText}>
-            Save Spot →
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text style={styles.saveButtonText}>
+              Save Spot
+            </Text>
+
+            <Text
+              className="text-white text-sm"
+              style={{ fontFamily: 'Outfit_700Bold', marginLeft: 6 }}
+            >
+              ❯
+            </Text>
+          </View>
         </Pressable>
       </ScrollView>
     </SafeAreaView>
@@ -231,41 +232,35 @@ const styles = StyleSheet.create({
   },
 
   header: {
-    backgroundColor: '#3c5853',
+    backgroundColor: '#eff3f2',
     paddingHorizontal: 24,
     paddingTop: 60,
-    paddingBottom: 24,
+    paddingBottom: 15,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
 
-  schoolLabel: {
-    color: '#D4E3DF',
-    fontSize: 15,
-    fontWeight: '500',
-    marginBottom: 8,
-  },
-
   headerTitle: {
-    color: '#FFFFFF',
+    color: '#21473f',
     fontSize: 25,
     fontWeight: '700',
     letterSpacing: -1,
   },
 
   closeButton: {
-    width: 48,
-    height: 48,
+    width: 40,
+    height: 40,
     borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgb(255, 255, 255)',
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: -5,
   },
 
   closeText: {
-    color: '#FFFFFF',
-    fontSize: 20,
+    color: '#21473f',
+    fontSize: 16,
     fontWeight: '900',
   },
 
@@ -276,16 +271,16 @@ const styles = StyleSheet.create({
   },
 
   sectionLabel: {
-    color: '#365C56',
+    color: '#21473f',
     fontSize: 15,
     fontWeight: '700',
     marginBottom: 10,
-    marginTop: 18,
+    marginTop: 15,
     letterSpacing: 0.5,
   },
 
   photoWrapper: {
-    marginBottom: 8,
+    marginBottom: 0,
   },
 
   input: {
@@ -295,8 +290,8 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     paddingHorizontal: 20,
     paddingVertical: 18,
-    fontSize: 17,
-    color: '#223331',
+    fontSize: 14,
+    color: '#21473f',
   },
 
   descriptionInput: {
@@ -307,8 +302,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 18,
     minHeight: 150,
-    fontSize: 17,
-    color: '#223331',
+    fontSize: 14,
+    color: '#21473f',
   },
 
   helperText: {
@@ -319,14 +314,14 @@ const styles = StyleSheet.create({
 
   mapContainer: {
     overflow: 'hidden',
-    borderRadius: 24,
-    marginBottom: 24,
+    borderRadius: 0,
+    marginBottom: 0,
   },
 
   saveButton: {
     height: 70,
     borderRadius: 24,
-    backgroundColor: '#1E4D46',
+    backgroundColor: '#3c5853',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -337,7 +332,7 @@ const styles = StyleSheet.create({
 
   saveButtonText: {
     color: '#FFFFFF',
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '700',
   },
 });
