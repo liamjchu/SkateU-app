@@ -144,7 +144,7 @@ export default function AddSpotScreen() {
 
         <TextInput
           style={styles.input}
-          placeholder="e.g. Library Steps, Parking Garage..."
+          placeholder="e.g. Library 5 Stair, Parking Garage Ledge..."
           placeholderTextColor="#879995"
           value={name}
           onChangeText={setName}
@@ -155,7 +155,7 @@ export default function AddSpotScreen() {
 
         <TextInput
           style={styles.descriptionInput}
-          placeholder="Describe the spot — obstacles, surface, security, vibes..."
+          placeholder="Describe the spot — obstacle type, spot condition, security..."
           placeholderTextColor="#879995"
           multiline
           textAlignVertical="top"
@@ -208,10 +208,12 @@ export default function AddSpotScreen() {
           disabled={!isFormValid}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={styles.saveButtonText}>
+            <Text 
+              className="text-center text-lg text-white"
+              style={{ fontFamily: 'Outfit_700Bold' }}
+            >
               Save Spot
             </Text>
-
             <Text
               className="text-white text-sm"
               style={{ fontFamily: 'Outfit_700Bold', marginLeft: 6 }}
@@ -228,11 +230,11 @@ export default function AddSpotScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#fdfdfd',
   },
 
   header: {
-    backgroundColor: '#eff3f2',
+    backgroundColor: '#E9EEEC',
     paddingHorizontal: 24,
     paddingTop: 60,
     paddingBottom: 15,
@@ -287,7 +289,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#DDE4E1',
-    borderRadius: 22,
+    borderRadius: 16,
     paddingHorizontal: 20,
     paddingVertical: 18,
     fontSize: 14,
@@ -298,7 +300,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#DDE4E1',
-    borderRadius: 22,
+    borderRadius: 16,
     paddingHorizontal: 20,
     paddingVertical: 18,
     minHeight: 150,
@@ -319,8 +321,8 @@ const styles = StyleSheet.create({
   },
 
   saveButton: {
-    height: 70,
-    borderRadius: 24,
+    height: 52,
+    borderRadius: 16,
     backgroundColor: '#3c5853',
     justifyContent: 'center',
     alignItems: 'center',
@@ -328,11 +330,5 @@ const styles = StyleSheet.create({
 
   saveButtonDisabled: {
     backgroundColor: '#BCC8C4',
-  },
-
-  saveButtonText: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '700',
   },
 });

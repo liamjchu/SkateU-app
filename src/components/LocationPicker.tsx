@@ -243,7 +243,7 @@ export default function LocationPicker({
 const styles = StyleSheet.create({
   container: {
     marginBottom: 24,
-    borderRadius: 24,
+    borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#dce5e2',
