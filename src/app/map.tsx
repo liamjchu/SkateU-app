@@ -1,16 +1,39 @@
 ﻿import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useRef } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Alert,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  Easing,
+  SlideInDown,
+  SlideOutDown,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import images from '../constants/images';
 import { useSpots } from '../context/SpotsContext';
+
+const COLLAPSED_SHEET_HEIGHT = 76;
 
 export default function MapScreen() {
   const webViewRef = useRef<WebView>(null);
   const searchParams = useLocalSearchParams();
   const router = useRouter();
-  const { spots } = useSpots();
+  const { spots, removeSpot } = useSpots();
   const webViewReadyRef = useRef(false);
+  const [selectedSpotId, setSelectedSpotId] = useState<string | undefined>();
+  const sheetHeight = useSharedValue(0);
+  const sheetTranslateY = useSharedValue(0);
+  const sheetStartY = useSharedValue(0);
 
   const schoolId = Array.isArray(searchParams.schoolId)
     ? searchParams.schoolId[0]
@@ -33,6 +56,10 @@ export default function MapScreen() {
   const lng = Number(searchParams.lng ?? '-71.4010');
   const validLat = Number.isFinite(lat) ? lat : 41.8268;
   const validLng = Number.isFinite(lng) ? lng : -71.4010;
+  const selectedSpot = useMemo(
+    () => spots.find((spot) => spot.id === selectedSpotId),
+    [selectedSpotId, spots]
+  );
 
   const html = `
   <!DOCTYPE html>
@@ -184,6 +211,80 @@ export default function MapScreen() {
     }
   }, [spots]);
 
+  useEffect(() => {
+    if (selectedSpotId && !selectedSpot) {
+      setSelectedSpotId(undefined);
+    }
+  }, [selectedSpot, selectedSpotId]);
+
+  useEffect(() => {
+    if (selectedSpot) {
+      sheetTranslateY.value = 0;
+      sheetStartY.value = 0;
+    }
+  }, [selectedSpot, sheetStartY, sheetTranslateY]);
+
+  const sheetAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: sheetTranslateY.value }],
+  }));
+
+  const sheetPanGesture = Gesture.Pan()
+    .onBegin(() => {
+      sheetStartY.value = sheetTranslateY.value;
+    })
+    .onUpdate((event) => {
+      const collapsedOffset = Math.max(
+        sheetHeight.value - COLLAPSED_SHEET_HEIGHT,
+        0
+      );
+      const nextOffset = sheetStartY.value + event.translationY;
+
+      sheetTranslateY.value = Math.min(
+        Math.max(nextOffset, 0),
+        collapsedOffset
+      );
+    })
+    .onEnd((event) => {
+      const collapsedOffset = Math.max(
+        sheetHeight.value - COLLAPSED_SHEET_HEIGHT,
+        0
+      );
+      const shouldCollapse =
+        event.velocityY > 250 ||
+        (event.velocityY >= -250 &&
+          sheetTranslateY.value > collapsedOffset / 2);
+      const nextOffset = shouldCollapse ? collapsedOffset : 0;
+
+      sheetTranslateY.value = withTiming(nextOffset, {
+        duration: 160,
+        easing: Easing.out(Easing.cubic),
+      });
+    });
+
+  const handleDeleteSpot = useCallback(() => {
+    if (!selectedSpot) return;
+
+    Alert.alert(
+      'Delete spot',
+      'Are you sure you want to permanently delete this spot?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await removeSpot(selectedSpot.id);
+              setSelectedSpotId(undefined);
+            } catch (error) {
+              console.warn('Failed to delete spot', error);
+            }
+          },
+        },
+      ]
+    );
+  }, [removeSpot, selectedSpot]);
+
   const handleWebViewMessage = (event: WebViewMessageEvent) => {
     try {
       const data = JSON.parse(event.nativeEvent.data) as {
@@ -213,7 +314,7 @@ export default function MapScreen() {
       }
 
       if (data.type === 'MARKER_PRESS' && typeof data.id === 'string') {
-        router.push({ pathname: '/spot/[id]', params: { id: data.id } });
+        setSelectedSpotId(data.id);
       }
     } catch (error) {
       console.error('MapScreen message parse error', error);
@@ -272,6 +373,7 @@ export default function MapScreen() {
       <Pressable
         className="absolute bottom-6 right-4 bg-[#21473f] w-18 h-18 rounded-full items-center justify-center shadow-lg z-50"
         onPress={() => {
+          setSelectedSpotId(undefined);
           webViewRef.current?.injectJavaScript(`window.sendCenter(); true;`);
         }}
         accessibilityLabel="Add new spot"
@@ -295,11 +397,116 @@ export default function MapScreen() {
         mixedContentMode="always"
         onMessage={handleWebViewMessage}
       />
+
+      {selectedSpot && (
+        <Animated.View
+          entering={SlideInDown.duration(240)}
+          exiting={SlideOutDown.duration(220)}
+          onLayout={(event) => {
+            sheetHeight.value = event.nativeEvent.layout.height;
+          }}
+          style={[styles.sheet, sheetAnimatedStyle]}
+        >
+          <GestureDetector gesture={sheetPanGesture}>
+            <View>
+              <View className="mb-3 h-1.5 w-12 self-center rounded-full bg-slate-300" />
+              <View className="flex-row items-center justify-between bg-white pb-3">
+                <Text
+                  className="flex-1 pr-3 text-lg font-semibold"
+                  style={{ fontFamily: 'Outfit_700Bold' }}
+                  numberOfLines={1}
+                >
+                  {selectedSpot.name}
+                </Text>
+                <Pressable
+                  onPress={() => setSelectedSpotId(undefined)}
+                  className="px-2 py-1"
+                >
+                  <Text
+                    className="text-sky-600"
+                    style={{ fontFamily: 'Outfit_600SemiBold' }}
+                  >
+                    Close
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          </GestureDetector>
+
+          <ScrollView
+            contentContainerStyle={styles.sheetContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {selectedSpot.imageUris.length > 0 ? (
+              <Image
+                source={{ uri: selectedSpot.imageUris[0] }}
+                style={styles.sheetImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <View className="mt-6 h-80 items-center justify-center rounded-3xl bg-slate-100">
+                <Text
+                  className="text-slate-500"
+                  style={{ fontFamily: 'Outfit_500Medium' }}
+                >
+                  No image available
+                </Text>
+              </View>
+            )}
+
+            <Text
+              className="mt-6 text-sm text-slate-500"
+              style={{ fontFamily: 'Outfit_500Medium' }}
+            >
+              {selectedSpot.description}
+            </Text>
+
+            <Pressable
+              onPress={handleDeleteSpot}
+              className="mt-6 items-center justify-center rounded-3xl bg-red-600 py-4"
+            >
+              <Text
+                className="font-semibold text-white"
+                style={{ fontFamily: 'Outfit_600SemiBold' }}
+              >
+                Delete Spot
+              </Text>
+            </Pressable>
+          </ScrollView>
+        </Animated.View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  sheet: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
+    maxHeight: '70%',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 16,
+  },
+  sheetContent: {
+    paddingBottom: 32,
+  },
+  sheetImage: {
+    width: '100%',
+    height: 280,
+    borderRadius: 24,
+    marginTop: 12,
+  },
   toggleButton: {
     position: 'absolute',
     top: '6.3%',
