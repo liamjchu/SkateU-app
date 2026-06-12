@@ -53,7 +53,7 @@ export default function SpotImagePicker({
     <View className="mb-6">
       <Pressable
         onPress={handlePickImage}
-        className="h-52 overflow-hidden rounded-[16px] items-center justify-center bg-white"
+        className="h-78 overflow-hidden rounded-[16px] items-center justify-center bg-white"
         style={{
           borderWidth: 1,
           borderColor: '#DDE4E1',

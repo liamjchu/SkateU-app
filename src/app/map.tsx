@@ -251,7 +251,7 @@ export default function MapScreen() {
           {locationSubtitle && (
             <Text
               style={{ fontFamily: 'Outfit_500Medium' }}
-              className="text-m text-[`#e8f0ee`]"
+              className="text-m text-[#e8f0ee]"
               numberOfLines={1}
             >
               {locationSubtitle}

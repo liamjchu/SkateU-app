@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Image, StyleSheet, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Image, View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 
@@ -22,6 +22,12 @@ export default function LocationPicker({
 }: LocationPickerProps) {
   const webViewRef = useRef<WebView>(null);
 
+  const initialRef = useRef({
+    latitude: initialLatitude,
+    longitude: initialLongitude,
+    layer: initialLayer,
+  });
+
   const [selectedLatitude, setSelectedLatitude] =
     useState<number>(initialLatitude);
 
@@ -32,7 +38,10 @@ export default function LocationPicker({
     onLocationChange(selectedLatitude, selectedLongitude);
   }, [selectedLatitude, selectedLongitude, onLocationChange]);
 
-  const html = `
+  const html = useMemo(() => {
+    const { latitude, longitude, layer } = initialRef.current;
+
+    return `
   <!DOCTYPE html>
   <html>
   <head>
@@ -70,7 +79,7 @@ export default function LocationPicker({
     <div id="map"></div>
 
     <script>
-      const center = [${initialLatitude}, ${initialLongitude}];
+      const center = [${latitude}, ${longitude}];
 
       window.map = L.map('map', {
         zoomControl: false,
@@ -86,101 +95,58 @@ export default function LocationPicker({
       const satelliteLayer = L.tileLayer(satelliteUrl);
 
       const selectedLayer =
-        '${initialLayer}' === 'satellite'
+        '${layer}' === 'satellite'
           ? satelliteLayer
           : defaultLayer;
 
       selectedLayer.addTo(window.map);
 
       function postCenter() {
-        if (
-          !window.map ||
-          !window.ReactNativeWebView ||
-          !window.ReactNativeWebView.postMessage
-        ) {
-          return;
-        }
-
         const center = window.map.getCenter();
-
-        window.ReactNativeWebView.postMessage(
-          JSON.stringify({
-            type: 'CENTER_CHANGED',
-            latitude: center.lat,
-            longitude: center.lng,
-          })
-        );
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'CENTER_CHANGED',
+          latitude: center.lat,
+          longitude: center.lng,
+        }));
       }
 
       function postInteractionStart() {
-        if (
-          !window.ReactNativeWebView ||
-          !window.ReactNativeWebView.postMessage
-        ) {
-          return;
-        }
-
-        window.ReactNativeWebView.postMessage(
-          JSON.stringify({
-            type: 'INTERACTION_START',
-          })
-        );
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'INTERACTION_START'
+        }));
       }
 
       function postInteractionEnd() {
-        if (
-          !window.ReactNativeWebView ||
-          !window.ReactNativeWebView.postMessage
-        ) {
-          return;
-        }
-
-        window.ReactNativeWebView.postMessage(
-          JSON.stringify({
-            type: 'INTERACTION_END',
-          })
-        );
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'INTERACTION_END'
+        }));
       }
 
       window.map.on('movestart', postInteractionStart);
-
       window.map.on('moveend', function () {
         postCenter();
         postInteractionEnd();
       });
 
       window.map.on('zoomstart', postInteractionStart);
-
       window.map.on('zoomend', function () {
         postCenter();
         postInteractionEnd();
       });
 
-      document.addEventListener(
-        'touchstart',
-        postInteractionStart,
-        { passive: true }
-      );
-
-      document.addEventListener(
-        'touchend',
-        postInteractionEnd,
-        { passive: true }
-      );
+      document.addEventListener('touchstart', postInteractionStart, { passive: true });
+      document.addEventListener('touchend', postInteractionEnd, { passive: true });
 
       postCenter();
     </script>
   </body>
   </html>
   `;
+  }, []);
 
   const handleMessage = (event: WebViewMessageEvent) => {
     try {
-      const data = JSON.parse(event.nativeEvent.data) as {
-        type: string;
-        latitude?: number;
-        longitude?: number;
-      };
+      const data = JSON.parse(event.nativeEvent.data);
 
       if (
         data.type === 'CENTER_CHANGED' &&
@@ -204,22 +170,22 @@ export default function LocationPicker({
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.mapContainer}>
+    <View className="mb-6 rounded-2xl overflow-hidden border border-[#dce5e2] bg-[#f7f8f8]">
+      <View className="h-[224px] relative bg-black">
         <WebView
           ref={webViewRef}
           originWhitelist={['*']}
           source={{ html }}
           onMessage={handleMessage}
-          style={styles.webview}
+          style={{ flex: 1, backgroundColor: '#0b0f14' }}
         />
 
-        <View pointerEvents="none" style={styles.pinWrapper}>
+        <View className="absolute left-1/2 top-1/2 w-[50px] h-[60px] -ml-[25px] -mt-[50px] items-center justify-start pointer-events-none">
           <Image
             source={{
               uri: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
             }}
-            style={styles.shadow}
+            className="absolute w-[41px] h-[41px] left-[12px] top-[8px]"
           />
 
           <Svg width={50} height={50} viewBox="0 0 24 24">
@@ -227,64 +193,10 @@ export default function LocationPicker({
               d="M12 22s7-6.4 7-12a7 7 0 1 0-14 0c0 5.6 7 12 7 12z"
               fill="#FFFFFF"
             />
-            <Circle
-              cx="12"
-              cy="10"
-              r="2.5"
-              fill="#21473f"
-            />
+            <Circle cx="12" cy="10" r="2.5" fill="#21473f" />
           </Svg>
         </View>
       </View>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    marginBottom: 24,
-    borderRadius: 16,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#dce5e2',
-    backgroundColor: '#f7f8f8',
-  },
-
-  mapContainer: {
-    height: 224,
-    position: 'relative',
-    backgroundColor: '#000',
-  },
-
-  webview: {
-    flex: 1,
-    backgroundColor: '#0b0f14',
-  },
-
-  pinWrapper: {
-    position: 'absolute',
-    left: '50%',
-    top: '50%',
-
-    width: 50,
-    height: 60,
-
-    marginLeft: -25,
-    marginTop: -50,
-
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-  },
-
-  shadow: {
-    position: 'absolute',
-
-    width: 41,
-    height: 41,
-
-    left: 12,
-    top: 8,
-
-    opacity: 1,
-  },
-});
