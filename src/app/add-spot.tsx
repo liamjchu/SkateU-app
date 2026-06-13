@@ -107,18 +107,21 @@ export default function AddSpotScreen() {
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safe}>
-      <View style={styles.header}>
+      <View
+        className="flex-row items-center justify-between border-b border-white/10 bg-[#21473f] px-4 pb-3 pt-[70px]"
+        style={styles.headerShadow}
+      >
         <Pressable
           onPress={() => router.back()}
-          style={styles.backButton}
+          className="w-9 items-center justify-center rounded-full p-2"
           accessibilityLabel="Go back"
         >
-          <Text style={styles.backButtonText}>❮</Text>
+          <Text className="text-xl font-bold text-white">❮</Text>
         </Pressable>
 
-        <View style={styles.headerTitleWrapper}>
+        <View className="max-w-80 flex-1 items-center">
           <Text
-            style={styles.headerTitle}
+            className="font-outfit-bold text-2xl text-white"
             numberOfLines={1}
             ellipsizeMode="tail"
           >
@@ -126,7 +129,7 @@ export default function AddSpotScreen() {
           </Text>
         </View>
 
-        <View style={styles.headerSpacer} />
+        <View className="w-9" />
       </View>
 
       <ScrollView
@@ -239,51 +242,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#fdfdfd',
   },
 
-  header: {
-    backgroundColor: '#21473f',
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 70,
-    paddingBottom: 12,
+  headerShadow: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 12,
-  },
-
-  backButton: {
-    alignItems: 'center',
-    borderRadius: 999,
-    justifyContent: 'center',
-    padding: 8,
-    width: 36,
-  },
-
-  backButtonText: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '700',
-  },
-
-  headerTitleWrapper: {
-    alignItems: 'center',
-    flex: 1,
-    maxWidth: 320,
-  },
-
-  headerTitle: {
-    color: '#FFFFFF',
-    fontFamily: 'Outfit_700Bold',
-    fontSize: 24,
-  },
-
-  headerSpacer: {
-    width: 36,
   },
 
   content: {

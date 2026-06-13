@@ -315,10 +315,16 @@ export default function MapScreen() {
 
       if (data.type === 'MARKER_PRESS' && typeof data.id === 'string') {
         if (data.id === selectedSpotId) {
-          sheetTranslateY.value = withTiming(0, {
+          const collapsedOffset = Math.max(
+            sheetHeight.value - COLLAPSED_SHEET_HEIGHT,
+            0
+          );
+
+          sheetTranslateY.value = withTiming(collapsedOffset, {
             duration: 160,
             easing: Easing.out(Easing.cubic),
           });
+          setSelectedSpotId(undefined);
           return;
         }
 
