@@ -22,7 +22,7 @@ import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import images from '../constants/images';
 import { useSpots } from '../context/SpotsContext';
 
-const COLLAPSED_SHEET_HEIGHT = 76;
+const COLLAPSED_SHEET_HEIGHT = 100;
 
 export default function MapScreen() {
   const webViewRef = useRef<WebView>(null);
@@ -314,6 +314,14 @@ export default function MapScreen() {
       }
 
       if (data.type === 'MARKER_PRESS' && typeof data.id === 'string') {
+        if (data.id === selectedSpotId) {
+          sheetTranslateY.value = withTiming(0, {
+            duration: 160,
+            easing: Easing.out(Easing.cubic),
+          });
+          return;
+        }
+
         setSelectedSpotId(data.id);
       }
     } catch (error) {

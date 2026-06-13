@@ -107,20 +107,26 @@ export default function AddSpotScreen() {
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safe}>
-      {/* Header */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>
+        <Pressable
+          onPress={() => router.back()}
+          style={styles.backButton}
+          accessibilityLabel="Go back"
+        >
+          <Text style={styles.backButtonText}>❮</Text>
+        </Pressable>
+
+        <View style={styles.headerTitleWrapper}>
+          <Text
+            style={styles.headerTitle}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
             Add New Spot
           </Text>
         </View>
 
-        <Pressable
-          onPress={() => router.back()}
-          style={styles.closeButton}
-        >
-          <Text style={styles.closeText}>✕</Text>
-        </Pressable>
+        <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView
@@ -234,36 +240,50 @@ const styles = StyleSheet.create({
   },
 
   header: {
-    backgroundColor: '#E9EEEC',
-    paddingHorizontal: 24,
-    paddingTop: 60,
-    paddingBottom: 15,
+    backgroundColor: '#21473f',
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    borderBottomWidth: 1,
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    paddingHorizontal: 16,
+    paddingTop: 70,
+    paddingBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 12,
+  },
+
+  backButton: {
+    alignItems: 'center',
+    borderRadius: 999,
+    justifyContent: 'center',
+    padding: 8,
+    width: 36,
+  },
+
+  backButtonText: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '700',
+  },
+
+  headerTitleWrapper: {
+    alignItems: 'center',
+    flex: 1,
+    maxWidth: 320,
   },
 
   headerTitle: {
-    color: '#21473f',
-    fontSize: 25,
-    fontWeight: '700',
-    letterSpacing: -1,
+    color: '#FFFFFF',
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 24,
   },
 
-  closeButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 16,
-    backgroundColor: 'rgb(255, 255, 255)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: -5,
-  },
-
-  closeText: {
-    color: '#21473f',
-    fontSize: 16,
-    fontWeight: '900',
+  headerSpacer: {
+    width: 36,
   },
 
   content: {

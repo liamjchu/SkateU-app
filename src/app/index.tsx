@@ -244,7 +244,7 @@ export default function HomeScreen() {
             className="text-3xl text-[#1B3B36] mb-1.5"
             style={{ fontFamily: 'Outfit_900Black' }}
           >
-            Welcome back!
+            Glad you're here!
           </Text>
           <Text 
             className="text-base text-slate-500/90"
