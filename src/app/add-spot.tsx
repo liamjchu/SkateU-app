@@ -107,20 +107,29 @@ export default function AddSpotScreen() {
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safe}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>
+      <View
+        className="flex-row items-center justify-between border-b border-white/10 bg-[#21473f] px-4 pb-3 pt-[70px]"
+        style={styles.headerShadow}
+      >
+        <Pressable
+          onPress={() => router.back()}
+          className="w-9 items-center justify-center rounded-full p-2"
+          accessibilityLabel="Go back"
+        >
+          <Text className="text-xl font-bold text-white">❮</Text>
+        </Pressable>
+
+        <View className="max-w-80 flex-1 items-center">
+          <Text
+            className="font-outfit-bold text-2xl text-white"
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
             Add New Spot
           </Text>
         </View>
 
-        <Pressable
-          onPress={() => router.back()}
-          style={styles.closeButton}
-        >
-          <Text style={styles.closeText}>✕</Text>
-        </Pressable>
+        <View className="w-9" />
       </View>
 
       <ScrollView
@@ -233,37 +242,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#fdfdfd',
   },
 
-  header: {
-    backgroundColor: '#E9EEEC',
-    paddingHorizontal: 24,
-    paddingTop: 60,
-    paddingBottom: 15,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-
-  headerTitle: {
-    color: '#21473f',
-    fontSize: 25,
-    fontWeight: '700',
-    letterSpacing: -1,
-  },
-
-  closeButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 16,
-    backgroundColor: 'rgb(255, 255, 255)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: -5,
-  },
-
-  closeText: {
-    color: '#21473f',
-    fontSize: 16,
-    fontWeight: '900',
+  headerShadow: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 12,
   },
 
   content: {

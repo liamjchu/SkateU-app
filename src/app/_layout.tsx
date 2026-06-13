@@ -9,6 +9,7 @@ import {
 import { SplashScreen, Stack } from 'expo-router';
 import { useEffect } from 'react';
 import { Text } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import '../../global.css';
 import { SpotsProvider } from '../context/SpotsContext';
 
@@ -41,28 +42,29 @@ export default function RootLayout() {
 
   // 3. FIXED: Wrapped Stack inside SpotsProvider so all screens can access spots data
   return (
-    <SpotsProvider>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen
-          name="index"
-          options={{
-            animation: 'slide_from_left',
-          }}
-        />
-        <Stack.Screen
-          name="map"
-          options={{
-            animation: 'slide_from_right',
-          }}
-        />
-        <Stack.Screen
-          name="add-spot"
-          options={{
-            presentation: 'modal',
-            animation: 'slide_from_bottom',
-          }}
-        />
-      </Stack>
-    </SpotsProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SpotsProvider>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen
+            name="index"
+            options={{
+              animation: 'slide_from_left',
+            }}
+          />
+          <Stack.Screen
+            name="map"
+            options={{
+              animation: 'slide_from_right',
+            }}
+          />
+          <Stack.Screen
+            name="add-spot"
+            options={{
+              animation: 'slide_from_right',
+            }}
+          />
+        </Stack>
+      </SpotsProvider>
+    </GestureHandlerRootView>
   );
 }
