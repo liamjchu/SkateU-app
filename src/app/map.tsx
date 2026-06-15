@@ -21,6 +21,9 @@ import Animated, {
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import images from '../constants/images';
 import { useSpots } from '../context/SpotsContext';
+import { useFavorites } from '../store/favoritesStore';
+import { useSchools } from '../store/schoolsStore';
+import type { School } from '../types/school';
 
 const COLLAPSED_SHEET_HEIGHT = 100;
 
@@ -29,6 +32,8 @@ export default function MapScreen() {
   const searchParams = useLocalSearchParams();
   const router = useRouter();
   const { spots, removeSpot } = useSpots();
+  const { schools, upsertSchool } = useSchools();
+  const { favoriteSchoolIds, toggleFavoriteSchool } = useFavorites();
   const webViewReadyRef = useRef(false);
   const [selectedSpotId, setSelectedSpotId] = useState<string | undefined>();
   const sheetHeight = useSharedValue(0);
@@ -47,6 +52,9 @@ export default function MapScreen() {
   const schoolState = Array.isArray(searchParams.schoolState)
     ? searchParams.schoolState[0]
     : searchParams.schoolState;
+  const schoolNumSpotsParam = Array.isArray(searchParams.schoolNumSpots)
+    ? searchParams.schoolNumSpots[0]
+    : searchParams.schoolNumSpots;
   const displayedSchoolName = schoolName ?? 'Campus map';
   const locationSubtitle = schoolCity && schoolState 
           ? `${schoolCity}, ${schoolState}` 
@@ -56,6 +64,37 @@ export default function MapScreen() {
   const lng = Number(searchParams.lng ?? '-71.4010');
   const validLat = Number.isFinite(lat) ? lat : 41.8268;
   const validLng = Number.isFinite(lng) ? lng : -71.4010;
+  const schoolNumSpots = Number(schoolNumSpotsParam ?? '0');
+  const currentSchool = useMemo<School | null>(() => {
+    if (!schoolId || !schoolName) {
+      return null;
+    }
+
+    const savedSchool = schools.find((school) => school.id === schoolId);
+
+    return {
+      id: schoolId,
+      name: schoolName,
+      lat: savedSchool?.lat ?? validLat,
+      lng: savedSchool?.lng ?? validLng,
+      city: savedSchool?.city ?? schoolCity ?? '',
+      state: savedSchool?.state ?? schoolState ?? '',
+      numSpots: savedSchool?.numSpots ?? (Number.isFinite(schoolNumSpots) ? schoolNumSpots : 0),
+      type: savedSchool?.type,
+    };
+  }, [
+    schoolCity,
+    schoolId,
+    schoolName,
+    schoolNumSpots,
+    schoolState,
+    schools,
+    validLat,
+    validLng,
+  ]);
+  const isFavoriteSchool = currentSchool
+    ? favoriteSchoolIds.includes(currentSchool.id)
+    : false;
   const selectedSpot = useMemo(
     () => spots.find((spot) => spot.id === selectedSpotId),
     [selectedSpotId, spots]
@@ -285,6 +324,13 @@ export default function MapScreen() {
     );
   }, [removeSpot, selectedSpot]);
 
+  const handleFavoritePress = useCallback(() => {
+    if (!currentSchool) return;
+
+    upsertSchool(currentSchool);
+    toggleFavoriteSchool(currentSchool);
+  }, [currentSchool, toggleFavoriteSchool, upsertSchool]);
+
   const handleWebViewMessage = (event: WebViewMessageEvent) => {
     try {
       const data = JSON.parse(event.nativeEvent.data) as {
@@ -350,7 +396,10 @@ export default function MapScreen() {
           elevation: 12,
         }}
       >
-        <Pressable onPress={() => router.push('/')} className="rounded-full p-2">
+        <Pressable
+          onPress={() => router.push('/')}
+          className="h-11 w-11 items-center justify-center rounded-full"
+        >
           <Text className="text-white text-xl">❮</Text>
         </Pressable>
 
@@ -374,13 +423,34 @@ export default function MapScreen() {
           )}
         </View>
 
-        <View className="w-8" />
+        {currentSchool ? (
+          <Pressable
+            onPress={handleFavoritePress}
+            className="h-11 w-11 items-center justify-center rounded-full"
+            accessibilityLabel={
+              isFavoriteSchool ? 'Remove school from favorites' : 'Add school to favorites'
+            }
+            accessibilityRole="button"
+          >
+            <Text
+              className={`-mt-1 text-3xl ${
+                isFavoriteSchool ? 'text-white' : 'text-white/70'
+              }`}
+            >
+              {isFavoriteSchool ? '★' : '☆'}
+            </Text>
+          </Pressable>
+        ) : (
+          <View className="h-11 w-11" />
+        )}
       </View>
       <Pressable
         style={styles.toggleButton}
         onPress={() => {
           webViewRef.current?.injectJavaScript(`window.toggleLayer(); true;`);
         }}
+        accessibilityLabel="Toggle map layer"
+        accessibilityRole="button"
       >
         <Image source={images.layers} style={styles.icon} />
       </Pressable>
@@ -523,13 +593,12 @@ const styles = StyleSheet.create({
   },
   toggleButton: {
     position: 'absolute',
-    top: '6.3%',
+    top: 150,
     right: 10,
     zIndex: 999,
     backgroundColor: 'rgba(0, 0, 0, .4)',
     padding: 8,
     borderRadius: 999,
-    transform: [{translateY: 80}],
 
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },

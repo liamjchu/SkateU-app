@@ -21,6 +21,7 @@ module.exports = {
         'logoGreen': "#3c5853",
         'lightGreen': "#e8f0ee",
         'lightGray': "#eff3f2",
+        'borderColor': "#DDE4E1",
       }
     },
   },
