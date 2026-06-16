@@ -331,6 +331,15 @@ export default function MapScreen() {
     toggleFavoriteSchool(currentSchool);
   }, [currentSchool, toggleFavoriteSchool, upsertSchool]);
 
+  const handleBackPress = useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+
+    router.replace('/');
+  }, [router]);
+
   const handleWebViewMessage = (event: WebViewMessageEvent) => {
     try {
       const data = JSON.parse(event.nativeEvent.data) as {
@@ -397,8 +406,10 @@ export default function MapScreen() {
         }}
       >
         <Pressable
-          onPress={() => router.push('/')}
+          onPress={handleBackPress}
           className="h-11 w-11 items-center justify-center rounded-full"
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
         >
           <Text className="text-white text-xl">❮</Text>
         </Pressable>
@@ -445,6 +456,7 @@ export default function MapScreen() {
         )}
       </View>
       <Pressable
+        className="absolute top-[150px] right-[10px] z-[999] rounded-full bg-[rgba(0,0,0,0.4)] p-2"
         style={styles.toggleButton}
         onPress={() => {
           webViewRef.current?.injectJavaScript(`window.toggleLayer(); true;`);
@@ -592,14 +604,6 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   toggleButton: {
-    position: 'absolute',
-    top: 150,
-    right: 10,
-    zIndex: 999,
-    backgroundColor: 'rgba(0, 0, 0, .4)',
-    padding: 8,
-    borderRadius: 999,
-
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,

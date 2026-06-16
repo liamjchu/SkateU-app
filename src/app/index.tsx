@@ -34,6 +34,10 @@ type SchoolsSearchResponse = {
   schools: School[];
 };
 
+function isAbsoluteUrl(url: string) {
+  return /^https?:\/\//i.test(url);
+}
+
 function isCollegeOrUniversity(school: School) {
   return school.type === 'higher_ed';
 }
@@ -42,6 +46,12 @@ function getApiUrl(path: string) {
   const configuredUrl = process.env.EXPO_PUBLIC_API_URL;
 
   if (configuredUrl) {
+    if (Platform.OS !== 'web' && !isAbsoluteUrl(configuredUrl)) {
+      throw new Error(
+        'EXPO_PUBLIC_API_URL must be an absolute URL on native platforms.'
+      );
+    }
+
     return `${configuredUrl.replace(/\/$/, '')}${path}`;
   }
 
@@ -55,7 +65,9 @@ function getApiUrl(path: string) {
     return `http://${hostUri}${path}`;
   }
 
-  return path;
+  throw new Error(
+    'Missing API URL for native platforms. Set EXPO_PUBLIC_API_URL to an absolute URL or run through Expo with a host URI.'
+  );
 }
 
 function formatSpotCount(count: number) {
@@ -341,7 +353,7 @@ export default function HomeScreen() {
       controller.abort();
       clearTimeout(timeoutId);
     };
-  }, [favoriteSchoolIds, searchQuery, selectedSchool?.name, upsertFavoriteSchool, upsertSchool]);
+  }, [searchQuery, selectedSchool?.name, upsertFavoriteSchool, upsertSchool]);
 
   const handleSearchChange = (text: string) => {
     setSearchQuery(text);
@@ -450,7 +462,7 @@ export default function HomeScreen() {
             onChangeText={handleSearchChange}
             onFocus={() => setIsOpen(true)}
             onPressIn={() => setIsOpen(true)}
-            placeholder="Search schools..."
+            placeholder="Search US colleges and universities..."
             placeholderTextColor="#8E9AA6"
             className="rounded-2xl bg-[#F0F3F5] py-5 pl-14 pr-12 text-lg text-[#1B3B36]"
             style={{ fontFamily: 'Outfit_600SemiBold' }}

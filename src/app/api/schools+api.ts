@@ -39,7 +39,11 @@ function getSupabaseConfig() {
 }
 
 function escapeLikeSearch(search: string) {
-  return search.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('*', '\\*');
+  return search
+    .replaceAll('\\', '\\\\')
+    .replaceAll('%', '\\%')
+    .replaceAll('_', '\\_')
+    .replaceAll('*', '\\*');
 }
 
 function mapSchool(row: DatabaseSchool): SchoolSearchResult {
