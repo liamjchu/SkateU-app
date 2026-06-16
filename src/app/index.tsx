@@ -1,8 +1,10 @@
-﻿import { useRouter } from 'expo-router';
-import { useState } from 'react';
+﻿import Constants from 'expo-constants';
+import { useRouter } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Image,
   Keyboard,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -11,23 +13,78 @@ import {
   type GestureResponderEvent,
 } from 'react-native';
 import IMAGES from '../constants/images';
+import { useSpots } from '../context/SpotsContext';
 import { useFavorites } from '../store/favoritesStore';
 import { useSchools } from '../store/schoolsStore';
 import type { School } from '../types/school';
 
 type SchoolRowProps = {
   school: School;
+  displayNumSpots: number;
   isFavorite: boolean;
   onSelect: (school: School) => void;
   onFavoritePress: (
     event: GestureResponderEvent,
-    schoolId: string
+    school: School
   ) => void;
   isDropdownItem?: boolean;
 };
 
+type SchoolsSearchResponse = {
+  schools: School[];
+};
+
+function isAbsoluteUrl(url: string) {
+  return /^https?:\/\//i.test(url);
+}
+
+function isCollegeOrUniversity(school: School) {
+  return school.type === 'higher_ed';
+}
+
+function getApiUrl(path: string) {
+  const configuredUrl = process.env.EXPO_PUBLIC_API_URL;
+
+  if (configuredUrl) {
+    if (Platform.OS !== 'web' && !isAbsoluteUrl(configuredUrl)) {
+      throw new Error(
+        'EXPO_PUBLIC_API_URL must be an absolute URL on native platforms.'
+      );
+    }
+
+    return `${configuredUrl.replace(/\/$/, '')}${path}`;
+  }
+
+  if (Platform.OS === 'web') {
+    return path;
+  }
+
+  const hostUri = Constants.expoConfig?.hostUri;
+
+  if (hostUri) {
+    return `http://${hostUri}${path}`;
+  }
+
+  throw new Error(
+    'Missing API URL for native platforms. Set EXPO_PUBLIC_API_URL to an absolute URL or run through Expo with a host URI.'
+  );
+}
+
+function formatSpotCount(count: number) {
+  if (count < 1000) {
+    return count.toString();
+  }
+
+  if (count < 1000000) {
+    return `${Math.floor(count / 100) / 10}K`;
+  }
+
+  return `${Math.floor(count / 100000) / 10}M`;
+}
+
 function SchoolRow({
   school,
+  displayNumSpots,
   isFavorite,
   onSelect,
   onFavoritePress,
@@ -39,9 +96,9 @@ function SchoolRow({
         onPress={() => onSelect(school)}
         className="flex-row items-center justify-between p-2 mb-3 rounded-3xl border border-slate-200/60 bg-[#F0F5F4]"
       >
-        <View className="flex-row items-center flex-1 pr-2">
+        <View className="min-w-0 flex-1 flex-row items-center pr-2">
           <Pressable
-            onPress={(event) => onFavoritePress(event, school.id)}
+            onPress={(event) => onFavoritePress(event, school)}
             className="h-11 w-11 items-center justify-center rounded-2xl bg-white"
           >
             <Text className={`-mt-1 text-xl ${isFavorite ? 'text-[#1B3B36]' : 'text-slate-400'}`}>
@@ -49,10 +106,12 @@ function SchoolRow({
             </Text>
           </Pressable>
 
-          <View className="ml-4 flex-1">
+          <View className="ml-4 min-w-0 flex-1">
             <Text 
               className="text-lg text-[#1B3B36]"
               style={{ fontFamily: 'Outfit_700Bold' }}
+              numberOfLines={1}
+              ellipsizeMode="tail"
             >
               {school.name}
             </Text>
@@ -65,13 +124,13 @@ function SchoolRow({
           </View>
         </View>
 
-        <View className="flex-row items-center space-x-1.5 bg-white/50 px-3 py-1.5 rounded-xl">
+        <View className="w-20 shrink-0 flex-row items-center justify-center space-x-1.5 rounded-xl bg-white/50 px-3 py-1.5">
           <Text className="text-sm">📍</Text>
           <Text 
             className="text-base text-[#1B3B36]"
             style={{ fontFamily: 'Outfit_700Bold' }}
           >
-            {school.numSpots ?? 0}
+            {formatSpotCount(displayNumSpots)}
           </Text>
         </View>
       </Pressable>
@@ -83,9 +142,9 @@ function SchoolRow({
       onPress={() => onSelect(school)}
       className="flex-row items-center justify-between py-3 px-4 border-b border-slate-100 bg-white"
     >
-      <View className="flex-row items-center flex-1 pr-2">
+      <View className="min-w-0 flex-1 flex-row items-center pr-2">
         <Pressable
-          onPress={(event) => onFavoritePress(event, school.id)}
+          onPress={(event) => onFavoritePress(event, school)}
           className="h-11 w-11 items-center justify-center rounded-2xl bg-[#F0F5F4]"
         >
           <Text className={`-mt-1 text-xl ${isFavorite ? 'text-[#1B3B36]' : 'text-slate-400'}`}>
@@ -93,10 +152,12 @@ function SchoolRow({
           </Text>
         </Pressable>
 
-        <View className="ml-3 flex-1">
+        <View className="ml-3 min-w-0 flex-1">
           <Text 
             className="text-base text-[#1B3B36]"
             style={{ fontFamily: 'Outfit_700Bold' }}
+            numberOfLines={1}
+            ellipsizeMode="tail"
           >
             {school.name}
           </Text>
@@ -109,13 +170,13 @@ function SchoolRow({
         </View>
       </View>
 
-      <View className="flex-row items-center space-x-1.5">
+      <View className="w-20 shrink-0 flex-row items-center justify-end space-x-1.5">
         <Text className="text-sm">📍</Text>
         <Text 
           className="text-base text-[#1B3B36]"
           style={{ fontFamily: 'Outfit_700Bold' }}
         >
-          {school.numSpots ?? 0}
+          {formatSpotCount(displayNumSpots)}
         </Text>
       </View>
     </Pressable>
@@ -124,34 +185,60 @@ function SchoolRow({
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { schools } = useSchools();
-  const { favoriteSchoolIds, toggleFavoriteSchool } = useFavorites();
+  const { spots } = useSpots();
+  const { schools, upsertSchool } = useSchools();
+  const {
+    favoriteSchoolIds,
+    favoriteSchools: storedFavoriteSchools,
+    toggleFavoriteSchool,
+    upsertFavoriteSchool,
+  } = useFavorites();
 
-  const [selectedSchoolId, setSelectedSchoolId] = useState<string>('');
+  const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<School[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState('');
 
-  const selectedSchool = schools.find(
-    (school: School) => school.id === selectedSchoolId
-  );
+  const localSpotCountsBySchoolId = useMemo(() => {
+    return spots.reduce<Record<string, number>>((counts, spot) => {
+      if (!spot.schoolId) {
+        return counts;
+      }
+
+      counts[spot.schoolId] = (counts[spot.schoolId] ?? 0) + 1;
+      return counts;
+    }, {});
+  }, [spots]);
+
+  const getDisplaySpotCount = (school: School) => {
+    return school.numSpots + (localSpotCountsBySchoolId[school.id] ?? 0);
+  };
 
   const favoriteSchools = favoriteSchoolIds
-    .map((schoolId) =>
-      schools.find((school: School) => school.id === schoolId)
-    )
+    .map((schoolId) => {
+      const school =
+        schools.find((school: School) => school.id === schoolId) ??
+        storedFavoriteSchools.find((school) => school.id === schoolId);
+
+      return school;
+    })
     .filter((school): school is School => !!school);
 
-  const filteredSchools = schools.filter((school: School) =>
-    school.name
-      .toLowerCase()
-      .includes(searchQuery.trim().toLowerCase())
-  );
+  const displayedSearchResults = searchResults.map((searchResult) => {
+    const school =
+      schools.find((school: School) => school.id === searchResult.id) ??
+      searchResult;
 
-  const sortedFilteredSchools = [
-    ...filteredSchools.filter((school: School) =>
+    return school;
+  });
+
+  const sortedSearchResults = [
+    ...displayedSearchResults.filter((school: School) =>
       favoriteSchoolIds.includes(school.id)
     ),
-    ...filteredSchools.filter(
+    ...displayedSearchResults.filter(
       (school: School) => !favoriteSchoolIds.includes(school.id)
     ),
   ];
@@ -162,36 +249,146 @@ export default function HomeScreen() {
       ? 'Good morning 👋'
       : hour < 18
         ? 'Good afternoon 👋'
-        : 'Good evening 👋';
+      : 'Good evening 👋';
+
+  useEffect(() => {
+    const missingFavoriteSchoolIds = favoriteSchoolIds.filter(
+      (schoolId) => !schools.some((school) => school.id === schoolId)
+    );
+
+    if (missingFavoriteSchoolIds.length === 0) {
+      return;
+    }
+
+    const controller = new AbortController();
+
+    const fetchMissingFavoriteSchools = async () => {
+      try {
+        const response = await fetch(
+          getApiUrl(`/api/schools?ids=${encodeURIComponent(missingFavoriteSchoolIds.join(','))}`),
+          { signal: controller.signal }
+        );
+
+        if (!response.ok) {
+          const errorData = (await response.json().catch(() => null)) as
+            | { error?: string }
+            | null;
+          throw new Error(
+            errorData?.error ?? `Favorite schools lookup failed with status ${response.status}`
+          );
+        }
+
+        const data = (await response.json()) as SchoolsSearchResponse;
+        data.schools.forEach((school) => {
+          upsertSchool(school);
+          upsertFavoriteSchool(school);
+        });
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') {
+          return;
+        }
+
+        console.warn('Unable to load favorite schools', error);
+      }
+    };
+
+    fetchMissingFavoriteSchools();
+
+    return () => {
+      controller.abort();
+    };
+  }, [favoriteSchoolIds, schools, upsertFavoriteSchool, upsertSchool]);
+
+  useEffect(() => {
+    const trimmedQuery = searchQuery.trim();
+
+    if (trimmedQuery.length < 3 || selectedSchool?.name === searchQuery) {
+      setSearchResults([]);
+      setIsSearching(false);
+      setSearchError('');
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(async () => {
+      setIsSearching(true);
+      setSearchError('');
+
+      try {
+        const response = await fetch(
+          getApiUrl(`/api/schools?search=${encodeURIComponent(trimmedQuery)}`),
+          { signal: controller.signal }
+        );
+
+        if (!response.ok) {
+          const errorData = (await response.json().catch(() => null)) as
+            | { error?: string }
+            | null;
+          throw new Error(
+            errorData?.error ?? `School search failed with status ${response.status}`
+          );
+        }
+
+        const data = (await response.json()) as SchoolsSearchResponse;
+        const collegeResults = data.schools.filter(isCollegeOrUniversity);
+
+        collegeResults.forEach((school) => {
+          upsertSchool(school);
+          upsertFavoriteSchool(school);
+        });
+        setSearchResults(collegeResults);
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') {
+          return;
+        }
+
+        setSearchResults([]);
+        setSearchError(error instanceof Error ? error.message : 'Unable to search schools right now.');
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => {
+      controller.abort();
+      clearTimeout(timeoutId);
+    };
+  }, [searchQuery, selectedSchool?.name, upsertFavoriteSchool, upsertSchool]);
 
   const handleSearchChange = (text: string) => {
     setSearchQuery(text);
     setIsOpen(true);
 
     if (selectedSchool && text !== selectedSchool.name) {
-      setSelectedSchoolId('');
+      setSelectedSchool(null);
     }
   };
 
   const handleClearSearch = () => {
     setSearchQuery('');
-    setSelectedSchoolId('');
+    setSelectedSchool(null);
+    setSearchResults([]);
+    setSearchError('');
     setIsOpen(false);
     Keyboard.dismiss();
   };
 
   const handleSchoolSelect = (school: School) => {
-    setSelectedSchoolId(school.id);
+    upsertSchool(school);
+    setSelectedSchool(school);
     setSearchQuery(school.name);
+    setSearchResults([]);
+    setSearchError('');
     setIsOpen(false);
   };
 
   const handleFavoritePress = (
     event: GestureResponderEvent,
-    schoolId: string
+    school: School
   ) => {
     event.stopPropagation();
-    toggleFavoriteSchool(schoolId);
+    upsertSchool(school);
+    toggleFavoriteSchool(school);
   };
 
   const handleGoPress = () => {
@@ -208,6 +405,7 @@ export default function HomeScreen() {
         schoolId: selectedSchool.id,
         schoolCity: selectedSchool.city,
         schoolState: selectedSchool.state,
+        schoolNumSpots: getDisplaySpotCount(selectedSchool).toString(),
       },
     });
   };
@@ -264,7 +462,7 @@ export default function HomeScreen() {
             onChangeText={handleSearchChange}
             onFocus={() => setIsOpen(true)}
             onPressIn={() => setIsOpen(true)}
-            placeholder="Search all schools..."
+            placeholder="Search US colleges and universities..."
             placeholderTextColor="#8E9AA6"
             className="rounded-2xl bg-[#F0F3F5] py-5 pl-14 pr-12 text-lg text-[#1B3B36]"
             style={{ fontFamily: 'Outfit_600SemiBold' }}
@@ -310,6 +508,7 @@ export default function HomeScreen() {
                   <SchoolRow
                     key={school.id}
                     school={school}
+                    displayNumSpots={getDisplaySpotCount(school)}
                     isFavorite
                     onSelect={handleSchoolSelect}
                     onFavoritePress={handleFavoritePress}
@@ -337,7 +536,11 @@ export default function HomeScreen() {
                 className="text-xs text-slate-400"
                 style={{ fontFamily: 'Outfit_700Bold' }}
               >
-                {sortedFilteredSchools.length} schools found
+                {searchQuery.trim().length < 3
+                  ? 'Type 3 or more characters'
+                  : sortedSearchResults.length === 20
+                    ? '20+ schools, only first 20 listed'
+                    : `${sortedSearchResults.length} schools found`}
               </Text>
             </View>
             <ScrollView
@@ -345,32 +548,45 @@ export default function HomeScreen() {
               nestedScrollEnabled
               showsVerticalScrollIndicator
             >
-              {schools.length > 0 ? (
-                sortedFilteredSchools.length > 0 ? (
-                  sortedFilteredSchools.map((school: School) => (
-                    <SchoolRow
-                      key={school.id}
-                      school={school}
-                      isFavorite={favoriteSchoolIds.includes(school.id)}
-                      onSelect={handleSchoolSelect}
-                      onFavoritePress={handleFavoritePress}
-                      isDropdownItem
-                    />
-                  ))
-                ) : (
-                  <Text 
-                    className="px-4 py-4 text-base text-slate-400 bg-white"
-                    style={{ fontFamily: 'Outfit_500Medium' }}
-                  >
-                    No schools found
-                  </Text>
-                )
+              {searchError ? (
+                <Text
+                  className="px-4 py-4 text-base text-slate-400 bg-white"
+                  style={{ fontFamily: 'Outfit_500Medium' }}
+                >
+                  {searchError}
+                </Text>
+              ) : isSearching ? (
+                <Text
+                  className="px-4 py-4 text-base text-slate-400 bg-white"
+                  style={{ fontFamily: 'Outfit_500Medium' }}
+                >
+                  Searching schools...
+                </Text>
+              ) : searchQuery.trim().length < 3 ? (
+                <Text
+                  className="px-4 py-4 text-base text-slate-400 bg-white"
+                  style={{ fontFamily: 'Outfit_500Medium' }}
+                >
+                  Keep typing to search by school's full name or city
+                </Text>
+              ) : sortedSearchResults.length > 0 ? (
+                sortedSearchResults.map((school: School) => (
+                  <SchoolRow
+                    key={school.id}
+                    school={school}
+                    displayNumSpots={getDisplaySpotCount(school)}
+                    isFavorite={favoriteSchoolIds.includes(school.id)}
+                    onSelect={handleSchoolSelect}
+                    onFavoritePress={handleFavoritePress}
+                    isDropdownItem
+                  />
+                ))
               ) : (
                 <Text 
                   className="px-4 py-4 text-base text-slate-400 bg-white"
                   style={{ fontFamily: 'Outfit_500Medium' }}
                 >
-                  Loading schools...
+                  No schools found
                 </Text>
               )}
             </ScrollView>
