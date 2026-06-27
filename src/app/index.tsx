@@ -434,10 +434,7 @@ export default function HomeScreen() {
           accessibilityLabel="Open profile"
           accessibilityRole="button"
         >
-          <Text
-            className="text-xl text-white"
-            style={{ fontFamily: 'Outfit_700Bold' }}
-          >
+          <Text className="font-outfit-bold text-xl text-white">
             P
           </Text>
         </Pressable>

@@ -8,7 +8,14 @@ export default function ProfileScreen() {
     <View className="flex-1 bg-white">
       <View className="bg-[#21473f] pt-25 pb-8 px-6 flex-row items-center justify-between">
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+              return;
+            }
+
+            router.replace('/');
+          }}
           className="h-11 w-11 items-center justify-center rounded-full"
           accessibilityLabel="Go back"
           accessibilityRole="button"
@@ -16,10 +23,7 @@ export default function ProfileScreen() {
           <Text className="text-xl text-white">❮</Text>
         </Pressable>
 
-        <Text
-          className="text-3xl text-white"
-          style={{ fontFamily: 'Outfit_900Black' }}
-        >
+        <Text className="font-outfit-black text-3xl text-white">
           Profile
         </Text>
 
@@ -29,18 +33,12 @@ export default function ProfileScreen() {
       <View className="flex-1 px-5 pt-6">
         <View className="items-center rounded-3xl bg-[#EBF2F0] p-6">
           <View className="mb-4 h-24 w-24 items-center justify-center rounded-full bg-[#21473f]">
-            <Text
-              className="text-4xl text-white"
-              style={{ fontFamily: 'Outfit_900Black' }}
-            >
+            <Text className="font-outfit-black text-4xl text-white">
               P
             </Text>
           </View>
 
-          <Text
-            className="text-2xl text-[#1B3B36]"
-            style={{ fontFamily: 'Outfit_900Black' }}
-          >
+          <Text className="font-outfit-black text-2xl text-[#1B3B36]">
             Your Profile
           </Text>
         </View>
@@ -52,10 +50,7 @@ export default function ProfileScreen() {
           accessibilityLabel="Log out"
           accessibilityRole="button"
         >
-          <Text
-            className="text-lg text-white"
-            style={{ fontFamily: 'Outfit_700Bold' }}
-          >
+          <Text className="font-outfit-bold text-lg text-white">
             Log out
           </Text>
         </Pressable>

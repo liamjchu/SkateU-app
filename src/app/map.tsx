@@ -505,13 +505,13 @@ export default function MapScreen() {
           </GestureDetector>
 
           <ScrollView
-            contentContainerStyle={styles.sheetContent}
+            contentContainerClassName="pb-[45px]"
             showsVerticalScrollIndicator={false}
           >
             {selectedSpot.imageUris.length > 0 ? (
               <Image
                 source={{ uri: selectedSpot.imageUris[0] }}
-                style={styles.sheetImage}
+                className="mt-5 h-[280px] w-full rounded-3xl"
                 resizeMode="cover"
               />
             ) : (
@@ -556,15 +556,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 12,
     elevation: 16,
-  },
-  sheetContent: {
-    paddingBottom: 45,
-  },
-  sheetImage: {
-    width: '100%',
-    height: 280,
-    borderRadius: 24,
-    marginTop: 20,
   },
   toggleButton: {
     shadowColor: '#000',
