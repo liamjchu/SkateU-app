@@ -427,6 +427,17 @@ export default function HomeScreen() {
             SkateU
           </Text>
         </View>
+
+        <Pressable
+          onPress={() => router.push('/profile')}
+          className="h-12 w-12 items-center justify-center rounded-full bg-white/15 border border-white/25"
+          accessibilityLabel="Open profile"
+          accessibilityRole="button"
+        >
+          <Text className="font-outfit-bold text-xl text-white">
+            P
+          </Text>
+        </Pressable>
       </View>
 
       <View className="flex-1 px-5 pt-6 relative">

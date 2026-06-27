@@ -1,7 +1,6 @@
 ﻿import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert,
   Image,
   Pressable,
   ScrollView,
@@ -31,7 +30,7 @@ export default function MapScreen() {
   const webViewRef = useRef<WebView>(null);
   const searchParams = useLocalSearchParams();
   const router = useRouter();
-  const { spots, removeSpot } = useSpots();
+  const { spots } = useSpots();
   const { schools, upsertSchool } = useSchools();
   const { favoriteSchoolIds, toggleFavoriteSchool } = useFavorites();
   const webViewReadyRef = useRef(false);
@@ -300,30 +299,6 @@ export default function MapScreen() {
       });
     });
 
-  const handleDeleteSpot = useCallback(() => {
-    if (!selectedSpot) return;
-
-    Alert.alert(
-      'Delete spot',
-      'Are you sure you want to permanently delete this spot?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await removeSpot(selectedSpot.id);
-              setSelectedSpotId(undefined);
-            } catch (error) {
-              console.warn('Failed to delete spot', error);
-            }
-          },
-        },
-      ]
-    );
-  }, [removeSpot, selectedSpot]);
-
   const handleFavoritePress = useCallback(() => {
     if (!currentSchool) return;
 
@@ -530,13 +505,13 @@ export default function MapScreen() {
           </GestureDetector>
 
           <ScrollView
-            contentContainerStyle={styles.sheetContent}
+            contentContainerClassName="pb-[45px]"
             showsVerticalScrollIndicator={false}
           >
             {selectedSpot.imageUris.length > 0 ? (
               <Image
                 source={{ uri: selectedSpot.imageUris[0] }}
-                style={styles.sheetImage}
+                className="mt-5 h-[280px] w-full rounded-3xl"
                 resizeMode="cover"
               />
             ) : (
@@ -556,18 +531,6 @@ export default function MapScreen() {
             >
               {selectedSpot.description}
             </Text>
-
-            <Pressable
-              onPress={handleDeleteSpot}
-              className="mt-6 items-center justify-center rounded-3xl bg-red-600 py-4"
-            >
-              <Text
-                className="font-semibold text-white"
-                style={{ fontFamily: 'Outfit_600SemiBold' }}
-              >
-                Delete Spot
-              </Text>
-            </Pressable>
           </ScrollView>
         </Animated.View>
       )}
@@ -582,7 +545,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: 1000,
-    maxHeight: '70%',
+    maxHeight: '62%',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     backgroundColor: '#FFFFFF',
@@ -593,15 +556,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 12,
     elevation: 16,
-  },
-  sheetContent: {
-    paddingBottom: 32,
-  },
-  sheetImage: {
-    width: '100%',
-    height: 280,
-    borderRadius: 24,
-    marginTop: 12,
   },
   toggleButton: {
     shadowColor: '#000',

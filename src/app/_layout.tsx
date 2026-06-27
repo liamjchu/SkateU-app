@@ -45,6 +45,13 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SpotsProvider>
         <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen
+            name="profile"
+            options={{
+              animation: 'slide_from_right',
+            }}
+          />
           <Stack.Screen
             name="map"
             options={{
