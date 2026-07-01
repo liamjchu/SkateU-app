@@ -12,6 +12,8 @@ import {
   View,
   type GestureResponderEvent,
 } from 'react-native';
+import LoginRequiredModal from '../components/LoginRequiredModal';
+import { IS_USER_SIGNED_IN } from '../constants/auth';
 import IMAGES from '../constants/images';
 import { useSpots } from '../context/SpotsContext';
 import { useFavorites } from '../store/favoritesStore';
@@ -200,6 +202,7 @@ export default function HomeScreen() {
   const [searchResults, setSearchResults] = useState<School[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
+  const [showLoginRequired, setShowLoginRequired] = useState(false);
 
   const localSpotCountsBySchoolId = useMemo(() => {
     return spots.reduce<Record<string, number>>((counts, spot) => {
@@ -410,6 +413,15 @@ export default function HomeScreen() {
     });
   };
 
+  const handleProfilePress = () => {
+    if (IS_USER_SIGNED_IN) {
+      router.push('/profile');
+      return;
+    }
+
+    setShowLoginRequired(true);
+  };
+
   return (
     <View className="flex-1 bg-white">
       {/* Top Header Banner Section */}
@@ -429,7 +441,7 @@ export default function HomeScreen() {
         </View>
 
         <Pressable
-          onPress={() => router.push('/profile')}
+          onPress={handleProfilePress}
           className="h-12 w-12 items-center justify-center rounded-full bg-white/15 border border-white/25"
           accessibilityLabel="Open profile"
           accessibilityRole="button"
@@ -439,6 +451,10 @@ export default function HomeScreen() {
           </Text>
         </Pressable>
       </View>
+      <LoginRequiredModal
+        visible={showLoginRequired}
+        onCancel={() => setShowLoginRequired(false)}
+      />
 
       <View className="flex-1 px-5 pt-6 relative">
         {/* Welcome Message Card */}

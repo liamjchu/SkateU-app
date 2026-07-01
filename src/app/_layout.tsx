@@ -53,6 +53,12 @@ export default function RootLayout() {
             }}
           />
           <Stack.Screen
+            name="login"
+            options={{
+              animation: 'slide_from_right',
+            }}
+          />
+          <Stack.Screen
             name="map"
             options={{
               animation: 'slide_from_right',

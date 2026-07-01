@@ -18,6 +18,8 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
+import LoginRequiredModal from '../components/LoginRequiredModal';
+import { IS_USER_SIGNED_IN } from '../constants/auth';
 import images from '../constants/images';
 import { useSpots } from '../context/SpotsContext';
 import { useFavorites } from '../store/favoritesStore';
@@ -35,6 +37,7 @@ export default function MapScreen() {
   const { favoriteSchoolIds, toggleFavoriteSchool } = useFavorites();
   const webViewReadyRef = useRef(false);
   const [selectedSpotId, setSelectedSpotId] = useState<string | undefined>();
+  const [showLoginRequired, setShowLoginRequired] = useState(false);
   const sheetHeight = useSharedValue(0);
   const sheetTranslateY = useSharedValue(0);
   const sheetStartY = useSharedValue(0);
@@ -315,6 +318,16 @@ export default function MapScreen() {
     router.replace('/');
   }, [router]);
 
+  const handleAddSpotPress = () => {
+    if (!IS_USER_SIGNED_IN) {
+      setShowLoginRequired(true);
+      return;
+    }
+
+    setSelectedSpotId(undefined);
+    webViewRef.current?.injectJavaScript(`window.sendCenter(); true;`);
+  };
+
   const handleWebViewMessage = (event: WebViewMessageEvent) => {
     try {
       const data = JSON.parse(event.nativeEvent.data) as {
@@ -443,14 +456,15 @@ export default function MapScreen() {
       </Pressable>
       <Pressable
         className="absolute bottom-6 right-4 bg-[#21473f] w-18 h-18 rounded-full items-center justify-center shadow-lg z-50"
-        onPress={() => {
-          setSelectedSpotId(undefined);
-          webViewRef.current?.injectJavaScript(`window.sendCenter(); true;`);
-        }}
+        onPress={handleAddSpotPress}
         accessibilityLabel="Add new spot"
       >
         <Text className="text-white text-4xl">+</Text>
       </Pressable>
+      <LoginRequiredModal
+        visible={showLoginRequired}
+        onCancel={() => setShowLoginRequired(false)}
+      />
       <WebView
         ref={webViewRef}
         style={{ flex: 1, backgroundColor: 'transparent' }}
