@@ -2,20 +2,20 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Image,
-  Keyboard,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-  type GestureResponderEvent,
+    Image,
+    Keyboard,
+    Platform,
+    Pressable,
+    ScrollView,
+    Text,
+    TextInput,
+    View,
+    type GestureResponderEvent,
 } from 'react-native';
 import LoginRequiredModal from '../components/LoginRequiredModal';
-import { IS_USER_SIGNED_IN } from '../constants/auth';
 import IMAGES from '../constants/images';
 import { useSpots } from '../context/SpotsContext';
+import { useAuthStore } from '../store/authStore';
 import { useFavorites } from '../store/favoritesStore';
 import { useSchools } from '../store/schoolsStore';
 import type { School } from '../types/school';
@@ -189,6 +189,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const { spots } = useSpots();
   const { schools, upsertSchool } = useSchools();
+  const session = useAuthStore((state) => state.session);
   const {
     favoriteSchoolIds,
     favoriteSchools: storedFavoriteSchools,
@@ -414,7 +415,7 @@ export default function HomeScreen() {
   };
 
   const handleProfilePress = () => {
-    if (IS_USER_SIGNED_IN) {
+    if (session) {
       router.push('/profile');
       return;
     }

@@ -1,27 +1,27 @@
 ﻿import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Image,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
+    Image,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
-  Easing,
-  SlideInDown,
-  SlideOutDown,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
+    Easing,
+    SlideInDown,
+    SlideOutDown,
+    useAnimatedStyle,
+    useSharedValue,
+    withTiming,
 } from 'react-native-reanimated';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import LoginRequiredModal from '../components/LoginRequiredModal';
-import { IS_USER_SIGNED_IN } from '../constants/auth';
 import images from '../constants/images';
 import { useSpots } from '../context/SpotsContext';
+import { useAuthStore } from '../store/authStore';
 import { useFavorites } from '../store/favoritesStore';
 import { useSchools } from '../store/schoolsStore';
 import type { School } from '../types/school';
@@ -32,6 +32,7 @@ export default function MapScreen() {
   const webViewRef = useRef<WebView>(null);
   const searchParams = useLocalSearchParams();
   const router = useRouter();
+  const session = useAuthStore((state) => state.session);
   const { spots } = useSpots();
   const { schools, upsertSchool } = useSchools();
   const { favoriteSchoolIds, toggleFavoriteSchool } = useFavorites();
@@ -319,7 +320,7 @@ export default function MapScreen() {
   }, [router]);
 
   const handleAddSpotPress = () => {
-    if (!IS_USER_SIGNED_IN) {
+    if (!session) {
       setShowLoginRequired(true);
       return;
     }

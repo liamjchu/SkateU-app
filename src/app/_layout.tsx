@@ -1,10 +1,10 @@
 import {
-  Outfit_400Regular,
-  Outfit_500Medium,
-  Outfit_600SemiBold,
-  Outfit_700Bold,
-  Outfit_900Black,
-  useFonts
+    Outfit_400Regular,
+    Outfit_500Medium,
+    Outfit_600SemiBold,
+    Outfit_700Bold,
+    Outfit_900Black,
+    useFonts
 } from '@expo-google-fonts/outfit';
 import { SplashScreen, Stack } from 'expo-router';
 import { useEffect } from 'react';
@@ -12,6 +12,7 @@ import { Text } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import '../../global.css';
 import { SpotsProvider } from '../context/SpotsContext';
+import { useAuthStore } from '../store/authStore';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -23,6 +24,13 @@ export default function RootLayout() {
     Outfit_700Bold,
     Outfit_900Black,
   });
+
+  const initAuth = useAuthStore((state) => state.init);
+
+  useEffect(() => {
+    // Restore any persisted Supabase session and subscribe to auth changes.
+    initAuth();
+  }, [initAuth]);
 
   useEffect(() => {
     if (fontsLoaded || fontError) {

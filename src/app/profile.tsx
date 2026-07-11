@@ -1,8 +1,33 @@
 import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
+import { useAuthStore } from '../store/authStore';
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const user = useAuthStore((state) => state.user);
+  const signOut = useAuthStore((state) => state.signOut);
+
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const email = user?.email ?? '';
+  const avatarLetter = email.charAt(0).toUpperCase() || 'P';
+
+  const handleLogout = async () => {
+    if (loggingOut) {
+      return;
+    }
+
+    setLoggingOut(true);
+
+    try {
+      await signOut();
+      router.replace('/');
+    } catch (error) {
+      console.warn('Failed to log out', error);
+      setLoggingOut(false);
+    }
+  };
 
   return (
     <View className="flex-1 bg-white">
@@ -34,24 +59,37 @@ export default function ProfileScreen() {
         <View className="items-center rounded-3xl bg-[#EBF2F0] p-6">
           <View className="mb-4 h-24 w-24 items-center justify-center rounded-full bg-[#21473f]">
             <Text className="font-outfit-black text-4xl text-white">
-              P
+              {avatarLetter}
             </Text>
           </View>
 
           <Text className="font-outfit-black text-2xl text-[#1B3B36]">
             Your Profile
           </Text>
+
+          {email ? (
+            <Text
+              className="mt-1 text-base text-slate-500"
+              style={{ fontFamily: 'Outfit_500Medium' }}
+            >
+              {email}
+            </Text>
+          ) : null}
         </View>
       </View>
 
       <View className="p-5 pb-6">
         <Pressable
-          className="w-full items-center justify-center rounded-2xl bg-[#21473f] py-4"
+          onPress={handleLogout}
+          disabled={loggingOut}
+          className={`w-full items-center justify-center rounded-2xl py-4 ${
+            loggingOut ? 'bg-[#21473f]/60' : 'bg-[#21473f]'
+          }`}
           accessibilityLabel="Log out"
           accessibilityRole="button"
         >
           <Text className="font-outfit-bold text-lg text-white">
-            Log out
+            {loggingOut ? 'Logging out...' : 'Log out'}
           </Text>
         </Pressable>
       </View>
