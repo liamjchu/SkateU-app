@@ -218,7 +218,8 @@ export default function LoginScreen() {
             onError={(message) => setError(message)}
           />
 
-          <Pressable
+          {/* TODO: Sign in with Apple - to be implemented later */}
+          {/* <Pressable
             className="items-center justify-center rounded-2xl border border-slate-200 py-4"
             accessibilityLabel="Sign in with Apple"
             accessibilityRole="button"
@@ -229,7 +230,7 @@ export default function LoginScreen() {
             >
               Sign in with Apple
             </Text>
-          </Pressable>
+          </Pressable> */}
         </View>
       </View>
     </View>
