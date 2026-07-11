@@ -47,9 +47,10 @@ export default function LoginScreen() {
         const { needsEmailConfirmation } = await signUp(email, password);
 
         if (needsEmailConfirmation) {
-          setNotice(
-            `Check your email to confirm your account. We sent a confirmation link to ${email.trim()}.`
-          );
+          router.push({
+            pathname: '/verify-otp',
+            params: { email: email.trim() },
+          });
           return;
         }
       } else {

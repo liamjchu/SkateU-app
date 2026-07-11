@@ -13,6 +13,8 @@ type AuthState = {
     email: string,
     password: string
   ) => Promise<{ needsEmailConfirmation: boolean }>;
+  verifyOtp: (email: string, token: string) => Promise<void>;
+  resendSignUpOtp: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -58,8 +60,31 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
 
     // When email confirmation is on, Supabase returns a user but no session
-    // until the address is confirmed.
+    // until the address is confirmed with the emailed 6-digit code.
     return { needsEmailConfirmation: !data.session };
+  },
+
+  verifyOtp: async (email, token) => {
+    const { error } = await supabase.auth.verifyOtp({
+      email: email.trim(),
+      token: token.trim(),
+      type: 'signup',
+    });
+
+    if (error) {
+      throw error;
+    }
+  },
+
+  resendSignUpOtp: async (email) => {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email.trim(),
+    });
+
+    if (error) {
+      throw error;
+    }
   },
 
   signOut: async () => {
