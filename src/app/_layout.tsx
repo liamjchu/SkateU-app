@@ -6,7 +6,9 @@ import {
     Outfit_900Black,
     useFonts
 } from '@expo-google-fonts/outfit';
+import * as Linking from 'expo-linking';
 import { SplashScreen, Stack } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import { useEffect } from 'react';
 import { Text } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -26,11 +28,50 @@ export default function RootLayout() {
   });
 
   const initAuth = useAuthStore((state) => state.init);
+  const setSessionFromUrl = useAuthStore((state) => state.setSessionFromUrl);
 
   useEffect(() => {
     // Restore any persisted Supabase session and subscribe to auth changes.
     initAuth();
   }, [initAuth]);
+
+  useEffect(() => {
+    // Global deep link listener. When Supabase redirects back to the app
+    // after Google OAuth, the URL carries the access/refresh tokens. We hand
+    // that URL to setSessionFromUrl, which extracts the tokens and calls
+    // supabase.auth.setSession() to hydrate the client. That in turn triggers
+    // onAuthStateChange in the auth store, so the whole app sees the new user.
+    const handleUrl = (url: string | null) => {
+      // Only act on our OAuth callback URLs; ignore other deep links.
+      // PKCE returns "?code=", implicit returns "#access_token=".
+      if (url && (url.includes('code=') || url.includes('access_token'))) {
+        setSessionFromUrl(url)
+          .then((handled) => {
+            // If the browser sheet was left spinning, close it now.
+            if (handled) {
+              try {
+                WebBrowser.dismissBrowser();
+              } catch {
+                // No browser open to dismiss; ignore.
+              }
+            }
+          })
+          .catch(() => {
+            // Ignore malformed/expired links; the user can just try again.
+          });
+      }
+    };
+
+    // Handle the cold-start case where the app was opened by the redirect URL.
+    Linking.getInitialURL().then(handleUrl);
+
+    // Handle the warm case where the app is already running (Expo Go flow).
+    const subscription = Linking.addEventListener('url', ({ url }) =>
+      handleUrl(url)
+    );
+
+    return () => subscription.remove();
+  }, [setSessionFromUrl]);
 
   useEffect(() => {
     if (fontsLoaded || fontError) {

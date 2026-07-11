@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
+import GoogleSignInButton from '../components/GoogleSignInButton';
 import { useAuthStore } from '../store/authStore';
 
 export default function LoginScreen() {
@@ -211,18 +212,11 @@ export default function LoginScreen() {
             </Text>
           </Pressable>
 
-          <Pressable
-            className="items-center justify-center rounded-2xl border border-slate-200 py-4"
-            accessibilityLabel="Sign in with Google"
-            accessibilityRole="button"
-          >
-            <Text
-              className="text-base text-[#1B3B36]"
-              style={{ fontFamily: 'Outfit_700Bold' }}
-            >
-              Sign in with Google
-            </Text>
-          </Pressable>
+          <GoogleSignInButton
+            disabled={submitting}
+            onSuccess={() => router.replace('/')}
+            onError={(message) => setError(message)}
+          />
 
           <Pressable
             className="items-center justify-center rounded-2xl border border-slate-200 py-4"

@@ -16,7 +16,11 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     storage: AsyncStorage,
     autoRefreshToken: true,
     persistSession: true,
-    // Not a web redirect flow, so we don't parse the session from a URL.
+    // Native apps use the PKCE flow: OAuth redirects back with a one-time
+    // "?code=" that we exchange for a session. This is more reliable than the
+    // implicit flow on mobile and survives the app reloading on a deep link.
+    flowType: 'pkce',
+    // We handle the redirect URL ourselves (native, not a web page).
     detectSessionInUrl: false,
   },
 });
