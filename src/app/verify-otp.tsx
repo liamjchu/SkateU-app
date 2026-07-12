@@ -109,7 +109,16 @@ export default function VerifyOtpScreen() {
 
   return (
     <View className="flex-1 bg-white">
-      <View className="bg-[#21473f] px-6 pb-8 pt-25">
+      <View
+        className="h-[126px] justify-center bg-[#21473f] px-6 pb-3 pt-[70px]"
+        style={{
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.25,
+          shadowRadius: 8,
+          elevation: 12,
+        }}
+      >
         <View className="flex-row items-center justify-between">
           <Pressable
             onPress={goBack}
@@ -121,8 +130,8 @@ export default function VerifyOtpScreen() {
           </Pressable>
 
           <Text
-            className="text-3xl text-white"
-            style={{ fontFamily: 'Outfit_900Black' }}
+            className="text-2xl text-white"
+            style={{ fontFamily: 'Outfit_700Bold' }}
           >
             Verify email
           </Text>

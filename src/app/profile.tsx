@@ -31,7 +31,16 @@ export default function ProfileScreen() {
 
   return (
     <View className="flex-1 bg-white">
-      <View className="bg-[#21473f] pt-25 pb-8 px-6 flex-row items-center justify-between">
+      <View
+        className="h-[126px] bg-[#21473f] px-6 pb-3 pt-[70px] flex-row items-center justify-between"
+        style={{
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.25,
+          shadowRadius: 8,
+          elevation: 12,
+        }}
+      >
         <Pressable
           onPress={() => {
             if (router.canGoBack()) {
@@ -48,7 +57,10 @@ export default function ProfileScreen() {
           <Text className="text-xl text-white">❮</Text>
         </Pressable>
 
-        <Text className="font-outfit-black text-3xl text-white">
+        <Text
+          className="text-2xl text-white"
+          style={{ fontFamily: 'Outfit_700Bold' }}
+        >
           Profile
         </Text>
 

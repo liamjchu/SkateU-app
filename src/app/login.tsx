@@ -72,7 +72,16 @@ export default function LoginScreen() {
 
   return (
     <View className="flex-1 bg-white">
-      <View className="h-[126px] justify-center bg-[#21473f] px-6 pb-3 pt-[70px]">
+      <View
+        className="h-[126px] justify-center bg-[#21473f] px-6 pb-3 pt-[70px]"
+        style={{
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.25,
+          shadowRadius: 8,
+          elevation: 12,
+        }}
+      >
         <View className="flex-row items-center justify-between">
           <Pressable
             onPress={goBack}
@@ -84,8 +93,8 @@ export default function LoginScreen() {
           </Pressable>
 
           <Text
-            className="text-3xl text-white"
-            style={{ fontFamily: 'Outfit_900Black' }}
+            className="text-2xl text-white"
+            style={{ fontFamily: 'Outfit_700Bold' }}
           >
             {isSignup ? 'Sign up' : 'Login'}
           </Text>
@@ -120,7 +129,7 @@ export default function LoginScreen() {
             autoCorrect={false}
             keyboardType="email-address"
             editable={!submitting}
-            className="rounded-2xl bg-[#F0F3F5] px-5 py-4 text-base text-[#1B3B36]"
+            className="rounded-2xl bg-[#F0F3F5] pl-4 pr-5 py-4 text-base text-[#1B3B36]"
             style={{ fontFamily: 'Outfit_600SemiBold' }}
           />
           <View className="flex-row items-center rounded-2xl bg-[#F0F3F5] pr-3">
@@ -132,7 +141,7 @@ export default function LoginScreen() {
               secureTextEntry={!showPassword}
               autoCapitalize="none"
               editable={!submitting}
-              className="flex-1 px-5 py-4 text-base text-[#1B3B36]"
+              className="flex-1 pl-4 pr-5 py-4 text-base text-[#1B3B36]"
               style={{ fontFamily: 'Outfit_600SemiBold' }}
             />
             <Pressable
@@ -211,6 +220,17 @@ export default function LoginScreen() {
                 : "Don't have an account? Sign up"}
             </Text>
           </Pressable>
+
+          <View className="flex-row items-center">
+            <View className="h-px flex-1 bg-slate-200" />
+            <Text
+              className="mx-3 text-sm text-slate-400"
+              style={{ fontFamily: 'Outfit_600SemiBold' }}
+            >
+              or
+            </Text>
+            <View className="h-px flex-1 bg-slate-200" />
+          </View>
 
           <GoogleSignInButton
             disabled={submitting}

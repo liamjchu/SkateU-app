@@ -1,21 +1,22 @@
-﻿import { useLocalSearchParams, useRouter } from 'expo-router';
+﻿import { Octicons } from '@expo/vector-icons';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    Image,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
-    Easing,
-    SlideInDown,
-    SlideOutDown,
-    useAnimatedStyle,
-    useSharedValue,
-    withTiming,
+  Easing,
+  SlideInDown,
+  SlideOutDown,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
 } from 'react-native-reanimated';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import LoginRequiredModal from '../components/LoginRequiredModal';
@@ -382,7 +383,7 @@ export default function MapScreen() {
   return (
     <View style={{ flex: 1 }}>
       <View
-        className="absolute left-0 right-0 z-50 bg-[#21473f] border-b border-white/10 px-4 pb-3 flex-row items-center justify-between"
+        className="absolute left-0 right-0 z-50 h-[126px] bg-[#21473f] border-b border-white/10 px-4 pb-3 flex-row items-center justify-between"
         style={{
           top: 0, paddingTop: 70,
           
@@ -432,13 +433,11 @@ export default function MapScreen() {
             }
             accessibilityRole="button"
           >
-            <Text
-              className={`-mt-1 text-3xl ${
-                isFavoriteSchool ? 'text-white' : 'text-white/70'
-              }`}
-            >
-              {isFavoriteSchool ? '★' : '☆'}
-            </Text>
+            <Octicons
+              name={isFavoriteSchool ? 'star-fill' : 'star'}
+              size={26}
+              color={isFavoriteSchool ? '#FFFFFF' : 'rgba(255,255,255,0.7)'}
+            />
           </Pressable>
         ) : (
           <View className="h-11 w-11" />
