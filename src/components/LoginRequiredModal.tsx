@@ -19,8 +19,20 @@ export default function LoginRequiredModal({
 
   return (
     <Modal visible={visible} transparent animationType="fade">
-      <View className="flex-1 items-center justify-center bg-black/40 px-6">
-        <View className="w-full rounded-3xl bg-white p-6">
+      <View
+        className="flex-1 items-center justify-center px-6"
+        style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}
+      >
+        <View
+          className="w-full rounded-3xl bg-white p-6"
+          style={{
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.25,
+            shadowRadius: 8,
+            elevation: 12,
+          }}
+        >
           <Text
             className="text-2xl text-[#1B3B36]"
             style={{ fontFamily: 'Outfit_900Black' }}

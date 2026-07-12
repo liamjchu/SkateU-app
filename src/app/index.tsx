@@ -1,4 +1,5 @@
-﻿import Constants from 'expo-constants';
+﻿import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -443,13 +444,11 @@ export default function HomeScreen() {
 
         <Pressable
           onPress={handleProfilePress}
-          className="h-12 w-12 items-center justify-center rounded-full bg-white/15 border border-white/25"
+          className="h-12 w-12 items-center justify-center rounded-full bg-white/15 border border-white"
           accessibilityLabel="Open profile"
           accessibilityRole="button"
         >
-          <Text className="font-outfit-bold text-xl text-white">
-            P
-          </Text>
+          <Ionicons name="person" size={22} color="white" />
         </Pressable>
       </View>
       <LoginRequiredModal

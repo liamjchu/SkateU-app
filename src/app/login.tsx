@@ -72,7 +72,7 @@ export default function LoginScreen() {
 
   return (
     <View className="flex-1 bg-white">
-      <View className="bg-[#21473f] px-6 pb-8 pt-25">
+      <View className="h-[126px] justify-center bg-[#21473f] px-6 pb-3 pt-[70px]">
         <View className="flex-row items-center justify-between">
           <Pressable
             onPress={goBack}
