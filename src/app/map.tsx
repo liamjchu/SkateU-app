@@ -1,4 +1,5 @@
-﻿import { useLocalSearchParams, useRouter } from 'expo-router';
+﻿import { Octicons } from '@expo/vector-icons';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Image,
@@ -17,9 +18,12 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
+import LoginRequiredModal from '../components/LoginRequiredModal';
 import images from '../constants/images';
 import { useSpots } from '../context/SpotsContext';
+import { useAuthStore } from '../store/authStore';
 import { useFavorites } from '../store/favoritesStore';
 import { useSchools } from '../store/schoolsStore';
 import type { School } from '../types/school';
@@ -30,11 +34,14 @@ export default function MapScreen() {
   const webViewRef = useRef<WebView>(null);
   const searchParams = useLocalSearchParams();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const session = useAuthStore((state) => state.session);
   const { spots } = useSpots();
   const { schools, upsertSchool } = useSchools();
   const { favoriteSchoolIds, toggleFavoriteSchool } = useFavorites();
   const webViewReadyRef = useRef(false);
   const [selectedSpotId, setSelectedSpotId] = useState<string | undefined>();
+  const [showLoginRequired, setShowLoginRequired] = useState(false);
   const sheetHeight = useSharedValue(0);
   const sheetTranslateY = useSharedValue(0);
   const sheetStartY = useSharedValue(0);
@@ -315,6 +322,16 @@ export default function MapScreen() {
     router.replace('/');
   }, [router]);
 
+  const handleAddSpotPress = () => {
+    if (!session) {
+      setShowLoginRequired(true);
+      return;
+    }
+
+    setSelectedSpotId(undefined);
+    webViewRef.current?.injectJavaScript(`window.sendCenter(); true;`);
+  };
+
   const handleWebViewMessage = (event: WebViewMessageEvent) => {
     try {
       const data = JSON.parse(event.nativeEvent.data) as {
@@ -368,9 +385,9 @@ export default function MapScreen() {
   return (
     <View style={{ flex: 1 }}>
       <View
-        className="absolute left-0 right-0 z-50 bg-[#21473f] border-b border-white/10 px-4 pb-3 flex-row items-center justify-between"
+        className="absolute left-0 right-0 z-50 h-[126px] bg-[#21473f] border-b border-white/10 px-4 pb-3 flex-row items-center justify-between"
         style={{
-          top: 0, paddingTop: 70,
+          top: 0, paddingTop: insets.top,
           
           shadowColor: '#000',
           shadowOffset: { width: 0, height: 4 },
@@ -418,13 +435,11 @@ export default function MapScreen() {
             }
             accessibilityRole="button"
           >
-            <Text
-              className={`-mt-1 text-3xl ${
-                isFavoriteSchool ? 'text-white' : 'text-white/70'
-              }`}
-            >
-              {isFavoriteSchool ? '★' : '☆'}
-            </Text>
+            <Octicons
+              name={isFavoriteSchool ? 'star-fill' : 'star'}
+              size={26}
+              color={isFavoriteSchool ? '#FFFFFF' : 'rgba(255,255,255,0.7)'}
+            />
           </Pressable>
         ) : (
           <View className="h-11 w-11" />
@@ -443,14 +458,15 @@ export default function MapScreen() {
       </Pressable>
       <Pressable
         className="absolute bottom-6 right-4 bg-[#21473f] w-18 h-18 rounded-full items-center justify-center shadow-lg z-50"
-        onPress={() => {
-          setSelectedSpotId(undefined);
-          webViewRef.current?.injectJavaScript(`window.sendCenter(); true;`);
-        }}
+        onPress={handleAddSpotPress}
         accessibilityLabel="Add new spot"
       >
         <Text className="text-white text-4xl">+</Text>
       </Pressable>
+      <LoginRequiredModal
+        visible={showLoginRequired}
+        onCancel={() => setShowLoginRequired(false)}
+      />
       <WebView
         ref={webViewRef}
         style={{ flex: 1, backgroundColor: 'transparent' }}

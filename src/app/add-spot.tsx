@@ -1,14 +1,14 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import LocationPicker from '../components/LocationPicker';
 import SpotImagePicker from '../components/SpotImagePicker';
 import { useSpots } from '../context/SpotsContext';
@@ -34,6 +34,7 @@ const generateSpotId = () => {
 export default function AddSpotScreen() {
   const router = useRouter();
   const searchParams = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
 
   const [imageUri, setImageUri] = useState<string | undefined>();
   const [name, setName] = useState('');
@@ -108,8 +109,8 @@ export default function AddSpotScreen() {
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safe}>
       <View
-        className="flex-row items-center justify-between border-b border-white/10 bg-[#21473f] px-4 pb-3 pt-[70px]"
-        style={styles.headerShadow}
+        className="h-[126px] flex-row items-center justify-between border-b border-white/10 bg-[#21473f] px-4 pb-3"
+        style={[styles.headerShadow, { paddingTop: insets.top }]}
       >
         <Pressable
           onPress={() => router.back()}
