@@ -1,10 +1,12 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../store/authStore';
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const user = useAuthStore((state) => state.user);
   const signOut = useAuthStore((state) => state.signOut);
 
@@ -32,8 +34,9 @@ export default function ProfileScreen() {
   return (
     <View className="flex-1 bg-white">
       <View
-        className="h-[126px] bg-[#21473f] px-6 pb-3 pt-[70px] flex-row items-center justify-between"
+        className="h-[126px] bg-[#21473f] px-6 pb-3 flex-row items-center justify-between"
         style={{
+          paddingTop: insets.top,
           shadowColor: '#000',
           shadowOffset: { width: 0, height: 4 },
           shadowOpacity: 0.25,

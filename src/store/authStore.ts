@@ -17,7 +17,9 @@ type AuthState = {
   ) => Promise<{ needsEmailConfirmation: boolean }>;
   verifyOtp: (email: string, token: string) => Promise<void>;
   resendSignUpOtp: (email: string) => Promise<void>;
-  signInWithGoogle: () => Promise<void>;
+  // Resolves true when a session was established, false when the user
+  // cancelled/dismissed the OAuth sheet.
+  signInWithGoogle: () => Promise<boolean>;
   setSessionFromUrl: (url: string) => Promise<boolean>;
   signOut: () => Promise<void>;
 };
@@ -56,6 +58,10 @@ const parseAuthParams = (url: string): Record<string, string> => {
 // what we've already processed and skip duplicates (a reused code errors out).
 const handledKeys = new Set<string>();
 
+// Holds the active auth-state listener so repeated init() calls don't stack up
+// multiple subscriptions (which would fire the setter several times per event).
+let authSubscription: { unsubscribe: () => void } | null = null;
+
 export const useAuthStore = create<AuthState>((set, get) => ({
   session: null,
   user: null,
@@ -70,10 +76,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
     });
 
+    // Drop any previous listener before subscribing again so we only ever keep
+    // one active subscription.
+    authSubscription?.unsubscribe();
+
     // Keep the store in sync with sign in, sign out, and token refreshes.
-    supabase.auth.onAuthStateChange((_event, session) => {
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       set({ session, user: session?.user ?? null });
     });
+    authSubscription = data.subscription;
   },
 
   signIn: async (email, password) => {
@@ -164,12 +175,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     if (result.type !== 'success' || !result.url) {
       // User dismissed the sheet or cancelled; nothing to do.
-      return;
+      return false;
     }
 
     // Hand the returned URL to Supabase to establish the session. The global
     // deep-link listener may also fire for the same URL; handledKeys dedupes it.
-    await get().setSessionFromUrl(result.url);
+    return await get().setSessionFromUrl(result.url);
   },
 
   setSessionFromUrl: async (url) => {

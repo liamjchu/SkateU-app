@@ -18,6 +18,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import LoginRequiredModal from '../components/LoginRequiredModal';
 import images from '../constants/images';
@@ -33,6 +34,7 @@ export default function MapScreen() {
   const webViewRef = useRef<WebView>(null);
   const searchParams = useLocalSearchParams();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const session = useAuthStore((state) => state.session);
   const { spots } = useSpots();
   const { schools, upsertSchool } = useSchools();
@@ -385,7 +387,7 @@ export default function MapScreen() {
       <View
         className="absolute left-0 right-0 z-50 h-[126px] bg-[#21473f] border-b border-white/10 px-4 pb-3 flex-row items-center justify-between"
         style={{
-          top: 0, paddingTop: 70,
+          top: 0, paddingTop: insets.top,
           
           shadowColor: '#000',
           shadowOffset: { width: 0, height: 4 },

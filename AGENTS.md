@@ -96,7 +96,7 @@ skate spot info/details, campus map sidebar. Do not create components too early.
 **data/** holds hardcoded content. Keep it typed.
 **store/** holds Zustand stores. Examples of state to keep here:
 uploaded spots and spot details, users. Persist with AsyncStorage when needed.
-**lib/** holds external service helpers (api.ts, cn.ts).
+**lib/** holds external service helpers (api.ts, cn.ts, supabase.ts).
 Never expose secret keys here.
 ---
 ## UI Rules

@@ -37,8 +37,12 @@ export default function GoogleSignInButton({
     setLoading(true);
 
     try {
-      await signInWithGoogle();
-      onSuccess?.();
+      const signedIn = await signInWithGoogle();
+      // Only navigate away on a completed sign in. A dismissed/cancelled OAuth
+      // sheet resolves false and should just re-enable the button.
+      if (signedIn) {
+        onSuccess?.();
+      }
     } catch (error) {
       onError?.(
         error instanceof Error

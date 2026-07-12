@@ -41,10 +41,21 @@ export default function RootLayout() {
     // that URL to setSessionFromUrl, which extracts the tokens and calls
     // supabase.auth.setSession() to hydrate the client. That in turn triggers
     // onAuthStateChange in the auth store, so the whole app sees the new user.
+    // The exact callback path we asked Supabase to redirect to. Comparing
+    // against this avoids reacting to unrelated deep links that merely happen
+    // to contain "code=" or "access_token".
+    const { path: callbackPath } = Linking.parse(
+      Linking.createURL('auth/callback')
+    );
+
     const handleUrl = (url: string | null) => {
-      // Only act on our OAuth callback URLs; ignore other deep links.
-      // PKCE returns "?code=", implicit returns "#access_token=".
-      if (url && (url.includes('code=') || url.includes('access_token'))) {
+      if (!url) {
+        return;
+      }
+
+      // Only act on our OAuth callback URL; ignore other deep links.
+      const { path } = Linking.parse(url);
+      if (path === callbackPath) {
         setSessionFromUrl(url)
           .then((handled) => {
             // If the browser sheet was left spinning, close it now.

@@ -51,6 +51,12 @@ export default function VerifyOtpScreen() {
     if (error) {
       setError('');
     }
+
+    // Verify automatically once all six digits are entered so the user doesn't
+    // have to reach for the button.
+    if (digits.length === CODE_LENGTH) {
+      submitCode(digits);
+    }
   };
 
   const submitCode = async (value: string) => {

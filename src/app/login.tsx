@@ -1,7 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View
+} from 'react-native';
 import GoogleSignInButton from '../components/GoogleSignInButton';
 import { useAuthStore } from '../store/authStore';
 
@@ -103,7 +111,17 @@ export default function LoginScreen() {
         </View>
       </View>
 
-      <View className="flex-1 px-5 pt-8">
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View className="flex-1 px-5 pt-8">
         <Text
           className="text-3xl text-[#1B3B36]"
           style={{ fontFamily: 'Outfit_900Black' }}
@@ -252,7 +270,9 @@ export default function LoginScreen() {
             </Text>
           </Pressable> */}
         </View>
-      </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }
