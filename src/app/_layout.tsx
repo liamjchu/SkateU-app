@@ -7,7 +7,7 @@ import {
     useFonts
 } from '@expo-google-fonts/outfit';
 import * as Linking from 'expo-linking';
-import { SplashScreen, Stack } from 'expo-router';
+import { SplashScreen, Stack, useRouter, useSegments } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect } from 'react';
 import { Text } from 'react-native';
@@ -15,6 +15,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import '../../global.css';
 import { SpotsProvider } from '../context/SpotsContext';
 import { useAuthStore } from '../store/authStore';
+import { useProfileStore } from '../store/profileStore';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -30,10 +31,31 @@ export default function RootLayout() {
   const initAuth = useAuthStore((state) => state.init);
   const setSessionFromUrl = useAuthStore((state) => state.setSessionFromUrl);
 
+  // --- Auth + profile state that drives the username gate ---
+  const userId = useAuthStore((state) => state.user?.id ?? null);
+  const authInitializing = useAuthStore((state) => state.initializing);
+  const profile = useProfileStore((state) => state.profile);
+  const profileLoaded = useProfileStore((state) => state.loaded);
+  const fetchProfile = useProfileStore((state) => state.fetchProfile);
+  const clearProfile = useProfileStore((state) => state.clearProfile);
+
+  const router = useRouter();
+  const segments = useSegments();
+
   useEffect(() => {
     // Restore any persisted Supabase session and subscribe to auth changes.
     initAuth();
   }, [initAuth]);
+
+  // Load (or clear) the profile whenever the signed-in user changes. Keyed on
+  // the user id so token refreshes don't trigger needless refetches.
+  useEffect(() => {
+    if (userId) {
+      fetchProfile(userId);
+    } else {
+      clearProfile();
+    }
+  }, [userId, fetchProfile, clearProfile]);
 
   useEffect(() => {
     // Global deep link listener. When Supabase redirects back to the app
@@ -84,11 +106,37 @@ export default function RootLayout() {
     return () => subscription.remove();
   }, [setSessionFromUrl]);
 
+  // The app is ready to decide on routing once fonts are loaded, the persisted
+  // session has been restored, and (if signed in) the profile has resolved.
+  const fontsReady = fontsLoaded || !!fontError;
+  const profileReady = !userId || profileLoaded;
+  const appReady = fontsReady && !authInitializing && profileReady;
+
+  // The gate: a signed-in user with no username is locked onto onboarding.
+  // Anonymous users are unaffected (they keep browsing as before).
+  const needsOnboarding = !!userId && profileLoaded && !profile?.username;
+  const onOnboarding = segments[0] === 'onboarding';
+  const routeSettled = needsOnboarding ? onOnboarding : !onOnboarding;
+
   useEffect(() => {
-    if (fontsLoaded || fontError) {
+    if (!appReady) {
+      return;
+    }
+
+    if (needsOnboarding && !onOnboarding) {
+      router.replace('/onboarding');
+    } else if (!needsOnboarding && onOnboarding) {
+      router.replace('/');
+    }
+  }, [appReady, needsOnboarding, onOnboarding, router]);
+
+  useEffect(() => {
+    // Keep the native splash up until we're both ready and on the correct
+    // screen. This prevents any flicker of the wrong screen during the check.
+    if (appReady && routeSettled) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded, fontError]);
+  }, [appReady, routeSettled]);
 
   // 1. PLACE THE ERROR CHECK HERE FIRST:
   if (fontError) {
@@ -106,6 +154,7 @@ export default function RootLayout() {
       <SpotsProvider>
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="index" />
+          <Stack.Screen name="onboarding" />
           <Stack.Screen
             name="profile"
             options={{

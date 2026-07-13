@@ -3,17 +3,21 @@ import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../store/authStore';
+import { useProfileStore } from '../store/profileStore';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const user = useAuthStore((state) => state.user);
   const signOut = useAuthStore((state) => state.signOut);
+  const username = useProfileStore((state) => state.profile?.username ?? '');
 
   const [loggingOut, setLoggingOut] = useState(false);
 
   const email = user?.email ?? '';
-  const avatarLetter = email.charAt(0).toUpperCase() || 'P';
+  // Prefer the username for the avatar initial, falling back to the email.
+  const avatarLetter =
+    username.charAt(0).toUpperCase() || email.charAt(0).toUpperCase() || 'P';
 
   const handleLogout = async () => {
     if (loggingOut) {
@@ -79,7 +83,7 @@ export default function ProfileScreen() {
           </View>
 
           <Text className="font-outfit-black text-2xl text-[#1B3B36]">
-            Your Profile
+            {username ? `@${username}` : 'Your Profile'}
           </Text>
 
           {email ? (

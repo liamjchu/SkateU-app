@@ -13,7 +13,6 @@ import {
   View,
   type GestureResponderEvent,
 } from 'react-native';
-import LoginRequiredModal from '../components/LoginRequiredModal';
 import IMAGES from '../constants/images';
 import { useSpots } from '../context/SpotsContext';
 import { useAuthStore } from '../store/authStore';
@@ -208,7 +207,6 @@ export default function HomeScreen() {
   const [searchResults, setSearchResults] = useState<School[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
-  const [showLoginRequired, setShowLoginRequired] = useState(false);
 
   const localSpotCountsBySchoolId = useMemo(() => {
     return spots.reduce<Record<string, number>>((counts, spot) => {
@@ -425,7 +423,7 @@ export default function HomeScreen() {
       return;
     }
 
-    setShowLoginRequired(true);
+    router.push('/login');
   };
 
   return (
@@ -473,10 +471,6 @@ export default function HomeScreen() {
           />
         </Pressable>
       </View>
-      <LoginRequiredModal
-        visible={showLoginRequired}
-        onCancel={() => setShowLoginRequired(false)}
-      />
 
       <View className="flex-1 px-5 pt-6 relative">
         {/* Welcome Message Card */}
