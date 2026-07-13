@@ -13,7 +13,6 @@ import { useEffect } from 'react';
 import { Text } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import '../../global.css';
-import { SpotsProvider } from '../context/SpotsContext';
 import { useAuthStore } from '../store/authStore';
 import { useProfileStore } from '../store/profileStore';
 
@@ -148,45 +147,42 @@ export default function RootLayout() {
     return null;
   }
 
-  // 3. FIXED: Wrapped Stack inside SpotsProvider so all screens can access spots data
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SpotsProvider>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="onboarding" />
-          <Stack.Screen
-            name="profile"
-            options={{
-              animation: 'slide_from_right',
-            }}
-          />
-          <Stack.Screen
-            name="login"
-            options={{
-              animation: 'slide_from_right',
-            }}
-          />
-          <Stack.Screen
-            name="verify-otp"
-            options={{
-              animation: 'slide_from_right',
-            }}
-          />
-          <Stack.Screen
-            name="map"
-            options={{
-              animation: 'slide_from_right',
-            }}
-          />
-          <Stack.Screen
-            name="add-spot"
-            options={{
-              animation: 'slide_from_right',
-            }}
-          />
-        </Stack>
-      </SpotsProvider>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="onboarding" />
+        <Stack.Screen
+          name="profile"
+          options={{
+            animation: 'slide_from_right',
+          }}
+        />
+        <Stack.Screen
+          name="login"
+          options={{
+            animation: 'slide_from_right',
+          }}
+        />
+        <Stack.Screen
+          name="verify-otp"
+          options={{
+            animation: 'slide_from_right',
+          }}
+        />
+        <Stack.Screen
+          name="map"
+          options={{
+            animation: 'slide_from_right',
+          }}
+        />
+        <Stack.Screen
+          name="add-spot"
+          options={{
+            animation: 'slide_from_right',
+          }}
+        />
+      </Stack>
     </GestureHandlerRootView>
   );
 }

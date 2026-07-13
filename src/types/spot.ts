@@ -9,3 +9,12 @@ export type Spot = {
   state: string
   schoolId?: string
 }
+
+export type NewSpotInput = {
+  schoolId: string
+  name: string
+  description: string
+  latitude: number
+  longitude: number
+  imageUri?: string
+}

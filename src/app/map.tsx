@@ -1,31 +1,36 @@
 ﻿import { Octicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import {
+    useFocusEffect,
+    useLocalSearchParams,
+    useRouter
+} from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Image,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
+    ActivityIndicator,
+    Image,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
-  Easing,
-  SlideInDown,
-  SlideOutDown,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
+    Easing,
+    SlideInDown,
+    SlideOutDown,
+    useAnimatedStyle,
+    useSharedValue,
+    withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import LoginRequiredModal from '../components/LoginRequiredModal';
 import images from '../constants/images';
-import { useSpots } from '../context/SpotsContext';
 import { useAuthStore } from '../store/authStore';
 import { useFavorites } from '../store/favoritesStore';
 import { useSchools } from '../store/schoolsStore';
+import { useSpotsStore } from '../store/spotsStore';
 import type { School } from '../types/school';
 
 const COLLAPSED_SHEET_HEIGHT = 100;
@@ -36,7 +41,10 @@ export default function MapScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const session = useAuthStore((state) => state.session);
-  const { spots } = useSpots();
+  const spots = useSpotsStore((s) => s.spots);
+  const loading = useSpotsStore((s) => s.loading);
+  const error = useSpotsStore((s) => s.error);
+  const fetchSpots = useSpotsStore((s) => s.fetchSpots);
   const { schools, upsertSchool } = useSchools();
   const { favoriteSchoolIds, toggleFavoriteSchool } = useFavorites();
   const webViewReadyRef = useRef(false);
@@ -255,6 +263,24 @@ export default function MapScreen() {
       sendMarkers();
     }
   }, [spots]);
+
+  // Load spots for the current school on mount and whenever schoolId changes.
+  // Guard against an undefined/empty id (the store also rejects blank ids).
+  useEffect(() => {
+    if (schoolId) {
+      fetchSpots(schoolId);
+    }
+  }, [fetchSpots, schoolId]);
+
+  // Refetch when the screen regains focus so a spot just created on the
+  // add-spot screen shows up on return.
+  useFocusEffect(
+    useCallback(() => {
+      if (schoolId) {
+        fetchSpots(schoolId);
+      }
+    }, [fetchSpots, schoolId])
+  );
 
   useEffect(() => {
     if (selectedSpotId && !selectedSpot) {
@@ -484,6 +510,23 @@ export default function MapScreen() {
         mixedContentMode="always"
         onMessage={handleWebViewMessage}
       />
+
+      {(loading || error) && (
+        <View
+          pointerEvents="none"
+          className="absolute left-0 right-0 top-[150px] z-40 items-center"
+        >
+          <View className="flex-row items-center rounded-full bg-black/50 px-3 py-1.5">
+            {loading && <ActivityIndicator size="small" color="#FFFFFF" />}
+            <Text
+              className="ml-2 text-xs text-white"
+              style={{ fontFamily: 'Outfit_500Medium' }}
+            >
+              {loading ? 'Loading spots…' : error}
+            </Text>
+          </View>
+        </View>
+      )}
 
       {selectedSpot && (
         <Animated.View

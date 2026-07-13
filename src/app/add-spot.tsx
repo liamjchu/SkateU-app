@@ -1,35 +1,29 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+    ActivityIndicator,
     Pressable,
     ScrollView,
     StyleSheet,
     Text,
     TextInput,
-    View,
+    View
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import LocationPicker from '../components/LocationPicker';
 import SpotImagePicker from '../components/SpotImagePicker';
-import { useSpots } from '../context/SpotsContext';
-import type { Spot } from '../types/spot';
+import { isAddSpotFormValid } from '../lib/addSpotForm';
+import { useAuthStore } from '../store/authStore';
+import { useSpotsStore } from '../store/spotsStore';
 
 type Coordinates = {
   latitude: number;
   longitude: number;
 };
 
-const generateSpotId = () => {
-  const webCrypto = globalThis.crypto as
-    | { randomUUID?: () => string }
-    | undefined;
-
-  if (webCrypto?.randomUUID) {
-    return webCrypto.randomUUID();
-  }
-
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
-};
+const AUTH_REQUIRED_ERROR = 'You must be signed in to add a spot.';
+const MISSING_SCHOOL_ERROR =
+  'A school is required to add a spot. Return to the map and try again.';
 
 export default function AddSpotScreen() {
   const router = useRouter();
@@ -57,15 +51,15 @@ export default function AddSpotScreen() {
   });
 
   const [scrollEnabled, setScrollEnabled] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const interactionTimeoutRef = useRef<number | null>(null);
 
-  const { addSpot } = useSpots();
+  const addSpot = useSpotsStore((s) => s.addSpot);
+  const session = useAuthStore((s) => s.session);
 
-  const isFormValid =
-    !!imageUri &&
-    name.trim().length > 0 &&
-    description.trim().length > 0;
+  const isFormValid = isAddSpotFormValid(imageUri, name, description);
 
   const handleLocationChange = useCallback(
     (latitude: number, longitude: number) => {
@@ -75,25 +69,47 @@ export default function AddSpotScreen() {
   );
 
   const handleSave = async () => {
-    if (!isFormValid) return;
+    if (!isFormValid || saving) return;
 
-    const newSpot: Spot = {
-      id: generateSpotId(),
-      name: name.trim(),
-      description: description.trim(),
-      latitude: selectedLocation.latitude,
-      longitude: selectedLocation.longitude,
-      imageUris: imageUri ? [imageUri] : [],
-      city: '',
-      state: '',
-      schoolId: schoolId || undefined,
-    };
+    // A school is required to associate the spot with the campus.
+    if (!schoolId) {
+      setSaveError(MISSING_SCHOOL_ERROR);
+      return;
+    }
+
+    // Never POST without a verified session; the server rejects it and the
+    // user would lose their entered data (Req 10.8).
+    const accessToken = session?.access_token;
+    if (!accessToken) {
+      setSaveError(AUTH_REQUIRED_ERROR);
+      return;
+    }
+
+    setSaving(true);
+    setSaveError(null);
 
     try {
-      await addSpot(newSpot);
+      await addSpot(
+        {
+          schoolId,
+          name: name.trim(),
+          description: description.trim(),
+          latitude: selectedLocation.latitude,
+          longitude: selectedLocation.longitude,
+          imageUri,
+        },
+        accessToken
+      );
+      // Success returns to the map, which refetches on focus (Req 10.4).
       router.back();
     } catch (error) {
-      console.warn('Failed to save spot', error);
+      // Keep all entered data and stay on the screen (Req 10.6).
+      setSaveError(
+        error instanceof Error && error.message.length > 0
+          ? error.message
+          : 'Unable to save this spot right now. Please try again.'
+      );
+      setSaving(false);
     }
   };
 
@@ -209,27 +225,47 @@ export default function AddSpotScreen() {
         </View>
 
         {/* SAVE */}
+        {saveError ? (
+          <Text className="mb-3 text-center text-sm text-red-600">
+            {saveError}
+          </Text>
+        ) : null}
+
         <Pressable
           style={[
             styles.saveButton,
-            !isFormValid && styles.saveButtonDisabled,
+            (!isFormValid || saving || !schoolId) && styles.saveButtonDisabled,
           ]}
           onPress={handleSave}
-          disabled={!isFormValid}
+          disabled={!isFormValid || saving || !schoolId}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text 
-              className="text-center text-lg text-white"
-              style={{ fontFamily: 'Outfit_700Bold' }}
-            >
-              Save Spot
-            </Text>
-            <Text
-              className="text-white text-sm"
-              style={{ fontFamily: 'Outfit_700Bold', marginLeft: 6 }}
-            >
-              ❯
-            </Text>
+            {saving ? (
+              <>
+                <ActivityIndicator color="#ffffff" />
+                <Text
+                  className="text-center text-lg text-white"
+                  style={{ fontFamily: 'Outfit_700Bold', marginLeft: 8 }}
+                >
+                  Saving…
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text
+                  className="text-center text-lg text-white"
+                  style={{ fontFamily: 'Outfit_700Bold' }}
+                >
+                  Save Spot
+                </Text>
+                <Text
+                  className="text-white text-sm"
+                  style={{ fontFamily: 'Outfit_700Bold', marginLeft: 6 }}
+                >
+                  ❯
+                </Text>
+              </>
+            )}
           </View>
         </Pressable>
       </ScrollView>

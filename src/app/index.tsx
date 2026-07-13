@@ -1,20 +1,19 @@
 ﻿import { Ionicons, Octicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  Image,
-  Keyboard,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-  type GestureResponderEvent,
+    Image,
+    Keyboard,
+    Platform,
+    Pressable,
+    ScrollView,
+    Text,
+    TextInput,
+    View,
+    type GestureResponderEvent,
 } from 'react-native';
 import IMAGES from '../constants/images';
-import { useSpots } from '../context/SpotsContext';
 import { useAuthStore } from '../store/authStore';
 import { useFavorites } from '../store/favoritesStore';
 import { useSchools } from '../store/schoolsStore';
@@ -191,7 +190,6 @@ function SchoolRow({
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { spots } = useSpots();
   const { schools, upsertSchool } = useSchools();
   const session = useAuthStore((state) => state.session);
   const {
@@ -208,19 +206,8 @@ export default function HomeScreen() {
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
 
-  const localSpotCountsBySchoolId = useMemo(() => {
-    return spots.reduce<Record<string, number>>((counts, spot) => {
-      if (!spot.schoolId) {
-        return counts;
-      }
-
-      counts[spot.schoolId] = (counts[spot.schoolId] ?? 0) + 1;
-      return counts;
-    }, {});
-  }, [spots]);
-
   const getDisplaySpotCount = (school: School) => {
-    return school.numSpots + (localSpotCountsBySchoolId[school.id] ?? 0);
+    return school.numSpots;
   };
 
   const favoriteSchools = favoriteSchoolIds
