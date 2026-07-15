@@ -183,7 +183,10 @@ describe('validatePostBody', () => {
         const lat = Number(rawLat);
         const lng = Number(rawLng);
 
-        const schoolOk = schoolId.length >= 1;
+        const schoolOk =
+          schoolId.length >= 1 &&
+          schoolId.length <= MAX_SCHOOL_ID_LENGTH &&
+          /^[A-Za-z0-9_-]+$/.test(schoolId);
         const nameOk = name.length >= 1 && name.length <= NAME_MAX;
         const descOk = description.length >= 1 && description.length <= DESCRIPTION_MAX;
         const latOk =
@@ -782,8 +785,8 @@ describe('mapSpot new fields', () => {
       latitude: 10,
       longitude: 20,
       image_urls: [],
-      created_at: '',
-      updated_at: '',
+      created_at: null,
+      updated_at: null,
       schools: null,
       creator: null,
     } as unknown as DatabaseSpot;

@@ -36,6 +36,7 @@ const LOAD_FAILED_ERROR = 'Unable to load spots right now.';
 const LOAD_TIMEOUT_ERROR = 'Loading spots timed out. Please try again.';
 const MY_SPOTS_LOAD_FAILED_ERROR = 'Unable to load your spots right now.';
 
+let spotsRequestVersion = 0;
 let mySpotsRequestVersion = 0;
 
 // React Native serializes an object of this shape as a multipart file part.
@@ -186,16 +187,21 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
   myError: null,
 
   fetchSpots: async (schoolId: string) => {
+    const requestVersion = ++spotsRequestVersion;
     const trimmedSchoolId = schoolId?.trim() ?? '';
 
     // Blank/whitespace ids never hit the network; expose an error and keep the
     // previously loaded spots unchanged (Req 9.6).
     if (trimmedSchoolId.length === 0) {
-      set({ error: INVALID_SCHOOL_ID_ERROR, loading: false });
+      if (requestVersion === spotsRequestVersion) {
+        set({ error: INVALID_SCHOOL_ID_ERROR, loading: false });
+      }
       return;
     }
 
-    set({ loading: true, error: null });
+    if (requestVersion === spotsRequestVersion) {
+      set({ loading: true, error: null });
+    }
 
     try {
       const response = await fetchGetWithRetry(
@@ -209,6 +215,10 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
 
       const data = (await response.json()) as { spots?: Spot[] };
 
+      if (requestVersion !== spotsRequestVersion) {
+        return;
+      }
+
       // An empty result is a success, not an error (Req 9.5).
       set({
         spots: data.spots ?? [],
@@ -218,6 +228,9 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
       });
     } catch (error) {
       // On failure/timeout keep the prior spots and clear loading (Req 9.4).
+      if (requestVersion !== spotsRequestVersion) {
+        return;
+      }
       set({ loading: false, error: toFetchErrorMessage(error) });
     }
   },
@@ -230,11 +243,11 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
     form.append('latitude', String(input.latitude));
     form.append('longitude', String(input.longitude));
 
-    if (input.imageUri) {
+    if (input.imageUri || input.image) {
       appendFilePart(form, 'image', {
-        uri: input.imageUri,
-        name: 'spot.jpg',
-        type: 'image/jpeg',
+        uri: input.image?.uri ?? input.imageUri ?? '',
+        name: input.image?.fileName ?? 'spot.jpg',
+        type: input.image?.mimeType ?? 'image/jpeg',
       });
     }
 
@@ -303,11 +316,11 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
 
     // Only send an image part when the user picked a new one; otherwise the
     // server keeps the existing image.
-    if (input.imageUri) {
+    if (input.imageUri || input.image) {
       appendFilePart(form, 'image', {
-        uri: input.imageUri,
-        name: 'spot.jpg',
-        type: 'image/jpeg',
+        uri: input.image?.uri ?? input.imageUri ?? '',
+        name: input.image?.fileName ?? 'spot.jpg',
+        type: input.image?.mimeType ?? 'image/jpeg',
       });
     }
 
@@ -368,6 +381,7 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
   },
 
   reset: () => {
+    spotsRequestVersion += 1;
     mySpotsRequestVersion += 1;
     set({
       spots: [],

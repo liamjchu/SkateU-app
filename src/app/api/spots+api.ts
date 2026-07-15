@@ -32,7 +32,7 @@ const SPOT_SELECT_COLUMNS =
  */
 export function getSupabaseConfig(): SupabaseConfig | null {
   const url = process.env.SUPABASE_URL;
-  const apiKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_ANON_KEY;
+  const apiKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!url || !apiKey) {
     return null;
@@ -142,6 +142,9 @@ export function validatePostBody(
   const schoolId = (fields.schoolId ?? '').trim();
   if (schoolId.length === 0) {
     return { ok: false, message: 'The schoolId field is required.' };
+  }
+  if (schoolId.length > MAX_SCHOOL_ID_LENGTH || !SPOT_ID_PATTERN.test(schoolId)) {
+    return { ok: false, message: 'The schoolId field is invalid.' };
   }
 
   const name = (fields.name ?? '').trim();
@@ -303,42 +306,40 @@ export async function uploadImages(
   schoolId: string,
   files: SpotImageFile[]
 ): Promise<string[]> {
-  const urls: string[] = [];
+  return Promise.all(
+    files.map(async (file) => {
+      const extension = IMAGE_EXTENSIONS[file.type] ?? 'bin';
+      const objectKey = `${schoolId}/${randomUUID()}.${extension}`;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
 
-  for (const file of files) {
-    const extension = IMAGE_EXTENSIONS[file.type] ?? 'bin';
-    const objectKey = `${schoolId}/${randomUUID()}.${extension}`;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
+      try {
+        const body = await file.arrayBuffer();
+        const response = await fetch(
+          `${config.url}/storage/v1/object/spot-images/${objectKey}`,
+          {
+            method: 'POST',
+            headers: {
+              apikey: config.apiKey,
+              Authorization: `Bearer ${config.apiKey}`,
+              'Content-Type': file.type,
+            },
+            body,
+            signal: controller.signal,
+          }
+        );
 
-    try {
-      const body = await file.arrayBuffer();
-      const response = await fetch(
-        `${config.url}/storage/v1/object/spot-images/${objectKey}`,
-        {
-          method: 'POST',
-          headers: {
-            apikey: config.apiKey,
-            Authorization: `Bearer ${config.apiKey}`,
-            'Content-Type': file.type,
-          },
-          body,
-          signal: controller.signal,
+        if (!response.ok) {
+          const message = await response.text();
+          throw new Error(`Image upload failed: ${message}`);
         }
-      );
-
-      if (!response.ok) {
-        const message = await response.text();
-        throw new Error(`Image upload failed: ${message}`);
+      } finally {
+        clearTimeout(timeout);
       }
-    } finally {
-      clearTimeout(timeout);
-    }
 
-    urls.push(`${config.url}/storage/v1/object/public/spot-images/${objectKey}`);
-  }
-
-  return urls;
+      return `${config.url}/storage/v1/object/public/spot-images/${objectKey}`;
+    })
+  );
 }
 
 // --- Auth -------------------------------------------------------------------
@@ -424,6 +425,49 @@ export async function fetchSpotOwnership(
     schoolId: rows[0].school_id,
     imageUrls: Array.isArray(rows[0].image_urls) ? rows[0].image_urls : [],
   };
+}
+
+const STORAGE_OBJECT_PREFIX = '/storage/v1/object/public/spot-images/';
+
+function storageObjectKeyFromUrl(value: string): string | null {
+  try {
+    const pathname = new URL(value).pathname;
+    if (!pathname.startsWith(STORAGE_OBJECT_PREFIX)) {
+      return null;
+    }
+
+    const key = decodeURIComponent(pathname.slice(STORAGE_OBJECT_PREFIX.length));
+    return key.length > 0 ? key : null;
+  } catch {
+    return null;
+  }
+}
+
+async function deleteStorageObjects(
+  config: SupabaseConfig,
+  imageUrls: string[]
+): Promise<void> {
+  const prefixes = imageUrls
+    .map(storageObjectKeyFromUrl)
+    .filter((key): key is string => key !== null);
+
+  if (prefixes.length === 0) {
+    return;
+  }
+
+  const response = await fetch(`${config.url}/storage/v1/object/remove`, {
+    method: 'POST',
+    headers: {
+      apikey: config.apiKey,
+      Authorization: `Bearer ${config.apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ prefixes }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
 }
 
 // --- Request helpers --------------------------------------------------------
@@ -622,13 +666,11 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
-    const imageUrl = files[0]
-      ? await imageFileToDataUrl(files[0])
-      : undefined;
+    const imageUrls = await Promise.all(files.map(imageFileToDataUrl));
     const moderation = await moderateSpotSubmission({
       title: bodyValidation.value.name,
       description: bodyValidation.value.description,
-      imageUrl,
+      imageUrls,
     });
 
     if (!moderation.approved) {
@@ -782,13 +824,14 @@ export async function PATCH(request: Request): Promise<Response> {
   }
 
   try {
-    const imageUrl = files[0]
-      ? await imageFileToDataUrl(files[0])
-      : ownership.imageUrls[0];
+    const moderationImageUrls =
+      files.length > 0
+        ? await Promise.all(files.map(imageFileToDataUrl))
+        : ownership.imageUrls;
     const moderation = await moderateSpotSubmission({
       title: bodyValidation.value.name,
       description: bodyValidation.value.description,
-      imageUrl,
+      imageUrls: moderationImageUrls,
     });
 
     if (!moderation.approved) {
@@ -851,6 +894,14 @@ export async function PATCH(request: Request): Promise<Response> {
     const updated = rows[0];
     if (!updated) {
       throw new Error('Update returned no representation.');
+    }
+
+    if (updates.image_urls) {
+      try {
+        await deleteStorageObjects(config, ownership.imageUrls);
+      } catch (error) {
+        console.error('Deleting replaced spot images failed:', error);
+      }
     }
 
     return Response.json({ spot: mapSpot(updated) });
@@ -933,6 +984,12 @@ export async function DELETE(request: Request): Promise<Response> {
 
     if (!response.ok) {
       throw new Error(await response.text());
+    }
+
+    try {
+      await deleteStorageObjects(config, ownership.imageUrls);
+    } catch (error) {
+      console.error('Deleting spot images failed:', error);
     }
 
     return Response.json({ success: true });

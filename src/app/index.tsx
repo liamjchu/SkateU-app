@@ -132,7 +132,7 @@ function SchoolRow({
             name="map-pin"
             size={11}
             color="#64748b"
-            style={{ marginRight: 2 }}
+            className="mr-[2px]"
           />
           <Text 
             className="text-base text-[#1B3B36]"
@@ -185,7 +185,7 @@ function SchoolRow({
           name="map-pin"
           size={11}
           color="#64748b"
-          style={{ marginRight: 2 }}
+          className="mr-[2px]"
         />
         <Text 
           className="text-base text-[#1B3B36]"
@@ -489,15 +489,15 @@ export default function HomeScreen() {
           elevation: 12,
         }}
       >
-        <View className="flex-row items-center space-x-3" style={{ marginLeft: -17 }}>
+        <View className="-ml-[17px] flex-row items-center space-x-3">
           <Image 
             source={IMAGES.logo} 
             className="h-14 w-14"
             resizeMode="contain"
           />
           <Text 
-            className="text-4xl text-white tracking-tight"
-            style={{ fontFamily: 'Outfit_900Black', marginLeft: -5 }}
+            className="-ml-[5px] text-4xl text-white tracking-tight"
+            style={{ fontFamily: 'Outfit_900Black' }}
           >
             SkateU
           </Text>

@@ -100,7 +100,7 @@ export async function imageFileToDataUrl(file: {
 export async function moderateSpotSubmission(input: {
   title: string;
   description: string;
-  imageUrl?: string;
+  imageUrls: string[];
 }): Promise<SpotModerationVerdict> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -119,10 +119,10 @@ export async function moderateSpotSubmission(input: {
     },
   ];
 
-  if (input.imageUrl) {
+  for (const imageUrl of input.imageUrls) {
     content.push({
       type: 'image_url',
-      image_url: { url: input.imageUrl, detail: 'low' },
+      image_url: { url: imageUrl, detail: 'low' },
     });
   }
 

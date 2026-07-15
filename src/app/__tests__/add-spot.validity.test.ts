@@ -2,7 +2,9 @@ import fc from 'fast-check';
 import {
     isAddSpotFormValid,
     SPOT_DESCRIPTION_MAX,
+    SPOT_DESCRIPTION_MIN,
     SPOT_NAME_MAX,
+    SPOT_NAME_MIN,
 } from '../../lib/addSpotForm';
 
 // Reference predicate expressed independently of the implementation so the
@@ -17,9 +19,9 @@ function expectedValid(
   const descLen = description.trim().length;
   return (
     hasImage &&
-    nameLen >= 1 &&
+    nameLen >= SPOT_NAME_MIN &&
     nameLen <= SPOT_NAME_MAX &&
-    descLen >= 1 &&
+    descLen >= SPOT_DESCRIPTION_MIN &&
     descLen <= SPOT_DESCRIPTION_MAX
   );
 }

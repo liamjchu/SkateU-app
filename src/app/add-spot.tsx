@@ -16,6 +16,9 @@ import { isAddSpotFormValid } from '../lib/addSpotForm';
 import { useAuthStore } from '../store/authStore';
 import { useSpotsStore } from '../store/spotsStore';
 
+
+import type { SpotImageAsset } from '../types/spot';
+
 type Coordinates = {
   latitude: number;
   longitude: number;
@@ -31,6 +34,7 @@ export default function AddSpotScreen() {
   const insets = useSafeAreaInsets();
 
   const [imageUri, setImageUri] = useState<string | undefined>();
+  const [imageAsset, setImageAsset] = useState<SpotImageAsset | undefined>();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
 
@@ -60,6 +64,11 @@ export default function AddSpotScreen() {
   const session = useAuthStore((s) => s.session);
 
   const isFormValid = isAddSpotFormValid(imageUri, name, description);
+
+  const handleImageSelected = (asset: SpotImageAsset) => {
+    setImageUri(asset.uri);
+    setImageAsset(asset);
+  };
 
   const handleLocationChange = useCallback(
     (latitude: number, longitude: number) => {
@@ -96,7 +105,7 @@ export default function AddSpotScreen() {
           description: description.trim(),
           latitude: selectedLocation.latitude,
           longitude: selectedLocation.longitude,
-          imageUri,
+          image: imageAsset,
         },
         accessToken
       );
@@ -162,7 +171,7 @@ export default function AddSpotScreen() {
         <View style={styles.photoWrapper}>
           <SpotImagePicker
             imageUri={imageUri}
-            onImageSelected={setImageUri}
+            onImageSelected={handleImageSelected}
           />
         </View>
 
@@ -240,29 +249,20 @@ export default function AddSpotScreen() {
           onPress={handleSave}
           disabled={!isFormValid || saving || !schoolId}
         >
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <View className="flex-row items-center">
             {saving ? (
               <>
                 <ActivityIndicator color="#ffffff" />
-                <Text
-                  className="text-center text-lg text-white"
-                  style={{ fontFamily: 'Outfit_700Bold', marginLeft: 8 }}
-                >
+                <Text className="ml-2 text-center font-outfit-bold text-lg text-white">
                   Saving…
                 </Text>
               </>
             ) : (
               <>
-                <Text
-                  className="text-center text-lg text-white"
-                  style={{ fontFamily: 'Outfit_700Bold' }}
-                >
+                <Text className="text-center font-outfit-bold text-lg text-white">
                   Save Spot
                 </Text>
-                <Text
-                  className="text-white text-sm"
-                  style={{ fontFamily: 'Outfit_700Bold', marginLeft: 6 }}
-                >
+                <Text className="ml-1.5 font-outfit-bold text-sm text-white">
                   ❯
                 </Text>
               </>

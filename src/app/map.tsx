@@ -302,14 +302,6 @@ export default function MapScreen() {
     }
   }, [spots]);
 
-  // Load spots for the current school on mount and whenever schoolId changes.
-  // Guard against an undefined/empty id (the store also rejects blank ids).
-  useEffect(() => {
-    if (schoolId) {
-      fetchSpots(schoolId);
-    }
-  }, [fetchSpots, schoolId]);
-
   // Refetch when the screen regains focus so a spot just created on the
   // add-spot screen shows up on return.
   useFocusEffect(
@@ -635,8 +627,7 @@ export default function MapScreen() {
               <View className="flex-row items-start justify-between bg-white pb-3">
                 <View className="flex-1 pr-3">
                   <Text
-                    className="text-lg font-semibold"
-                    style={{ fontFamily: 'Outfit_700Bold' }}
+                    className="font-outfit-bold text-lg"
                     numberOfLines={1}
                   >
                     {selectedSpot.name}
@@ -644,8 +635,7 @@ export default function MapScreen() {
                   <View className="mt-1 flex-row items-center">
                     <Octicons name="person" size={13} color="#64748b" />
                     <Text
-                      className="ml-1 text-xs text-slate-500"
-                      style={{ fontFamily: 'Outfit_500Medium' }}
+                      className="ml-1 font-outfit-medium text-xs text-slate-500"
                       numberOfLines={1}
                     >
                       {selectedSpot.creatorUsername
@@ -655,14 +645,12 @@ export default function MapScreen() {
                     {spotTimeInfo ? (
                       <>
                         <Text
-                          className="mx-1.5 text-xs text-slate-400"
-                          style={{ fontFamily: 'Outfit_500Medium' }}
+                          className="mx-1.5 font-outfit-medium text-xs text-slate-400"
                         >
                           ·
                         </Text>
                         <Text
-                          className="text-xs text-slate-500"
-                          style={{ fontFamily: 'Outfit_500Medium' }}
+                          className="font-outfit-medium text-xs text-slate-500"
                           numberOfLines={1}
                         >
                           {`${spotTimeInfo.label} ${spotTimeInfo.relative}`}
@@ -676,8 +664,7 @@ export default function MapScreen() {
                   className="px-2 py-1"
                 >
                   <Text
-                    className="text-sky-600"
-                    style={{ fontFamily: 'Outfit_600SemiBold' }}
+                    className="font-outfit-semibold text-sky-600"
                   >
                     Close
                   </Text>
@@ -699,8 +686,7 @@ export default function MapScreen() {
             ) : (
               <View className="mt-6 h-80 items-center justify-center rounded-3xl bg-slate-100">
                 <Text
-                  className="text-slate-500"
-                  style={{ fontFamily: 'Outfit_500Medium' }}
+                  className="font-outfit-medium text-slate-500"
                 >
                   No image available
                 </Text>
@@ -708,8 +694,7 @@ export default function MapScreen() {
             )}
 
             <Text
-              className="mt-6 text-sm text-slate-500"
-              style={{ fontFamily: 'Outfit_500Medium' }}
+              className="font-outfit-medium mt-6 text-sm text-slate-500"
             >
               {selectedSpot.description}
             </Text>
@@ -725,8 +710,7 @@ export default function MapScreen() {
                 >
                   <Feather name="edit-2" size={16} color="#FFFFFF" />
                   <Text
-                    className="ml-2 text-sm text-white"
-                    style={{ fontFamily: 'Outfit_600SemiBold' }}
+                    className="ml-2 font-outfit-semibold text-sm text-white"
                   >
                     Edit spot
                   </Text>
@@ -744,8 +728,7 @@ export default function MapScreen() {
                     <Feather name="trash-2" size={16} color="#DC2626" />
                   )}
                   <Text
-                    className="ml-2 text-sm text-red-600"
-                    style={{ fontFamily: 'Outfit_600SemiBold' }}
+                    className="ml-2 font-outfit-semibold text-sm text-red-600"
                   >
                     Delete spot
                   </Text>

@@ -1,3 +1,5 @@
+import { getSupabaseConfig, resolveUserId } from './spots+api';
+
 // Server-side username moderation. The OpenAI key lives only here (never
 // EXPO_PUBLIC_*), so it is never shipped in the client bundle.
 //
@@ -10,6 +12,17 @@ const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 const MODEL = 'gpt-4o-mini';
 
 const USERNAME_MAX = 20;
+const MODERATION_TIMEOUT_MS = 8_000;
+
+function readBearerToken(request: Request): string | null {
+  const header =
+    request.headers.get('Authorization') ?? request.headers.get('authorization');
+  if (!header) {
+    return null;
+  }
+  const match = /^Bearer\s+(.+)$/i.exec(header.trim());
+  return match ? match[1].trim() : null;
+}
 
 const SYSTEM_PROMPT = `You are a strict username moderation filter for SkateU, a school skate-spot app used by all ages. Decide if a username is safe to display publicly, like Instagram or Roblox would allow.
 
@@ -48,6 +61,31 @@ function containsSensitiveNumericIdentifier(value: string): boolean {
 }
 
 export async function POST(request: Request) {
+  const accessToken = readBearerToken(request);
+  if (!accessToken) {
+    return Response.json(
+      { error: 'Authentication is required to moderate a username.' },
+      { status: 401 }
+    );
+  }
+
+  const config = getSupabaseConfig();
+  if (!config) {
+    return Response.json(
+      { error: 'Username moderation database is not configured.' },
+      { status: 500 }
+    );
+  }
+
+  const auth = await resolveUserId(config, accessToken);
+  if (!auth.ok) {
+    const message =
+      auth.reason === 'expired'
+        ? 'The access token is expired.'
+        : 'The access token is invalid.';
+    return Response.json({ error: message }, { status: 401 });
+  }
+
   const apiKey = process.env.OPENAI_API_KEY;
 
   if (!apiKey) {
@@ -80,6 +118,9 @@ export async function POST(request: Request) {
     });
   }
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), MODERATION_TIMEOUT_MS);
+
   try {
     const response = await fetch(OPENAI_URL, {
       method: 'POST',
@@ -96,6 +137,7 @@ export async function POST(request: Request) {
           { role: 'user', content: `Username: ${username}` },
         ],
       }),
+      signal: controller.signal,
     });
 
     if (!response.ok) {
@@ -123,12 +165,48 @@ export async function POST(request: Request) {
 
     const verdict = JSON.parse(content) as ModerationVerdict;
 
+    if (verdict.appropriate !== true) {
+      return Response.json({
+        allowed: false,
+        reason:
+          typeof verdict.reason === 'string' && verdict.reason.length > 0
+            ? verdict.reason
+            : "That username isn't allowed. Please pick another.",
+      });
+    }
+
+    const profileResponse = await fetch(
+      `${config.url}/rest/v1/profiles?id=eq.${encodeURIComponent(auth.userId)}`,
+      {
+        method: 'PATCH',
+        headers: {
+          apikey: config.apiKey,
+          Authorization: `Bearer ${config.apiKey}`,
+          'Content-Type': 'application/json',
+          Prefer: 'return=representation',
+        },
+        body: JSON.stringify({ username }),
+      }
+    );
+
+    if (profileResponse.status === 409) {
+      return Response.json({
+        allowed: false,
+        reason: 'That username is already taken.',
+      });
+    }
+
+    if (!profileResponse.ok) {
+      console.error('Moderated username profile update failed:', profileResponse.status);
+      return Response.json(
+        { error: 'Could not save the username right now. Try again.' },
+        { status: 502 }
+      );
+    }
+
     return Response.json({
-      allowed: verdict.appropriate === true,
-      reason:
-        typeof verdict.reason === 'string' && verdict.reason.length > 0
-          ? verdict.reason
-          : "That username isn't allowed. Please pick another.",
+      allowed: true,
+      reason: '',
     });
   } catch (error) {
     console.error('Username moderation failed:', error);
@@ -136,5 +214,7 @@ export async function POST(request: Request) {
       { error: 'Could not verify the username right now. Try again.' },
       { status: 502 }
     );
+  } finally {
+    clearTimeout(timeout);
   }
 }

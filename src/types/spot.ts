@@ -20,6 +20,12 @@ export type Spot = {
   updatedAt: string
 }
 
+export type SpotImageAsset = {
+  uri: string
+  fileName?: string
+  mimeType?: string
+}
+
 export type NewSpotInput = {
   schoolId: string
   name: string
@@ -27,6 +33,7 @@ export type NewSpotInput = {
   latitude: number
   longitude: number
   imageUri?: string
+  image?: SpotImageAsset
 }
 
 export type UpdateSpotInput = {
@@ -36,4 +43,5 @@ export type UpdateSpotInput = {
   longitude: number
   // A new local image URI to upload. When omitted, the existing image is kept.
   imageUri?: string
+  image?: SpotImageAsset
 }

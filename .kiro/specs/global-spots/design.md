@@ -271,7 +271,7 @@ const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
 
 The client `Spot` type carries `city` and `state`, but `spots` does not store them — they belong to the school. GET resolves them by PostgREST resource embedding on the `school_id` foreign key:
 
-```
+```sql
 select=id,school_id,name,description,latitude,longitude,image_urls,schools(city,state)
 ```
 
@@ -355,7 +355,7 @@ The route reads file parts from `request.formData()` (each is a `File`/`Blob` wi
 2. Build an object key: `${schoolId}/${crypto.randomUUID()}.${ext}` where `ext` is derived from the content type. Random names avoid collisions and path traversal.
 3. Upload via the Storage REST endpoint using the service-role key, guarded by a 30s timeout (`AbortController` + `setTimeout`):
 
-   ```
+   ```http
    POST ${url}/storage/v1/object/spot-images/${objectKey}
    headers: { apikey, Authorization: Bearer <service key>, 'Content-Type': file.type }
    body: <file bytes>

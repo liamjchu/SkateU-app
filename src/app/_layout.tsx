@@ -10,7 +10,7 @@ import * as Linking from 'expo-linking';
 import { SplashScreen, Stack, useRouter, useSegments } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect } from 'react';
-import { Text } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import '../../global.css';
 import { useAuthStore } from '../store/authStore';
@@ -36,6 +36,7 @@ export default function RootLayout() {
   const authInitializing = useAuthStore((state) => state.initializing);
   const profile = useProfileStore((state) => state.profile);
   const profileLoaded = useProfileStore((state) => state.loaded);
+  const profileError = useProfileStore((state) => state.error);
   const fetchProfile = useProfileStore((state) => state.fetchProfile);
   const clearProfile = useProfileStore((state) => state.clearProfile);
   const clearMySpots = useSpotsStore((state) => state.clearMySpots);
@@ -149,6 +150,24 @@ export default function RootLayout() {
   // 2. This keeps the app loading until the fonts are ready
   if (!fontsLoaded) {
     return null;
+  }
+
+  if (userId && profileError) {
+    return (
+      <View className="flex-1 items-center justify-center bg-white px-6">
+        <Text className="text-center font-outfit-medium text-base text-slate-600">
+          {profileError}
+        </Text>
+        <Pressable
+          className="mt-4 rounded-2xl bg-[#21473f] px-5 py-3"
+          onPress={() => fetchProfile(userId)}
+          accessibilityRole="button"
+          accessibilityLabel="Retry loading profile"
+        >
+          <Text className="font-outfit-bold text-base text-white">Retry</Text>
+        </Pressable>
+      </View>
+    );
   }
 
   return (

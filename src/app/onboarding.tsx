@@ -27,6 +27,7 @@ type AvailabilityStatus =
 export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
   const user = useAuthStore((state) => state.user);
+  const accessToken = useAuthStore((state) => state.session?.access_token);
   const signOut = useAuthStore((state) => state.signOut);
   const isUsernameAvailable = useProfileStore(
     (state) => state.isUsernameAvailable
@@ -117,7 +118,10 @@ export default function OnboardingScreen() {
       // server so the OpenAI key is never in the client bundle.
       const response = await fetch(getApiUrl('/api/moderate-username'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({ username: value }),
       });
 
@@ -147,9 +151,14 @@ export default function OnboardingScreen() {
       // On success the profile store updates `username`, and the root gate
       // in _layout redirects into the app automatically.
     } catch (error) {
-      setStatus('taken');
+      const isDuplicateUsername =
+        error instanceof Error &&
+        error.message === 'That username is already taken.';
+      setStatus(isDuplicateUsername ? 'taken' : 'error');
       setSubmitError(
-        error instanceof Error ? error.message : 'Could not save. Try again.'
+        isDuplicateUsername
+          ? 'That username is already taken.'
+          : 'Could not save. Try again.'
       );
       setSubmitting(false);
     }
@@ -178,8 +187,7 @@ export default function OnboardingScreen() {
         }}
       >
         <Text
-          className="text-2xl text-white"
-          style={{ fontFamily: 'Outfit_700Bold' }}
+          className="font-outfit-bold text-2xl text-white"
         >
           Choose a username
         </Text>
@@ -191,14 +199,12 @@ export default function OnboardingScreen() {
       >
         <View className="flex-1 px-5 pt-8">
           <Text
-            className="text-3xl text-[#1B3B36]"
-            style={{ fontFamily: 'Outfit_900Black' }}
+            className="font-outfit-black text-3xl text-[#1B3B36]"
           >
             One last step
           </Text>
           <Text
-            className="mt-2 text-base text-slate-500"
-            style={{ fontFamily: 'Outfit_500Medium' }}
+            className="mt-2 font-outfit-medium text-base text-slate-500"
           >
             Pick a unique username. This is how other skaters will see you —
             your email stays private.
@@ -207,8 +213,7 @@ export default function OnboardingScreen() {
           <View className="mt-8">
             <View className="flex-row items-center rounded-2xl bg-[#F0F3F5] pl-4 pr-3">
               <Text
-                className="text-base text-slate-400"
-                style={{ fontFamily: 'Outfit_700Bold' }}
+                className="font-outfit-bold text-base text-slate-400"
               >
                 @
               </Text>
@@ -222,8 +227,7 @@ export default function OnboardingScreen() {
                 autoFocus
                 maxLength={20}
                 editable={!submitting}
-                className="flex-1 py-4 pl-1 pr-2 text-base text-[#1B3B36]"
-                style={{ fontFamily: 'Outfit_600SemiBold' }}
+                className="flex-1 py-4 pl-1 pr-2 font-outfit-semibold text-base text-[#1B3B36]"
               />
               <View className="h-6 w-6 items-center justify-center">
                 {status === 'checking' ? (
@@ -244,37 +248,26 @@ export default function OnboardingScreen() {
 
             <View className="mt-2 min-h-[20px] px-1">
               {submitError ? (
-                <Text
-                  className="text-sm text-red-500"
-                  style={{ fontFamily: 'Outfit_500Medium' }}
-                >
+                <Text className="font-outfit-medium text-sm text-red-500">
                   {submitError}
                 </Text>
               ) : status === 'invalid' && validationError ? (
-                <Text
-                  className="text-sm text-red-500"
-                  style={{ fontFamily: 'Outfit_500Medium' }}
-                >
+                <Text className="font-outfit-medium text-sm text-red-500">
                   {validationError}
                 </Text>
               ) : status === 'taken' ? (
-                <Text
-                  className="text-sm text-red-500"
-                  style={{ fontFamily: 'Outfit_500Medium' }}
-                >
+                <Text className="font-outfit-medium text-sm text-red-500">
                   That username is already taken.
                 </Text>
               ) : status === 'available' ? (
                 <Text
-                  className="text-sm text-[#1B3B36]"
-                  style={{ fontFamily: 'Outfit_600SemiBold' }}
+                  className="font-outfit-semibold text-sm text-[#1B3B36]"
                 >
                   Nice — that one's available.
                 </Text>
               ) : status === 'error' ? (
                 <Text
-                  className="text-sm text-slate-400"
-                  style={{ fontFamily: 'Outfit_500Medium' }}
+                  className="font-outfit-medium text-sm text-slate-400"
                 >
                   Couldn't check right now. Try again.
                 </Text>
@@ -294,8 +287,7 @@ export default function OnboardingScreen() {
             accessibilityRole="button"
           >
             <Text
-              className="text-lg text-white"
-              style={{ fontFamily: 'Outfit_700Bold' }}
+              className="font-outfit-bold text-lg text-white"
             >
               {submitting ? 'Saving...' : 'Continue'}
             </Text>
@@ -308,8 +300,7 @@ export default function OnboardingScreen() {
             accessibilityRole="button"
           >
             <Text
-              className="text-base text-slate-500"
-              style={{ fontFamily: 'Outfit_600SemiBold' }}
+              className="font-outfit-semibold text-base text-slate-500"
             >
               Sign out
             </Text>

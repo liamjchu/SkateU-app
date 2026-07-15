@@ -15,6 +15,8 @@ import SpotImagePicker from '../components/SpotImagePicker';
 import { isAddSpotFormValid } from '../lib/addSpotForm';
 import { useAuthStore } from '../store/authStore';
 import { useSpotsStore } from '../store/spotsStore';
+import type { SpotImageAsset } from '../types/spot';
+
 
 type Coordinates = {
   latitude: number;
@@ -51,6 +53,7 @@ export default function EditSpotScreen() {
   const [imageUri, setImageUri] = useState<string | undefined>(
     spot?.imageUris[0]
   );
+  const [imageAsset, setImageAsset] = useState<SpotImageAsset | undefined>();
   const [imageChanged, setImageChanged] = useState(false);
 
   const [selectedLocation, setSelectedLocation] = useState<Coordinates>({
@@ -79,6 +82,7 @@ export default function EditSpotScreen() {
     setName(spot.name);
     setDescription(spot.description);
     setImageUri(spot.imageUris[0]);
+    setImageAsset(undefined);
     setImageChanged(false);
     setSelectedLocation({
       latitude: spot.latitude,
@@ -88,8 +92,9 @@ export default function EditSpotScreen() {
 
   const isFormValid = isAddSpotFormValid(imageUri, name, description);
 
-  const handleImageSelected = (uri: string) => {
-    setImageUri(uri);
+  const handleImageSelected = (asset: SpotImageAsset) => {
+    setImageUri(asset.uri);
+    setImageAsset(asset);
     setImageChanged(true);
   };
 
@@ -129,7 +134,7 @@ export default function EditSpotScreen() {
           description: description.trim(),
           latitude: selectedLocation.latitude,
           longitude: selectedLocation.longitude,
-          imageUri: imageChanged ? imageUri : undefined,
+          image: imageChanged ? imageAsset : undefined,
         },
         accessToken
       );
@@ -270,22 +275,16 @@ export default function EditSpotScreen() {
             onPress={handleSave}
             disabled={!isFormValid || saving}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={styles.saveContent}>
               {saving ? (
                 <>
-                  <ActivityIndicator color="#ffffff" />
-                  <Text
-                    className="text-center text-lg text-white"
-                    style={{ fontFamily: 'Outfit_700Bold', marginLeft: 8 }}
-                  >
+                  <ActivityIndicator color="#ffffff" style={styles.saveIndicator} />
+                  <Text style={styles.saveTextWithMargin}>
                     Saving…
                   </Text>
                 </>
               ) : (
-                <Text
-                  className="text-center text-lg text-white"
-                  style={{ fontFamily: 'Outfit_700Bold' }}
-                >
+                <Text style={styles.saveText}>
                   Save Changes
                 </Text>
               )}
@@ -372,6 +371,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 24,
+  },
+
+  saveContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  saveIndicator: {},
+
+  saveText: {
+    color: '#FFFFFF',
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 18,
+    textAlign: 'center',
+  },
+
+  saveTextWithMargin: {
+    color: '#FFFFFF',
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 18,
+    marginLeft: 8,
+    textAlign: 'center',
   },
 
   saveButtonDisabled: {

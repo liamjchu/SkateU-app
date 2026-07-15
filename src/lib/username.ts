@@ -22,7 +22,7 @@ export function validateUsername(value: string): string | null {
     return `Must be ${USERNAME_MAX} characters or fewer.`;
   }
   if (!/^[a-z]/.test(value)) {
-    return 'Must start with a letter.';
+    return 'Must start with a lowercase letter.';
   }
   if (!USERNAME_PATTERN.test(value)) {
     return 'Use lowercase letters, numbers, and underscores only.';

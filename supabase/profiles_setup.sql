@@ -21,6 +21,25 @@ create table if not exists public.profiles (
 create unique index if not exists profiles_username_lower_key
   on public.profiles (lower(username));
 
+-- Keep profile timestamps current for both client and server updates.
+create or replace function public.set_profiles_updated_at()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists profiles_set_updated_at on public.profiles;
+
+create trigger profiles_set_updated_at
+  before update on public.profiles
+  for each row execute function public.set_profiles_updated_at();
+
 -- -----------------------------------------------------------------------------
 -- 2. Signup trigger
 --    RECOMMENDED APPROACH: fire AFTER INSERT on auth.users and create the
@@ -59,6 +78,16 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
+-- Backfill profiles for users created before the signup trigger existed.
+-- This is idempotent and runs before the spots -> profiles FK is added.
+insert into public.profiles (id, username, avatar_url)
+select
+  users.id,
+  null,
+  users.raw_user_meta_data ->> 'avatar_url'
+from auth.users as users
+on conflict (id) do nothing;
+
 -- -----------------------------------------------------------------------------
 -- 3. Row Level Security
 -- -----------------------------------------------------------------------------
@@ -71,13 +100,32 @@ create policy "Profiles are publicly readable"
   for select
   using (true);
 
--- Policy 2: a user may update only their own row.
+-- Username changes are performed by the moderated server flow. Direct client
+-- updates may still change permitted profile fields, but cannot change the
+-- username column.
+create or replace function public.profile_username_is_unchanged(
+  profile_id uuid,
+  candidate_username text
+)
+returns boolean
+language sql
+security definer
+set search_path = ''
+as $$
+  select existing.username is not distinct from candidate_username
+  from public.profiles as existing
+  where existing.id = profile_id;
+$$;
+
 drop policy if exists "Users can update own profile" on public.profiles;
 create policy "Users can update own profile"
   on public.profiles
   for update
   using (auth.uid() = id)
-  with check (auth.uid() = id);
+  with check (
+    auth.uid() = id
+    and public.profile_username_is_unchanged(id, username)
+  );
 
 -- Note: no INSERT policy on purpose. Rows are created by the SECURITY DEFINER
 -- trigger above, so clients never insert directly.
