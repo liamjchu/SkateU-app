@@ -12,9 +12,19 @@ type SpotsState = {
   mySpots: Spot[];
   myLoading: boolean;
   myError: string | null;
-  fetchSpots: (schoolId: string) => Promise<void>;
+  // Spots the signed-in user has liked, for the profile page.
+  likedSpots: Spot[];
+  likedLoading: boolean;
+  likedError: string | null;
+  fetchSpots: (schoolId: string, accessToken?: string) => Promise<void>;
   addSpot: (input: NewSpotInput, accessToken: string) => Promise<Spot>;
   fetchMySpots: (accessToken: string) => Promise<void>;
+  fetchLikedSpots: (accessToken: string) => Promise<void>;
+  toggleSpotLike: (
+    id: string,
+    likedByUser: boolean,
+    accessToken: string
+  ) => Promise<void>;
   updateSpot: (
     id: string,
     input: UpdateSpotInput,
@@ -22,6 +32,7 @@ type SpotsState = {
   ) => Promise<Spot>;
   deleteSpot: (id: string, accessToken: string) => Promise<void>;
   clearMySpots: () => void;
+  clearLikedSpots: () => void;
   reset: () => void;
 };
 
@@ -35,9 +46,11 @@ const INVALID_SCHOOL_ID_ERROR =
 const LOAD_FAILED_ERROR = 'Unable to load spots right now.';
 const LOAD_TIMEOUT_ERROR = 'Loading spots timed out. Please try again.';
 const MY_SPOTS_LOAD_FAILED_ERROR = 'Unable to load your spots right now.';
+const LIKED_SPOTS_LOAD_FAILED_ERROR = 'Unable to load liked spots right now.';
 
 let spotsRequestVersion = 0;
 let mySpotsRequestVersion = 0;
+let likedSpotsRequestVersion = 0;
 
 // React Native serializes an object of this shape as a multipart file part.
 type RNFile = { uri: string; name: string; type: string };
@@ -185,8 +198,11 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
   mySpots: [],
   myLoading: false,
   myError: null,
+  likedSpots: [],
+  likedLoading: false,
+  likedError: null,
 
-  fetchSpots: async (schoolId: string) => {
+  fetchSpots: async (schoolId: string, accessToken?: string) => {
     const requestVersion = ++spotsRequestVersion;
     const trimmedSchoolId = schoolId?.trim() ?? '';
 
@@ -206,7 +222,12 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
     try {
       const response = await fetchGetWithRetry(
         getApiUrl(`/api/spots?schoolId=${encodeURIComponent(trimmedSchoolId)}`),
-        { method: 'GET' }
+        {
+          method: 'GET',
+          headers: accessToken
+            ? { Authorization: `Bearer ${accessToken}` }
+            : undefined,
+        }
       );
 
       if (!response.ok) {
@@ -307,6 +328,92 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
     }
   },
 
+  fetchLikedSpots: async (accessToken: string) => {
+    const requestVersion = ++likedSpotsRequestVersion;
+    set({ likedLoading: true, likedError: null });
+
+    try {
+      const response = await fetchGetWithRetry(getApiUrl('/api/spot-likes'), {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response));
+      }
+
+      const data = (await response.json()) as { spots?: Spot[] };
+      if (requestVersion !== likedSpotsRequestVersion) {
+        return;
+      }
+
+      set({ likedSpots: data.spots ?? [], likedLoading: false, likedError: null });
+    } catch (error) {
+      if (requestVersion !== likedSpotsRequestVersion) {
+        return;
+      }
+
+      set({
+        likedLoading: false,
+        likedError:
+          error instanceof Error && error.message.length > 0
+            ? error.message
+            : LIKED_SPOTS_LOAD_FAILED_ERROR,
+      });
+    }
+  },
+
+  toggleSpotLike: async (id: string, likedByUser: boolean, accessToken: string) => {
+    const response = await fetchMutationWithTimeout(
+      getApiUrl(`/api/spot-likes?id=${encodeURIComponent(id)}`),
+      {
+        method: likedByUser ? 'DELETE' : 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response));
+    }
+
+    const data = (await response.json()) as {
+      likeCount?: number;
+      likedByUser?: boolean;
+    };
+    const nextLiked = data.likedByUser ?? !likedByUser;
+    const nextCount = data.likeCount ?? 0;
+
+    set((state) => {
+      const updateSpot = (spot: Spot): Spot =>
+        spot.id === id
+          ? { ...spot, likeCount: nextCount, likedByUser: nextLiked }
+          : spot;
+      const updatedSpots = state.spots.map(updateSpot);
+      const updatedMySpots = state.mySpots.map(updateSpot);
+      const updatedLikedSpots = state.likedSpots.map(updateSpot);
+
+      if (!nextLiked) {
+        return {
+          spots: updatedSpots,
+          mySpots: updatedMySpots,
+          likedSpots: updatedLikedSpots.filter((spot) => spot.id !== id),
+        };
+      }
+
+      const likedSpot = updatedSpots.find((spot) => spot.id === id);
+      return {
+        spots: updatedSpots,
+        mySpots: updatedMySpots,
+        likedSpots: likedSpot
+          ? [
+              likedSpot,
+              ...updatedLikedSpots.filter((spot) => spot.id !== id),
+            ]
+          : updatedLikedSpots,
+      };
+    });
+  },
+
   updateSpot: async (id: string, input: UpdateSpotInput, accessToken: string) => {
     const form = new FormData();
     form.append('name', input.name);
@@ -380,9 +487,15 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
     set({ mySpots: [], myLoading: false, myError: null });
   },
 
+  clearLikedSpots: () => {
+    likedSpotsRequestVersion += 1;
+    set({ likedSpots: [], likedLoading: false, likedError: null });
+  },
+
   reset: () => {
     spotsRequestVersion += 1;
     mySpotsRequestVersion += 1;
+    likedSpotsRequestVersion += 1;
     set({
       spots: [],
       loading: false,
@@ -391,6 +504,9 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
       mySpots: [],
       myLoading: false,
       myError: null,
+      likedSpots: [],
+      likedLoading: false,
+      likedError: null,
     });
   },
 }));

@@ -40,6 +40,7 @@ export default function RootLayout() {
   const fetchProfile = useProfileStore((state) => state.fetchProfile);
   const clearProfile = useProfileStore((state) => state.clearProfile);
   const clearMySpots = useSpotsStore((state) => state.clearMySpots);
+  const clearLikedSpots = useSpotsStore((state) => state.clearLikedSpots);
 
   const router = useRouter();
   const segments = useSegments();
@@ -53,13 +54,14 @@ export default function RootLayout() {
   // the user id so token refreshes don't trigger needless refetches.
   useEffect(() => {
     clearMySpots();
+    clearLikedSpots();
 
     if (userId) {
       fetchProfile(userId);
     } else {
       clearProfile();
     }
-  }, [clearMySpots, userId, fetchProfile, clearProfile]);
+  }, [clearLikedSpots, clearMySpots, userId, fetchProfile, clearProfile]);
 
   useEffect(() => {
     // Global deep link listener. When Supabase redirects back to the app
