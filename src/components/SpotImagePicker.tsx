@@ -2,10 +2,11 @@ import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useState } from 'react';
 import { ActivityIndicator, Image, Pressable, Text, View } from 'react-native';
+import type { SpotImageAsset } from '../types/spot';
 
 type SpotImagePickerProps = {
   imageUri?: string;
-  onImageSelected: (uri: string) => void;
+  onImageSelected: (asset: SpotImageAsset) => void;
 };
 
 export default function SpotImagePicker({
@@ -35,10 +36,15 @@ export default function SpotImagePicker({
       });
 
       if (!result.canceled && result.assets.length > 0) {
-        const uri = result.assets[0].uri;
+        const asset = result.assets[0];
+        const uri = asset.uri;
 
         if (uri) {
-          onImageSelected(uri);
+          onImageSelected({
+            uri,
+            fileName: asset.fileName ?? undefined,
+            mimeType: asset.mimeType ?? undefined,
+          });
         }
       }
     } catch (exception) {

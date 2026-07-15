@@ -1,21 +1,19 @@
-﻿import { Ionicons, Octicons } from '@expo/vector-icons';
+﻿import { Feather, Ionicons, Octicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
-import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  Image,
-  Keyboard,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-  type GestureResponderEvent,
+    Image,
+    Keyboard,
+    Platform,
+    Pressable,
+    ScrollView,
+    Text,
+    TextInput,
+    View,
+    type GestureResponderEvent,
 } from 'react-native';
-import LoginRequiredModal from '../components/LoginRequiredModal';
 import IMAGES from '../constants/images';
-import { useSpots } from '../context/SpotsContext';
 import { useAuthStore } from '../store/authStore';
 import { useFavorites } from '../store/favoritesStore';
 import { useSchools } from '../store/schoolsStore';
@@ -130,7 +128,12 @@ function SchoolRow({
         </View>
 
         <View className="w-20 shrink-0 flex-row items-center justify-center space-x-1.5 rounded-xl bg-white/50 px-3 py-1.5">
-          <Ionicons name="location-outline" size={14} color="#1B3B36" style={{ marginRight: 2 }} />
+          <Feather
+            name="map-pin"
+            size={11}
+            color="#64748b"
+            className="mr-[2px]"
+          />
           <Text 
             className="text-base text-[#1B3B36]"
             style={{ fontFamily: 'Outfit_700Bold' }}
@@ -178,7 +181,12 @@ function SchoolRow({
       </View>
 
       <View className="w-20 shrink-0 flex-row items-center justify-end space-x-1.5">
-        <Ionicons name="location-outline" size={14} color="#1B3B36" style={{ marginRight: 2 }} />
+        <Feather
+          name="map-pin"
+          size={11}
+          color="#64748b"
+          className="mr-[2px]"
+        />
         <Text 
           className="text-base text-[#1B3B36]"
           style={{ fontFamily: 'Outfit_700Bold' }}
@@ -192,7 +200,6 @@ function SchoolRow({
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { spots } = useSpots();
   const { schools, upsertSchool } = useSchools();
   const session = useAuthStore((state) => state.session);
   const {
@@ -208,21 +215,9 @@ export default function HomeScreen() {
   const [searchResults, setSearchResults] = useState<School[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
-  const [showLoginRequired, setShowLoginRequired] = useState(false);
-
-  const localSpotCountsBySchoolId = useMemo(() => {
-    return spots.reduce<Record<string, number>>((counts, spot) => {
-      if (!spot.schoolId) {
-        return counts;
-      }
-
-      counts[spot.schoolId] = (counts[spot.schoolId] ?? 0) + 1;
-      return counts;
-    }, {});
-  }, [spots]);
 
   const getDisplaySpotCount = (school: School) => {
-    return school.numSpots + (localSpotCountsBySchoolId[school.id] ?? 0);
+    return school.numSpots;
   };
 
   const favoriteSchools = favoriteSchoolIds
@@ -308,6 +303,50 @@ export default function HomeScreen() {
     };
   }, [favoriteSchoolIds, schools, upsertFavoriteSchool, upsertSchool]);
 
+  // Re-pull favorite schools' spot counts from the backend whenever the home
+  // screen regains focus (e.g. after adding a spot on the map), so the counter
+  // reflects the current schools.numspots column.
+  useFocusEffect(
+    useCallback(() => {
+      if (favoriteSchoolIds.length === 0) {
+        return;
+      }
+
+      const controller = new AbortController();
+
+      const refreshFavoriteSchools = async () => {
+        try {
+          const response = await fetch(
+            getApiUrl(`/api/schools?ids=${encodeURIComponent(favoriteSchoolIds.join(','))}`),
+            { signal: controller.signal }
+          );
+
+          if (!response.ok) {
+            return;
+          }
+
+          const data = (await response.json()) as SchoolsSearchResponse;
+          data.schools.forEach((school) => {
+            upsertSchool(school);
+            upsertFavoriteSchool(school);
+          });
+        } catch (error) {
+          if (error instanceof Error && error.name === 'AbortError') {
+            return;
+          }
+
+          console.warn('Unable to refresh favorite schools', error);
+        }
+      };
+
+      refreshFavoriteSchools();
+
+      return () => {
+        controller.abort();
+      };
+    }, [favoriteSchoolIds, upsertFavoriteSchool, upsertSchool])
+  );
+
   useEffect(() => {
     const trimmedQuery = searchQuery.trim();
 
@@ -391,6 +430,26 @@ export default function HomeScreen() {
     setIsOpen(false);
   };
 
+  const navigateToSchoolMap = (school: School) => {
+    router.push({
+      pathname: '/map',
+      params: {
+        lat: school.lat.toString(),
+        lng: school.lng.toString(),
+        schoolName: school.name,
+        schoolId: school.id,
+        schoolCity: school.city,
+        schoolState: school.state,
+        schoolNumSpots: getDisplaySpotCount(school).toString(),
+      },
+    });
+  };
+
+  const handleFavoriteSelect = (school: School) => {
+    upsertSchool(school);
+    navigateToSchoolMap(school);
+  };
+
   const handleFavoritePress = (
     event: GestureResponderEvent,
     school: School
@@ -405,18 +464,7 @@ export default function HomeScreen() {
       return;
     }
 
-    router.push({
-      pathname: '/map',
-      params: {
-        lat: selectedSchool.lat.toString(),
-        lng: selectedSchool.lng.toString(),
-        schoolName: selectedSchool.name,
-        schoolId: selectedSchool.id,
-        schoolCity: selectedSchool.city,
-        schoolState: selectedSchool.state,
-        schoolNumSpots: getDisplaySpotCount(selectedSchool).toString(),
-      },
-    });
+    navigateToSchoolMap(selectedSchool);
   };
 
   const handleProfilePress = () => {
@@ -425,7 +473,7 @@ export default function HomeScreen() {
       return;
     }
 
-    setShowLoginRequired(true);
+    router.push('/login');
   };
 
   return (
@@ -441,14 +489,14 @@ export default function HomeScreen() {
           elevation: 12,
         }}
       >
-        <View className="flex-row items-center space-x-3">
+        <View className="-ml-[17px] flex-row items-center space-x-3">
           <Image 
             source={IMAGES.logo} 
-            className="h-12 w-12 rounded-2xl"
+            className="h-14 w-14"
             resizeMode="contain"
           />
           <Text 
-            className="text-4xl text-white tracking-tight ml-4"
+            className="-ml-[5px] text-4xl text-white tracking-tight"
             style={{ fontFamily: 'Outfit_900Black' }}
           >
             SkateU
@@ -461,8 +509,8 @@ export default function HomeScreen() {
           accessibilityLabel="Open profile"
           accessibilityRole="button"
         >
-          <Ionicons
-            name="person-outline"
+          <Octicons
+            name="person"
             size={22}
             color="white"
             style={{
@@ -473,10 +521,6 @@ export default function HomeScreen() {
           />
         </Pressable>
       </View>
-      <LoginRequiredModal
-        visible={showLoginRequired}
-        onCancel={() => setShowLoginRequired(false)}
-      />
 
       <View className="flex-1 px-5 pt-6 relative">
         {/* Welcome Message Card */}
@@ -581,7 +625,7 @@ export default function HomeScreen() {
                       school={school}
                       displayNumSpots={getDisplaySpotCount(school)}
                       isFavorite
-                      onSelect={handleSchoolSelect}
+                      onSelect={handleFavoriteSelect}
                       onFavoritePress={handleFavoritePress}
                     />
                   ))}

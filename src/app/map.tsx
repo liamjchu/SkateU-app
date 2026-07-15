@@ -1,31 +1,38 @@
-﻿import { Octicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+﻿import { Feather, Octicons } from '@expo/vector-icons';
+import {
+    useFocusEffect,
+    useLocalSearchParams,
+    useRouter
+} from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Image,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
+    ActivityIndicator,
+    Alert,
+    Image,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
-  Easing,
-  SlideInDown,
-  SlideOutDown,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
+    Easing,
+    SlideInDown,
+    SlideOutDown,
+    useAnimatedStyle,
+    useSharedValue,
+    withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import LoginRequiredModal from '../components/LoginRequiredModal';
 import images from '../constants/images';
-import { useSpots } from '../context/SpotsContext';
+import { formatRelativeTime } from '../lib/relativeTime';
 import { useAuthStore } from '../store/authStore';
 import { useFavorites } from '../store/favoritesStore';
 import { useSchools } from '../store/schoolsStore';
+import { useSpotsStore } from '../store/spotsStore';
 import type { School } from '../types/school';
 
 const COLLAPSED_SHEET_HEIGHT = 100;
@@ -36,12 +43,20 @@ export default function MapScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const session = useAuthStore((state) => state.session);
-  const { spots } = useSpots();
+  const spots = useSpotsStore((s) => s.spots);
+  const mySpots = useSpotsStore((s) => s.mySpots);
+  const myLoading = useSpotsStore((s) => s.myLoading);
+  const deleteSpot = useSpotsStore((s) => s.deleteSpot);
+  const fetchMySpots = useSpotsStore((s) => s.fetchMySpots);
+  const loading = useSpotsStore((s) => s.loading);
+  const error = useSpotsStore((s) => s.error);
+  const fetchSpots = useSpotsStore((s) => s.fetchSpots);
   const { schools, upsertSchool } = useSchools();
   const { favoriteSchoolIds, toggleFavoriteSchool } = useFavorites();
   const webViewReadyRef = useRef(false);
   const [selectedSpotId, setSelectedSpotId] = useState<string | undefined>();
   const [showLoginRequired, setShowLoginRequired] = useState(false);
+  const [deletingSpotId, setDeletingSpotId] = useState<string | null>(null);
   const sheetHeight = useSharedValue(0);
   const sheetTranslateY = useSharedValue(0);
   const sheetStartY = useSharedValue(0);
@@ -105,6 +120,37 @@ export default function MapScreen() {
     () => spots.find((spot) => spot.id === selectedSpotId),
     [selectedSpotId, spots]
   );
+  const selectedSpotIsOwned = Boolean(
+    session?.user &&
+      selectedSpot &&
+      !myLoading &&
+      mySpots.some((spot) => spot.id === selectedSpot.id)
+  );
+
+  // Show "edited …" when the spot was changed after creation, otherwise
+  // "added …". created_at and updated_at both default to now() on insert, so a
+  // small threshold avoids labelling a brand-new spot as edited.
+  const spotTimeInfo = useMemo(() => {
+    if (!selectedSpot) {
+      return null;
+    }
+
+    const createdMs = Date.parse(selectedSpot.createdAt);
+    const updatedMs = Date.parse(selectedSpot.updatedAt);
+    const wasEdited =
+      Number.isFinite(createdMs) &&
+      Number.isFinite(updatedMs) &&
+      updatedMs - createdMs > 2000;
+
+    const relative = formatRelativeTime(
+      wasEdited ? selectedSpot.updatedAt : selectedSpot.createdAt
+    );
+    if (!relative) {
+      return null;
+    }
+
+    return { label: wasEdited ? 'edited' : 'added', relative };
+  }, [selectedSpot]);
 
   const html = `
   <!DOCTYPE html>
@@ -256,6 +302,20 @@ export default function MapScreen() {
     }
   }, [spots]);
 
+  // Refetch when the screen regains focus so a spot just created on the
+  // add-spot screen shows up on return.
+  useFocusEffect(
+    useCallback(() => {
+      if (schoolId) {
+        fetchSpots(schoolId);
+      }
+
+      if (session?.access_token) {
+        fetchMySpots(session.access_token);
+      }
+    }, [fetchMySpots, fetchSpots, schoolId, session?.access_token])
+  );
+
   useEffect(() => {
     if (selectedSpotId && !selectedSpot) {
       setSelectedSpotId(undefined);
@@ -330,6 +390,56 @@ export default function MapScreen() {
 
     setSelectedSpotId(undefined);
     webViewRef.current?.injectJavaScript(`window.sendCenter(); true;`);
+  };
+
+  const handleEditSelectedSpot = () => {
+    if (!selectedSpot || !selectedSpotIsOwned || deletingSpotId) {
+      return;
+    }
+
+    router.push(`/edit-spot?id=${encodeURIComponent(selectedSpot.id)}`);
+  };
+
+  const handleDeleteSelectedSpot = () => {
+    if (!selectedSpot || !selectedSpotIsOwned || deletingSpotId) {
+      return;
+    }
+
+    const spotToDelete = selectedSpot;
+    Alert.alert(
+      'Delete spot?',
+      `"${spotToDelete.name}" will be permanently removed for everyone. This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const accessToken = session?.access_token;
+            if (!accessToken) {
+              Alert.alert('You must be signed in to delete a spot.');
+              return;
+            }
+
+            setDeletingSpotId(spotToDelete.id);
+
+            try {
+              await deleteSpot(spotToDelete.id, accessToken);
+              setSelectedSpotId(undefined);
+            } catch (error) {
+              Alert.alert(
+                'Could not delete spot',
+                error instanceof Error && error.message.length > 0
+                  ? error.message
+                  : 'Please try again.'
+              );
+            } finally {
+              setDeletingSpotId(null);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleWebViewMessage = (event: WebViewMessageEvent) => {
@@ -485,6 +595,23 @@ export default function MapScreen() {
         onMessage={handleWebViewMessage}
       />
 
+      {(loading || error) && (
+        <View
+          pointerEvents="none"
+          className="absolute left-0 right-0 top-[150px] z-40 items-center"
+        >
+          <View className="flex-row items-center rounded-full bg-black/50 px-3 py-1.5">
+            {loading && <ActivityIndicator size="small" color="#FFFFFF" />}
+            <Text
+              className="ml-2 text-xs text-white"
+              style={{ fontFamily: 'Outfit_500Medium' }}
+            >
+              {loading ? 'Loading spots…' : error}
+            </Text>
+          </View>
+        </View>
+      )}
+
       {selectedSpot && (
         <Animated.View
           entering={SlideInDown.duration(240)}
@@ -497,21 +624,47 @@ export default function MapScreen() {
           <GestureDetector gesture={sheetPanGesture}>
             <View>
               <View className="mb-3 h-1.5 w-12 self-center rounded-full bg-slate-300" />
-              <View className="flex-row items-center justify-between bg-white pb-3">
-                <Text
-                  className="flex-1 pr-3 text-lg font-semibold"
-                  style={{ fontFamily: 'Outfit_700Bold' }}
-                  numberOfLines={1}
-                >
-                  {selectedSpot.name}
-                </Text>
+              <View className="flex-row items-start justify-between bg-white pb-3">
+                <View className="flex-1 pr-3">
+                  <Text
+                    className="font-outfit-bold text-lg"
+                    numberOfLines={1}
+                  >
+                    {selectedSpot.name}
+                  </Text>
+                  <View className="mt-1 flex-row items-center">
+                    <Octicons name="person" size={13} color="#64748b" />
+                    <Text
+                      className="ml-1 font-outfit-medium text-xs text-slate-500"
+                      numberOfLines={1}
+                    >
+                      {selectedSpot.creatorUsername
+                        ? `@${selectedSpot.creatorUsername}`
+                        : 'Unknown skater'}
+                    </Text>
+                    {spotTimeInfo ? (
+                      <>
+                        <Text
+                          className="mx-1.5 font-outfit-medium text-xs text-slate-400"
+                        >
+                          ·
+                        </Text>
+                        <Text
+                          className="font-outfit-medium text-xs text-slate-500"
+                          numberOfLines={1}
+                        >
+                          {`${spotTimeInfo.label} ${spotTimeInfo.relative}`}
+                        </Text>
+                      </>
+                    ) : null}
+                  </View>
+                </View>
                 <Pressable
                   onPress={() => setSelectedSpotId(undefined)}
                   className="px-2 py-1"
                 >
                   <Text
-                    className="text-sky-600"
-                    style={{ fontFamily: 'Outfit_600SemiBold' }}
+                    className="font-outfit-semibold text-sky-600"
                   >
                     Close
                   </Text>
@@ -533,8 +686,7 @@ export default function MapScreen() {
             ) : (
               <View className="mt-6 h-80 items-center justify-center rounded-3xl bg-slate-100">
                 <Text
-                  className="text-slate-500"
-                  style={{ fontFamily: 'Outfit_500Medium' }}
+                  className="font-outfit-medium text-slate-500"
                 >
                   No image available
                 </Text>
@@ -542,11 +694,47 @@ export default function MapScreen() {
             )}
 
             <Text
-              className="mt-6 text-sm text-slate-500"
-              style={{ fontFamily: 'Outfit_500Medium' }}
+              className="font-outfit-medium mt-6 text-sm text-slate-500"
             >
               {selectedSpot.description}
             </Text>
+
+            {selectedSpotIsOwned ? (
+              <View className="mt-5 flex-row gap-3">
+                <Pressable
+                  onPress={handleEditSelectedSpot}
+                  disabled={deletingSpotId !== null}
+                  className="h-12 flex-1 flex-row items-center justify-center rounded-2xl bg-[#21473f]"
+                  accessibilityLabel={`Edit ${selectedSpot.name}`}
+                  accessibilityRole="button"
+                >
+                  <Feather name="edit-2" size={16} color="#FFFFFF" />
+                  <Text
+                    className="ml-2 font-outfit-semibold text-sm text-white"
+                  >
+                    Edit spot
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={handleDeleteSelectedSpot}
+                  disabled={deletingSpotId !== null}
+                  className="h-12 flex-1 flex-row items-center justify-center rounded-2xl border border-red-200 bg-red-50"
+                  accessibilityLabel={`Delete ${selectedSpot.name}`}
+                  accessibilityRole="button"
+                >
+                  {deletingSpotId === selectedSpot.id ? (
+                    <ActivityIndicator size="small" color="#DC2626" />
+                  ) : (
+                    <Feather name="trash-2" size={16} color="#DC2626" />
+                  )}
+                  <Text
+                    className="ml-2 font-outfit-semibold text-sm text-red-600"
+                  >
+                    Delete spot
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
           </ScrollView>
         </Animated.View>
       )}
