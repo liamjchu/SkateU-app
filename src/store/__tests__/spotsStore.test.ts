@@ -57,6 +57,8 @@ const spotArb: fc.Arbitrary<Spot> = fc.record({
   imageUris: fc.array(fc.webUrl()),
   city: fc.string(),
   state: fc.string(),
+  creatorUsername: fc.option(fc.string(), { nil: null }),
+  createdAt: fc.date({ noInvalidDate: true }).map((d) => d.toISOString()),
 });
 
 // Whitespace-only strings, including the empty string.
@@ -139,6 +141,8 @@ describe('spotsStore', () => {
         imageUris: ['https://example.com/a.jpg'],
         city: 'Boulder',
         state: 'CO',
+        creatorUsername: 'skater_jane',
+        createdAt: '2024-01-01T00:00:00.000Z',
       },
     ];
     fetchMock.mockResolvedValue(mockResponse({ spots }));
@@ -188,6 +192,8 @@ describe('spotsStore', () => {
       imageUris: [],
       city: 'City',
       state: 'ST',
+      creatorUsername: null,
+      createdAt: '2024-01-01T00:00:00.000Z',
     };
     fetchMock.mockResolvedValue(mockResponse({ spot: created }, { status: 201 }));
 

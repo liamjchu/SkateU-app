@@ -101,8 +101,13 @@ describe('mapSpot', () => {
       latitude: fc.double({ noNaN: true }),
       longitude: fc.double({ noNaN: true }),
       image_urls: fc.array(fc.string()),
+      created_at: fc.date({ noInvalidDate: true }).map((d) => d.toISOString()),
       schools: fc.option(
         fc.record({ city: fc.string(), state: fc.string() }),
+        { nil: null }
+      ),
+      creator: fc.option(
+        fc.record({ username: fc.option(fc.string(), { nil: null }) }),
         { nil: null }
       ),
     });
@@ -337,7 +342,9 @@ describe('GET /api/spots', () => {
       latitude: 10,
       longitude: 20,
       image_urls: ['https://img/1.jpg'],
+      created_at: '2024-01-01T00:00:00.000Z',
       schools: { city: 'Austin', state: 'TX' },
+      creator: { username: 'skater_jane' },
     };
     global.fetch = jest.fn(async () => jsonResponse([row])) as unknown as typeof fetch;
 
@@ -357,6 +364,8 @@ describe('GET /api/spots', () => {
           city: 'Austin',
           state: 'TX',
           schoolId: 'school1',
+          creatorUsername: 'skater_jane',
+          createdAt: '2024-01-01T00:00:00.000Z',
         },
       ],
     });
@@ -525,7 +534,9 @@ describe('POST /api/spots', () => {
       latitude: 10,
       longitude: 20,
       image_urls: [],
+      created_at: '2024-01-01T00:00:00.000Z',
       schools: { city: 'Austin', state: 'TX' },
+      creator: { username: 'skater_jane' },
     };
     const fetchMock: FetchMock = jest.fn(async (input) => {
       const requestUrl = input.toString();

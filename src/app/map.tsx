@@ -27,6 +27,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import LoginRequiredModal from '../components/LoginRequiredModal';
 import images from '../constants/images';
+import { formatRelativeTime } from '../lib/relativeTime';
 import { useAuthStore } from '../store/authStore';
 import { useFavorites } from '../store/favoritesStore';
 import { useSchools } from '../store/schoolsStore';
@@ -540,14 +541,45 @@ export default function MapScreen() {
           <GestureDetector gesture={sheetPanGesture}>
             <View>
               <View className="mb-3 h-1.5 w-12 self-center rounded-full bg-slate-300" />
-              <View className="flex-row items-center justify-between bg-white pb-3">
-                <Text
-                  className="flex-1 pr-3 text-lg font-semibold"
-                  style={{ fontFamily: 'Outfit_700Bold' }}
-                  numberOfLines={1}
-                >
-                  {selectedSpot.name}
-                </Text>
+              <View className="flex-row items-start justify-between bg-white pb-3">
+                <View className="flex-1 pr-3">
+                  <Text
+                    className="text-lg font-semibold"
+                    style={{ fontFamily: 'Outfit_700Bold' }}
+                    numberOfLines={1}
+                  >
+                    {selectedSpot.name}
+                  </Text>
+                  <View className="mt-1 flex-row items-center">
+                    <Octicons name="person" size={13} color="#64748b" />
+                    <Text
+                      className="ml-1 text-xs text-slate-500"
+                      style={{ fontFamily: 'Outfit_500Medium' }}
+                      numberOfLines={1}
+                    >
+                      {selectedSpot.creatorUsername
+                        ? `@${selectedSpot.creatorUsername}`
+                        : 'Unknown skater'}
+                    </Text>
+                    {formatRelativeTime(selectedSpot.createdAt) ? (
+                      <>
+                        <Text
+                          className="mx-1.5 text-xs text-slate-400"
+                          style={{ fontFamily: 'Outfit_500Medium' }}
+                        >
+                          ·
+                        </Text>
+                        <Text
+                          className="text-xs text-slate-500"
+                          style={{ fontFamily: 'Outfit_500Medium' }}
+                          numberOfLines={1}
+                        >
+                          {`added ${formatRelativeTime(selectedSpot.createdAt)}`}
+                        </Text>
+                      </>
+                    ) : null}
+                  </View>
+                </View>
                 <Pressable
                   onPress={() => setSelectedSpotId(undefined)}
                   className="px-2 py-1"

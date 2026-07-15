@@ -1,7 +1,7 @@
 ﻿import { Ionicons, Octicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
     Image,
     Keyboard,
@@ -293,6 +293,50 @@ export default function HomeScreen() {
     };
   }, [favoriteSchoolIds, schools, upsertFavoriteSchool, upsertSchool]);
 
+  // Re-pull favorite schools' spot counts from the backend whenever the home
+  // screen regains focus (e.g. after adding a spot on the map), so the counter
+  // reflects the current schools.numspots column.
+  useFocusEffect(
+    useCallback(() => {
+      if (favoriteSchoolIds.length === 0) {
+        return;
+      }
+
+      const controller = new AbortController();
+
+      const refreshFavoriteSchools = async () => {
+        try {
+          const response = await fetch(
+            getApiUrl(`/api/schools?ids=${encodeURIComponent(favoriteSchoolIds.join(','))}`),
+            { signal: controller.signal }
+          );
+
+          if (!response.ok) {
+            return;
+          }
+
+          const data = (await response.json()) as SchoolsSearchResponse;
+          data.schools.forEach((school) => {
+            upsertSchool(school);
+            upsertFavoriteSchool(school);
+          });
+        } catch (error) {
+          if (error instanceof Error && error.name === 'AbortError') {
+            return;
+          }
+
+          console.warn('Unable to refresh favorite schools', error);
+        }
+      };
+
+      refreshFavoriteSchools();
+
+      return () => {
+        controller.abort();
+      };
+    }, [favoriteSchoolIds, upsertFavoriteSchool, upsertSchool])
+  );
+
   useEffect(() => {
     const trimmedQuery = searchQuery.trim();
 
@@ -376,6 +420,26 @@ export default function HomeScreen() {
     setIsOpen(false);
   };
 
+  const navigateToSchoolMap = (school: School) => {
+    router.push({
+      pathname: '/map',
+      params: {
+        lat: school.lat.toString(),
+        lng: school.lng.toString(),
+        schoolName: school.name,
+        schoolId: school.id,
+        schoolCity: school.city,
+        schoolState: school.state,
+        schoolNumSpots: getDisplaySpotCount(school).toString(),
+      },
+    });
+  };
+
+  const handleFavoriteSelect = (school: School) => {
+    upsertSchool(school);
+    navigateToSchoolMap(school);
+  };
+
   const handleFavoritePress = (
     event: GestureResponderEvent,
     school: School
@@ -390,18 +454,7 @@ export default function HomeScreen() {
       return;
     }
 
-    router.push({
-      pathname: '/map',
-      params: {
-        lat: selectedSchool.lat.toString(),
-        lng: selectedSchool.lng.toString(),
-        schoolName: selectedSchool.name,
-        schoolId: selectedSchool.id,
-        schoolCity: selectedSchool.city,
-        schoolState: selectedSchool.state,
-        schoolNumSpots: getDisplaySpotCount(selectedSchool).toString(),
-      },
-    });
+    navigateToSchoolMap(selectedSchool);
   };
 
   const handleProfilePress = () => {
@@ -426,15 +479,15 @@ export default function HomeScreen() {
           elevation: 12,
         }}
       >
-        <View className="flex-row items-center space-x-3">
+        <View className="flex-row items-center space-x-3" style={{ marginLeft: -17 }}>
           <Image 
             source={IMAGES.logo} 
-            className="h-12 w-12 rounded-2xl"
+            className="h-14 w-14"
             resizeMode="contain"
           />
           <Text 
-            className="text-4xl text-white tracking-tight ml-4"
-            style={{ fontFamily: 'Outfit_900Black' }}
+            className="text-4xl text-white tracking-tight"
+            style={{ fontFamily: 'Outfit_900Black', marginLeft: -5 }}
           >
             SkateU
           </Text>
@@ -446,8 +499,8 @@ export default function HomeScreen() {
           accessibilityLabel="Open profile"
           accessibilityRole="button"
         >
-          <Ionicons
-            name="person-outline"
+          <Octicons
+            name="person"
             size={22}
             color="white"
             style={{
@@ -562,7 +615,7 @@ export default function HomeScreen() {
                       school={school}
                       displayNumSpots={getDisplaySpotCount(school)}
                       isFavorite
-                      onSelect={handleSchoolSelect}
+                      onSelect={handleFavoriteSelect}
                       onFavoritePress={handleFavoritePress}
                     />
                   ))}

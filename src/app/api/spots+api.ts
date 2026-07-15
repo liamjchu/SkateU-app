@@ -22,7 +22,7 @@ const IMAGE_EXTENSIONS: Record<string, string> = {
 };
 
 const SPOT_SELECT_COLUMNS =
-  'id,school_id,name,description,latitude,longitude,image_urls,schools(city,state)';
+  'id,school_id,name,description,latitude,longitude,image_urls,created_at,schools(city,state),creator:profiles(username)';
 
 /**
  * Reads Supabase configuration from server-side environment variables only.
@@ -67,7 +67,9 @@ export type DatabaseSpot = {
   latitude: number;
   longitude: number;
   image_urls: string[];
+  created_at: string;
   schools: { city: string; state: string } | null;
+  creator: { username: string | null } | null;
 };
 
 export type DatabaseSpotInsert = {
@@ -95,6 +97,8 @@ export function mapSpot(row: DatabaseSpot): Spot {
     city: row.schools?.city ?? '',
     state: row.schools?.state ?? '',
     schoolId: row.school_id,
+    creatorUsername: row.creator?.username ?? null,
+    createdAt: row.created_at ?? '',
   };
 }
 
