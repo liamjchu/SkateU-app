@@ -11,7 +11,7 @@ const MODEL = 'gpt-4o-mini';
 
 const USERNAME_MAX = 20;
 
-const SYSTEM_PROMPT = `You are a strict username moderation filter for SkateU, a school skate-spot app used by all ages. Decide if a username is "G-rated" and safe to display publicly, like Instagram or Roblox would allow.
+const SYSTEM_PROMPT = `You are a strict username moderation filter for SkateU, a school skate-spot app used by all ages. Decide if a username is safe to display publicly, like Instagram or Roblox would allow.
 
 Reject the username if it contains, references, or clearly hints at any of the following, INCLUDING obfuscated, misspelled, leetspeak (e.g. 4=a, 3=e, 1=i, 0=o, $=s), or concatenated forms without spaces:
 - Profanity, vulgar language, or crude slang
@@ -21,12 +21,11 @@ Reject the username if it contains, references, or clearly hints at any of the f
 - Drugs, alcohol abuse, or illegal activity
 - Bodily functions or gross-out references
 - Impersonation of staff/admin/official accounts (e.g. "admin", "moderator", "official")
+- Sensitive personal information, including passwords, passcodes, PINs, login credentials, API/private keys, Social Security numbers, credit/debit card numbers or security codes, bank/routing numbers, government IDs, passports, driver's licenses, student IDs, medical records, private home addresses, personal phone numbers, personal email addresses, or private documents
 
-Allow ordinary names, nicknames, school/skate terms, hobbies, numbers, and neutral words.
+Allow ordinary names, nicknames, school/skate terms, hobbies, numbers, and neutral words only when they do not resemble sensitive personal information. Never repeat a detected secret or identifier in the reason. When uncertain whether something is a disguised bad word or sensitive personal information, err on the side of rejecting.
 
-When uncertain whether something is a disguised bad word, err on the side of rejecting.
-
-Respond ONLY with compact JSON: {"appropriate": boolean, "reason": string}. "reason" is a short, friendly, user-facing explanation (no profanity) when appropriate is false, otherwise an empty string.`;
+Respond ONLY with compact JSON: {"appropriate": boolean, "reason": string}. "reason" is a short, friendly, user-facing explanation (without profanity or sensitive values) when appropriate is false, otherwise an empty string.`;
 
 type ModerationVerdict = {
   appropriate: boolean;
@@ -35,6 +34,17 @@ type ModerationVerdict = {
 
 function badRequest(message: string) {
   return Response.json({ error: message }, { status: 400 });
+}
+
+function containsSensitiveNumericIdentifier(value: string): boolean {
+  const compact = value.replace(/[\s_-]/g, '');
+  if (!/^\d+$/.test(compact)) {
+    return false;
+  }
+
+  // Catch common SSN-like and payment-card-like values before spending an AI
+  // request. Usernames are short, so these lengths are safe privacy guards.
+  return compact.length === 9 || (compact.length >= 13 && compact.length <= 19);
 }
 
 export async function POST(request: Request) {
@@ -61,6 +71,13 @@ export async function POST(request: Request) {
 
   if (!username || username.length > USERNAME_MAX) {
     return badRequest('A valid username is required.');
+  }
+
+  if (containsSensitiveNumericIdentifier(username)) {
+    return Response.json({
+      allowed: false,
+      reason: 'Usernames cannot contain sensitive personal information.',
+    });
   }
 
   try {

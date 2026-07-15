@@ -33,7 +33,20 @@ const originalEnv = { ...process.env };
 function setConfigured(): void {
   process.env.SUPABASE_URL = 'https://project.supabase.co';
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-secret-key';
+  process.env.OPENAI_API_KEY = 'test-openai-key';
   delete process.env.SUPABASE_ANON_KEY;
+}
+
+function openAIApprovalResponse(): Response {
+  return jsonResponse({
+    choices: [
+      {
+        message: {
+          content: JSON.stringify({ approved: true, flag: 'NONE', reason: '' }),
+        },
+      },
+    ],
+  });
 }
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -519,6 +532,9 @@ describe('POST /api/spots', () => {
       if (requestUrl.includes('/auth/v1/user')) {
         return jsonResponse({ id: 'user-1' });
       }
+      if (requestUrl.includes('api.openai.com')) {
+        return openAIApprovalResponse();
+      }
       // insert fails
       return new Response('insert error', { status: 500 });
     });
@@ -552,6 +568,9 @@ describe('POST /api/spots', () => {
       if (requestUrl.includes('/auth/v1/user')) {
         return jsonResponse({ id: 'user-1' });
       }
+      if (requestUrl.includes('api.openai.com')) {
+        return openAIApprovalResponse();
+      }
       return jsonResponse([createdRow], 201);
     });
     global.fetch = fetchMock as unknown as typeof fetch;
@@ -582,36 +601,45 @@ describe('POST /api/spots', () => {
       },
       // Insert failure
       () => {
-        global.fetch = jest.fn(async (input) =>
-          input.toString().includes('/auth/v1/user')
-            ? jsonResponse({ id: 'user-1' })
-            : new Response('insert error', { status: 500 })
-        ) as unknown as typeof fetch;
+        global.fetch = jest.fn(async (input) => {
+          const url = input.toString();
+          if (url.includes('/auth/v1/user')) {
+            return jsonResponse({ id: 'user-1' });
+          }
+          return url.includes('api.openai.com')
+            ? openAIApprovalResponse()
+            : new Response('insert error', { status: 500 });
+        }) as unknown as typeof fetch;
         return POST(
           makePostRequest(validForm(), { Authorization: 'Bearer good' })
         );
       },
       // Success
       () => {
-        global.fetch = jest.fn(async (input) =>
-          input.toString().includes('/auth/v1/user')
-            ? jsonResponse({ id: 'user-1' })
-            : jsonResponse(
-                [
-                  {
-                    id: 'spot1',
-                    school_id: 'school1',
-                    name: 'Rail',
-                    description: 'A nice rail',
-                    latitude: 10,
-                    longitude: 20,
-                    image_urls: [],
-                    schools: { city: 'Austin', state: 'TX' },
-                  },
-                ],
-                201
-              )
-        ) as unknown as typeof fetch;
+        global.fetch = jest.fn(async (input) => {
+          const url = input.toString();
+          if (url.includes('/auth/v1/user')) {
+            return jsonResponse({ id: 'user-1' });
+          }
+          if (url.includes('api.openai.com')) {
+            return openAIApprovalResponse();
+          }
+          return jsonResponse(
+            [
+              {
+                id: 'spot1',
+                school_id: 'school1',
+                name: 'Rail',
+                description: 'A nice rail',
+                latitude: 10,
+                longitude: 20,
+                image_urls: [],
+                schools: { city: 'Austin', state: 'TX' },
+              },
+            ],
+            201
+          );
+        }) as unknown as typeof fetch;
         return POST(
           makePostRequest(validForm(), { Authorization: 'Bearer good' })
         );
@@ -948,6 +976,9 @@ describe('PATCH /api/spots', () => {
       const url = input.toString();
       if (url.includes('/auth/v1/user')) {
         return jsonResponse({ id: 'user-1' });
+      }
+      if (url.includes('api.openai.com')) {
+        return openAIApprovalResponse();
       }
       if (init?.method === 'PATCH') {
         return jsonResponse([ownedRow()]);

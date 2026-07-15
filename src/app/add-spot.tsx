@@ -109,6 +109,7 @@ export default function AddSpotScreen() {
           ? error.message
           : 'Unable to save this spot right now. Please try again.'
       );
+    } finally {
       setSaving(false);
     }
   };

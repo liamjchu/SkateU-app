@@ -24,8 +24,10 @@ type SpotsState = {
   reset: () => void;
 };
 
-// Both requests must complete or time out within 10 seconds (Req 9.2, 10.3).
+// Reads stay short, while mutations get enough time for moderation and image upload.
 const REQUEST_TIMEOUT_MS = 10_000;
+const MUTATION_TIMEOUT_MS = 60_000;
+const SAVE_TIMEOUT_ERROR = 'Saving this spot timed out. Please try again.';
 
 const INVALID_SCHOOL_ID_ERROR =
   'A valid school identifier is required to load spots.';
@@ -47,24 +49,57 @@ function appendFilePart(form: FormData, field: string, file: RNFile): void {
 // instead of blocking the store's loading state indefinitely.
 async function fetchWithTimeout(
   input: string,
-  init: RequestInit
+  init: RequestInit,
+  timeoutMs: number = REQUEST_TIMEOUT_MS
 ): Promise<Response> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    return await fetch(input, { ...init, signal: controller.signal });
+    const response = await fetch(input, { ...init, signal: controller.signal });
+
+    // Keep the timeout active until the complete response body has arrived.
+    // Without this, fetch() can resolve on headers while response.json() later
+    // hangs forever on a partial server response.
+    const responseWithClone = response as unknown as {
+      clone?: () => Response;
+    };
+    if (typeof responseWithClone.clone === 'function') {
+      await responseWithClone.clone().arrayBuffer();
+    }
+
+    return response;
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+async function fetchMutationWithTimeout(
+  input: string,
+  init: RequestInit
+): Promise<Response> {
+  try {
+    return await fetchWithTimeout(input, init, MUTATION_TIMEOUT_MS);
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error(SAVE_TIMEOUT_ERROR);
+    }
+    throw error;
   }
 }
 
 // Prefer the server-provided `{ error }` message, falling back to the status.
 async function readErrorMessage(response: Response): Promise<string> {
   try {
-    const data = (await response.json()) as { error?: string };
+    const data = (await response.json()) as {
+      error?: string;
+      reason?: string;
+    };
     if (typeof data.error === 'string' && data.error.length > 0) {
       return data.error;
+    }
+    if (typeof data.reason === 'string' && data.reason.length > 0) {
+      return data.reason;
     }
   } catch {
     // Body was not JSON; fall through to the status-based message.
@@ -201,7 +236,7 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
     }
 
     // Do not set Content-Type: the runtime adds the multipart boundary.
-    const response = await fetchWithTimeout(getApiUrl('/api/spots'), {
+    const response = await fetchMutationWithTimeout(getApiUrl('/api/spots'), {
       method: 'POST',
       headers: { Authorization: `Bearer ${accessToken}` },
       body: form,
@@ -264,7 +299,7 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
       });
     }
 
-    const response = await fetchWithTimeout(
+    const response = await fetchMutationWithTimeout(
       getApiUrl(`/api/spots?id=${encodeURIComponent(id)}`),
       {
         method: 'PATCH',

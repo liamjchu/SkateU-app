@@ -116,6 +116,7 @@ export default function EditSpotScreen() {
           ? error.message
           : 'Unable to save your changes right now. Please try again.'
       );
+    } finally {
       setSaving(false);
     }
   };

@@ -1,4 +1,4 @@
-﻿import { Ionicons, Octicons } from '@expo/vector-icons';
+﻿import { Feather, Ionicons, Octicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
@@ -128,7 +128,12 @@ function SchoolRow({
         </View>
 
         <View className="w-20 shrink-0 flex-row items-center justify-center space-x-1.5 rounded-xl bg-white/50 px-3 py-1.5">
-          <Ionicons name="location-outline" size={14} color="#1B3B36" style={{ marginRight: 2 }} />
+          <Feather
+            name="map-pin"
+            size={11}
+            color="#64748b"
+            style={{ marginRight: 2 }}
+          />
           <Text 
             className="text-base text-[#1B3B36]"
             style={{ fontFamily: 'Outfit_700Bold' }}
@@ -176,7 +181,12 @@ function SchoolRow({
       </View>
 
       <View className="w-20 shrink-0 flex-row items-center justify-end space-x-1.5">
-        <Ionicons name="location-outline" size={14} color="#1B3B36" style={{ marginRight: 2 }} />
+        <Feather
+          name="map-pin"
+          size={11}
+          color="#64748b"
+          style={{ marginRight: 2 }}
+        />
         <Text 
           className="text-base text-[#1B3B36]"
           style={{ fontFamily: 'Outfit_700Bold' }}

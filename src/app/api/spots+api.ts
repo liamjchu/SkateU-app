@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 
+import { imageFileToDataUrl, moderateSpotSubmission } from '../../lib/spotModeration';
 import type { Spot } from '../../types/spot';
 
 // --- Configuration & constants (mirrors schools+api.ts) ---------------------
@@ -381,7 +382,7 @@ export async function resolveUserId(
 
 export type SpotOwnership =
   | { found: false }
-  | { found: true; ownerId: string | null; schoolId: string };
+  | { found: true; ownerId: string | null; schoolId: string; imageUrls: string[] };
 
 /**
  * Looks up a spot's owner and school so a write can be authorized before it is
@@ -394,7 +395,7 @@ export async function fetchSpotOwnership(
 ): Promise<SpotOwnership> {
   const query = new URL(`${config.url}/rest/v1/spots`);
   query.searchParams.set('id', `eq.${spotId}`);
-  query.searchParams.set('select', 'created_by_user_id,school_id');
+  query.searchParams.set('select', 'created_by_user_id,school_id,image_urls');
 
   const response = await fetch(query.toString(), {
     headers: {
@@ -410,6 +411,7 @@ export async function fetchSpotOwnership(
   const rows = (await response.json()) as {
     created_by_user_id: string | null;
     school_id: string;
+    image_urls?: string[];
   }[];
 
   if (rows.length === 0) {
@@ -420,6 +422,7 @@ export async function fetchSpotOwnership(
     found: true,
     ownerId: rows[0].created_by_user_id,
     schoolId: rows[0].school_id,
+    imageUrls: Array.isArray(rows[0].image_urls) ? rows[0].image_urls : [],
   };
 }
 
@@ -618,6 +621,27 @@ export async function POST(request: Request): Promise<Response> {
     }
   }
 
+  try {
+    const imageUrl = files[0]
+      ? await imageFileToDataUrl(files[0])
+      : undefined;
+    const moderation = await moderateSpotSubmission({
+      title: bodyValidation.value.name,
+      description: bodyValidation.value.description,
+      imageUrl,
+    });
+
+    if (!moderation.approved) {
+      return Response.json(moderation, { status: 422 });
+    }
+  } catch (error) {
+    console.error('Spot moderation failed before create:', error);
+    return Response.json(
+      { error: 'Content moderation is temporarily unavailable. Please try again.' },
+      { status: 503 }
+    );
+  }
+
   let imageUrls: string[];
   try {
     imageUrls = await uploadImages(config, bodyValidation.value.schoolId, files);
@@ -755,6 +779,27 @@ export async function PATCH(request: Request): Promise<Response> {
     if (!imageValidation.ok) {
       return Response.json({ error: imageValidation.message }, { status: 400 });
     }
+  }
+
+  try {
+    const imageUrl = files[0]
+      ? await imageFileToDataUrl(files[0])
+      : ownership.imageUrls[0];
+    const moderation = await moderateSpotSubmission({
+      title: bodyValidation.value.name,
+      description: bodyValidation.value.description,
+      imageUrl,
+    });
+
+    if (!moderation.approved) {
+      return Response.json(moderation, { status: 422 });
+    }
+  } catch (error) {
+    console.error('Spot moderation failed before update:', error);
+    return Response.json(
+      { error: 'Content moderation is temporarily unavailable. Please try again.' },
+      { status: 503 }
+    );
   }
 
   const updates: {
