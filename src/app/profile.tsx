@@ -146,8 +146,7 @@ export default function ProfileScreen() {
         </Pressable>
 
         <Text
-          className="text-2xl text-white"
-          style={{ fontFamily: 'Outfit_700Bold' }}
+          className="font-outfit-bold text-2xl text-white"
         >
           Profile
         </Text>
@@ -173,8 +172,7 @@ export default function ProfileScreen() {
 
           {email ? (
             <Text
-              className="mt-1 text-base text-slate-500"
-              style={{ fontFamily: 'Outfit_500Medium' }}
+              className="mt-1 font-outfit-medium text-base text-slate-500"
             >
               {email}
             </Text>
@@ -191,10 +189,9 @@ export default function ProfileScreen() {
             accessibilityState={{ selected: !showingLikedSpots }}
           >
             <Text
-              className={`text-sm ${
+              className={`font-outfit-bold text-sm ${
                 !showingLikedSpots ? 'text-[#1B3B36]' : 'text-slate-500'
               }`}
-              style={{ fontFamily: 'Outfit_700Bold' }}
             >
               Your Spots {mySpots.length > 0 ? `(${mySpots.length})` : ''}
             </Text>
@@ -208,10 +205,9 @@ export default function ProfileScreen() {
             accessibilityState={{ selected: showingLikedSpots }}
           >
             <Text
-              className={`text-sm ${
+              className={`font-outfit-bold text-sm ${
                 showingLikedSpots ? 'text-[#1B3B36]' : 'text-slate-500'
               }`}
-              style={{ fontFamily: 'Outfit_700Bold' }}
             >
               Liked Spots {likedSpots.length > 0 ? `(${likedSpots.length})` : ''}
             </Text>
@@ -229,8 +225,7 @@ export default function ProfileScreen() {
         ) : displayedSpots.length === 0 ? (
           <View className="mt-4 rounded-2xl bg-[#F4F7F6] p-6">
             <Text
-              className="text-center text-sm text-slate-500"
-              style={{ fontFamily: 'Outfit_500Medium' }}
+              className="font-outfit-medium text-center text-sm text-slate-500"
             >
               {showingLikedSpots
                 ? 'Spots you like will appear here.'
@@ -258,8 +253,7 @@ export default function ProfileScreen() {
 
                 <View className="ml-3 flex-1">
                   <Text
-                    className="text-base text-[#1B3B36]"
-                    style={{ fontFamily: 'Outfit_700Bold' }}
+                    className="font-outfit-bold text-base text-[#1B3B36]"
                     numberOfLines={1}
                   >
                     {spot.name}
@@ -268,8 +262,7 @@ export default function ProfileScreen() {
                     <View className="mt-0.5 flex-row items-center">
                       <Feather name="map-pin" size={11} color="#64748b" />
                       <Text
-                        className="ml-1 flex-1 text-xs text-slate-500"
-                        style={{ fontFamily: 'Outfit_600SemiBold' }}
+                        className="font-outfit-semibold ml-1 flex-1 text-xs text-slate-500"
                         numberOfLines={1}
                       >
                         {spot.schoolName}
@@ -277,8 +270,7 @@ export default function ProfileScreen() {
                     </View>
                   ) : null}
                   <Text
-                    className="mt-0.5 text-sm text-slate-500"
-                    style={{ fontFamily: 'Outfit_500Medium' }}
+                    className="font-outfit-medium mt-0.5 text-sm text-slate-500"
                     numberOfLines={2}
                   >
                     {spot.description}
@@ -286,8 +278,7 @@ export default function ProfileScreen() {
                   <View className="mt-1 flex-row items-center">
                     <Octicons name="heart-fill" size={12} color="#DC2626" />
                     <Text
-                      className="ml-1 text-xs text-slate-500"
-                      style={{ fontFamily: 'Outfit_600SemiBold' }}
+                      className="font-outfit-semibold ml-1 text-xs text-slate-500"
                     >
                       {spot.likeCount ?? 0}
                     </Text>

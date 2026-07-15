@@ -72,11 +72,17 @@ from (
   from public.spot_likes
   group by spot_id
 ) counts
-where counts.spot_id = s.id;
+where counts.spot_id = s.id
+  and s.likes_count is distinct from counts.like_count;
 
-update public.spots
+update public.spots s
 set likes_count = 0
-where id not in (select spot_id from public.spot_likes);
+where s.likes_count is distinct from 0
+  and not exists (
+    select 1
+    from public.spot_likes sl
+    where sl.spot_id = s.id
+  );
 
 alter table public.spot_likes enable row level security;
 

@@ -51,6 +51,7 @@ const LIKED_SPOTS_LOAD_FAILED_ERROR = 'Unable to load liked spots right now.';
 let spotsRequestVersion = 0;
 let mySpotsRequestVersion = 0;
 let likedSpotsRequestVersion = 0;
+let spotLikeMutationVersion = 0;
 
 // React Native serializes an object of this shape as a multipart file part.
 type RNFile = { uri: string; name: string; type: string };
@@ -204,6 +205,7 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
 
   fetchSpots: async (schoolId: string, accessToken?: string) => {
     const requestVersion = ++spotsRequestVersion;
+    const mutationVersion = spotLikeMutationVersion;
     const trimmedSchoolId = schoolId?.trim() ?? '';
 
     // Blank/whitespace ids never hit the network; expose an error and keep the
@@ -236,7 +238,13 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
 
       const data = (await response.json()) as { spots?: Spot[] };
 
-      if (requestVersion !== spotsRequestVersion) {
+      if (
+        requestVersion !== spotsRequestVersion ||
+        mutationVersion !== spotLikeMutationVersion
+      ) {
+        if (requestVersion === spotsRequestVersion) {
+          set({ loading: false });
+        }
         return;
       }
 
@@ -249,7 +257,13 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
       });
     } catch (error) {
       // On failure/timeout keep the prior spots and clear loading (Req 9.4).
-      if (requestVersion !== spotsRequestVersion) {
+      if (
+        requestVersion !== spotsRequestVersion ||
+        mutationVersion !== spotLikeMutationVersion
+      ) {
+        if (requestVersion === spotsRequestVersion) {
+          set({ loading: false });
+        }
         return;
       }
       set({ loading: false, error: toFetchErrorMessage(error) });
@@ -294,6 +308,7 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
 
   fetchMySpots: async (accessToken: string) => {
     const requestVersion = ++mySpotsRequestVersion;
+    const mutationVersion = spotLikeMutationVersion;
     set({ myLoading: true, myError: null });
 
     try {
@@ -307,13 +322,25 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
       }
 
       const data = (await response.json()) as { spots?: Spot[] };
-      if (requestVersion !== mySpotsRequestVersion) {
+      if (
+        requestVersion !== mySpotsRequestVersion ||
+        mutationVersion !== spotLikeMutationVersion
+      ) {
+        if (requestVersion === mySpotsRequestVersion) {
+          set({ myLoading: false });
+        }
         return;
       }
 
       set({ mySpots: data.spots ?? [], myLoading: false, myError: null });
     } catch (error) {
-      if (requestVersion !== mySpotsRequestVersion) {
+      if (
+        requestVersion !== mySpotsRequestVersion ||
+        mutationVersion !== spotLikeMutationVersion
+      ) {
+        if (requestVersion === mySpotsRequestVersion) {
+          set({ myLoading: false });
+        }
         return;
       }
 
@@ -330,6 +357,7 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
 
   fetchLikedSpots: async (accessToken: string) => {
     const requestVersion = ++likedSpotsRequestVersion;
+    const mutationVersion = spotLikeMutationVersion;
     set({ likedLoading: true, likedError: null });
 
     try {
@@ -343,13 +371,25 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
       }
 
       const data = (await response.json()) as { spots?: Spot[] };
-      if (requestVersion !== likedSpotsRequestVersion) {
+      if (
+        requestVersion !== likedSpotsRequestVersion ||
+        mutationVersion !== spotLikeMutationVersion
+      ) {
+        if (requestVersion === likedSpotsRequestVersion) {
+          set({ likedLoading: false });
+        }
         return;
       }
 
       set({ likedSpots: data.spots ?? [], likedLoading: false, likedError: null });
     } catch (error) {
-      if (requestVersion !== likedSpotsRequestVersion) {
+      if (
+        requestVersion !== likedSpotsRequestVersion ||
+        mutationVersion !== spotLikeMutationVersion
+      ) {
+        if (requestVersion === likedSpotsRequestVersion) {
+          set({ likedLoading: false });
+        }
         return;
       }
 
@@ -364,6 +404,10 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
   },
 
   toggleSpotLike: async (id: string, likedByUser: boolean, accessToken: string) => {
+    // Invalidate reads when a like mutation starts so an older response cannot
+    // overwrite the mutation result when it arrives later.
+    spotLikeMutationVersion += 1;
+
     const response = await fetchMutationWithTimeout(
       getApiUrl(`/api/spot-likes?id=${encodeURIComponent(id)}`),
       {
@@ -382,6 +426,7 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
     };
     const nextLiked = data.likedByUser ?? !likedByUser;
     const nextCount = data.likeCount ?? 0;
+    spotLikeMutationVersion += 1;
 
     set((state) => {
       const updateSpot = (spot: Spot): Spot =>
@@ -456,6 +501,9 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
     set((state) => ({
       mySpots: state.mySpots.map((spot) => (spot.id === id ? updated : spot)),
       spots: state.spots.map((spot) => (spot.id === id ? updated : spot)),
+      likedSpots: state.likedSpots.map((spot) =>
+        spot.id === id ? { ...updated, likedByUser: spot.likedByUser } : spot
+      ),
     }));
 
     return updated;
@@ -479,6 +527,7 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
     set((state) => ({
       mySpots: state.mySpots.filter((spot) => spot.id !== id),
       spots: state.spots.filter((spot) => spot.id !== id),
+      likedSpots: state.likedSpots.filter((spot) => spot.id !== id),
     }));
   },
 
@@ -489,13 +538,21 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
 
   clearLikedSpots: () => {
     likedSpotsRequestVersion += 1;
-    set({ likedSpots: [], likedLoading: false, likedError: null });
+    spotLikeMutationVersion += 1;
+    set((state) => ({
+      spots: state.spots.map((spot) => ({ ...spot, likedByUser: false })),
+      mySpots: state.mySpots.map((spot) => ({ ...spot, likedByUser: false })),
+      likedSpots: [],
+      likedLoading: false,
+      likedError: null,
+    }));
   },
 
   reset: () => {
     spotsRequestVersion += 1;
     mySpotsRequestVersion += 1;
     likedSpotsRequestVersion += 1;
+    spotLikeMutationVersion += 1;
     set({
       spots: [],
       loading: false,

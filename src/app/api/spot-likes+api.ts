@@ -13,6 +13,16 @@ type LikeRow = { spot_id: string; created_at: string };
 
 type LikeCountRow = { likes_count: number };
 
+const POSTGREST_IN_FILTER_BATCH_SIZE = 100;
+
+function chunkIds(ids: string[]): string[][] {
+  const chunks: string[][] = [];
+  for (let index = 0; index < ids.length; index += POSTGREST_IN_FILTER_BATCH_SIZE) {
+    chunks.push(ids.slice(index, index + POSTGREST_IN_FILTER_BATCH_SIZE));
+  }
+  return chunks;
+}
+
 function readBearerToken(request: Request): string | null {
   const header =
     request.headers.get('Authorization') ?? request.headers.get('authorization');
@@ -71,21 +81,31 @@ async function fetchLikedSpotIds(
   userId: string,
   spotIds?: string[]
 ): Promise<string[]> {
-  const query = new URL(`${config.url}/rest/v1/spot_likes`);
-  query.searchParams.set('user_id', `eq.${userId}`);
-  query.searchParams.set('select', 'spot_id,created_at');
-  query.searchParams.set('order', 'created_at.desc');
-  if (spotIds && spotIds.length > 0) {
-    query.searchParams.set('spot_id', `in.(${spotIds.join(',')})`);
-  }
+  const batches =
+    spotIds && spotIds.length > 0 ? chunkIds(spotIds) : [undefined];
+  const rowsByBatch = await Promise.all(
+    batches.map(async (batch) => {
+      const query = new URL(`${config.url}/rest/v1/spot_likes`);
+      query.searchParams.set('user_id', `eq.${userId}`);
+      query.searchParams.set('select', 'spot_id,created_at');
+      query.searchParams.set('order', 'created_at.desc');
+      if (batch) {
+        query.searchParams.set('spot_id', `in.(${batch.join(',')})`);
+      }
 
-  const response = await fetch(query.toString(), {
-    headers: { apikey: config.apiKey, Authorization: `Bearer ${config.apiKey}` },
-  });
-  if (!response.ok) throw new Error(await response.text());
+      const response = await fetch(query.toString(), {
+        headers: { apikey: config.apiKey, Authorization: `Bearer ${config.apiKey}` },
+      });
+      if (!response.ok) throw new Error(await response.text());
 
-  const rows = (await response.json()) as LikeRow[];
-  return rows.map((row) => row.spot_id);
+      return (await response.json()) as LikeRow[];
+    })
+  );
+
+  return rowsByBatch
+    .flat()
+    .sort((left, right) => right.created_at.localeCompare(left.created_at))
+    .map((row) => row.spot_id);
 }
 
 async function getLikedSpots(
@@ -95,16 +115,21 @@ async function getLikedSpots(
   const likedIds = await fetchLikedSpotIds(config, userId);
   if (likedIds.length === 0) return Response.json({ spots: [] });
 
-  const query = new URL(`${config.url}/rest/v1/spots`);
-  query.searchParams.set('id', `in.(${likedIds.join(',')})`);
-  query.searchParams.set('select', SPOT_SELECT_COLUMNS);
+  const rowsByBatch = await Promise.all(
+    chunkIds(likedIds).map(async (batch) => {
+      const query = new URL(`${config.url}/rest/v1/spots`);
+      query.searchParams.set('id', `in.(${batch.join(',')})`);
+      query.searchParams.set('select', SPOT_SELECT_COLUMNS);
 
-  const response = await fetch(query.toString(), {
-    headers: { apikey: config.apiKey, Authorization: `Bearer ${config.apiKey}` },
-  });
-  if (!response.ok) throw new Error(await response.text());
+      const response = await fetch(query.toString(), {
+        headers: { apikey: config.apiKey, Authorization: `Bearer ${config.apiKey}` },
+      });
+      if (!response.ok) throw new Error(await response.text());
 
-  const rows = (await response.json()) as DatabaseSpot[];
+      return (await response.json()) as DatabaseSpot[];
+    })
+  );
+  const rows = rowsByBatch.flat();
   const byId = new Map(rows.map((row) => [row.id, row]));
   return Response.json({
     spots: likedIds

@@ -16,6 +16,8 @@ export const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
 export const UPLOAD_TIMEOUT_MS = 30_000;
 export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
 
+const POSTGREST_IN_FILTER_BATCH_SIZE = 100;
+
 const IMAGE_EXTENSIONS: Record<string, string> = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
@@ -432,6 +434,14 @@ export async function fetchSpotOwnership(
 
 const STORAGE_OBJECT_PREFIX = '/storage/v1/object/public/spot-images/';
 
+function chunkIds(ids: string[]): string[][] {
+  const chunks: string[][] = [];
+  for (let index = 0; index < ids.length; index += POSTGREST_IN_FILTER_BATCH_SIZE) {
+    chunks.push(ids.slice(index, index + POSTGREST_IN_FILTER_BATCH_SIZE));
+  }
+  return chunks;
+}
+
 function storageObjectKeyFromUrl(value: string): string | null {
   try {
     const pathname = new URL(value).pathname;
@@ -503,23 +513,28 @@ async function fetchLikedSpotIds(
     return new Set<string>();
   }
 
-  const query = new URL(`${config.url}/rest/v1/spot_likes`);
-  query.searchParams.set('user_id', `eq.${userId}`);
-  query.searchParams.set('spot_id', `in.(${spotIds.join(',')})`);
-  query.searchParams.set('select', 'spot_id');
+  const rowsByBatch = await Promise.all(
+    chunkIds(spotIds).map(async (batch) => {
+      const query = new URL(`${config.url}/rest/v1/spot_likes`);
+      query.searchParams.set('user_id', `eq.${userId}`);
+      query.searchParams.set('spot_id', `in.(${batch.join(',')})`);
+      query.searchParams.set('select', 'spot_id');
 
-  const response = await fetch(query.toString(), {
-    headers: {
-      apikey: config.apiKey,
-      Authorization: `Bearer ${config.apiKey}`,
-    },
-  });
-  if (!response.ok) {
-    throw new Error(await response.text());
-  }
+      const response = await fetch(query.toString(), {
+        headers: {
+          apikey: config.apiKey,
+          Authorization: `Bearer ${config.apiKey}`,
+        },
+      });
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
 
-  const rows = (await response.json()) as { spot_id: string }[];
-  return new Set(rows.map((row) => row.spot_id));
+      return (await response.json()) as { spot_id: string }[];
+    })
+  );
+
+  return new Set(rowsByBatch.flat().map((row) => row.spot_id));
 }
 
 async function mapSpotsForUser(

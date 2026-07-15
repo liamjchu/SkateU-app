@@ -81,20 +81,16 @@ export default function SpotImagePicker({
         return;
       }
 
+      const imagePickerOptions: ImagePicker.ImagePickerOptions = {
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.7,
+        aspect: [4, 3],
+      };
       const result =
         source === 'camera'
-          ? await ImagePicker.launchCameraAsync({
-              mediaTypes: ['images'],
-              allowsEditing: true,
-              quality: 0.7,
-              aspect: [4, 3],
-            })
-          : await ImagePicker.launchImageLibraryAsync({
-              mediaTypes: ['images'],
-              allowsEditing: true,
-              quality: 0.7,
-              aspect: [4, 3],
-            });
+          ? await ImagePicker.launchCameraAsync(imagePickerOptions)
+          : await ImagePicker.launchImageLibraryAsync(imagePickerOptions);
 
       if (!result.canceled && result.assets.length > 0) {
         const asset = result.assets[0];
