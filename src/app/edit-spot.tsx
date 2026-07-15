@@ -35,6 +35,8 @@ export default function EditSpotScreen() {
     : searchParams.id;
 
   const mySpots = useSpotsStore((s) => s.mySpots);
+  const myLoading = useSpotsStore((s) => s.myLoading);
+  const fetchMySpots = useSpotsStore((s) => s.fetchMySpots);
   const updateSpot = useSpotsStore((s) => s.updateSpot);
   const session = useAuthStore((s) => s.session);
 
@@ -61,6 +63,28 @@ export default function EditSpotScreen() {
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const interactionTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const accessToken = session?.access_token;
+    if (accessToken && spotId) {
+      fetchMySpots(accessToken);
+    }
+  }, [fetchMySpots, session?.access_token, spotId]);
+
+  useEffect(() => {
+    if (!spot) {
+      return;
+    }
+
+    setName(spot.name);
+    setDescription(spot.description);
+    setImageUri(spot.imageUris[0]);
+    setImageChanged(false);
+    setSelectedLocation({
+      latitude: spot.latitude,
+      longitude: spot.longitude,
+    });
+  }, [spot]);
 
   const isFormValid = isAddSpotFormValid(imageUri, name, description);
 
@@ -150,8 +174,9 @@ export default function EditSpotScreen() {
 
       {!spot ? (
         <View className="flex-1 items-center justify-center px-8">
-          <Text className="text-center text-base text-slate-500">
-            {MISSING_SPOT_ERROR}
+          {myLoading ? <ActivityIndicator size="small" color="#21473f" /> : null}
+          <Text className="mt-3 text-center text-base text-slate-500">
+            {myLoading ? 'Loading spot…' : MISSING_SPOT_ERROR}
           </Text>
         </View>
       ) : (

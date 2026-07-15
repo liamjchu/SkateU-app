@@ -21,6 +21,7 @@ type SpotsState = {
     accessToken: string
   ) => Promise<Spot>;
   deleteSpot: (id: string, accessToken: string) => Promise<void>;
+  clearMySpots: () => void;
   reset: () => void;
 };
 
@@ -34,6 +35,8 @@ const INVALID_SCHOOL_ID_ERROR =
 const LOAD_FAILED_ERROR = 'Unable to load spots right now.';
 const LOAD_TIMEOUT_ERROR = 'Loading spots timed out. Please try again.';
 const MY_SPOTS_LOAD_FAILED_ERROR = 'Unable to load your spots right now.';
+
+let mySpotsRequestVersion = 0;
 
 // React Native serializes an object of this shape as a multipart file part.
 type RNFile = { uri: string; name: string; type: string };
@@ -256,6 +259,7 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
   },
 
   fetchMySpots: async (accessToken: string) => {
+    const requestVersion = ++mySpotsRequestVersion;
     set({ myLoading: true, myError: null });
 
     try {
@@ -269,8 +273,16 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
       }
 
       const data = (await response.json()) as { spots?: Spot[] };
+      if (requestVersion !== mySpotsRequestVersion) {
+        return;
+      }
+
       set({ mySpots: data.spots ?? [], myLoading: false, myError: null });
     } catch (error) {
+      if (requestVersion !== mySpotsRequestVersion) {
+        return;
+      }
+
       // Keep any previously loaded spots and surface the error.
       set({
         myLoading: false,
@@ -350,7 +362,13 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
     }));
   },
 
+  clearMySpots: () => {
+    mySpotsRequestVersion += 1;
+    set({ mySpots: [], myLoading: false, myError: null });
+  },
+
   reset: () => {
+    mySpotsRequestVersion += 1;
     set({
       spots: [],
       loading: false,

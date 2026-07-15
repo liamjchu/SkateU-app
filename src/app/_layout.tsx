@@ -15,6 +15,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import '../../global.css';
 import { useAuthStore } from '../store/authStore';
 import { useProfileStore } from '../store/profileStore';
+import { useSpotsStore } from '../store/spotsStore';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -37,6 +38,7 @@ export default function RootLayout() {
   const profileLoaded = useProfileStore((state) => state.loaded);
   const fetchProfile = useProfileStore((state) => state.fetchProfile);
   const clearProfile = useProfileStore((state) => state.clearProfile);
+  const clearMySpots = useSpotsStore((state) => state.clearMySpots);
 
   const router = useRouter();
   const segments = useSegments();
@@ -49,12 +51,14 @@ export default function RootLayout() {
   // Load (or clear) the profile whenever the signed-in user changes. Keyed on
   // the user id so token refreshes don't trigger needless refetches.
   useEffect(() => {
+    clearMySpots();
+
     if (userId) {
       fetchProfile(userId);
     } else {
       clearProfile();
     }
-  }, [userId, fetchProfile, clearProfile]);
+  }, [clearMySpots, userId, fetchProfile, clearProfile]);
 
   useEffect(() => {
     // Global deep link listener. When Supabase redirects back to the app

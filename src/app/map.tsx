@@ -1,4 +1,4 @@
-﻿import { Octicons } from '@expo/vector-icons';
+﻿import { Feather, Octicons } from '@expo/vector-icons';
 import {
     useFocusEffect,
     useLocalSearchParams,
@@ -7,6 +7,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
+    Alert,
     Image,
     Pressable,
     ScrollView,
@@ -43,6 +44,10 @@ export default function MapScreen() {
   const insets = useSafeAreaInsets();
   const session = useAuthStore((state) => state.session);
   const spots = useSpotsStore((s) => s.spots);
+  const mySpots = useSpotsStore((s) => s.mySpots);
+  const myLoading = useSpotsStore((s) => s.myLoading);
+  const deleteSpot = useSpotsStore((s) => s.deleteSpot);
+  const fetchMySpots = useSpotsStore((s) => s.fetchMySpots);
   const loading = useSpotsStore((s) => s.loading);
   const error = useSpotsStore((s) => s.error);
   const fetchSpots = useSpotsStore((s) => s.fetchSpots);
@@ -51,6 +56,7 @@ export default function MapScreen() {
   const webViewReadyRef = useRef(false);
   const [selectedSpotId, setSelectedSpotId] = useState<string | undefined>();
   const [showLoginRequired, setShowLoginRequired] = useState(false);
+  const [deletingSpotId, setDeletingSpotId] = useState<string | null>(null);
   const sheetHeight = useSharedValue(0);
   const sheetTranslateY = useSharedValue(0);
   const sheetStartY = useSharedValue(0);
@@ -113,6 +119,12 @@ export default function MapScreen() {
   const selectedSpot = useMemo(
     () => spots.find((spot) => spot.id === selectedSpotId),
     [selectedSpotId, spots]
+  );
+  const selectedSpotIsOwned = Boolean(
+    session?.user &&
+      selectedSpot &&
+      !myLoading &&
+      mySpots.some((spot) => spot.id === selectedSpot.id)
   );
 
   // Show "edited …" when the spot was changed after creation, otherwise
@@ -305,7 +317,11 @@ export default function MapScreen() {
       if (schoolId) {
         fetchSpots(schoolId);
       }
-    }, [fetchSpots, schoolId])
+
+      if (session?.access_token) {
+        fetchMySpots(session.access_token);
+      }
+    }, [fetchMySpots, fetchSpots, schoolId, session?.access_token])
   );
 
   useEffect(() => {
@@ -382,6 +398,56 @@ export default function MapScreen() {
 
     setSelectedSpotId(undefined);
     webViewRef.current?.injectJavaScript(`window.sendCenter(); true;`);
+  };
+
+  const handleEditSelectedSpot = () => {
+    if (!selectedSpot || !selectedSpotIsOwned || deletingSpotId) {
+      return;
+    }
+
+    router.push(`/edit-spot?id=${encodeURIComponent(selectedSpot.id)}`);
+  };
+
+  const handleDeleteSelectedSpot = () => {
+    if (!selectedSpot || !selectedSpotIsOwned || deletingSpotId) {
+      return;
+    }
+
+    const spotToDelete = selectedSpot;
+    Alert.alert(
+      'Delete spot?',
+      `"${spotToDelete.name}" will be permanently removed for everyone. This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const accessToken = session?.access_token;
+            if (!accessToken) {
+              Alert.alert('You must be signed in to delete a spot.');
+              return;
+            }
+
+            setDeletingSpotId(spotToDelete.id);
+
+            try {
+              await deleteSpot(spotToDelete.id, accessToken);
+              setSelectedSpotId(undefined);
+            } catch (error) {
+              Alert.alert(
+                'Could not delete spot',
+                error instanceof Error && error.message.length > 0
+                  ? error.message
+                  : 'Please try again.'
+              );
+            } finally {
+              setDeletingSpotId(null);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleWebViewMessage = (event: WebViewMessageEvent) => {
@@ -647,6 +713,45 @@ export default function MapScreen() {
             >
               {selectedSpot.description}
             </Text>
+
+            {selectedSpotIsOwned ? (
+              <View className="mt-5 flex-row gap-3">
+                <Pressable
+                  onPress={handleEditSelectedSpot}
+                  disabled={deletingSpotId !== null}
+                  className="h-12 flex-1 flex-row items-center justify-center rounded-2xl bg-[#21473f]"
+                  accessibilityLabel={`Edit ${selectedSpot.name}`}
+                  accessibilityRole="button"
+                >
+                  <Feather name="edit-2" size={16} color="#FFFFFF" />
+                  <Text
+                    className="ml-2 text-sm text-white"
+                    style={{ fontFamily: 'Outfit_600SemiBold' }}
+                  >
+                    Edit spot
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={handleDeleteSelectedSpot}
+                  disabled={deletingSpotId !== null}
+                  className="h-12 flex-1 flex-row items-center justify-center rounded-2xl border border-red-200 bg-red-50"
+                  accessibilityLabel={`Delete ${selectedSpot.name}`}
+                  accessibilityRole="button"
+                >
+                  {deletingSpotId === selectedSpot.id ? (
+                    <ActivityIndicator size="small" color="#DC2626" />
+                  ) : (
+                    <Feather name="trash-2" size={16} color="#DC2626" />
+                  )}
+                  <Text
+                    className="ml-2 text-sm text-red-600"
+                    style={{ fontFamily: 'Outfit_600SemiBold' }}
+                  >
+                    Delete spot
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
           </ScrollView>
         </Animated.View>
       )}
