@@ -115,6 +115,31 @@ export default function MapScreen() {
     [selectedSpotId, spots]
   );
 
+  // Show "edited …" when the spot was changed after creation, otherwise
+  // "added …". created_at and updated_at both default to now() on insert, so a
+  // small threshold avoids labelling a brand-new spot as edited.
+  const spotTimeInfo = useMemo(() => {
+    if (!selectedSpot) {
+      return null;
+    }
+
+    const createdMs = Date.parse(selectedSpot.createdAt);
+    const updatedMs = Date.parse(selectedSpot.updatedAt);
+    const wasEdited =
+      Number.isFinite(createdMs) &&
+      Number.isFinite(updatedMs) &&
+      updatedMs - createdMs > 2000;
+
+    const relative = formatRelativeTime(
+      wasEdited ? selectedSpot.updatedAt : selectedSpot.createdAt
+    );
+    if (!relative) {
+      return null;
+    }
+
+    return { label: wasEdited ? 'edited' : 'added', relative };
+  }, [selectedSpot]);
+
   const html = `
   <!DOCTYPE html>
   <html>
@@ -561,7 +586,7 @@ export default function MapScreen() {
                         ? `@${selectedSpot.creatorUsername}`
                         : 'Unknown skater'}
                     </Text>
-                    {formatRelativeTime(selectedSpot.createdAt) ? (
+                    {spotTimeInfo ? (
                       <>
                         <Text
                           className="mx-1.5 text-xs text-slate-400"
@@ -574,7 +599,7 @@ export default function MapScreen() {
                           style={{ fontFamily: 'Outfit_500Medium' }}
                           numberOfLines={1}
                         >
-                          {`added ${formatRelativeTime(selectedSpot.createdAt)}`}
+                          {`${spotTimeInfo.label} ${spotTimeInfo.relative}`}
                         </Text>
                       </>
                     ) : null}

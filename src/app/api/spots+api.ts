@@ -22,7 +22,7 @@ const IMAGE_EXTENSIONS: Record<string, string> = {
 };
 
 const SPOT_SELECT_COLUMNS =
-  'id,school_id,name,description,latitude,longitude,image_urls,created_at,schools(city,state),creator:profiles(username)';
+  'id,school_id,name,description,latitude,longitude,image_urls,created_at,updated_at,schools(name,city,state),creator:profiles(username)';
 
 /**
  * Reads Supabase configuration from server-side environment variables only.
@@ -57,6 +57,22 @@ export function validateSchoolId(value: string | null): ValidationResult<string>
   return { ok: true, value };
 }
 
+/**
+ * Accepts a spot id iff it matches ^[A-Za-z0-9_-]+$ and its length is 1–64.
+ * Spot ids are UUIDs, which satisfy this pattern.
+ */
+export function validateSpotId(value: string | null): ValidationResult<string> {
+  if (value === null || value.length === 0) {
+    return { ok: false, message: 'The spot id is required.' };
+  }
+
+  if (value.length > MAX_SCHOOL_ID_LENGTH || !SPOT_ID_PATTERN.test(value)) {
+    return { ok: false, message: 'The spot id is invalid.' };
+  }
+
+  return { ok: true, value };
+}
+
 // --- Row types & mapping ----------------------------------------------------
 
 export type DatabaseSpot = {
@@ -68,7 +84,8 @@ export type DatabaseSpot = {
   longitude: number;
   image_urls: string[];
   created_at: string;
-  schools: { city: string; state: string } | null;
+  updated_at: string;
+  schools: { name: string; city: string; state: string } | null;
   creator: { username: string | null } | null;
 };
 
@@ -96,9 +113,11 @@ export function mapSpot(row: DatabaseSpot): Spot {
     imageUris: row.image_urls ?? [],
     city: row.schools?.city ?? '',
     state: row.schools?.state ?? '',
+    schoolName: row.schools?.name ?? '',
     schoolId: row.school_id,
     creatorUsername: row.creator?.username ?? null,
     createdAt: row.created_at ?? '',
+    updatedAt: row.updated_at ?? '',
   };
 }
 
@@ -185,6 +204,62 @@ export function buildInsertRecord(
     longitude: body.longitude,
     image_urls: imageUrls,
   };
+}
+
+// --- PATCH body validation --------------------------------------------------
+
+export type ValidatedPatchBody = {
+  name: string;
+  description: string;
+  latitude: number;
+  longitude: number;
+};
+
+/**
+ * Validates the trimmed fields of an edit-spot request. Name, description, and
+ * location are editable; the school a spot belongs to is fixed after creation.
+ */
+export function validatePatchBody(
+  fields: Record<string, string>
+): ValidationResult<ValidatedPatchBody> {
+  const name = (fields.name ?? '').trim();
+  if (name.length === 0) {
+    return { ok: false, message: 'The name field is required.' };
+  }
+  if (name.length > NAME_MAX) {
+    return { ok: false, message: `The name field must be ${NAME_MAX} characters or fewer.` };
+  }
+
+  const description = (fields.description ?? '').trim();
+  if (description.length === 0) {
+    return { ok: false, message: 'The description field is required.' };
+  }
+  if (description.length > DESCRIPTION_MAX) {
+    return {
+      ok: false,
+      message: `The description field must be ${DESCRIPTION_MAX} characters or fewer.`,
+    };
+  }
+
+  const rawLatitude = (fields.latitude ?? '').trim();
+  if (rawLatitude.length === 0) {
+    return { ok: false, message: 'The latitude field is required.' };
+  }
+  const latitude = Number(rawLatitude);
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
+    return { ok: false, message: 'The latitude coordinate is invalid.' };
+  }
+
+  const rawLongitude = (fields.longitude ?? '').trim();
+  if (rawLongitude.length === 0) {
+    return { ok: false, message: 'The longitude field is required.' };
+  }
+  const longitude = Number(rawLongitude);
+  if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+    return { ok: false, message: 'The longitude coordinate is invalid.' };
+  }
+
+  return { ok: true, value: { name, description, latitude, longitude } };
 }
 
 // --- Image validation & upload ----------------------------------------------
@@ -302,6 +377,52 @@ export async function resolveUserId(
   }
 }
 
+// --- Ownership --------------------------------------------------------------
+
+export type SpotOwnership =
+  | { found: false }
+  | { found: true; ownerId: string | null; schoolId: string };
+
+/**
+ * Looks up a spot's owner and school so a write can be authorized before it is
+ * applied. The service-role key bypasses RLS, so ownership MUST be checked here
+ * against the verified user id — never trust the client for this.
+ */
+export async function fetchSpotOwnership(
+  config: SupabaseConfig,
+  spotId: string
+): Promise<SpotOwnership> {
+  const query = new URL(`${config.url}/rest/v1/spots`);
+  query.searchParams.set('id', `eq.${spotId}`);
+  query.searchParams.set('select', 'created_by_user_id,school_id');
+
+  const response = await fetch(query.toString(), {
+    headers: {
+      apikey: config.apiKey,
+      Authorization: `Bearer ${config.apiKey}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+
+  const rows = (await response.json()) as {
+    created_by_user_id: string | null;
+    school_id: string;
+  }[];
+
+  if (rows.length === 0) {
+    return { found: false };
+  }
+
+  return {
+    found: true,
+    ownerId: rows[0].created_by_user_id,
+    schoolId: rows[0].school_id,
+  };
+}
+
 // --- Request helpers --------------------------------------------------------
 
 function readBearerToken(request: Request): string | null {
@@ -327,12 +448,7 @@ function isFilePart(value: FormDataEntryValue): value is File {
 
 export async function GET(request: Request): Promise<Response> {
   const url = new URL(request.url);
-  const schoolIdParam = url.searchParams.get('schoolId');
-
-  const validation = validateSchoolId(schoolIdParam);
-  if (!validation.ok) {
-    return Response.json({ error: validation.message }, { status: 400 });
-  }
+  const mineParam = url.searchParams.get('mine');
 
   const config = getSupabaseConfig();
   if (!config) {
@@ -340,6 +456,18 @@ export async function GET(request: Request): Promise<Response> {
       { error: 'Spots database is not configured.' },
       { status: 500 }
     );
+  }
+
+  // `?mine=1` lists every spot the authenticated user created, across schools.
+  // It requires a verified token so one user can never read another user's set
+  // via a forged id.
+  if (mineParam === '1' || mineParam === 'true') {
+    return getMySpots(request, config);
+  }
+
+  const validation = validateSchoolId(url.searchParams.get('schoolId'));
+  if (!validation.ok) {
+    return Response.json({ error: validation.message }, { status: 400 });
   }
 
   try {
@@ -366,6 +494,59 @@ export async function GET(request: Request): Promise<Response> {
     console.error('Loading spots failed:', error);
     return Response.json(
       { error: 'Unable to load spots right now.' },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * Lists the authenticated user's own spots (newest first). Ownership is derived
+ * from the verified token, never from a client-supplied id.
+ */
+async function getMySpots(
+  request: Request,
+  config: SupabaseConfig
+): Promise<Response> {
+  const accessToken = readBearerToken(request);
+  if (!accessToken) {
+    return Response.json(
+      { error: 'Authentication is required to load your spots.' },
+      { status: 401 }
+    );
+  }
+
+  const auth = await resolveUserId(config, accessToken);
+  if (!auth.ok) {
+    const message =
+      auth.reason === 'expired'
+        ? 'The access token is expired.'
+        : 'The access token is invalid.';
+    return Response.json({ error: message }, { status: 401 });
+  }
+
+  try {
+    const query = new URL(`${config.url}/rest/v1/spots`);
+    query.searchParams.set('created_by_user_id', `eq.${auth.userId}`);
+    query.searchParams.set('select', SPOT_SELECT_COLUMNS);
+    query.searchParams.set('order', 'created_at.desc');
+
+    const response = await fetch(query.toString(), {
+      headers: {
+        apikey: config.apiKey,
+        Authorization: `Bearer ${config.apiKey}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+
+    const rows = (await response.json()) as DatabaseSpot[];
+    return Response.json({ spots: rows.map(mapSpot) });
+  } catch (error) {
+    console.error('Loading your spots failed:', error);
+    return Response.json(
+      { error: 'Unable to load your spots right now.' },
       { status: 500 }
     );
   }
@@ -480,6 +661,240 @@ export async function POST(request: Request): Promise<Response> {
     console.error('Creating spot failed:', error);
     return Response.json(
       { error: 'Unable to save this spot right now.' },
+      { status: 500 }
+    );
+  }
+}
+
+// --- PATCH /api/spots?id=<spotId> -------------------------------------------
+
+export async function PATCH(request: Request): Promise<Response> {
+  const accessToken = readBearerToken(request);
+  if (!accessToken) {
+    return Response.json(
+      { error: 'Authentication is required to edit a spot.' },
+      { status: 401 }
+    );
+  }
+
+  const config = getSupabaseConfig();
+  if (!config) {
+    return Response.json(
+      { error: 'Spots database is not configured.' },
+      { status: 500 }
+    );
+  }
+
+  const idValidation = validateSpotId(new URL(request.url).searchParams.get('id'));
+  if (!idValidation.ok) {
+    return Response.json({ error: idValidation.message }, { status: 400 });
+  }
+
+  const auth = await resolveUserId(config, accessToken);
+  if (!auth.ok) {
+    const message =
+      auth.reason === 'expired'
+        ? 'The access token is expired.'
+        : 'The access token is invalid.';
+    return Response.json({ error: message }, { status: 401 });
+  }
+
+  let form: FormData;
+  try {
+    form = (await request.formData()) as unknown as FormData;
+  } catch {
+    return Response.json(
+      { error: 'The request body is malformed.' },
+      { status: 400 }
+    );
+  }
+
+  const bodyValidation = validatePatchBody({
+    name: readTextField(form, 'name'),
+    description: readTextField(form, 'description'),
+    latitude: readTextField(form, 'latitude'),
+    longitude: readTextField(form, 'longitude'),
+  });
+  if (!bodyValidation.ok) {
+    return Response.json({ error: bodyValidation.message }, { status: 400 });
+  }
+
+  // Authorize the write: the spot must exist and be owned by this user.
+  let ownership: SpotOwnership;
+  try {
+    ownership = await fetchSpotOwnership(config, idValidation.value);
+  } catch (error) {
+    console.error('Loading spot ownership failed:', error);
+    return Response.json(
+      { error: 'Unable to update this spot right now.' },
+      { status: 500 }
+    );
+  }
+
+  if (!ownership.found) {
+    return Response.json({ error: 'That spot no longer exists.' }, { status: 404 });
+  }
+  if (ownership.ownerId !== auth.userId) {
+    return Response.json(
+      { error: 'You can only edit spots you created.' },
+      { status: 403 }
+    );
+  }
+
+  // A new image is optional. When present, upload it and replace image_urls;
+  // otherwise the existing image is left untouched.
+  const files = form.getAll('image').filter(isFilePart);
+  if (files.length > MAX_IMAGES) {
+    return Response.json(
+      { error: `A spot can have at most ${MAX_IMAGES} images.` },
+      { status: 400 }
+    );
+  }
+  for (const file of files) {
+    const imageValidation = validateImageFile({ type: file.type, size: file.size });
+    if (!imageValidation.ok) {
+      return Response.json({ error: imageValidation.message }, { status: 400 });
+    }
+  }
+
+  const updates: {
+    name: string;
+    description: string;
+    latitude: number;
+    longitude: number;
+    image_urls?: string[];
+  } = {
+    name: bodyValidation.value.name,
+    description: bodyValidation.value.description,
+    latitude: bodyValidation.value.latitude,
+    longitude: bodyValidation.value.longitude,
+  };
+
+  if (files.length > 0) {
+    try {
+      updates.image_urls = await uploadImages(config, ownership.schoolId, files);
+    } catch (error) {
+      console.error('Uploading spot images failed:', error);
+      return Response.json(
+        { error: 'Unable to upload the spot images right now.' },
+        { status: 500 }
+      );
+    }
+  }
+
+  try {
+    const updateUrl = new URL(`${config.url}/rest/v1/spots`);
+    updateUrl.searchParams.set('id', `eq.${idValidation.value}`);
+    updateUrl.searchParams.set('select', SPOT_SELECT_COLUMNS);
+
+    const response = await fetch(updateUrl.toString(), {
+      method: 'PATCH',
+      headers: {
+        apikey: config.apiKey,
+        Authorization: `Bearer ${config.apiKey}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=representation',
+      },
+      body: JSON.stringify(updates),
+    });
+
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+
+    const rows = (await response.json()) as DatabaseSpot[];
+    const updated = rows[0];
+    if (!updated) {
+      throw new Error('Update returned no representation.');
+    }
+
+    return Response.json({ spot: mapSpot(updated) });
+  } catch (error) {
+    console.error('Updating spot failed:', error);
+    return Response.json(
+      { error: 'Unable to update this spot right now.' },
+      { status: 500 }
+    );
+  }
+}
+
+// --- DELETE /api/spots?id=<spotId> ------------------------------------------
+
+export async function DELETE(request: Request): Promise<Response> {
+  const accessToken = readBearerToken(request);
+  if (!accessToken) {
+    return Response.json(
+      { error: 'Authentication is required to delete a spot.' },
+      { status: 401 }
+    );
+  }
+
+  const config = getSupabaseConfig();
+  if (!config) {
+    return Response.json(
+      { error: 'Spots database is not configured.' },
+      { status: 500 }
+    );
+  }
+
+  const idValidation = validateSpotId(new URL(request.url).searchParams.get('id'));
+  if (!idValidation.ok) {
+    return Response.json({ error: idValidation.message }, { status: 400 });
+  }
+
+  const auth = await resolveUserId(config, accessToken);
+  if (!auth.ok) {
+    const message =
+      auth.reason === 'expired'
+        ? 'The access token is expired.'
+        : 'The access token is invalid.';
+    return Response.json({ error: message }, { status: 401 });
+  }
+
+  // Authorize the delete: the spot must exist and be owned by this user.
+  let ownership: SpotOwnership;
+  try {
+    ownership = await fetchSpotOwnership(config, idValidation.value);
+  } catch (error) {
+    console.error('Loading spot ownership failed:', error);
+    return Response.json(
+      { error: 'Unable to delete this spot right now.' },
+      { status: 500 }
+    );
+  }
+
+  if (!ownership.found) {
+    // Already gone — treat as success so the client can drop it locally.
+    return Response.json({ success: true });
+  }
+  if (ownership.ownerId !== auth.userId) {
+    return Response.json(
+      { error: 'You can only delete spots you created.' },
+      { status: 403 }
+    );
+  }
+
+  try {
+    const deleteUrl = new URL(`${config.url}/rest/v1/spots`);
+    deleteUrl.searchParams.set('id', `eq.${idValidation.value}`);
+
+    const response = await fetch(deleteUrl.toString(), {
+      method: 'DELETE',
+      headers: {
+        apikey: config.apiKey,
+        Authorization: `Bearer ${config.apiKey}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+
+    return Response.json({ success: true });
+  } catch (error) {
+    console.error('Deleting spot failed:', error);
+    return Response.json(
+      { error: 'Unable to delete this spot right now.' },
       { status: 500 }
     );
   }
