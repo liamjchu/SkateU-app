@@ -1,13 +1,55 @@
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useState } from 'react';
-import { ActivityIndicator, Image, Pressable, Text, View } from 'react-native';
+import {
+    ActivityIndicator,
+    Alert,
+    Image,
+    Pressable,
+    Text,
+    View,
+} from 'react-native';
 import type { SpotImageAsset } from '../types/spot';
 
 type SpotImagePickerProps = {
   imageUri?: string;
   onImageSelected: (asset: SpotImageAsset) => void;
 };
+
+type ImageSource = 'camera' | 'gallery';
+
+function chooseImageSource(): Promise<ImageSource | undefined> {
+  return new Promise((resolve) => {
+    let resolved = false;
+
+    const finish = (source?: ImageSource) => {
+      if (resolved) return;
+      resolved = true;
+      resolve(source);
+    };
+
+    Alert.alert(
+      'Add Spot Photo',
+      'Choose how you want to add a photo.',
+      [
+        {
+          text: 'Take Photo',
+          onPress: () => finish('camera'),
+        },
+        {
+          text: 'Choose from Gallery',
+          onPress: () => finish('gallery'),
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel',
+          onPress: () => finish(),
+        },
+      ],
+      { cancelable: true, onDismiss: () => finish() }
+    );
+  });
+}
 
 export default function SpotImagePicker({
   imageUri,
@@ -18,22 +60,41 @@ export default function SpotImagePicker({
 
   async function handlePickImage() {
     setError(undefined);
+
+    const source = await chooseImageSource();
+    if (!source) return;
+
     setLoading(true);
 
     try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const permission =
+        source === 'camera'
+          ? await ImagePicker.requestCameraPermissionsAsync()
+          : await ImagePicker.requestMediaLibraryPermissionsAsync();
 
       if (!permission.granted) {
-        setError('Permission is required to select a photo.');
+        setError(
+          source === 'camera'
+            ? 'Camera permission is required to take a photo.'
+            : 'Photo library permission is required to choose a photo.'
+        );
         return;
       }
 
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        quality: 0.7,
-        aspect: [4, 3],
-      });
+      const result =
+        source === 'camera'
+          ? await ImagePicker.launchCameraAsync({
+              mediaTypes: ['images'],
+              allowsEditing: true,
+              quality: 0.7,
+              aspect: [4, 3],
+            })
+          : await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ['images'],
+              allowsEditing: true,
+              quality: 0.7,
+              aspect: [4, 3],
+            });
 
       if (!result.canceled && result.assets.length > 0) {
         const asset = result.assets[0];
@@ -48,7 +109,11 @@ export default function SpotImagePicker({
         }
       }
     } catch (exception) {
-      setError('Unable to open the photo library. Please try again.');
+      setError(
+        source === 'camera'
+          ? 'Unable to open the camera. Please try again.'
+          : 'Unable to open the photo library. Please try again.'
+      );
       console.error(exception);
     } finally {
       setLoading(false);
@@ -121,7 +186,7 @@ export default function SpotImagePicker({
                   textAlign: 'center',
                 }}
               >
-                Tap to choose from your library
+                Tap to take a photo or choose from your gallery
               </Text>
             </>
           )}
