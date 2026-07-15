@@ -18,6 +18,10 @@ export type Spot = {
   // ISO timestamp of the spot's last edit. Equals createdAt until edited.
   // Empty string when unknown.
   updatedAt: string
+  // Total number of users who currently like this spot.
+  likeCount?: number
+  // Whether the current authenticated user likes this spot.
+  likedByUser?: boolean
 }
 
 export type SpotImageAsset = {

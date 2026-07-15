@@ -16,14 +16,16 @@ export const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
 export const UPLOAD_TIMEOUT_MS = 30_000;
 export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
 
+const POSTGREST_IN_FILTER_BATCH_SIZE = 100;
+
 const IMAGE_EXTENSIONS: Record<string, string> = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
   'image/webp': 'webp',
 };
 
-const SPOT_SELECT_COLUMNS =
-  'id,school_id,name,description,latitude,longitude,image_urls,created_at,updated_at,schools(name,city,state),creator:profiles(username)';
+export const SPOT_SELECT_COLUMNS =
+  'id,school_id,name,description,latitude,longitude,image_urls,created_at,updated_at,likes_count,schools(name,city,state),creator:profiles(username)';
 
 /**
  * Reads Supabase configuration from server-side environment variables only.
@@ -86,6 +88,7 @@ export type DatabaseSpot = {
   image_urls: string[];
   created_at: string;
   updated_at: string;
+  likes_count?: number;
   schools: { name: string; city: string; state: string } | null;
   creator: { username: string | null } | null;
 };
@@ -104,7 +107,7 @@ export type DatabaseSpotInsert = {
  * Maps a database row (with the school embed present or absent) to the strict
  * client Spot shape. imageUris is always an array; city/state default to ''.
  */
-export function mapSpot(row: DatabaseSpot): Spot {
+export function mapSpot(row: DatabaseSpot, likedByUser = false): Spot {
   return {
     id: row.id,
     name: row.name,
@@ -119,6 +122,8 @@ export function mapSpot(row: DatabaseSpot): Spot {
     creatorUsername: row.creator?.username ?? null,
     createdAt: row.created_at ?? '',
     updatedAt: row.updated_at ?? '',
+    likeCount: row.likes_count ?? 0,
+    likedByUser,
   };
 }
 
@@ -429,6 +434,14 @@ export async function fetchSpotOwnership(
 
 const STORAGE_OBJECT_PREFIX = '/storage/v1/object/public/spot-images/';
 
+function chunkIds(ids: string[]): string[][] {
+  const chunks: string[][] = [];
+  for (let index = 0; index < ids.length; index += POSTGREST_IN_FILTER_BATCH_SIZE) {
+    chunks.push(ids.slice(index, index + POSTGREST_IN_FILTER_BATCH_SIZE));
+  }
+  return chunks;
+}
+
 function storageObjectKeyFromUrl(value: string): string | null {
   try {
     const pathname = new URL(value).pathname;
@@ -491,6 +504,61 @@ function isFilePart(value: FormDataEntryValue): value is File {
   return typeof value !== 'string';
 }
 
+async function fetchLikedSpotIds(
+  config: SupabaseConfig,
+  userId: string,
+  spotIds: string[]
+): Promise<Set<string>> {
+  if (spotIds.length === 0) {
+    return new Set<string>();
+  }
+
+  const rowsByBatch = await Promise.all(
+    chunkIds(spotIds).map(async (batch) => {
+      const query = new URL(`${config.url}/rest/v1/spot_likes`);
+      query.searchParams.set('user_id', `eq.${userId}`);
+      query.searchParams.set('spot_id', `in.(${batch.join(',')})`);
+      query.searchParams.set('select', 'spot_id');
+
+      const response = await fetch(query.toString(), {
+        headers: {
+          apikey: config.apiKey,
+          Authorization: `Bearer ${config.apiKey}`,
+        },
+      });
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      return (await response.json()) as { spot_id: string }[];
+    })
+  );
+
+  return new Set(rowsByBatch.flat().map((row) => row.spot_id));
+}
+
+async function mapSpotsForUser(
+  config: SupabaseConfig,
+  rows: DatabaseSpot[],
+  userId: string | null
+): Promise<Spot[]> {
+  if (!userId) {
+    return rows.map((row) => mapSpot(row));
+  }
+
+  try {
+    const likedIds = await fetchLikedSpotIds(
+      config,
+      userId,
+      rows.map((row) => row.id)
+    );
+    return rows.map((row) => mapSpot(row, likedIds.has(row.id)));
+  } catch (error) {
+    console.error('Loading spot like state failed:', error);
+    return rows.map((row) => mapSpot(row));
+  }
+}
+
 // --- GET /api/spots ---------------------------------------------------------
 
 export async function GET(request: Request): Promise<Response> {
@@ -536,7 +604,16 @@ export async function GET(request: Request): Promise<Response> {
     }
 
     const rows = (await response.json()) as DatabaseSpot[];
-    return Response.json({ spots: rows.map(mapSpot) });
+    let userId: string | null = null;
+    const accessToken = readBearerToken(request);
+    if (accessToken) {
+      const auth = await resolveUserId(config, accessToken);
+      if (auth.ok) {
+        userId = auth.userId;
+      }
+    }
+
+    return Response.json({ spots: await mapSpotsForUser(config, rows, userId) });
   } catch (error) {
     console.error('Loading spots failed:', error);
     return Response.json(
@@ -589,7 +666,7 @@ async function getMySpots(
     }
 
     const rows = (await response.json()) as DatabaseSpot[];
-    return Response.json({ spots: rows.map(mapSpot) });
+    return Response.json({ spots: await mapSpotsForUser(config, rows, auth.userId) });
   } catch (error) {
     console.error('Loading your spots failed:', error);
     return Response.json(

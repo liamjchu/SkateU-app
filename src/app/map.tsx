@@ -47,6 +47,7 @@ export default function MapScreen() {
   const mySpots = useSpotsStore((s) => s.mySpots);
   const myLoading = useSpotsStore((s) => s.myLoading);
   const deleteSpot = useSpotsStore((s) => s.deleteSpot);
+  const toggleSpotLike = useSpotsStore((s) => s.toggleSpotLike);
   const fetchMySpots = useSpotsStore((s) => s.fetchMySpots);
   const loading = useSpotsStore((s) => s.loading);
   const error = useSpotsStore((s) => s.error);
@@ -56,6 +57,7 @@ export default function MapScreen() {
   const webViewReadyRef = useRef(false);
   const [selectedSpotId, setSelectedSpotId] = useState<string | undefined>();
   const [showLoginRequired, setShowLoginRequired] = useState(false);
+  const [likingSpotId, setLikingSpotId] = useState<string | null>(null);
   const [deletingSpotId, setDeletingSpotId] = useState<string | null>(null);
   const sheetHeight = useSharedValue(0);
   const sheetTranslateY = useSharedValue(0);
@@ -307,7 +309,7 @@ export default function MapScreen() {
   useFocusEffect(
     useCallback(() => {
       if (schoolId) {
-        fetchSpots(schoolId);
+        fetchSpots(schoolId, session?.access_token);
       }
 
       if (session?.access_token) {
@@ -390,6 +392,40 @@ export default function MapScreen() {
 
     setSelectedSpotId(undefined);
     webViewRef.current?.injectJavaScript(`window.sendCenter(); true;`);
+  };
+
+  const handleLikePress = async () => {
+    if (!selectedSpot) {
+      return;
+    }
+
+    const accessToken = session?.access_token;
+    if (!accessToken) {
+      setShowLoginRequired(true);
+      return;
+    }
+
+    if (likingSpotId) {
+      return;
+    }
+
+    setLikingSpotId(selectedSpot.id);
+    try {
+      await toggleSpotLike(
+        selectedSpot.id,
+        selectedSpot.likedByUser === true,
+        accessToken
+      );
+    } catch (error) {
+      Alert.alert(
+        'Could not update like',
+        error instanceof Error && error.message.length > 0
+          ? error.message
+          : 'Please try again.'
+      );
+    } finally {
+      setLikingSpotId(null);
+    }
   };
 
   const handleEditSelectedSpot = () => {
@@ -659,16 +695,50 @@ export default function MapScreen() {
                     ) : null}
                   </View>
                 </View>
-                <Pressable
-                  onPress={() => setSelectedSpotId(undefined)}
-                  className="px-2 py-1"
-                >
-                  <Text
-                    className="font-outfit-semibold text-sky-600"
+                <View className="flex-row items-center">
+                  <Pressable
+                    onPress={handleLikePress}
+                    disabled={likingSpotId === selectedSpot.id}
+                    className="mr-2 flex-row items-center rounded-full bg-[#F4F7F6] px-3 py-2"
+                    accessibilityLabel={
+                      selectedSpot.likedByUser === true
+                        ? `Unlike ${selectedSpot.name}`
+                        : `Like ${selectedSpot.name}`
+                    }
+                    accessibilityRole="button"
                   >
-                    Close
-                  </Text>
-                </Pressable>
+                    {likingSpotId === selectedSpot.id ? (
+                      <ActivityIndicator size="small" color="#DC2626" />
+                    ) : (
+                      <Octicons
+                        name={
+                          selectedSpot.likedByUser === true
+                            ? 'heart-fill'
+                            : 'heart'
+                        }
+                        size={17}
+                        color={
+                          selectedSpot.likedByUser === true
+                            ? '#DC2626'
+                            : '#64748b'
+                        }
+                      />
+                    )}
+                    <Text className="ml-1.5 font-outfit-semibold text-sm text-slate-600">
+                      {selectedSpot.likeCount ?? 0}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setSelectedSpotId(undefined)}
+                    className="px-2 py-1"
+                  >
+                    <Text
+                      className="font-outfit-semibold text-sky-600"
+                    >
+                      Close
+                    </Text>
+                  </Pressable>
+                </View>
               </View>
             </View>
           </GestureDetector>

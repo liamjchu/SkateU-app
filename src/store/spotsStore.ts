@@ -12,9 +12,19 @@ type SpotsState = {
   mySpots: Spot[];
   myLoading: boolean;
   myError: string | null;
-  fetchSpots: (schoolId: string) => Promise<void>;
+  // Spots the signed-in user has liked, for the profile page.
+  likedSpots: Spot[];
+  likedLoading: boolean;
+  likedError: string | null;
+  fetchSpots: (schoolId: string, accessToken?: string) => Promise<void>;
   addSpot: (input: NewSpotInput, accessToken: string) => Promise<Spot>;
   fetchMySpots: (accessToken: string) => Promise<void>;
+  fetchLikedSpots: (accessToken: string) => Promise<void>;
+  toggleSpotLike: (
+    id: string,
+    likedByUser: boolean,
+    accessToken: string
+  ) => Promise<void>;
   updateSpot: (
     id: string,
     input: UpdateSpotInput,
@@ -22,6 +32,7 @@ type SpotsState = {
   ) => Promise<Spot>;
   deleteSpot: (id: string, accessToken: string) => Promise<void>;
   clearMySpots: () => void;
+  clearLikedSpots: () => void;
   reset: () => void;
 };
 
@@ -35,9 +46,12 @@ const INVALID_SCHOOL_ID_ERROR =
 const LOAD_FAILED_ERROR = 'Unable to load spots right now.';
 const LOAD_TIMEOUT_ERROR = 'Loading spots timed out. Please try again.';
 const MY_SPOTS_LOAD_FAILED_ERROR = 'Unable to load your spots right now.';
+const LIKED_SPOTS_LOAD_FAILED_ERROR = 'Unable to load liked spots right now.';
 
 let spotsRequestVersion = 0;
 let mySpotsRequestVersion = 0;
+let likedSpotsRequestVersion = 0;
+let spotLikeMutationVersion = 0;
 
 // React Native serializes an object of this shape as a multipart file part.
 type RNFile = { uri: string; name: string; type: string };
@@ -185,9 +199,13 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
   mySpots: [],
   myLoading: false,
   myError: null,
+  likedSpots: [],
+  likedLoading: false,
+  likedError: null,
 
-  fetchSpots: async (schoolId: string) => {
+  fetchSpots: async (schoolId: string, accessToken?: string) => {
     const requestVersion = ++spotsRequestVersion;
+    const mutationVersion = spotLikeMutationVersion;
     const trimmedSchoolId = schoolId?.trim() ?? '';
 
     // Blank/whitespace ids never hit the network; expose an error and keep the
@@ -206,7 +224,12 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
     try {
       const response = await fetchGetWithRetry(
         getApiUrl(`/api/spots?schoolId=${encodeURIComponent(trimmedSchoolId)}`),
-        { method: 'GET' }
+        {
+          method: 'GET',
+          headers: accessToken
+            ? { Authorization: `Bearer ${accessToken}` }
+            : undefined,
+        }
       );
 
       if (!response.ok) {
@@ -215,7 +238,13 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
 
       const data = (await response.json()) as { spots?: Spot[] };
 
-      if (requestVersion !== spotsRequestVersion) {
+      if (
+        requestVersion !== spotsRequestVersion ||
+        mutationVersion !== spotLikeMutationVersion
+      ) {
+        if (requestVersion === spotsRequestVersion) {
+          set({ loading: false });
+        }
         return;
       }
 
@@ -228,7 +257,13 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
       });
     } catch (error) {
       // On failure/timeout keep the prior spots and clear loading (Req 9.4).
-      if (requestVersion !== spotsRequestVersion) {
+      if (
+        requestVersion !== spotsRequestVersion ||
+        mutationVersion !== spotLikeMutationVersion
+      ) {
+        if (requestVersion === spotsRequestVersion) {
+          set({ loading: false });
+        }
         return;
       }
       set({ loading: false, error: toFetchErrorMessage(error) });
@@ -273,6 +308,7 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
 
   fetchMySpots: async (accessToken: string) => {
     const requestVersion = ++mySpotsRequestVersion;
+    const mutationVersion = spotLikeMutationVersion;
     set({ myLoading: true, myError: null });
 
     try {
@@ -286,13 +322,25 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
       }
 
       const data = (await response.json()) as { spots?: Spot[] };
-      if (requestVersion !== mySpotsRequestVersion) {
+      if (
+        requestVersion !== mySpotsRequestVersion ||
+        mutationVersion !== spotLikeMutationVersion
+      ) {
+        if (requestVersion === mySpotsRequestVersion) {
+          set({ myLoading: false });
+        }
         return;
       }
 
       set({ mySpots: data.spots ?? [], myLoading: false, myError: null });
     } catch (error) {
-      if (requestVersion !== mySpotsRequestVersion) {
+      if (
+        requestVersion !== mySpotsRequestVersion ||
+        mutationVersion !== spotLikeMutationVersion
+      ) {
+        if (requestVersion === mySpotsRequestVersion) {
+          set({ myLoading: false });
+        }
         return;
       }
 
@@ -305,6 +353,110 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
             : MY_SPOTS_LOAD_FAILED_ERROR,
       });
     }
+  },
+
+  fetchLikedSpots: async (accessToken: string) => {
+    const requestVersion = ++likedSpotsRequestVersion;
+    const mutationVersion = spotLikeMutationVersion;
+    set({ likedLoading: true, likedError: null });
+
+    try {
+      const response = await fetchGetWithRetry(getApiUrl('/api/spot-likes'), {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response));
+      }
+
+      const data = (await response.json()) as { spots?: Spot[] };
+      if (
+        requestVersion !== likedSpotsRequestVersion ||
+        mutationVersion !== spotLikeMutationVersion
+      ) {
+        if (requestVersion === likedSpotsRequestVersion) {
+          set({ likedLoading: false });
+        }
+        return;
+      }
+
+      set({ likedSpots: data.spots ?? [], likedLoading: false, likedError: null });
+    } catch (error) {
+      if (
+        requestVersion !== likedSpotsRequestVersion ||
+        mutationVersion !== spotLikeMutationVersion
+      ) {
+        if (requestVersion === likedSpotsRequestVersion) {
+          set({ likedLoading: false });
+        }
+        return;
+      }
+
+      set({
+        likedLoading: false,
+        likedError:
+          error instanceof Error && error.message.length > 0
+            ? error.message
+            : LIKED_SPOTS_LOAD_FAILED_ERROR,
+      });
+    }
+  },
+
+  toggleSpotLike: async (id: string, likedByUser: boolean, accessToken: string) => {
+    // Invalidate reads when a like mutation starts so an older response cannot
+    // overwrite the mutation result when it arrives later.
+    spotLikeMutationVersion += 1;
+
+    const response = await fetchMutationWithTimeout(
+      getApiUrl(`/api/spot-likes?id=${encodeURIComponent(id)}`),
+      {
+        method: likedByUser ? 'DELETE' : 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response));
+    }
+
+    const data = (await response.json()) as {
+      likeCount?: number;
+      likedByUser?: boolean;
+    };
+    const nextLiked = data.likedByUser ?? !likedByUser;
+    const nextCount = data.likeCount ?? 0;
+    spotLikeMutationVersion += 1;
+
+    set((state) => {
+      const updateSpot = (spot: Spot): Spot =>
+        spot.id === id
+          ? { ...spot, likeCount: nextCount, likedByUser: nextLiked }
+          : spot;
+      const updatedSpots = state.spots.map(updateSpot);
+      const updatedMySpots = state.mySpots.map(updateSpot);
+      const updatedLikedSpots = state.likedSpots.map(updateSpot);
+
+      if (!nextLiked) {
+        return {
+          spots: updatedSpots,
+          mySpots: updatedMySpots,
+          likedSpots: updatedLikedSpots.filter((spot) => spot.id !== id),
+        };
+      }
+
+      const likedSpot = updatedSpots.find((spot) => spot.id === id);
+      return {
+        spots: updatedSpots,
+        mySpots: updatedMySpots,
+        likedSpots: likedSpot
+          ? [
+              likedSpot,
+              ...updatedLikedSpots.filter((spot) => spot.id !== id),
+            ]
+          : updatedLikedSpots,
+      };
+    });
   },
 
   updateSpot: async (id: string, input: UpdateSpotInput, accessToken: string) => {
@@ -349,6 +501,9 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
     set((state) => ({
       mySpots: state.mySpots.map((spot) => (spot.id === id ? updated : spot)),
       spots: state.spots.map((spot) => (spot.id === id ? updated : spot)),
+      likedSpots: state.likedSpots.map((spot) =>
+        spot.id === id ? { ...updated, likedByUser: spot.likedByUser } : spot
+      ),
     }));
 
     return updated;
@@ -372,6 +527,7 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
     set((state) => ({
       mySpots: state.mySpots.filter((spot) => spot.id !== id),
       spots: state.spots.filter((spot) => spot.id !== id),
+      likedSpots: state.likedSpots.filter((spot) => spot.id !== id),
     }));
   },
 
@@ -380,9 +536,23 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
     set({ mySpots: [], myLoading: false, myError: null });
   },
 
+  clearLikedSpots: () => {
+    likedSpotsRequestVersion += 1;
+    spotLikeMutationVersion += 1;
+    set((state) => ({
+      spots: state.spots.map((spot) => ({ ...spot, likedByUser: false })),
+      mySpots: state.mySpots.map((spot) => ({ ...spot, likedByUser: false })),
+      likedSpots: [],
+      likedLoading: false,
+      likedError: null,
+    }));
+  },
+
   reset: () => {
     spotsRequestVersion += 1;
     mySpotsRequestVersion += 1;
+    likedSpotsRequestVersion += 1;
+    spotLikeMutationVersion += 1;
     set({
       spots: [],
       loading: false,
@@ -391,6 +561,9 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
       mySpots: [],
       myLoading: false,
       myError: null,
+      likedSpots: [],
+      likedLoading: false,
+      likedError: null,
     });
   },
 }));

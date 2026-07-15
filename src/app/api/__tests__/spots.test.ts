@@ -365,6 +365,7 @@ describe('GET /api/spots', () => {
       image_urls: ['https://img/1.jpg'],
       created_at: '2024-01-01T00:00:00.000Z',
       updated_at: '2024-01-01T00:00:00.000Z',
+      likes_count: 4,
       schools: { name: 'UT Austin', city: 'Austin', state: 'TX' },
       creator: { username: 'skater_jane' },
     };
@@ -389,6 +390,8 @@ describe('GET /api/spots', () => {
           creatorUsername: 'skater_jane',
           createdAt: '2024-01-01T00:00:00.000Z',
           updatedAt: '2024-01-01T00:00:00.000Z',
+          likeCount: 4,
+          likedByUser: false,
           schoolName: 'UT Austin',
         },
       ],

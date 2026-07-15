@@ -1,4 +1,4 @@
-import { Feather } from '@expo/vector-icons';
+import { Feather, Octicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
@@ -28,8 +28,13 @@ export default function ProfileScreen() {
   const myLoading = useSpotsStore((state) => state.myLoading);
   const myError = useSpotsStore((state) => state.myError);
   const fetchMySpots = useSpotsStore((state) => state.fetchMySpots);
+  const likedSpots = useSpotsStore((state) => state.likedSpots);
+  const likedLoading = useSpotsStore((state) => state.likedLoading);
+  const likedError = useSpotsStore((state) => state.likedError);
+  const fetchLikedSpots = useSpotsStore((state) => state.fetchLikedSpots);
   const deleteSpot = useSpotsStore((state) => state.deleteSpot);
 
+  const [spotTab, setSpotTab] = useState<'created' | 'liked'>('created');
   const [loggingOut, setLoggingOut] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -45,9 +50,15 @@ export default function ProfileScreen() {
       const accessToken = session?.access_token;
       if (accessToken) {
         fetchMySpots(accessToken);
+        fetchLikedSpots(accessToken);
       }
-    }, [fetchMySpots, session?.access_token])
+    }, [fetchLikedSpots, fetchMySpots, session?.access_token])
   );
+
+  const showingLikedSpots = spotTab === 'liked';
+  const displayedSpots = showingLikedSpots ? likedSpots : mySpots;
+  const displayedLoading = showingLikedSpots ? likedLoading : myLoading;
+  const displayedError = showingLikedSpots ? likedError : myError;
 
   const handleLogout = async () => {
     if (loggingOut) {
@@ -135,8 +146,7 @@ export default function ProfileScreen() {
         </Pressable>
 
         <Text
-          className="text-2xl text-white"
-          style={{ fontFamily: 'Outfit_700Bold' }}
+          className="font-outfit-bold text-2xl text-white"
         >
           Profile
         </Text>
@@ -162,50 +172,69 @@ export default function ProfileScreen() {
 
           {email ? (
             <Text
-              className="mt-1 text-base text-slate-500"
-              style={{ fontFamily: 'Outfit_500Medium' }}
+              className="mt-1 font-outfit-medium text-base text-slate-500"
             >
               {email}
             </Text>
           ) : null}
         </View>
 
-        <View className="mt-8 flex-row items-center justify-between">
-          <Text
-            className="text-lg text-[#1B3B36]"
-            style={{ fontFamily: 'Outfit_700Bold' }}
+        <View className="mt-8 flex-row rounded-2xl bg-[#F4F7F6] p-1">
+          <Pressable
+            onPress={() => setSpotTab('created')}
+            className={`flex-1 items-center rounded-xl py-3 ${
+              !showingLikedSpots ? 'bg-white' : ''
+            }`}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: !showingLikedSpots }}
           >
-            Your Spots
-          </Text>
-          {mySpots.length > 0 ? (
             <Text
-              className="text-sm text-slate-500"
-              style={{ fontFamily: 'Outfit_600SemiBold' }}
+              className={`font-outfit-bold text-sm ${
+                !showingLikedSpots ? 'text-[#1B3B36]' : 'text-slate-500'
+              }`}
             >
-              {mySpots.length}
+              Your Spots {mySpots.length > 0 ? `(${mySpots.length})` : ''}
             </Text>
-          ) : null}
+          </Pressable>
+          <Pressable
+            onPress={() => setSpotTab('liked')}
+            className={`flex-1 items-center rounded-xl py-3 ${
+              showingLikedSpots ? 'bg-white' : ''
+            }`}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: showingLikedSpots }}
+          >
+            <Text
+              className={`font-outfit-bold text-sm ${
+                showingLikedSpots ? 'text-[#1B3B36]' : 'text-slate-500'
+              }`}
+            >
+              Liked Spots {likedSpots.length > 0 ? `(${likedSpots.length})` : ''}
+            </Text>
+          </Pressable>
         </View>
 
-        {myLoading && mySpots.length === 0 ? (
+        {displayedLoading && displayedSpots.length === 0 ? (
           <View className="mt-6 items-center">
             <ActivityIndicator size="small" color="#21473f" />
           </View>
-        ) : myError && mySpots.length === 0 ? (
-          <Text className="mt-4 text-center text-sm text-red-600">{myError}</Text>
-        ) : mySpots.length === 0 ? (
+        ) : displayedError && displayedSpots.length === 0 ? (
+          <Text className="mt-4 text-center text-sm text-red-600">
+            {displayedError}
+          </Text>
+        ) : displayedSpots.length === 0 ? (
           <View className="mt-4 rounded-2xl bg-[#F4F7F6] p-6">
             <Text
-              className="text-center text-sm text-slate-500"
-              style={{ fontFamily: 'Outfit_500Medium' }}
+              className="font-outfit-medium text-center text-sm text-slate-500"
             >
-              You haven&apos;t added any spots yet. Find a campus map and tap
-              the + button to add your first spot.
+              {showingLikedSpots
+                ? 'Spots you like will appear here.'
+                : 'You haven&apos;t added any spots yet. Find a campus map and tap the + button to add your first spot.'}
             </Text>
           </View>
         ) : (
           <View className="mt-3">
-            {mySpots.map((spot) => (
+            {displayedSpots.map((spot) => (
               <View
                 key={spot.id}
                 className="mb-3 flex-row items-center rounded-2xl border border-[#E3EAE8] bg-white p-3"
@@ -224,8 +253,7 @@ export default function ProfileScreen() {
 
                 <View className="ml-3 flex-1">
                   <Text
-                    className="text-base text-[#1B3B36]"
-                    style={{ fontFamily: 'Outfit_700Bold' }}
+                    className="font-outfit-bold text-base text-[#1B3B36]"
                     numberOfLines={1}
                   >
                     {spot.name}
@@ -234,8 +262,7 @@ export default function ProfileScreen() {
                     <View className="mt-0.5 flex-row items-center">
                       <Feather name="map-pin" size={11} color="#64748b" />
                       <Text
-                        className="ml-1 flex-1 text-xs text-slate-500"
-                        style={{ fontFamily: 'Outfit_600SemiBold' }}
+                        className="font-outfit-semibold ml-1 flex-1 text-xs text-slate-500"
                         numberOfLines={1}
                       >
                         {spot.schoolName}
@@ -243,38 +270,47 @@ export default function ProfileScreen() {
                     </View>
                   ) : null}
                   <Text
-                    className="mt-0.5 text-sm text-slate-500"
-                    style={{ fontFamily: 'Outfit_500Medium' }}
+                    className="font-outfit-medium mt-0.5 text-sm text-slate-500"
                     numberOfLines={2}
                   >
                     {spot.description}
                   </Text>
+                  <View className="mt-1 flex-row items-center">
+                    <Octicons name="heart-fill" size={12} color="#DC2626" />
+                    <Text
+                      className="font-outfit-semibold ml-1 text-xs text-slate-500"
+                    >
+                      {spot.likeCount ?? 0}
+                    </Text>
+                  </View>
                 </View>
 
-                {deletingId === spot.id ? (
-                  <View className="ml-2 h-10 w-10 items-center justify-center">
-                    <ActivityIndicator size="small" color="#21473f" />
-                  </View>
-                ) : (
-                  <View className="ml-2 flex-row">
-                    <Pressable
-                      onPress={() => handleEdit(spot)}
-                      className="h-10 w-10 items-center justify-center rounded-full"
-                      accessibilityLabel={`Edit ${spot.name}`}
-                      accessibilityRole="button"
-                    >
-                      <Feather name="edit-2" size={18} color="#21473f" />
-                    </Pressable>
-                    <Pressable
-                      onPress={() => handleDelete(spot)}
-                      className="h-10 w-10 items-center justify-center rounded-full"
-                      accessibilityLabel={`Delete ${spot.name}`}
-                      accessibilityRole="button"
-                    >
-                      <Feather name="trash-2" size={18} color="#DC2626" />
-                    </Pressable>
-                  </View>
-                )}
+                {!showingLikedSpots ? (
+                  deletingId === spot.id ? (
+                    <View className="ml-2 h-10 w-10 items-center justify-center">
+                      <ActivityIndicator size="small" color="#21473f" />
+                    </View>
+                  ) : (
+                    <View className="ml-2 flex-row">
+                      <Pressable
+                        onPress={() => handleEdit(spot)}
+                        className="h-10 w-10 items-center justify-center rounded-full"
+                        accessibilityLabel={`Edit ${spot.name}`}
+                        accessibilityRole="button"
+                      >
+                        <Feather name="edit-2" size={18} color="#21473f" />
+                      </Pressable>
+                      <Pressable
+                        onPress={() => handleDelete(spot)}
+                        className="h-10 w-10 items-center justify-center rounded-full"
+                        accessibilityLabel={`Delete ${spot.name}`}
+                        accessibilityRole="button"
+                      >
+                        <Feather name="trash-2" size={18} color="#DC2626" />
+                      </Pressable>
+                    </View>
+                  )
+                ) : null}
               </View>
             ))}
           </View>
