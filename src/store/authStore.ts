@@ -2,6 +2,7 @@ import type { Session, User } from '@supabase/supabase-js';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { create } from 'zustand';
+import { getApiUrl } from '../lib/api';
 import { supabase } from '../lib/supabase';
 
 type AuthState = {
@@ -22,6 +23,14 @@ type AuthState = {
   signInWithGoogle: () => Promise<boolean>;
   setSessionFromUrl: (url: string) => Promise<boolean>;
   signOut: () => Promise<void>;
+  // Emails a fresh 6-digit code to re-verify identity before a destructive
+  // action (account deletion). Reuses Supabase's email OTP, not a separate
+  // "delete" flow type.
+  sendDeleteAccountOtp: (email: string) => Promise<void>;
+  verifyDeleteAccountOtp: (email: string, token: string) => Promise<void>;
+  // Permanently deletes the signed-in user's account. Call only after
+  // verifyDeleteAccountOtp has succeeded.
+  deleteAccount: () => Promise<void>;
 };
 
 // Reads every param off the redirect URL, whether Supabase put them in the
@@ -237,5 +246,58 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (error) {
       throw error;
     }
+  },
+
+  // Sends a 6-digit email OTP to the already-registered user. Unlike signUp's
+  // confirmation email, `shouldCreateUser: false` guarantees this never creates
+  // a new account — it only works for an existing address, which re-verifies
+  // that whoever is tapping "Delete account" controls that inbox.
+  sendDeleteAccountOtp: async (email) => {
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
+      options: { shouldCreateUser: false },
+    });
+
+    if (error) {
+      throw error;
+    }
+  },
+
+  verifyDeleteAccountOtp: async (email, token) => {
+    const { error } = await supabase.auth.verifyOtp({
+      email: email.trim(),
+      token: token.trim(),
+      type: 'email',
+    });
+
+    if (error) {
+      throw error;
+    }
+  },
+
+  deleteAccount: async () => {
+    const { data } = await supabase.auth.getSession();
+    const accessToken = data.session?.access_token;
+
+    if (!accessToken) {
+      throw new Error('You must be signed in to delete your account.');
+    }
+
+    const response = await fetch(getApiUrl('/api/delete-account'), {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (!response.ok) {
+      const data = (await response.json().catch(() => null)) as
+        | { error?: string }
+        | null;
+      throw new Error(
+        data?.error ?? 'Could not delete your account right now. Try again.'
+      );
+    }
+
+    // The server has deleted the auth user; drop the local session too.
+    await supabase.auth.signOut();
   },
 }));

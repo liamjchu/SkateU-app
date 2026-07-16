@@ -196,6 +196,12 @@ export default function RootLayout() {
           }}
         />
         <Stack.Screen
+          name="verify-delete-account"
+          options={{
+            animation: 'slide_from_right',
+          }}
+        />
+        <Stack.Screen
           name="map"
           options={{
             animation: 'slide_from_right',

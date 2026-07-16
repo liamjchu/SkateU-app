@@ -676,7 +676,7 @@ export default function MapScreen() {
                     >
                       {selectedSpot.creatorUsername
                         ? `@${selectedSpot.creatorUsername}`
-                        : 'Unknown skater'}
+                        : 'Deleted User'}
                     </Text>
                     {spotTimeInfo ? (
                       <>

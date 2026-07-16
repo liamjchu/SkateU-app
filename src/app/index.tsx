@@ -3,15 +3,15 @@ import Constants from 'expo-constants';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
-    Image,
-    Keyboard,
-    Platform,
-    Pressable,
-    ScrollView,
-    Text,
-    TextInput,
-    View,
-    type GestureResponderEvent,
+  Image,
+  Keyboard,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+  type GestureResponderEvent,
 } from 'react-native';
 import IMAGES from '../constants/images';
 import { useAuthStore } from '../store/authStore';
@@ -489,7 +489,7 @@ export default function HomeScreen() {
           elevation: 12,
         }}
       >
-        <View className="-ml-[17px] flex-row items-center space-x-3">
+        <View className="-ml-[7px] flex-row items-center space-x-3">
           <Image 
             source={IMAGES.logo} 
             className="h-14 w-14"
