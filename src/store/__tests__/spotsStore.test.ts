@@ -419,3 +419,84 @@ describe('spotsStore GET retry behaviour', () => {
     expect(useSpotsStore.getState().error).toMatch(/temporarily unavailable/i);
   });
 });
+
+
+describe('spotsStore liked spots', () => {
+  it('loads liked spots and sends the authenticated request', async () => {
+    const liked = makeSpot({ id: 'liked', likedByUser: true, likeCount: 4 });
+    fetchMock.mockResolvedValue(mockResponse({ spots: [liked] }));
+
+    await useSpotsStore.getState().fetchLikedSpots('token-abc');
+
+    const state = useSpotsStore.getState();
+    expect(state.likedSpots).toEqual([liked]);
+    expect(state.likedLoading).toBe(false);
+    expect(state.likedError).toBeNull();
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url.toString()).toContain('/api/spot-likes');
+    expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer token-abc');
+  });
+
+  it('preserves loaded likes and exposes the server reason when loading fails', async () => {
+    const existing = makeSpot({ id: 'liked', likedByUser: true });
+    useSpotsStore.setState({ likedSpots: [existing] });
+    fetchMock.mockResolvedValue(mockResponse({ reason: 'Sign in again.' }, { ok: false, status: 401 }));
+
+    await useSpotsStore.getState().fetchLikedSpots('expired-token');
+
+    expect(useSpotsStore.getState()).toMatchObject({
+      likedSpots: [existing],
+      likedLoading: false,
+      likedError: 'Sign in again.',
+    });
+  });
+
+  it('synchronizes a successful like and unlike across every loaded collection', async () => {
+    const spot = makeSpot({ id: 'a', likedByUser: false, likeCount: 1 });
+    useSpotsStore.setState({ spots: [spot], mySpots: [spot], likedSpots: [] });
+    fetchMock.mockResolvedValueOnce(mockResponse({ likedByUser: true, likeCount: 2 }));
+
+    await useSpotsStore.getState().toggleSpotLike('a', false, 'token-abc');
+
+    let state = useSpotsStore.getState();
+    expect(state.spots[0]).toMatchObject({ likedByUser: true, likeCount: 2 });
+    expect(state.mySpots[0]).toMatchObject({ likedByUser: true, likeCount: 2 });
+    expect(state.likedSpots).toHaveLength(1);
+    expect(fetchMock.mock.calls[0][1]?.method).toBe('POST');
+
+    fetchMock.mockResolvedValueOnce(mockResponse({ likedByUser: false, likeCount: 1 }));
+    await useSpotsStore.getState().toggleSpotLike('a', true, 'token-abc');
+
+    state = useSpotsStore.getState();
+    expect(state.spots[0]).toMatchObject({ likedByUser: false, likeCount: 1 });
+    expect(state.likedSpots).toEqual([]);
+    expect(fetchMock.mock.calls[1][1]?.method).toBe('DELETE');
+  });
+
+  it('clears likes from loaded map and profile spots on sign out', () => {
+    const liked = makeSpot({ likedByUser: true });
+    useSpotsStore.setState({ spots: [liked], mySpots: [liked], likedSpots: [liked], likedLoading: true, likedError: 'old error' });
+
+    useSpotsStore.getState().clearLikedSpots();
+
+    expect(useSpotsStore.getState()).toMatchObject({ likedSpots: [], likedLoading: false, likedError: null });
+    expect(useSpotsStore.getState().spots[0]?.likedByUser).toBe(false);
+    expect(useSpotsStore.getState().mySpots[0]?.likedByUser).toBe(false);
+  });
+});
+
+
+describe('spotsStore like response compatibility', () => {
+  it('uses safe defaults when a successful like response omits optional fields', async () => {
+    const spot = makeSpot({ id: 'a', likedByUser: false, likeCount: 8 });
+    useSpotsStore.setState({ spots: [spot], mySpots: [spot] });
+    fetchMock.mockResolvedValue(mockResponse({}));
+
+    await useSpotsStore.getState().toggleSpotLike('a', false, 'token-abc');
+
+    const state = useSpotsStore.getState();
+    expect(state.spots[0]).toMatchObject({ likedByUser: true, likeCount: 0 });
+    expect(state.mySpots[0]).toMatchObject({ likedByUser: true, likeCount: 0 });
+    expect(state.likedSpots[0]).toMatchObject({ id: 'a', likedByUser: true });
+  });
+});

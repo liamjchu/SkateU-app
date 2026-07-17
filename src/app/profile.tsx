@@ -2,13 +2,13 @@ import { Feather, Octicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
+    ActivityIndicator,
+    Alert,
+    Image,
+    Pressable,
+    ScrollView,
+    Text,
+    View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../store/authStore';
@@ -367,6 +367,17 @@ export default function ProfileScreen() {
       </ScrollView>
 
       <View className="gap-3 p-5 pb-6">
+        <Pressable
+          onPress={() => router.push('/change-password')}
+          className="w-full items-center justify-center rounded-2xl border border-[#21473f] py-4"
+          accessibilityLabel="Change password"
+          accessibilityRole="button"
+        >
+          <Text className="font-outfit-bold text-lg text-[#21473f]">
+            Change password
+          </Text>
+        </Pressable>
+
         <Pressable
           onPress={handleLogout}
           disabled={loggingOut}
