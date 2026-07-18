@@ -12,8 +12,15 @@ export const requestPasswordResetEmail = async (email: string): Promise<void> =>
   }
 };
 
-/** Updates the password for the authenticated recovery session. */
-export const updatePassword = async (password: string): Promise<void> => {
+/** Updates the password only for an active Supabase recovery session. */
+export const updatePassword = async (
+  password: string,
+  isPasswordRecovery: boolean
+): Promise<void> => {
+  if (!isPasswordRecovery) {
+    throw new Error('Password recovery is required to reset your password.');
+  }
+
   const { error } = await supabase.auth.updateUser({ password });
 
   if (error) {

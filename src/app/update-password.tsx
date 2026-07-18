@@ -29,7 +29,10 @@ const getUpdateErrorMessage = (updateError: unknown): string => {
 
 export default function UpdatePasswordScreen() {
   const router = useRouter();
-  const hasSession = useAuthStore((state) => state.session !== null);
+  const isPasswordRecovery = useAuthStore((state) => state.passwordRecovery);
+  const completePasswordRecovery = useAuthStore(
+    (state) => state.completePasswordRecovery
+  );
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
@@ -52,7 +55,7 @@ export default function UpdatePasswordScreen() {
       return;
     }
 
-    if (!hasSession) {
+    if (!isPasswordRecovery) {
       setError('Your reset link has expired. Request a new one and try again.');
       return;
     }
@@ -72,7 +75,8 @@ export default function UpdatePasswordScreen() {
     setSubmitting(true);
 
     try {
-      await updatePassword(password);
+      await updatePassword(password, isPasswordRecovery);
+      completePasswordRecovery();
       setSuccess(true);
     } catch (updateError) {
       setError(getUpdateErrorMessage(updateError));
@@ -103,10 +107,7 @@ export default function UpdatePasswordScreen() {
           >
             <Text className="text-xl text-white">❮</Text>
           </Pressable>
-          <Text
-            className="text-2xl text-white"
-            style={{ fontFamily: 'Outfit_700Bold' }}
-          >
+          <Text className="font-outfit-bold text-2xl text-white">
             New password
           </Text>
           <View className="h-11 w-11" />
@@ -118,28 +119,19 @@ export default function UpdatePasswordScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={{ flexGrow: 1 }}
+          className="flex-1"
+          contentContainerClassName="flex-grow"
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
           <View className="flex-1 px-5 pt-8">
-            <Text
-              className="text-3xl text-[#1B3B36]"
-              style={{ fontFamily: 'Outfit_900Black' }}
-            >
+            <Text className="font-outfit-black text-3xl text-[#1B3B36]">
               Create a new password
             </Text>
-            <Text
-              className="mt-2 text-base text-slate-500"
-              style={{ fontFamily: 'Outfit_500Medium' }}
-            >
+            <Text className="mt-2 font-outfit-medium text-base text-slate-500">
               Choose a password you have not used before.
             </Text>
-            <Text
-              className="mt-2 text-sm text-slate-400"
-              style={{ fontFamily: 'Outfit_500Medium' }}
-            >
+            <Text className="mt-2 font-outfit-medium text-sm text-slate-400">
               {PASSWORD_REQUIREMENTS}
             </Text>
 
@@ -155,8 +147,7 @@ export default function UpdatePasswordScreen() {
                   autoCorrect={false}
                   autoComplete="new-password"
                   editable={!submitting && !success}
-                  className="flex-1 pl-4 pr-5 py-4 text-base text-[#1B3B36]"
-                  style={{ fontFamily: 'Outfit_600SemiBold' }}
+                  className="flex-1 pl-4 pr-5 py-4 font-outfit-semibold text-base text-[#1B3B36]"
                 />
                 <Pressable
                   onPress={() => setShowPassword((visible) => !visible)}
@@ -185,8 +176,7 @@ export default function UpdatePasswordScreen() {
                   autoCorrect={false}
                   autoComplete="new-password"
                   editable={!submitting && !success}
-                  className="flex-1 pl-4 pr-5 py-4 text-base text-[#1B3B36]"
-                  style={{ fontFamily: 'Outfit_600SemiBold' }}
+                  className="flex-1 pl-4 pr-5 py-4 font-outfit-semibold text-base text-[#1B3B36]"
                 />
                 <Pressable
                   onPress={() => setShowConfirmation((visible) => !visible)}
@@ -207,11 +197,7 @@ export default function UpdatePasswordScreen() {
               </View>
 
               {error ? (
-                <Text
-                  selectable
-                  className="text-sm text-red-500"
-                  style={{ fontFamily: 'Outfit_500Medium' }}
-                >
+                <Text selectable className="font-outfit-medium text-sm text-red-500">
                   {error}
                 </Text>
               ) : null}
@@ -220,8 +206,7 @@ export default function UpdatePasswordScreen() {
                 <View className="rounded-2xl bg-[#EBF2F0] px-4 py-3">
                   <Text
                     selectable
-                    className="text-sm text-[#1B3B36]"
-                    style={{ fontFamily: 'Outfit_600SemiBold' }}
+                    className="font-outfit-semibold text-sm text-[#1B3B36]"
                   >
                     Your password has been updated. Taking you back to SkateU...
                   </Text>
@@ -236,10 +221,7 @@ export default function UpdatePasswordScreen() {
                   accessibilityRole="button"
                   accessibilityLabel="Save new password"
                 >
-                  <Text
-                    className="text-lg text-white"
-                    style={{ fontFamily: 'Outfit_700Bold' }}
-                  >
+                  <Text className="font-outfit-bold text-lg text-white">
                     {submitting ? 'Saving password...' : 'Save new password'}
                   </Text>
                 </Pressable>
@@ -252,10 +234,7 @@ export default function UpdatePasswordScreen() {
                   className="items-center justify-center py-1"
                   accessibilityRole="button"
                 >
-                  <Text
-                    className="text-sm text-slate-500"
-                    style={{ fontFamily: 'Outfit_600SemiBold' }}
-                  >
+                  <Text className="font-outfit-semibold text-sm text-slate-500">
                     Request a new reset link
                   </Text>
                 </Pressable>

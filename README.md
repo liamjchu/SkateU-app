@@ -25,8 +25,14 @@ Expo 55 · React Native · TypeScript · Expo Router · NativeWind · Zustand ·
 
 ```bash
 npm install
-copy .env.example .env.local
+cp .env.example .env.local
 npx expo start
+```
+
+On Windows Command Prompt, use:
+
+```cmd
+copy .env.example .env.local
 ```
 
 Add the client-safe Supabase values to `.env.local` before starting. Use the Expo CLI prompts to open a development build, Android emulator, iOS simulator, or web browser.

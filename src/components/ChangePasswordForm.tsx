@@ -12,6 +12,7 @@ type PasswordFieldProps = {
   value: string;
   onChangeText: (value: string) => void;
   placeholder: string;
+  autoComplete: 'current-password' | 'new-password';
   visible: boolean;
   onToggleVisibility: () => void;
   editable: boolean;
@@ -34,6 +35,7 @@ function PasswordField({
   value,
   onChangeText,
   placeholder,
+  autoComplete,
   visible,
   onToggleVisibility,
   editable,
@@ -48,10 +50,9 @@ function PasswordField({
         secureTextEntry={!visible}
         autoCapitalize="none"
         autoCorrect={false}
-        autoComplete="new-password"
+        autoComplete={autoComplete}
         editable={editable}
-        className="flex-1 pl-4 pr-5 py-4 text-base text-[#1B3B36]"
-        style={{ fontFamily: 'Outfit_600SemiBold' }}
+        className="flex-1 pl-4 pr-5 py-4 font-outfit-semibold text-base text-[#1B3B36]"
       />
       <Pressable
         onPress={onToggleVisibility}
@@ -142,6 +143,7 @@ export default function ChangePasswordForm({ email }: ChangePasswordFormProps) {
         value={currentPassword}
         onChangeText={setCurrentPassword}
         placeholder="Current password"
+        autoComplete="current-password"
         visible={showCurrentPassword}
         onToggleVisibility={() => setShowCurrentPassword((visible) => !visible)}
         editable={!submitting}
@@ -150,6 +152,7 @@ export default function ChangePasswordForm({ email }: ChangePasswordFormProps) {
         value={newPassword}
         onChangeText={setNewPassword}
         placeholder="New password"
+        autoComplete="new-password"
         visible={showNewPassword}
         onToggleVisibility={() => setShowNewPassword((visible) => !visible)}
         editable={!submitting}
@@ -158,6 +161,7 @@ export default function ChangePasswordForm({ email }: ChangePasswordFormProps) {
         value={confirmPassword}
         onChangeText={setConfirmPassword}
         placeholder="Confirm new password"
+        autoComplete="new-password"
         visible={showConfirmation}
         onToggleVisibility={() => setShowConfirmation((visible) => !visible)}
         editable={!submitting}

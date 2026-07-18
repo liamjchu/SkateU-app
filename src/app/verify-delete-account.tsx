@@ -151,10 +151,7 @@ export default function VerifyDeleteAccountScreen() {
             <Text className="text-xl text-white">❮</Text>
           </Pressable>
 
-          <Text
-            className="text-2xl text-white"
-            style={{ fontFamily: 'Outfit_700Bold' }}
-          >
+          <Text className="font-outfit-bold text-2xl text-white">
             Delete account
           </Text>
 
@@ -163,16 +160,10 @@ export default function VerifyDeleteAccountScreen() {
       </View>
 
       <View className="flex-1 px-5 pt-8">
-        <Text
-          className="text-3xl text-[#1B3B36]"
-          style={{ fontFamily: 'Outfit_900Black' }}
-        >
+        <Text className="font-outfit-black text-3xl text-[#1B3B36]">
           Enter your code
         </Text>
-        <Text
-          className="mt-2 text-base text-slate-500"
-          style={{ fontFamily: 'Outfit_500Medium' }}
-        >
+        <Text className="mt-2 font-outfit-medium text-base text-slate-500">
           {email
             ? `We sent a 6-digit verification code to ${email}. Enter it to permanently delete your account.`
             : 'Enter the 6-digit verification code we emailed you to permanently delete your account.'}
@@ -192,10 +183,7 @@ export default function VerifyDeleteAccountScreen() {
                       isActive ? 'border-2 border-[#21473f]' : ''
                     }`}
                   >
-                    <Text
-                      className="text-2xl text-[#1B3B36]"
-                      style={{ fontFamily: 'Outfit_700Bold' }}
-                    >
+                    <Text className="font-outfit-bold text-2xl text-[#1B3B36]">
                       {char}
                     </Text>
                   </View>
@@ -218,20 +206,14 @@ export default function VerifyDeleteAccountScreen() {
           />
 
           {error ? (
-            <Text
-              className="text-sm text-red-500"
-              style={{ fontFamily: 'Outfit_500Medium' }}
-            >
+            <Text className="font-outfit-medium text-sm text-red-500">
               {error}
             </Text>
           ) : null}
 
           {notice ? (
             <View className="rounded-2xl bg-[#EBF2F0] px-4 py-3">
-              <Text
-                className="text-sm text-[#1B3B36]"
-                style={{ fontFamily: 'Outfit_600SemiBold' }}
-              >
+              <Text className="font-outfit-semibold text-sm text-[#1B3B36]">
                 {notice}
               </Text>
             </View>
@@ -249,10 +231,7 @@ export default function VerifyDeleteAccountScreen() {
             {submitting ? (
               <ActivityIndicator color="#ffffff" />
             ) : (
-              <Text
-                className="text-lg text-white"
-                style={{ fontFamily: 'Outfit_700Bold' }}
-              >
+              <Text className="font-outfit-bold text-lg text-white">
                 Verify and delete
               </Text>
             )}
@@ -266,10 +245,9 @@ export default function VerifyDeleteAccountScreen() {
             accessibilityLabel="Resend code"
           >
             <Text
-              className={`text-base ${
+              className={`font-outfit-semibold text-base ${
                 cooldown > 0 || resending ? 'text-slate-400' : 'text-[#21473f]'
               }`}
-              style={{ fontFamily: 'Outfit_600SemiBold' }}
             >
               {resending
                 ? 'Sending...'

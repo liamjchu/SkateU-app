@@ -82,10 +82,7 @@ export default function ForgotPasswordScreen() {
           >
             <Text className="text-xl text-white">❮</Text>
           </Pressable>
-          <Text
-            className="text-2xl text-white"
-            style={{ fontFamily: 'Outfit_700Bold' }}
-          >
+          <Text className="font-outfit-bold text-2xl text-white">
             Reset password
           </Text>
           <View className="h-11 w-11" />
@@ -97,22 +94,16 @@ export default function ForgotPasswordScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={{ flexGrow: 1 }}
+          className="flex-1"
+          contentContainerClassName="flex-grow"
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
           <View className="flex-1 px-5 pt-8">
-            <Text
-              className="text-3xl text-[#1B3B36]"
-              style={{ fontFamily: 'Outfit_900Black' }}
-            >
+            <Text className="font-outfit-black text-3xl text-[#1B3B36]">
               Forgot your password?
             </Text>
-            <Text
-              className="mt-2 text-base text-slate-500"
-              style={{ fontFamily: 'Outfit_500Medium' }}
-            >
+            <Text className="mt-2 font-outfit-medium text-base text-slate-500">
               Enter your email and we&apos;ll send a link to reset it.
             </Text>
 
@@ -127,16 +118,11 @@ export default function ForgotPasswordScreen() {
                 autoComplete="email"
                 keyboardType="email-address"
                 editable={!submitting}
-                className="rounded-2xl bg-[#F0F3F5] pl-4 pr-5 py-4 text-base text-[#1B3B36]"
-                style={{ fontFamily: 'Outfit_600SemiBold' }}
+                className="rounded-2xl bg-[#F0F3F5] pl-4 pr-5 py-4 font-outfit-semibold text-base text-[#1B3B36]"
               />
 
               {error ? (
-                <Text
-                  selectable
-                  className="text-sm text-red-500"
-                  style={{ fontFamily: 'Outfit_500Medium' }}
-                >
+                <Text selectable className="font-outfit-medium text-sm text-red-500">
                   {error}
                 </Text>
               ) : null}
@@ -145,8 +131,7 @@ export default function ForgotPasswordScreen() {
                 <View className="rounded-2xl bg-[#EBF2F0] px-4 py-3">
                   <Text
                     selectable
-                    className="text-sm text-[#1B3B36]"
-                    style={{ fontFamily: 'Outfit_600SemiBold' }}
+                    className="font-outfit-semibold text-sm text-[#1B3B36]"
                   >
                     {notice}
                   </Text>
@@ -162,10 +147,7 @@ export default function ForgotPasswordScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Send password reset link"
               >
-                <Text
-                  className="text-lg text-white"
-                  style={{ fontFamily: 'Outfit_700Bold' }}
-                >
+                <Text className="font-outfit-bold text-lg text-white">
                   {submitting ? 'Sending link...' : 'Send reset link'}
                 </Text>
               </Pressable>

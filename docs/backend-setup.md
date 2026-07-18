@@ -2,7 +2,19 @@
 
 ## 1. Configure environment variables
 
-Copy `.env.example` to `.env.local` for local client work. Values beginning with `EXPO_PUBLIC_` are embedded in the client bundle and must contain only the Supabase URL and anon key.
+Copy `.env.example` to `.env.local` for local client work:
+
+```bash
+cp .env.example .env.local
+```
+
+On Windows Command Prompt, use:
+
+```cmd
+copy .env.example .env.local
+```
+
+Values beginning with `EXPO_PUBLIC_` are embedded in the client bundle and must contain only the Supabase URL and anon key.
 
 | Variable | Where it belongs | Purpose |
 | --- | --- | --- |
@@ -33,6 +45,7 @@ In the Supabase SQL Editor, run the idempotent scripts in this order:
 3. `supabase/spots_creator_link.sql`
 4. `supabase/spot_likes_setup.sql`
 5. `supabase/spots_count_trigger.sql`
+6. `supabase/account_deletion_proofs_setup.sql`
 
 Create a Storage bucket named `spot-images` with public read enabled. Image upload and deletion are performed by server routes with the service-role key; public read only serves the rendered image URLs.
 

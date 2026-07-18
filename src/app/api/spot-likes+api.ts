@@ -31,7 +31,14 @@ function readBearerToken(request: Request): string | null {
   return match ? match[1].trim() : null;
 }
 
-function authError(reason: 'invalid' | 'expired'): Response {
+function authError(reason: 'invalid' | 'expired' | 'timeout'): Response {
+  if (reason === 'timeout') {
+    return Response.json(
+      { error: 'Account verification timed out. Please try again.' },
+      { status: 503 }
+    );
+  }
+
   return Response.json(
     {
       error:
