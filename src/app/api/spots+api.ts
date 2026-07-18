@@ -14,6 +14,7 @@ export const DESCRIPTION_MAX = 1000;
 export const MAX_IMAGES = 10;
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
 export const UPLOAD_TIMEOUT_MS = 30_000;
+export const AUTH_REQUEST_TIMEOUT_MS = 10_000;
 export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
 
 const POSTGREST_IN_FILTER_BATCH_SIZE = 100;
@@ -351,7 +352,7 @@ export async function uploadImages(
 
 export type AuthResult =
   | { ok: true; userId: string }
-  | { ok: false; reason: 'invalid' | 'expired' };
+  | { ok: false; reason: 'invalid' | 'expired' | 'timeout' };
 
 /**
  * Verifies the bearer token against Supabase auth. Returns the user id on 200,
@@ -361,12 +362,16 @@ export async function resolveUserId(
   config: SupabaseConfig,
   accessToken: string
 ): Promise<AuthResult> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), AUTH_REQUEST_TIMEOUT_MS);
+
   try {
     const response = await fetch(`${config.url}/auth/v1/user`, {
       headers: {
         apikey: config.apiKey,
         Authorization: `Bearer ${accessToken}`,
       },
+      signal: controller.signal,
     });
 
     if (response.ok) {
@@ -379,8 +384,16 @@ export async function resolveUserId(
 
     const body = await response.text();
     return { ok: false, reason: /expired/i.test(body) ? 'expired' : 'invalid' };
-  } catch {
-    return { ok: false, reason: 'invalid' };
+  } catch (error) {
+    return {
+      ok: false,
+      reason:
+        error instanceof Error && error.name === 'AbortError'
+          ? 'timeout'
+          : 'invalid',
+    };
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

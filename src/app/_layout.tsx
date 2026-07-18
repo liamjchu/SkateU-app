@@ -64,16 +64,14 @@ export default function RootLayout() {
   }, [clearLikedSpots, clearMySpots, userId, fetchProfile, clearProfile]);
 
   useEffect(() => {
-    // Global deep link listener. When Supabase redirects back to the app
-    // after Google OAuth, the URL carries the access/refresh tokens. We hand
-    // that URL to setSessionFromUrl, which extracts the tokens and calls
-    // supabase.auth.setSession() to hydrate the client. That in turn triggers
-    // onAuthStateChange in the auth store, so the whole app sees the new user.
-    // The exact callback path we asked Supabase to redirect to. Comparing
-    // against this avoids reacting to unrelated deep links that merely happen
-    // to contain "code=" or "access_token".
-    const { path: callbackPath } = Linking.parse(
+    // Supabase redirects OAuth and recovery emails to distinct native paths.
+    // Both contain a one-time code (or session tokens), which the auth store
+    // exchanges for a persisted session before the user reaches a screen.
+    const { path: oauthCallbackPath } = Linking.parse(
       Linking.createURL('auth/callback')
+    );
+    const { path: recoveryCallbackPath } = Linking.parse(
+      Linking.createURL('auth/reset-password')
     );
 
     const handleUrl = (url: string | null) => {
@@ -81,36 +79,48 @@ export default function RootLayout() {
         return;
       }
 
-      // Only act on our OAuth callback URL; ignore other deep links.
       const { path } = Linking.parse(url);
-      if (path === callbackPath) {
-        setSessionFromUrl(url)
-          .then((handled) => {
-            // If the browser sheet was left spinning, close it now.
-            if (handled) {
-              try {
-                WebBrowser.dismissBrowser();
-              } catch {
-                // No browser open to dismiss; ignore.
-              }
-            }
-          })
-          .catch(() => {
-            // Ignore malformed/expired links; the user can just try again.
-          });
+      const isRecoveryLink = path === recoveryCallbackPath;
+      const isAuthCallback = path === oauthCallbackPath || isRecoveryLink;
+
+      if (!isAuthCallback) {
+        return;
       }
+
+      setSessionFromUrl(url)
+        .then((handled) => {
+          if (!handled) {
+            return;
+          }
+
+          try {
+            WebBrowser.dismissBrowser();
+          } catch {
+            // No browser is open when a cold-start email link is handled.
+          }
+
+          if (isRecoveryLink) {
+            router.replace('/update-password');
+          }
+        })
+        .catch(() => {
+          if (isRecoveryLink) {
+            router.replace({
+              pathname: '/forgot-password',
+              params: { resetError: 'expired' },
+            });
+          }
+        });
     };
 
-    // Handle the cold-start case where the app was opened by the redirect URL.
+    // Handle both a cold-start email link and an app that is already open.
     Linking.getInitialURL().then(handleUrl);
-
-    // Handle the warm case where the app is already running (Expo Go flow).
     const subscription = Linking.addEventListener('url', ({ url }) =>
       handleUrl(url)
     );
 
     return () => subscription.remove();
-  }, [setSessionFromUrl]);
+  }, [router, setSessionFromUrl]);
 
   // The app is ready to decide on routing once fonts are loaded, the persisted
   // session has been restored, and (if signed in) the profile has resolved.
@@ -191,6 +201,12 @@ export default function RootLayout() {
         />
         <Stack.Screen
           name="verify-otp"
+          options={{
+            animation: 'slide_from_right',
+          }}
+        />
+        <Stack.Screen
+          name="verify-delete-account"
           options={{
             animation: 'slide_from_right',
           }}

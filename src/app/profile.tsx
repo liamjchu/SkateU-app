@@ -2,13 +2,13 @@ import { Feather, Octicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
+    ActivityIndicator,
+    Alert,
+    Image,
+    Pressable,
+    ScrollView,
+    Text,
+    View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../store/authStore';
@@ -34,9 +34,14 @@ export default function ProfileScreen() {
   const fetchLikedSpots = useSpotsStore((state) => state.fetchLikedSpots);
   const deleteSpot = useSpotsStore((state) => state.deleteSpot);
 
+  const sendDeleteAccountOtp = useAuthStore(
+    (state) => state.sendDeleteAccountOtp
+  );
+
   const [spotTab, setSpotTab] = useState<'created' | 'liked'>('created');
   const [loggingOut, setLoggingOut] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [sendingDeleteOtp, setSendingDeleteOtp] = useState(false);
 
   const email = user?.email ?? '';
   // Prefer the username for the avatar initial, falling back to the email.
@@ -60,7 +65,7 @@ export default function ProfileScreen() {
   const displayedLoading = showingLikedSpots ? likedLoading : myLoading;
   const displayedError = showingLikedSpots ? likedError : myError;
 
-  const handleLogout = async () => {
+  const performLogout = async () => {
     if (loggingOut) {
       return;
     }
@@ -74,6 +79,50 @@ export default function ProfileScreen() {
       console.warn('Failed to log out', error);
       setLoggingOut(false);
     }
+  };
+
+  const handleLogout = () => {
+    Alert.alert('Log out?', 'Are you sure you want to log out?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Log out', style: 'destructive', onPress: performLogout },
+    ]);
+  };
+
+  const performDeleteAccount = async () => {
+    if (sendingDeleteOtp || !email) {
+      return;
+    }
+
+    setSendingDeleteOtp(true);
+
+    try {
+      await sendDeleteAccountOtp(email);
+      router.push(`/verify-delete-account?email=${encodeURIComponent(email)}`);
+    } catch (error) {
+      Alert.alert(
+        'Could not send verification code',
+        error instanceof Error && error.message.length > 0
+          ? error.message
+          : 'Please try again.'
+      );
+    } finally {
+      setSendingDeleteOtp(false);
+    }
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete your account?',
+      'This will permanently delete your account and profile. This cannot be undone. Your uploaded spots will remain, but will no longer be linked to your account.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: performDeleteAccount,
+        },
+      ]
+    );
   };
 
   const handleEdit = (spot: Spot) => {
@@ -229,7 +278,7 @@ export default function ProfileScreen() {
             >
               {showingLikedSpots
                 ? 'Spots you like will appear here.'
-                : 'You haven&apos;t added any spots yet. Find a campus map and tap the + button to add your first spot.'}
+                : 'You haven\'t added any spots yet. Find a campus map and tap the + button to add your first spot.'}
             </Text>
           </View>
         ) : (
@@ -317,7 +366,18 @@ export default function ProfileScreen() {
         )}
       </ScrollView>
 
-      <View className="p-5 pb-6">
+      <View className="gap-3 p-5 pb-6">
+        <Pressable
+          onPress={() => router.push('/change-password')}
+          className="w-full items-center justify-center rounded-2xl border border-[#21473f] py-4"
+          accessibilityLabel="Change password"
+          accessibilityRole="button"
+        >
+          <Text className="font-outfit-bold text-lg text-[#21473f]">
+            Change password
+          </Text>
+        </Pressable>
+
         <Pressable
           onPress={handleLogout}
           disabled={loggingOut}
@@ -329,6 +389,20 @@ export default function ProfileScreen() {
         >
           <Text className="font-outfit-bold text-lg text-white">
             {loggingOut ? 'Logging out...' : 'Log out'}
+          </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={handleDeleteAccount}
+          disabled={sendingDeleteOtp}
+          className={`w-full items-center justify-center rounded-2xl py-4 ${
+            sendingDeleteOtp ? 'bg-red-600/60' : 'bg-red-600'
+          }`}
+          accessibilityLabel="Delete account"
+          accessibilityRole="button"
+        >
+          <Text className="font-outfit-bold text-lg text-white">
+            {sendingDeleteOtp ? 'Sending code...' : 'Delete account'}
           </Text>
         </Pressable>
       </View>

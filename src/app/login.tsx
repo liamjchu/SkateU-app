@@ -2,13 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    ScrollView,
+    Text,
+    TextInput,
+    View
 } from 'react-native';
 import GoogleSignInButton from '../components/GoogleSignInButton';
 import { useAuthStore } from '../store/authStore';
@@ -238,6 +238,23 @@ export default function LoginScreen() {
                 : "Don't have an account? Sign up"}
             </Text>
           </Pressable>
+
+          {!isSignup ? (
+            <Pressable
+              onPress={() => router.push('/forgot-password')}
+              disabled={submitting}
+              className="items-center justify-center py-1"
+              accessibilityRole="button"
+              accessibilityLabel="Forgot password"
+            >
+              <Text
+                className="text-sm text-slate-400"
+                style={{ fontFamily: 'Outfit_500Medium' }}
+              >
+                Forgot password?
+              </Text>
+            </Pressable>
+          ) : null}
 
           <View className="flex-row items-center">
             <View className="h-px flex-1 bg-slate-200" />
