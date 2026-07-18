@@ -1,7 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Image, View } from 'react-native';
+import {
+    ActivityIndicator,
+    Image,
+    Text,
+    View,
+    useWindowDimensions,
+} from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
+import FeedbackPressable from './FeedbackPressable';
 
 type LayerType = 'default' | 'satellite';
 
@@ -20,7 +27,12 @@ export default function LocationPicker({
   onLocationChange,
   onInteractionChange,
 }: LocationPickerProps) {
+  const { height, width } = useWindowDimensions();
+  const isTabletLayout = width >= 768 && height >= 600;
   const webViewRef = useRef<WebView>(null);
+  const [webViewAttempt, setWebViewAttempt] = useState(0);
+  const [mapStatus, setMapStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [mapError, setMapError] = useState('');
 
   const initialRef = useRef({
     latitude: initialLatitude,
@@ -51,14 +63,17 @@ export default function LocationPicker({
 
     <style>
       html, body {
+        width: 100%;
+        height: 100%;
         margin: 0;
         padding: 0;
+        overflow: hidden;
         background: #0b0f14;
       }
 
       #map {
-        height: 100vh;
-        width: 100vw;
+        height: 100%;
+        width: 100%;
       }
 
       .leaflet-control-attribution {
@@ -79,74 +94,124 @@ export default function LocationPicker({
     <div id="map"></div>
 
     <script>
-      const center = [${latitude}, ${longitude}];
-
-      window.map = L.map('map', {
-        zoomControl: false,
-      }).setView(center, 15.5);
-
-      const defaultUrl =
-        'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
-
-      const satelliteUrl =
-        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}.png';
-
-      const defaultLayer = L.tileLayer(defaultUrl);
-      const satelliteLayer = L.tileLayer(satelliteUrl);
-
-      const selectedLayer =
-        '${layer}' === 'satellite'
-          ? satelliteLayer
-          : defaultLayer;
-
-      selectedLayer.addTo(window.map);
-
-      function postCenter() {
-        const center = window.map.getCenter();
-        window.ReactNativeWebView.postMessage(JSON.stringify({
-          type: 'CENTER_CHANGED',
-          latitude: center.lat,
-          longitude: center.lng,
-        }));
+      function postMessage(message) {
+        if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+          window.ReactNativeWebView.postMessage(JSON.stringify(message));
+        }
       }
 
-      function postInteractionStart() {
-        window.ReactNativeWebView.postMessage(JSON.stringify({
-          type: 'INTERACTION_START'
-        }));
-      }
+      window.onerror = function(message, source, lineno) {
+        postMessage({ type: 'CONSOLE_ERROR', message: String(message) + ' at line ' + lineno });
+        return true;
+      };
 
-      function postInteractionEnd() {
-        window.ReactNativeWebView.postMessage(JSON.stringify({
-          type: 'INTERACTION_END'
-        }));
-      }
+      try {
+        const center = [${latitude}, ${longitude}];
 
-      window.map.on('movestart', postInteractionStart);
-      window.map.on('moveend', function () {
+        window.map = L.map('map', {
+          zoomControl: false,
+        }).setView(center, 15.5);
+
+        const defaultUrl =
+          'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+
+        const satelliteUrl =
+          'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}.png';
+
+        const defaultLayer = L.tileLayer(defaultUrl);
+        const satelliteLayer = L.tileLayer(satelliteUrl);
+        const reportTileError = function () {
+          postMessage({
+            type: 'CONSOLE_ERROR',
+            message: 'Map tiles could not be loaded.',
+          });
+        };
+        defaultLayer.on('tileerror', reportTileError);
+        satelliteLayer.on('tileerror', reportTileError);
+
+        const selectedLayer =
+          '${layer}' === 'satellite'
+            ? satelliteLayer
+            : defaultLayer;
+
+        selectedLayer.addTo(window.map);
+
+        function postCenter() {
+          const center = window.map.getCenter();
+          postMessage({
+            type: 'CENTER_CHANGED',
+            latitude: center.lat,
+            longitude: center.lng,
+          });
+        }
+
+        function postInteractionStart() {
+          postMessage({ type: 'INTERACTION_START' });
+        }
+
+        function postInteractionEnd() {
+          postMessage({ type: 'INTERACTION_END' });
+        }
+
+        window.map.on('movestart', postInteractionStart);
+        window.map.on('moveend', function () {
+          postCenter();
+          postInteractionEnd();
+        });
+
+        window.map.on('zoomstart', postInteractionStart);
+        window.map.on('zoomend', function () {
+          postCenter();
+          postInteractionEnd();
+        });
+
+        document.addEventListener('touchstart', postInteractionStart, { passive: true });
+        document.addEventListener('touchend', postInteractionEnd, { passive: true });
+
+        postMessage({ type: 'WEBVIEW_READY' });
         postCenter();
-        postInteractionEnd();
-      });
-
-      window.map.on('zoomstart', postInteractionStart);
-      window.map.on('zoomend', function () {
-        postCenter();
-        postInteractionEnd();
-      });
-
-      document.addEventListener('touchstart', postInteractionStart, { passive: true });
-      document.addEventListener('touchend', postInteractionEnd, { passive: true });
-
-      postCenter();
+      } catch (error) {
+        postMessage({
+          type: 'CONSOLE_ERROR',
+          message: error instanceof Error ? error.message : 'Unable to initialize the location map.',
+        });
+      }
     </script>
   </body>
   </html>
   `;
   }, []);
 
+  useEffect(() => {
+    if (mapStatus !== 'loading') {
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      setMapStatus('error');
+      setMapError('The location map took too long to load.');
+    }, 12_000);
+
+    return () => clearTimeout(timeout);
+  }, [mapStatus, webViewAttempt]);
+
   const handleMessage = (event: WebViewMessageEvent) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
+
+      if (data.type === 'WEBVIEW_READY') {
+        setMapStatus('ready');
+        setMapError('');
+      }
+
+      if (data.type === 'CONSOLE_ERROR') {
+        setMapStatus('error');
+        setMapError(
+          typeof data.message === 'string' && data.message.length > 0
+            ? data.message
+            : 'The location map could not be loaded.'
+        );
+      }
 
       if (
         data.type === 'CENTER_CHANGED' &&
@@ -169,16 +234,81 @@ export default function LocationPicker({
     }
   };
 
+  const retryMap = () => {
+    setMapError('');
+    setMapStatus('loading');
+    setWebViewAttempt((attempt) => attempt + 1);
+  };
+
   return (
-    <View className="mb-6 rounded-2xl overflow-hidden border border-[#dce5e2] bg-[#f7f8f8]">
-      <View className="h-[224px] relative bg-black">
+    <View
+      className="mb-6 overflow-hidden rounded-2xl border border-[#dce5e2] bg-[#f7f8f8]"
+      accessible
+      accessibilityLabel={`Location picker. Selected latitude ${selectedLatitude.toFixed(5)}, longitude ${selectedLongitude.toFixed(5)}. Drag the map to change the location.`}
+    >
+      <View
+        className="relative bg-black"
+        style={{ height: isTabletLayout ? 320 : 224 }}
+      >
         <WebView
+          key={webViewAttempt}
+          accessibilityLabel="Interactive map. Drag to choose the spot location."
+          accessible
           ref={webViewRef}
           originWhitelist={['*']}
-          source={{ html }}
+          source={{ html, baseUrl: 'https://localhost' }}
+          javaScriptEnabled
+          domStorageEnabled
+          mixedContentMode="always"
+          onLoadStart={() => {
+            setMapStatus('loading');
+            setMapError('');
+          }}
+          onError={() => {
+            setMapStatus('error');
+            setMapError('The location map could not be loaded.');
+          }}
+          onHttpError={() => {
+            setMapStatus('error');
+            setMapError('The location map could not be loaded.');
+          }}
           onMessage={handleMessage}
           style={{ flex: 1, backgroundColor: '#0b0f14' }}
         />
+
+        {mapStatus !== 'ready' ? (
+          <View
+            className="absolute inset-0 items-center justify-center bg-[#0b0f14]/90 px-6"
+            accessibilityLabel={`Location map unavailable. ${mapError || 'Check your connection and try again.'}`}
+          >
+            {mapStatus === 'loading' ? (
+              <>
+                <ActivityIndicator color="#FFFFFF" />
+                <Text className="mt-3 text-center font-outfit-medium text-sm text-white">
+                  Loading location map…
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text className="text-center font-outfit-bold text-base text-white">
+                  Location map unavailable
+                </Text>
+                <Text className="mt-1 text-center font-outfit-medium text-sm text-white/80">
+                  Check your connection and try again.
+                </Text>
+                <FeedbackPressable
+                  onPress={retryMap}
+                  className="mt-4 rounded-xl bg-white px-5 py-2.5"
+                  accessibilityRole="button"
+                  accessibilityLabel="Retry loading location map"
+                >
+                  <Text className="font-outfit-bold text-sm text-[#21473f]">Retry</Text>
+                </FeedbackPressable>
+              </>
+            )}
+          </View>
+        ) : null}
+
 
         <View className="absolute left-1/2 top-1/2 w-[50px] h-[60px] -ml-[25px] -mt-[50px] items-center justify-start pointer-events-none">
           <Image

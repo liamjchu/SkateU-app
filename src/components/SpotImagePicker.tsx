@@ -5,11 +5,12 @@ import {
     ActivityIndicator,
     Alert,
     Image,
-    Pressable,
     Text,
     View,
+    useWindowDimensions
 } from 'react-native';
 import type { SpotImageAsset } from '../types/spot';
+import FeedbackPressable from './FeedbackPressable';
 
 type SpotImagePickerProps = {
   imageUri?: string;
@@ -55,6 +56,8 @@ export default function SpotImagePicker({
   imageUri,
   onImageSelected,
 }: SpotImagePickerProps) {
+  const { height, width } = useWindowDimensions();
+  const isTabletLayout = width >= 768 && height >= 600;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
@@ -118,18 +121,27 @@ export default function SpotImagePicker({
 
   return (
     <View className="mb-6">
-      <Pressable
+      <FeedbackPressable
+        haptic="light"
+        disabled={loading}
         onPress={handlePickImage}
-        className="h-78 overflow-hidden rounded-[16px] items-center justify-center bg-white"
+        className="overflow-hidden rounded-[16px] items-center justify-center bg-white"
+        accessibilityRole="button"
+        accessibilityLabel={imageUri ? 'Change spot photo' : 'Add spot photo'}
+        accessibilityHint="Opens camera or photo library"
+        accessibilityState={{ disabled: loading, busy: loading }}
         style={{
           borderWidth: 1,
           borderColor: '#DDE4E1',
           borderStyle: 'solid',
+          height: isTabletLayout ? 320 : 312,
         }}
       >
         {imageUri ? (
           <Image
             source={{ uri: imageUri }}
+            accessibilityLabel="Selected spot photo"
+            accessible
             resizeMode="cover"
             style={{
               position: 'absolute',
@@ -187,10 +199,22 @@ export default function SpotImagePicker({
             </>
           )}
         </View>
-      </Pressable>
+        {imageUri && !loading ? (
+          <View className="absolute bottom-4 flex-row items-center rounded-full bg-black/60 px-4 py-2">
+            <Feather name="camera" size={16} color="#FFFFFF" />
+            <Text className="ml-2 font-outfit-bold text-sm text-white">
+              Change photo
+            </Text>
+          </View>
+        ) : null}
+      </FeedbackPressable>
 
       {error ? (
-        <Text className="mt-2 px-2 text-xs text-red-600">
+        <Text
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+          className="mt-2 px-2 text-xs text-[#B45F58]"
+        >
           {error}
         </Text>
       ) : null}

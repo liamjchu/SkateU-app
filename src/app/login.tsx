@@ -93,7 +93,7 @@ export default function LoginScreen() {
         <View className="flex-row items-center justify-between">
           <Pressable
             onPress={goBack}
-            className="h-11 w-11 items-center justify-center rounded-full"
+            className="h-12 w-12 items-center justify-center rounded-full"
             accessibilityLabel="Go back"
             accessibilityRole="button"
           >
@@ -121,7 +121,7 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View className="flex-1 px-5 pt-8">
+          <View className="flex-1 self-center w-full max-w-[640px] px-5 pt-8 pb-8">
         <Text
           className="text-3xl text-[#1B3B36]"
           style={{ fontFamily: 'Outfit_900Black' }}
@@ -142,6 +142,7 @@ export default function LoginScreen() {
             value={email}
             onChangeText={setEmail}
             placeholder="Email"
+            accessibilityLabel="Email address"
             placeholderTextColor="#8E9AA6"
             autoCapitalize="none"
             autoCorrect={false}
@@ -155,6 +156,7 @@ export default function LoginScreen() {
               value={password}
               onChangeText={setPassword}
               placeholder="Password"
+              accessibilityLabel="Password"
               placeholderTextColor="#8E9AA6"
               secureTextEntry={!showPassword}
               autoCapitalize="none"
@@ -166,9 +168,10 @@ export default function LoginScreen() {
               onPress={() => setShowPassword((prev) => !prev)}
               disabled={submitting}
               hitSlop={8}
-              className="h-9 w-9 items-center justify-center"
+              className="h-12 w-12 items-center justify-center"
               accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
               accessibilityRole="button"
+              accessibilityState={{ disabled: submitting }}
             >
               <Ionicons
                 name={showPassword ? 'eye-outline' : 'eye-off-outline'}
@@ -180,7 +183,9 @@ export default function LoginScreen() {
 
           {error ? (
             <Text
-              className="text-sm text-red-500"
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
+              className="text-sm text-[#B45F58]"
               style={{ fontFamily: 'Outfit_500Medium' }}
             >
               {error}
@@ -188,7 +193,11 @@ export default function LoginScreen() {
           ) : null}
 
           {notice ? (
-            <View className="rounded-2xl bg-[#EBF2F0] px-4 py-3">
+            <View
+              accessible
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
+              className="rounded-2xl bg-[#EBF2F0] px-4 py-3">
               <Text
                 className="text-sm text-[#1B3B36]"
                 style={{ fontFamily: 'Outfit_600SemiBold' }}
@@ -206,6 +215,7 @@ export default function LoginScreen() {
             }`}
             accessibilityLabel={isSignup ? 'Sign up' : 'Login'}
             accessibilityRole="button"
+            accessibilityState={{ disabled: submitting, busy: submitting }}
           >
             <Text
               className="text-lg text-white"
@@ -226,8 +236,11 @@ export default function LoginScreen() {
               setMode(isSignup ? 'login' : 'signup');
             }}
             disabled={submitting}
-            className="items-center justify-center py-1"
+            className="min-h-12 items-center justify-center px-2 py-1"
             accessibilityRole="button"
+            accessibilityLabel={
+              isSignup ? 'Switch to login' : 'Switch to sign up'
+            }
           >
             <Text
               className="text-base text-slate-500"
@@ -243,7 +256,7 @@ export default function LoginScreen() {
             <Pressable
               onPress={() => router.push('/forgot-password')}
               disabled={submitting}
-              className="items-center justify-center py-1"
+              className="min-h-12 items-center justify-center px-2 py-1"
               accessibilityRole="button"
               accessibilityLabel="Forgot password"
             >

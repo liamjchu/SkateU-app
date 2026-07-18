@@ -2,18 +2,19 @@
 import {
     useFocusEffect,
     useLocalSearchParams,
-    useRouter
+    useRouter,
 } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    BackHandler,
     Image,
-    Pressable,
     ScrollView,
     StyleSheet,
     Text,
-    View
+    View,
+    useWindowDimensions
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -26,8 +27,10 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
+import FeedbackPressable from '../components/FeedbackPressable';
 import LoginRequiredModal from '../components/LoginRequiredModal';
 import images from '../constants/images';
+import { triggerHaptic } from '../lib/haptics';
 import { formatRelativeTime } from '../lib/relativeTime';
 import { useAuthStore } from '../store/authStore';
 import { useFavorites } from '../store/favoritesStore';
@@ -41,7 +44,13 @@ export default function MapScreen() {
   const webViewRef = useRef<WebView>(null);
   const searchParams = useLocalSearchParams();
   const router = useRouter();
+  const initialSpotId = Array.isArray(searchParams.spotId)
+    ? searchParams.spotId[0]
+    : searchParams.spotId;
   const insets = useSafeAreaInsets();
+  const { height, width } = useWindowDimensions();
+  const isTabletLayout = width >= 768 && height >= 600;
+  const tabletSheetWidth = Math.min(width - 48, 520);
   const session = useAuthStore((state) => state.session);
   const spots = useSpotsStore((s) => s.spots);
   const mySpots = useSpotsStore((s) => s.mySpots);
@@ -55,7 +64,13 @@ export default function MapScreen() {
   const { schools, upsertSchool } = useSchools();
   const { favoriteSchoolIds, toggleFavoriteSchool } = useFavorites();
   const webViewReadyRef = useRef(false);
-  const [selectedSpotId, setSelectedSpotId] = useState<string | undefined>();
+  const [mapAttempt, setMapAttempt] = useState(0);
+  const [mapStatus, setMapStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [mapError, setMapError] = useState('');
+  const [selectedSpotId, setSelectedSpotId] = useState<string | undefined>(initialSpotId);
+  const [mapLayer, setMapLayer] = useState<'default' | 'satellite'>(
+    searchParams.layer === 'satellite' ? 'satellite' : 'default'
+  );
   const [showLoginRequired, setShowLoginRequired] = useState(false);
   const [likingSpotId, setLikingSpotId] = useState<string | null>(null);
   const [deletingSpotId, setDeletingSpotId] = useState<string | null>(null);
@@ -207,6 +222,16 @@ export default function MapScreen() {
         window.map = L.map('map', { zoomControl: false }).setView(center, 15.5);
         const defaultLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png');
         const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}.png');
+        const reportTileError = function () {
+          if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'CONSOLE_ERROR',
+              message: 'Map tiles could not be loaded.'
+            }));
+          }
+        };
+        defaultLayer.on('tileerror', reportTileError);
+        satelliteLayer.on('tileerror', reportTileError);
 
         window.currentLayer = defaultLayer.addTo(window.map);
 
@@ -288,13 +313,13 @@ export default function MapScreen() {
   </html>
   `;
 
-  const sendMarkers = () => {
+  const sendMarkers = useCallback(() => {
     if (!webViewRef.current) return;
 
     const markerData = spots.map(({ id, latitude, longitude, name }) => ({ id, latitude, longitude, name }));
     const markerJson = JSON.stringify(markerData);
     webViewRef.current.injectJavaScript(`window.renderSpots(${markerJson}); true;`);
-  };
+  }, [spots]);
 
   // Inject marker-only spot data into the map when spots change,
   // but only after the WebView has finished loading and signaled readiness.
@@ -302,7 +327,7 @@ export default function MapScreen() {
     if (webViewRef.current && webViewReadyRef.current) {
       sendMarkers();
     }
-  }, [spots]);
+  }, [sendMarkers, spots]);
 
   // Refetch when the screen regains focus so a spot just created on the
   // add-spot screen shows up on return.
@@ -319,10 +344,59 @@ export default function MapScreen() {
   );
 
   useEffect(() => {
+    if (mapStatus !== 'loading') {
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      webViewReadyRef.current = false;
+      setMapStatus('error');
+      setMapError('The campus map took too long to load.');
+    }, 12_000);
+
+    return () => clearTimeout(timeout);
+  }, [mapAttempt, mapStatus]);
+
+  useEffect(() => {
+    if (initialSpotId && spots.some((spot) => spot.id === initialSpotId)) {
+      setSelectedSpotId(initialSpotId);
+    }
+  }, [initialSpotId, spots]);
+
+  const retryMap = useCallback(() => {
+    webViewReadyRef.current = false;
+    setMapError('');
+    setMapStatus('loading');
+    setMapAttempt((attempt) => attempt + 1);
+  }, []);
+
+  const retrySpots = useCallback(() => {
+    if (schoolId) {
+      fetchSpots(schoolId, session?.access_token);
+    }
+  }, [fetchSpots, schoolId, session?.access_token]);
+
+  useEffect(() => {
     if (selectedSpotId && !selectedSpot) {
       setSelectedSpotId(undefined);
     }
   }, [selectedSpot, selectedSpotId]);
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        if (!selectedSpotId) {
+          return false;
+        }
+
+        setSelectedSpotId(undefined);
+        return true;
+      }
+    );
+
+    return () => subscription.remove();
+  }, [selectedSpotId]);
 
   useEffect(() => {
     if (selectedSpot) {
@@ -416,6 +490,7 @@ export default function MapScreen() {
         selectedSpot.likedByUser === true,
         accessToken
       );
+      triggerHaptic('light');
     } catch (error) {
       Alert.alert(
         'Could not update like',
@@ -441,6 +516,7 @@ export default function MapScreen() {
       return;
     }
 
+    triggerHaptic('warning');
     const spotToDelete = selectedSpot;
     Alert.alert(
       'Delete spot?',
@@ -483,6 +559,7 @@ export default function MapScreen() {
       const data = JSON.parse(event.nativeEvent.data) as {
         type: string;
         id?: string;
+        message?: string;
         latitude?: number;
         longitude?: number;
         layer?: string;
@@ -491,7 +568,25 @@ export default function MapScreen() {
       // When the WebView finishes loading, it will notify us so we can send markers
       if (data.type === 'WEBVIEW_READY') {
         webViewReadyRef.current = true;
+        setMapStatus('ready');
+        setMapError('');
         sendMarkers();
+        return;
+      }
+
+      if (data.type === 'CONSOLE_ERROR') {
+        webViewReadyRef.current = false;
+        setMapStatus('error');
+        setMapError(
+          data.message && data.message.length > 0
+            ? data.message
+            : 'The campus map could not be initialized.'
+        );
+        return;
+      }
+
+      if (data.type === 'LAYER_TOGGLED') {
+        setMapLayer(data.layer === 'satellite' ? 'satellite' : 'default');
         return;
       }
 
@@ -507,6 +602,7 @@ export default function MapScreen() {
       }
 
       if (data.type === 'MARKER_PRESS' && typeof data.id === 'string') {
+        triggerHaptic('selection');
         if (data.id === selectedSpotId) {
           const collapsedOffset = Math.max(
             sheetHeight.value - COLLAPSED_SHEET_HEIGHT,
@@ -543,29 +639,31 @@ export default function MapScreen() {
           elevation: 12,
         }}
       >
-        <Pressable
+        <FeedbackPressable
+          haptic="light"
           onPress={handleBackPress}
-          className="h-11 w-11 items-center justify-center rounded-full"
+          className="h-12 w-12 items-center justify-center rounded-full"
           accessibilityLabel="Go back"
           accessibilityRole="button"
         >
           <Text className="text-white text-xl">❮</Text>
-        </Pressable>
+        </FeedbackPressable>
 
-        <View className="flex-1 max-w-80 items-center">
+        <View
+          pointerEvents="none"
+          className="absolute left-0 right-0 items-center justify-center px-20"
+          style={{ top: insets.top, bottom: 12 }}
+        >
           <Text
             style={{ fontFamily: 'Outfit_700Bold' }}
-            className="text-2xl text-white"
-            numberOfLines={1}
-            ellipsizeMode="tail"
+            className="text-center text-2xl text-white"
           >
             {displayedSchoolName}
           </Text>
           {locationSubtitle && (
             <Text
               style={{ fontFamily: 'Outfit_500Medium' }}
-              className="text-m text-[#e8f0ee]"
-              numberOfLines={1}
+              className="text-center text-m text-[#e8f0ee]"
             >
               {locationSubtitle}
             </Text>
@@ -573,9 +671,10 @@ export default function MapScreen() {
         </View>
 
         {currentSchool ? (
-          <Pressable
+          <FeedbackPressable
+            haptic="selection"
             onPress={handleFavoritePress}
-            className="h-11 w-11 items-center justify-center rounded-full"
+            className="h-12 w-12 items-center justify-center rounded-full"
             accessibilityLabel={
               isFavoriteSchool ? 'Remove school from favorites' : 'Add school to favorites'
             }
@@ -586,34 +685,56 @@ export default function MapScreen() {
               size={26}
               color={isFavoriteSchool ? '#FFFFFF' : 'rgba(255,255,255,0.7)'}
             />
-          </Pressable>
+          </FeedbackPressable>
         ) : (
           <View className="h-11 w-11" />
         )}
       </View>
-      <Pressable
-        className="absolute top-[150px] right-[10px] z-[999] rounded-full bg-[rgba(0,0,0,0.4)] p-2"
-        style={styles.toggleButton}
+      <FeedbackPressable
+        haptic="selection"
+        className="absolute right-[10px] z-[999] rounded-full bg-[rgba(0,0,0,0.4)] p-2"
+        style={[styles.toggleButton, { top: 134 }]}
         onPress={() => {
           webViewRef.current?.injectJavaScript(`window.toggleLayer(); true;`);
         }}
-        accessibilityLabel="Toggle map layer"
+        accessibilityLabel={
+          mapLayer === 'satellite'
+            ? 'Switch to standard map'
+            : 'Switch to satellite map'
+        }
         accessibilityRole="button"
+        accessibilityState={{ selected: mapLayer === 'satellite' }}
       >
         <Image source={images.layers} style={styles.icon} />
-      </Pressable>
-      <Pressable
-        className="absolute bottom-6 right-4 bg-[#21473f] w-18 h-18 rounded-full items-center justify-center shadow-lg z-50"
+      </FeedbackPressable>
+      <FeedbackPressable
+        haptic="light"
+        className="absolute right-4 bg-[#21473f] w-18 h-18 rounded-full items-center justify-center shadow-lg z-50"
+        style={{ bottom: Math.max(insets.bottom, 16) }}
         onPress={handleAddSpotPress}
         accessibilityLabel="Add new spot"
+        accessibilityRole="button"
+        accessibilityHint="Opens the form to add a skate spot"
       >
         <Text className="text-white text-4xl">+</Text>
-      </Pressable>
+      </FeedbackPressable>
       <LoginRequiredModal
         visible={showLoginRequired}
         onCancel={() => setShowLoginRequired(false)}
       />
       <WebView
+        accessibilityLabel={`Campus map for ${displayedSchoolName}. ${spots.length} skate ${spots.length === 1 ? 'spot' : 'spots'} available. Use the map or the accessible spot actions to select a spot.`}
+        accessibilityActions={spots.map((spot) => ({
+          name: `select-${spot.id}`,
+          label: `Select ${spot.name}`,
+        }))}
+        onAccessibilityAction={(event) => {
+          const spotId = event.nativeEvent.actionName.replace('select-', '');
+          if (spots.some((spot) => spot.id === spotId)) {
+            setSelectedSpotId(spotId);
+          }
+        }}
+        key={mapAttempt}
         ref={webViewRef}
         style={{ flex: 1, backgroundColor: 'transparent' }}
         originWhitelist={['*']}
@@ -628,52 +749,149 @@ export default function MapScreen() {
         domStorageEnabled={true}
         // Allow mixed content so HTTPS tiles can load over the base URL
         mixedContentMode="always"
+        onLoadStart={() => {
+          webViewReadyRef.current = false;
+          setMapStatus('loading');
+          setMapError('');
+        }}
+        onError={() => {
+          webViewReadyRef.current = false;
+          setMapStatus('error');
+          setMapError('The campus map could not be loaded.');
+        }}
+        onHttpError={() => {
+          webViewReadyRef.current = false;
+          setMapStatus('error');
+          setMapError('The campus map could not be loaded.');
+        }}
         onMessage={handleWebViewMessage}
       />
 
-      {(loading || error) && (
+      {mapStatus === 'loading' ? (
+        <View className="absolute inset-0 z-40 items-center justify-center bg-[#21473f]/90 px-8">
+          <ActivityIndicator color="#FFFFFF" />
+          <Text className="mt-3 text-center font-outfit-medium text-base text-white">
+            Loading campus map…
+          </Text>
+        </View>
+      ) : mapStatus === 'error' ? (
         <View
-          pointerEvents="none"
-          className="absolute left-0 right-0 top-[150px] z-40 items-center"
+          className="absolute inset-0 z-40 items-center justify-center bg-[#21473f]/95 px-8"
+          accessibilityLabel={`Map unavailable. ${mapError || 'Check your connection and try again.'}`}
+        >
+          <Text className="text-center font-outfit-bold text-xl text-white">
+            Map unavailable
+          </Text>
+          <Text className="mt-2 text-center font-outfit-medium text-base text-white/80">
+            Check your connection and try again.
+          </Text>
+          <FeedbackPressable
+            onPress={retryMap}
+            className="mt-5 rounded-2xl bg-white px-6 py-3"
+            accessibilityRole="button"
+            accessibilityLabel="Retry loading campus map"
+          >
+            <Text className="font-outfit-bold text-base text-[#21473f]">Retry</Text>
+          </FeedbackPressable>
+        </View>
+      ) : null}
+
+      {mapStatus === 'ready' && error ? (
+        <View
+          className="absolute left-4 right-4 z-40 rounded-2xl border border-[#F3B7B2] bg-white px-4 py-3"
+          style={{ top: insets.top + 142 }}
+        >
+          <View className="flex-row items-center justify-between">
+            <View className="flex-1 pr-3">
+              <Text
+                accessibilityRole="alert"
+                accessibilityLiveRegion="polite"
+                className="font-outfit-bold text-sm text-[#B45F58]"
+              >
+                Spots unavailable
+              </Text>
+              <Text className="mt-0.5 font-outfit-medium text-xs text-slate-500">
+                The map loaded, but spots could not be refreshed.
+              </Text>
+            </View>
+            <FeedbackPressable
+              onPress={retrySpots}
+              className="rounded-xl bg-[#21473f] px-4 py-2"
+              accessibilityRole="button"
+              accessibilityLabel="Retry loading skate spots"
+            >
+              <Text className="font-outfit-bold text-xs text-white">Retry</Text>
+            </FeedbackPressable>
+          </View>
+        </View>
+      ) : mapStatus === 'ready' && loading ? (
+        <View
+          className="absolute left-0 right-0 z-40 items-center"
+          style={{ top: insets.top + 142 }}
         >
           <View className="flex-row items-center rounded-full bg-black/50 px-3 py-1.5">
-            {loading && <ActivityIndicator size="small" color="#FFFFFF" />}
-            <Text
-              className="ml-2 text-xs text-white"
-              style={{ fontFamily: 'Outfit_500Medium' }}
-            >
-              {loading ? 'Loading spots…' : error}
+            <ActivityIndicator size="small" color="#FFFFFF" />
+            <Text className="ml-2 font-outfit-medium text-xs text-white">
+              Loading spots…
             </Text>
           </View>
         </View>
-      )}
+      ) : null}
+
+      {mapStatus === 'ready' && !loading && !error && spots.length === 0 ? (
+        <View className="absolute left-6 right-6 top-1/2 z-30 -translate-y-1/2 items-center rounded-3xl bg-white px-6 py-6 shadow-lg">
+          <Feather name="map-pin" size={28} color="#21473f" />
+          <Text className="mt-3 text-center font-outfit-bold text-xl text-[#1B3B36]">
+            No skate spots here yet
+          </Text>
+          <Text className="mt-1.5 text-center font-outfit-medium text-sm leading-5 text-slate-500">
+            Be the first to add a spot to this campus.
+          </Text>
+          <FeedbackPressable
+            onPress={handleAddSpotPress}
+            className="mt-5 rounded-2xl bg-[#21473f] px-5 py-3"
+            accessibilityRole="button"
+            accessibilityLabel="Add the first spot"
+          >
+            <Text className="font-outfit-bold text-base text-white">Add the first spot</Text>
+          </FeedbackPressable>
+        </View>
+      ) : null}
 
       {selectedSpot && (
         <Animated.View
+          accessibilityViewIsModal
+          accessibilityLabel={`${selectedSpot.name} spot details`}
           entering={SlideInDown.duration(240)}
           exiting={SlideOutDown.duration(220)}
           onLayout={(event) => {
             sheetHeight.value = event.nativeEvent.layout.height;
           }}
-          style={[styles.sheet, sheetAnimatedStyle]}
+          style={[
+            styles.sheet,
+            isTabletLayout && {
+              left: 24,
+              right: undefined,
+              width: tabletSheetWidth,
+              maxHeight: '72%',
+            },
+            { paddingBottom: Math.max(insets.bottom, 16) + 16 },
+            sheetAnimatedStyle,
+          ]}
         >
           <GestureDetector gesture={sheetPanGesture}>
             <View>
               <View className="mb-3 h-1.5 w-12 self-center rounded-full bg-slate-300" />
               <View className="flex-row items-start justify-between bg-white pb-3">
                 <View className="flex-1 pr-3">
-                  <Text
-                    className="font-outfit-bold text-lg"
-                    numberOfLines={1}
-                  >
+                  <Text className="font-outfit-bold text-lg">
                     {selectedSpot.name}
                   </Text>
                   <View className="mt-1 flex-row items-center">
                     <Octicons name="person" size={13} color="#64748b" />
                     <Text
                       className="ml-1 font-outfit-medium text-xs text-slate-500"
-                      numberOfLines={1}
-                    >
+                  >
                       {selectedSpot.creatorUsername
                         ? `@${selectedSpot.creatorUsername}`
                         : 'Deleted User'}
@@ -687,7 +905,6 @@ export default function MapScreen() {
                         </Text>
                         <Text
                           className="font-outfit-medium text-xs text-slate-500"
-                          numberOfLines={1}
                         >
                           {`${spotTimeInfo.label} ${spotTimeInfo.relative}`}
                         </Text>
@@ -696,7 +913,7 @@ export default function MapScreen() {
                   </View>
                 </View>
                 <View className="flex-row items-center">
-                  <Pressable
+                  <FeedbackPressable
                     onPress={handleLikePress}
                     disabled={likingSpotId === selectedSpot.id}
                     className="mr-2 flex-row items-center rounded-full bg-[#F4F7F6] px-3 py-2"
@@ -708,7 +925,7 @@ export default function MapScreen() {
                     accessibilityRole="button"
                   >
                     {likingSpotId === selectedSpot.id ? (
-                      <ActivityIndicator size="small" color="#DC2626" />
+                      <ActivityIndicator size="small" color="#B45F58" />
                     ) : (
                       <Octicons
                         name={
@@ -719,7 +936,7 @@ export default function MapScreen() {
                         size={17}
                         color={
                           selectedSpot.likedByUser === true
-                            ? '#DC2626'
+                            ? '#B45F58'
                             : '#64748b'
                         }
                       />
@@ -727,29 +944,34 @@ export default function MapScreen() {
                     <Text className="ml-1.5 font-outfit-semibold text-sm text-slate-600">
                       {selectedSpot.likeCount ?? 0}
                     </Text>
-                  </Pressable>
-                  <Pressable
+                  </FeedbackPressable>
+                  <FeedbackPressable
+                    haptic="selection"
                     onPress={() => setSelectedSpotId(undefined)}
-                    className="px-2 py-1"
+                    className="min-h-12 min-w-12 items-center justify-center rounded-full px-2 py-1"
+                    accessibilityRole="button"
+                    accessibilityLabel={`Close ${selectedSpot.name} details`}
                   >
                     <Text
                       className="font-outfit-semibold text-sky-600"
                     >
                       Close
                     </Text>
-                  </Pressable>
+                  </FeedbackPressable>
                 </View>
               </View>
             </View>
           </GestureDetector>
 
           <ScrollView
-            contentContainerClassName="pb-[45px]"
+            contentContainerClassName="pb-[24px]"
             showsVerticalScrollIndicator={false}
           >
             {selectedSpot.imageUris.length > 0 ? (
               <Image
                 source={{ uri: selectedSpot.imageUris[0] }}
+                accessibilityLabel={`Photo of ${selectedSpot.name}`}
+                accessible
                 className="mt-5 h-[280px] w-full rounded-3xl"
                 resizeMode="cover"
               />
@@ -771,7 +993,8 @@ export default function MapScreen() {
 
             {selectedSpotIsOwned ? (
               <View className="mt-5 flex-row gap-3">
-                <Pressable
+                <FeedbackPressable
+                  haptic="light"
                   onPress={handleEditSelectedSpot}
                   disabled={deletingSpotId !== null}
                   className="h-12 flex-1 flex-row items-center justify-center rounded-2xl bg-[#21473f]"
@@ -784,25 +1007,25 @@ export default function MapScreen() {
                   >
                     Edit spot
                   </Text>
-                </Pressable>
-                <Pressable
+                </FeedbackPressable>
+                <FeedbackPressable
                   onPress={handleDeleteSelectedSpot}
                   disabled={deletingSpotId !== null}
-                  className="h-12 flex-1 flex-row items-center justify-center rounded-2xl border border-red-200 bg-red-50"
+                  className="h-12 flex-1 flex-row items-center justify-center rounded-2xl border border-[#F3B7B2] bg-[#FBE9E7]"
                   accessibilityLabel={`Delete ${selectedSpot.name}`}
                   accessibilityRole="button"
                 >
                   {deletingSpotId === selectedSpot.id ? (
-                    <ActivityIndicator size="small" color="#DC2626" />
+                    <ActivityIndicator size="small" color="#F3B7B2" />
                   ) : (
-                    <Feather name="trash-2" size={16} color="#DC2626" />
+                    <Feather name="trash-2" size={16} color="#B45F58" />
                   )}
                   <Text
-                    className="ml-2 font-outfit-semibold text-sm text-red-600"
+                    className="ml-2 font-outfit-semibold text-sm text-[#B45F58]"
                   >
                     Delete spot
                   </Text>
-                </Pressable>
+                </FeedbackPressable>
               </View>
             ) : null}
           </ScrollView>
@@ -819,7 +1042,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: 1000,
-    maxHeight: '62%',
+    maxHeight: '56%',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     backgroundColor: '#FFFFFF',

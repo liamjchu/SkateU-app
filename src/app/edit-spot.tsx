@@ -2,7 +2,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
-    Pressable,
+    KeyboardAvoidingView,
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
@@ -10,9 +11,16 @@ import {
     View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import FeedbackPressable from '../components/FeedbackPressable';
 import LocationPicker from '../components/LocationPicker';
 import SpotImagePicker from '../components/SpotImagePicker';
-import { isAddSpotFormValid } from '../lib/addSpotForm';
+import {
+    getSpotFormErrors,
+    isAddSpotFormValid,
+    SPOT_DESCRIPTION_MAX,
+    SPOT_NAME_MAX,
+} from '../lib/addSpotForm';
+import { triggerHaptic } from '../lib/haptics';
 import { useAuthStore } from '../store/authStore';
 import { useSpotsStore } from '../store/spotsStore';
 import type { SpotImageAsset } from '../types/spot';
@@ -64,6 +72,12 @@ export default function EditSpotScreen() {
   const [scrollEnabled, setScrollEnabled] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [touched, setTouched] = useState({
+    image: false,
+    name: false,
+    description: false,
+  });
 
   const interactionTimeoutRef = useRef<number | null>(null);
 
@@ -91,8 +105,13 @@ export default function EditSpotScreen() {
   }, [spot]);
 
   const isFormValid = isAddSpotFormValid(imageUri, name, description);
+  const formErrors = getSpotFormErrors(imageUri, name, description);
+  const showImageError = hasSubmitted || touched.image;
+  const showNameError = hasSubmitted || touched.name;
+  const showDescriptionError = hasSubmitted || touched.description;
 
   const handleImageSelected = (asset: SpotImageAsset) => {
+    setTouched((current) => ({ ...current, image: true }));
     setImageUri(asset.uri);
     setImageAsset(asset);
     setImageChanged(true);
@@ -115,6 +134,7 @@ export default function EditSpotScreen() {
   }, []);
 
   const handleSave = async () => {
+    setHasSubmitted(true);
     if (!isFormValid || saving || !spotId) return;
 
     const accessToken = session?.access_token;
@@ -138,6 +158,7 @@ export default function EditSpotScreen() {
         },
         accessToken
       );
+      triggerHaptic('success');
       router.back();
     } catch (error) {
       setSaveError(
@@ -156,13 +177,15 @@ export default function EditSpotScreen() {
         className="h-[126px] flex-row items-center justify-between border-b border-white/10 bg-[#21473f] px-4 pb-3"
         style={[styles.headerShadow, { paddingTop: insets.top }]}
       >
-        <Pressable
+        <FeedbackPressable
+          haptic="light"
           onPress={() => router.back()}
-          className="w-9 items-center justify-center rounded-full p-2"
+          className="h-12 w-12 items-center justify-center rounded-full"
           accessibilityLabel="Go back"
+          accessibilityRole="button"
         >
           <Text className="text-xl font-bold text-white">❮</Text>
-        </Pressable>
+        </FeedbackPressable>
 
         <View className="max-w-80 flex-1 items-center">
           <Text
@@ -185,14 +208,21 @@ export default function EditSpotScreen() {
           </Text>
         </View>
       ) : (
-        <ScrollView
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={insets.top + 126}
+          style={{ flex: 1 }}
+        >
+          <ScrollView
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
           scrollEnabled={scrollEnabled}
           showsVerticalScrollIndicator={false}
         >
-          {/* PHOTO */}
-          <Text style={[styles.sectionLabel, { marginTop: 0 }]}>PHOTO</Text>
+          <View className="mb-2 flex-row items-center">
+            <Text style={[styles.sectionLabel, { marginTop: 0, marginBottom: 0 }]}>PHOTO</Text>
+            <Text className="ml-2 font-outfit-medium text-xs text-slate-500">Required</Text>
+          </View>
 
           <View style={styles.photoWrapper}>
             <SpotImagePicker
@@ -200,30 +230,59 @@ export default function EditSpotScreen() {
               onImageSelected={handleImageSelected}
             />
           </View>
+          {showImageError && formErrors.image ? (
+            <Text className="-mt-4 mb-3 text-sm text-[#B45F58]">{formErrors.image}</Text>
+          ) : null}
 
           {/* NAME */}
-          <Text style={[styles.sectionLabel, { marginTop: 0 }]}>SPOT NAME</Text>
-
+          <View className="mb-2 flex-row items-center">
+            <Text style={[styles.sectionLabel, { marginTop: 0, marginBottom: 0 }]}>SPOT NAME</Text>
+            <Text className="ml-2 font-outfit-medium text-xs text-slate-500">Required</Text>
+          </View>
           <TextInput
-            style={styles.input}
+            style={[styles.input, showNameError && formErrors.name ? styles.inputError : null]}
             placeholder="e.g. Library 5 Stair, Parking Garage Ledge..."
             placeholderTextColor="#879995"
+            accessibilityLabel="Spot name, required"
+            accessibilityHint="Enter a short name for this skate spot"
             value={name}
+            maxLength={SPOT_NAME_MAX}
+            onBlur={() => setTouched((current) => ({ ...current, name: true }))}
             onChangeText={setName}
           />
+          <View className="mt-1 flex-row justify-between">
+            <Text className="font-outfit-medium text-xs text-slate-500">1–{SPOT_NAME_MAX} characters</Text>
+            <Text className="font-outfit-medium text-xs text-slate-500">{name.length} / {SPOT_NAME_MAX}</Text>
+          </View>
+          {showNameError && formErrors.name ? (
+            <Text className="mt-1 text-sm text-[#B45F58]">{formErrors.name}</Text>
+          ) : null}
 
           {/* DESCRIPTION */}
-          <Text style={styles.sectionLabel}>DESCRIPTION</Text>
-
+          <View className="mb-2 mt-4 flex-row items-center">
+            <Text style={[styles.sectionLabel, { marginTop: 0, marginBottom: 0 }]}>DESCRIPTION</Text>
+            <Text className="ml-2 font-outfit-medium text-xs text-slate-500">Required</Text>
+          </View>
           <TextInput
-            style={styles.descriptionInput}
+            style={[styles.descriptionInput, showDescriptionError && formErrors.description ? styles.inputError : null]}
             placeholder="Describe the spot — obstacle type, spot condition, security..."
             placeholderTextColor="#879995"
+            accessibilityLabel="Spot description, required"
+            accessibilityHint="Describe the obstacle, condition, and security details"
             multiline
+            maxLength={SPOT_DESCRIPTION_MAX}
             textAlignVertical="top"
             value={description}
+            onBlur={() => setTouched((current) => ({ ...current, description: true }))}
             onChangeText={setDescription}
           />
+          <View className="mt-1 flex-row justify-between">
+            <Text className="font-outfit-medium text-xs text-slate-500">1–{SPOT_DESCRIPTION_MAX} characters</Text>
+            <Text className="font-outfit-medium text-xs text-slate-500">{description.length} / {SPOT_DESCRIPTION_MAX}</Text>
+          </View>
+          {showDescriptionError && formErrors.description ? (
+            <Text className="mt-1 text-sm text-[#B45F58]">{formErrors.description}</Text>
+          ) : null}
 
           {/* LOCATION */}
           <Text style={styles.sectionLabel}>LOCATION</Text>
@@ -258,22 +317,34 @@ export default function EditSpotScreen() {
                 }
               }}
             />
+            <View className="-mt-4 mb-3 flex-row items-center rounded-xl bg-[#EBF2F0] px-3 py-2">
+              <Text className="font-outfit-bold text-sm text-[#21473f]">✓ Spot location selected</Text>
+              <Text className="ml-2 flex-1 text-right font-outfit-medium text-xs text-slate-500">
+                {selectedLocation.latitude.toFixed(5)}, {selectedLocation.longitude.toFixed(5)}
+              </Text>
+            </View>
           </View>
 
-          {/* SAVE */}
           {saveError ? (
-            <Text className="mb-3 mt-4 text-center text-sm text-red-600">
+            <Text
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
+              className="mb-3 mt-4 text-center text-sm text-[#B45F58]">
               {saveError}
             </Text>
           ) : null}
 
-          <Pressable
+          <FeedbackPressable
             style={[
               styles.saveButton,
-              (!isFormValid || saving) && styles.saveButtonDisabled,
+              saving && styles.saveButtonDisabled,
             ]}
             onPress={handleSave}
-            disabled={!isFormValid || saving}
+            disabled={saving}
+            accessibilityRole="button"
+            accessibilityLabel={saving ? 'Saving changes' : 'Save changes'}
+            accessibilityHint={!isFormValid ? 'Review the required fields and fix the highlighted errors' : undefined}
+            accessibilityState={{ disabled: saving, busy: saving }}
           >
             <View style={styles.saveContent}>
               {saving ? (
@@ -289,8 +360,9 @@ export default function EditSpotScreen() {
                 </Text>
               )}
             </View>
-          </Pressable>
-        </ScrollView>
+          </FeedbackPressable>
+          </ScrollView>
+        </KeyboardAvoidingView>
       )}
     </SafeAreaView>
   );
@@ -311,6 +383,9 @@ const styles = StyleSheet.create({
   },
 
   content: {
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: 720,
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 40,
@@ -338,6 +413,10 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     fontSize: 14,
     color: '#21473f',
+  },
+
+  inputError: {
+    borderColor: '#B45F58',
   },
 
   descriptionInput: {

@@ -167,7 +167,10 @@ export default function RootLayout() {
   if (userId && profileError) {
     return (
       <View className="flex-1 items-center justify-center bg-white px-6">
-        <Text className="text-center font-outfit-medium text-base text-slate-600">
+        <Text
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+          className="text-center font-outfit-medium text-base text-slate-600">
           {profileError}
         </Text>
         <Pressable
@@ -189,6 +192,12 @@ export default function RootLayout() {
         <Stack.Screen name="onboarding" />
         <Stack.Screen
           name="profile"
+          options={{
+            animation: 'slide_from_right',
+          }}
+        />
+        <Stack.Screen
+          name="change-username"
           options={{
             animation: 'slide_from_right',
           }}

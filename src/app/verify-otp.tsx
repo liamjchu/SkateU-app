@@ -128,7 +128,7 @@ export default function VerifyOtpScreen() {
         <View className="flex-row items-center justify-between">
           <Pressable
             onPress={goBack}
-            className="h-11 w-11 items-center justify-center rounded-full"
+            className="h-12 w-12 items-center justify-center rounded-full"
             accessibilityLabel="Go back"
             accessibilityRole="button"
           >
@@ -146,7 +146,7 @@ export default function VerifyOtpScreen() {
         </View>
       </View>
 
-      <View className="flex-1 px-5 pt-8">
+      <View className="flex-1 self-center w-full max-w-[640px] px-5 pt-8 pb-8">
         <Text
           className="text-3xl text-[#1B3B36]"
           style={{ fontFamily: 'Outfit_900Black' }}
@@ -164,7 +164,12 @@ export default function VerifyOtpScreen() {
 
         <View className="mt-8 gap-4">
           {/* A single input drives the six visible cells. */}
-          <Pressable onPress={() => inputRef.current?.focus()}>
+          <Pressable
+            onPress={() => inputRef.current?.focus()}
+            accessibilityRole="button"
+            accessibilityLabel={`Verification code, ${code.length} of ${CODE_LENGTH} digits entered`}
+            accessibilityHint="Opens the 6-digit verification code input"
+          >
             <View className="flex-row justify-between">
               {cells.map((_, index) => {
                 const char = code[index] ?? '';
@@ -173,7 +178,7 @@ export default function VerifyOtpScreen() {
                 return (
                   <View
                     key={index}
-                    className={`h-14 w-12 items-center justify-center rounded-2xl bg-[#F0F3F5] ${
+                    className={`h-14 flex-1 mx-1 items-center justify-center rounded-2xl bg-[#F0F3F5] ${
                       isActive ? 'border-2 border-[#21473f]' : ''
                     }`}
                   >
@@ -197,6 +202,9 @@ export default function VerifyOtpScreen() {
             textContentType="oneTimeCode"
             autoComplete="sms-otp"
             maxLength={CODE_LENGTH}
+            accessibilityLabel="6-digit verification code"
+            accessibilityHint="Enter the code sent to your email"
+            accessibilityValue={{ text: `${code.length} of ${CODE_LENGTH} digits entered` }}
             editable={!submitting}
             autoFocus
             className="absolute h-px w-px opacity-0"
@@ -204,7 +212,9 @@ export default function VerifyOtpScreen() {
 
           {error ? (
             <Text
-              className="text-sm text-red-500"
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
+              className="text-sm text-[#B45F58]"
               style={{ fontFamily: 'Outfit_500Medium' }}
             >
               {error}
@@ -212,7 +222,11 @@ export default function VerifyOtpScreen() {
           ) : null}
 
           {notice ? (
-            <View className="rounded-2xl bg-[#EBF2F0] px-4 py-3">
+            <View
+              accessible
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
+              className="rounded-2xl bg-[#EBF2F0] px-4 py-3">
               <Text
                 className="text-sm text-[#1B3B36]"
                 style={{ fontFamily: 'Outfit_600SemiBold' }}
@@ -228,8 +242,9 @@ export default function VerifyOtpScreen() {
             className={`mt-2 h-14 flex-row items-center justify-center rounded-2xl ${
               submitting ? 'bg-[#21473f]/60' : 'bg-[#21473f]'
             }`}
-            accessibilityLabel="Verify code"
+            accessibilityLabel={submitting ? 'Verifying code' : 'Verify code'}
             accessibilityRole="button"
+            accessibilityState={{ disabled: submitting, busy: submitting }}
           >
             {submitting ? (
               <ActivityIndicator color="#ffffff" />
@@ -246,9 +261,16 @@ export default function VerifyOtpScreen() {
           <Pressable
             onPress={handleResend}
             disabled={resending || cooldown > 0}
-            className="items-center justify-center py-1"
+            className="min-h-12 items-center justify-center px-2 py-1"
             accessibilityRole="button"
-            accessibilityLabel="Resend code"
+            accessibilityLabel={
+              resending
+                ? 'Sending a new verification code'
+                : cooldown > 0
+                  ? `Resend verification code in ${cooldown} seconds`
+                  : 'Resend verification code'
+            }
+            accessibilityState={{ disabled: resending || cooldown > 0, busy: resending }}
           >
             <Text
               className={`text-base ${

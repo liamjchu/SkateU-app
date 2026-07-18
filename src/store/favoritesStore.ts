@@ -27,33 +27,33 @@ export const useFavorites = create<FavoritesStore>()(
       favoriteSchoolIds: [],
       favoriteSchools: [],
       addFavoriteSchool: (school: School) => {
-        set((state) => {
-          return {
-            favoriteSchoolIds: state.favoriteSchoolIds.includes(school.id)
-              ? state.favoriteSchoolIds
-              : [...state.favoriteSchoolIds, school.id],
-            favoriteSchools: mergeFavoriteSchools([
-              ...state.favoriteSchools,
-              school,
-            ]),
-          };
-        });
+        set((state) => ({
+          favoriteSchoolIds: state.favoriteSchoolIds.includes(school.id)
+            ? state.favoriteSchoolIds
+            : [...state.favoriteSchoolIds, school.id],
+          favoriteSchools: mergeFavoriteSchools([
+            ...state.favoriteSchools,
+            school,
+          ]),
+        }));
       },
       removeFavoriteSchool: (id: string) => {
         set((state) => ({
-          favoriteSchoolIds: state.favoriteSchoolIds.filter((schoolId) => schoolId !== id),
-          favoriteSchools: state.favoriteSchools.filter((school) => school.id !== id),
+          favoriteSchoolIds: state.favoriteSchoolIds.filter(
+            (schoolId) => schoolId !== id
+          ),
+          favoriteSchools: state.favoriteSchools.filter(
+            (school) => school.id !== id
+          ),
         }));
       },
       toggleFavoriteSchool: (school: School) => {
-        const { addFavoriteSchool, isFavoriteSchool, removeFavoriteSchool } = get();
-
-        if (isFavoriteSchool(school.id)) {
-          removeFavoriteSchool(school.id);
+        if (get().isFavoriteSchool(school.id)) {
+          get().removeFavoriteSchool(school.id);
           return;
         }
 
-        addFavoriteSchool(school);
+        get().addFavoriteSchool(school);
       },
       upsertFavoriteSchool: (school: School) => {
         set((state) => {
@@ -69,7 +69,8 @@ export const useFavorites = create<FavoritesStore>()(
           };
         });
       },
-      isFavoriteSchool: (id: string) => get().favoriteSchoolIds.includes(id),
+      isFavoriteSchool: (id: string) =>
+        get().favoriteSchoolIds.includes(id),
     }),
     {
       name: '@skateu:favorite-schools',

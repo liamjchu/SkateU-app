@@ -11,6 +11,7 @@ type ChangePasswordFormProps = {
 type PasswordFieldProps = {
   value: string;
   onChangeText: (value: string) => void;
+  label: string;
   placeholder: string;
   autoComplete: 'current-password' | 'new-password';
   visible: boolean;
@@ -34,6 +35,7 @@ const getChangePasswordErrorMessage = (changeError: unknown): string => {
 function PasswordField({
   value,
   onChangeText,
+  label,
   placeholder,
   autoComplete,
   visible,
@@ -45,6 +47,8 @@ function PasswordField({
       <TextInput
         value={value}
         onChangeText={onChangeText}
+        accessibilityLabel={label}
+        accessibilityHint="Enter your password"
         placeholder={placeholder}
         placeholderTextColor="#8E9AA6"
         secureTextEntry={!visible}
@@ -58,9 +62,9 @@ function PasswordField({
         onPress={onToggleVisibility}
         disabled={!editable}
         hitSlop={8}
-        className="h-9 w-9 items-center justify-center"
+        className="h-12 w-12 items-center justify-center"
         accessibilityRole="button"
-        accessibilityLabel={visible ? `Hide ${placeholder}` : `Show ${placeholder}`}
+        accessibilityLabel={visible ? `Hide ${label}` : `Show ${label}`}
       >
         <Ionicons
           name={visible ? 'eye-outline' : 'eye-off-outline'}
@@ -142,6 +146,7 @@ export default function ChangePasswordForm({ email }: ChangePasswordFormProps) {
       <PasswordField
         value={currentPassword}
         onChangeText={setCurrentPassword}
+        label="Current password"
         placeholder="Current password"
         autoComplete="current-password"
         visible={showCurrentPassword}
@@ -151,6 +156,7 @@ export default function ChangePasswordForm({ email }: ChangePasswordFormProps) {
       <PasswordField
         value={newPassword}
         onChangeText={setNewPassword}
+        label="New password"
         placeholder="New password"
         autoComplete="new-password"
         visible={showNewPassword}
@@ -160,6 +166,7 @@ export default function ChangePasswordForm({ email }: ChangePasswordFormProps) {
       <PasswordField
         value={confirmPassword}
         onChangeText={setConfirmPassword}
+        label="Confirm new password"
         placeholder="Confirm new password"
         autoComplete="new-password"
         visible={showConfirmation}
@@ -168,13 +175,23 @@ export default function ChangePasswordForm({ email }: ChangePasswordFormProps) {
       />
 
       {error ? (
-        <Text selectable className="font-outfit-medium text-sm text-red-500">
+        <Text
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+          selectable
+          className="font-outfit-medium text-sm text-[#B45F58]"
+        >
           {error}
         </Text>
       ) : null}
 
       {success ? (
-        <View className="rounded-2xl bg-[#EBF2F0] px-4 py-3">
+        <View
+          accessible
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+          className="rounded-2xl bg-[#EBF2F0] px-4 py-3"
+        >
           <Text selectable className="font-outfit-semibold text-sm text-[#1B3B36]">
             {success}
           </Text>
@@ -188,7 +205,8 @@ export default function ChangePasswordForm({ email }: ChangePasswordFormProps) {
           submitting ? 'bg-[#21473f]/60' : 'bg-[#21473f]'
         }`}
         accessibilityRole="button"
-        accessibilityLabel="Update password"
+        accessibilityLabel={submitting ? 'Updating password' : 'Update password'}
+        accessibilityState={{ disabled: submitting, busy: submitting }}
       >
         <Text className="font-outfit-bold text-lg text-white">
           {submitting ? 'Updating password...' : 'Update password'}

@@ -1,9 +1,25 @@
 import { create } from 'zustand';
+import { getApiUrl } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import type { Profile } from '../types/profile';
+import { useSpotsStore } from './spotsStore';
+
+export type UsernameClaimResult =
+  | { ok: true }
+  | { ok: false; taken: boolean; message: string };
+
+type UsernameClaimResponse = {
+  allowed?: boolean;
+  taken?: boolean;
+  reason?: string;
+  error?: string;
+  profile?: Profile;
+};
 
 type ProfileState = {
   profile: Profile | null;
+  // The user who just completed onboarding in this app session.
+  welcomeAboardUserId: string | null;
   // True while the initial profile fetch for the current user is in flight.
   loading: boolean;
   // True once we've resolved the profile for the current user successfully
@@ -14,16 +30,22 @@ type ProfileState = {
 
   fetchProfile: (userId: string) => Promise<void>;
   clearProfile: () => void;
-  isUsernameAvailable: (username: string) => Promise<boolean>;
-  setUsername: (userId: string, username: string) => Promise<void>;
+  isUsernameAvailable: (
+    username: string,
+    excludingUserId?: string
+  ) => Promise<boolean>;
+  claimUsername: (
+    accessToken: string,
+    username: string,
+    showWelcomeOnSave?: boolean
+  ) => Promise<UsernameClaimResult>;
 };
 
-// Postgres unique-violation error code (raised if two users race for a name).
-const UNIQUE_VIOLATION = '23505';
 let profileRequestVersion = 0;
 
-export const useProfileStore = create<ProfileState>((set) => ({
+export const useProfileStore = create<ProfileState>((set, get) => ({
   profile: null,
+  welcomeAboardUserId: null,
   loading: false,
   loaded: false,
   error: null,
@@ -63,17 +85,22 @@ export const useProfileStore = create<ProfileState>((set) => ({
 
   clearProfile: () => {
     profileRequestVersion += 1;
-    set({ profile: null, loading: false, loaded: false, error: null });
+    set({
+      profile: null,
+      welcomeAboardUserId: null,
+      loading: false,
+      loaded: false,
+      error: null,
+    });
   },
 
-  // Case-insensitive availability check. The DB has the final say via its
-  // unique index, but this gives the user instant feedback while typing.
-  isUsernameAvailable: async (username) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id')
-      .ilike('username', username)
-      .maybeSingle();
+  // This only provides typing feedback. The server-side claim remains the
+  // source of truth so concurrent requests cannot reserve the same username.
+  isUsernameAvailable: async (username, excludingUserId) => {
+    const query = supabase.from('profiles').select('id').eq('username', username);
+    const { data, error } = excludingUserId
+      ? await query.neq('id', excludingUserId).maybeSingle()
+      : await query.maybeSingle();
 
     if (error) {
       throw error;
@@ -82,26 +109,56 @@ export const useProfileStore = create<ProfileState>((set) => ({
     return data === null;
   },
 
-  setUsername: async (userId, username) => {
-    const requestVersion = ++profileRequestVersion;
-    const { data, error } = await supabase
-      .from('profiles')
-      .update({ username, updated_at: new Date().toISOString() })
-      .eq('id', userId)
-      .select('id, username, avatar_url, updated_at')
-      .single();
+  claimUsername: async (accessToken, username, showWelcomeOnSave = false) => {
+    const response = await fetch(getApiUrl('/api/moderate-username'), {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ username }),
+    });
 
-    if (error) {
-      if (error.code === UNIQUE_VIOLATION) {
-        throw new Error('That username is already taken.');
-      }
-      throw error;
+    const data = (await response.json().catch(() => null)) as
+      | UsernameClaimResponse
+      | null;
+
+    if (!response.ok) {
+      throw new Error(
+        data?.error ?? 'Could not save the username right now. Try again.'
+      );
     }
 
-    if (requestVersion !== profileRequestVersion) {
-      return;
+    if (!data?.allowed) {
+      return {
+        ok: false,
+        taken: data?.taken === true,
+        message: data?.reason ?? "That username isn't allowed. Please pick another.",
+      };
     }
 
-    set({ profile: data as Profile, loaded: true, error: null });
+    const profile = data.profile;
+    if (!profile?.id || profile.username !== username) {
+      throw new Error('Could not save the username right now. Try again.');
+    }
+
+    const previousUsername = get().profile?.username;
+    const welcomeAboardUserId = get().welcomeAboardUserId;
+    profileRequestVersion += 1;
+    set({
+      profile,
+      welcomeAboardUserId: showWelcomeOnSave ? profile.id : welcomeAboardUserId,
+      loading: false,
+      loaded: true,
+      error: null,
+    });
+
+    if (previousUsername && previousUsername !== username) {
+      useSpotsStore
+        .getState()
+        .replaceCreatorUsername(previousUsername, username);
+    }
+
+    return { ok: true };
   },
 }));

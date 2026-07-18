@@ -1,3 +1,5 @@
+import { validateUsername } from '../../lib/username';
+import type { Profile } from '../../types/profile';
 import { getSupabaseConfig, resolveUserId } from './spots+api';
 
 // Server-side username moderation. The OpenAI key lives only here (never
@@ -11,7 +13,6 @@ import { getSupabaseConfig, resolveUserId } from './spots+api';
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 const MODEL = 'gpt-4o-mini';
 
-const USERNAME_MAX = 20;
 const MODERATION_TIMEOUT_MS = 8_000;
 
 function readBearerToken(request: Request): string | null {
@@ -107,8 +108,9 @@ export async function POST(request: Request) {
       ? (body as { username: string }).username.trim()
       : '';
 
-  if (!username || username.length > USERNAME_MAX) {
-    return badRequest('A valid username is required.');
+  const validationError = validateUsername(username);
+  if (validationError) {
+    return badRequest(validationError);
   }
 
   if (containsSensitiveNumericIdentifier(username)) {
@@ -192,6 +194,7 @@ export async function POST(request: Request) {
     if (profileResponse.status === 409) {
       return Response.json({
         allowed: false,
+        taken: true,
         reason: 'That username is already taken.',
       });
     }
@@ -204,9 +207,22 @@ export async function POST(request: Request) {
       );
     }
 
+    const profiles = (await profileResponse.json()) as Profile[];
+    const profile = profiles[0];
+    if (!profile || profile.id !== auth.userId || profile.username !== username) {
+      console.error('Moderated username profile update returned an invalid profile.');
+      return Response.json(
+        { error: 'Could not save the username right now. Try again.' },
+        { status: 502 }
+      );
+    }
+
+    // Updating the single profile row replaces the old unique value, releasing
+    // it immediately for another user. Spot reads join this live profile row.
     return Response.json({
       allowed: true,
       reason: '',
+      profile,
     });
   } catch (error) {
     console.error('Username moderation failed:', error);
