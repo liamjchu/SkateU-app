@@ -141,7 +141,7 @@ export default function UpdatePasswordScreen() {
                   value={password}
                   onChangeText={setPassword}
                   placeholder="New password"
-                  placeholderTextColor="#8E9AA6"
+                  placeholderTextColor="#52645F"
                   accessibilityLabel="New password"
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
@@ -162,7 +162,7 @@ export default function UpdatePasswordScreen() {
                   <Ionicons
                     name={showPassword ? 'eye-outline' : 'eye-off-outline'}
                     size={22}
-                    color="#8E9AA6"
+                    color="#52645F"
                   />
                 </Pressable>
               </View>
@@ -172,7 +172,7 @@ export default function UpdatePasswordScreen() {
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   placeholder="Confirm new password"
-                  placeholderTextColor="#8E9AA6"
+                  placeholderTextColor="#52645F"
                   accessibilityLabel="Confirm new password"
                   secureTextEntry={!showConfirmation}
                   autoCapitalize="none"
@@ -195,7 +195,7 @@ export default function UpdatePasswordScreen() {
                   <Ionicons
                     name={showConfirmation ? 'eye-outline' : 'eye-off-outline'}
                     size={22}
-                    color="#8E9AA6"
+                    color="#52645F"
                   />
                 </Pressable>
               </View>
@@ -205,7 +205,7 @@ export default function UpdatePasswordScreen() {
                   accessibilityRole="alert"
                   accessibilityLiveRegion="polite"
                   selectable
-                  className="font-outfit-medium text-sm text-[#B45F58]">
+                  className="font-outfit-medium text-sm text-[#7F302C]">
                   {error}
                 </Text>
               ) : null}
@@ -228,7 +228,7 @@ export default function UpdatePasswordScreen() {
                   onPress={handleSubmit}
                   disabled={submitting}
                   className={`mt-2 items-center justify-center rounded-2xl py-4 ${
-                    submitting ? 'bg-[#21473f]/60' : 'bg-[#21473f]'
+                    submitting ? 'bg-[#60756F]' : 'bg-[#21473f]'
                   }`}
                   accessibilityRole="button"
                   accessibilityLabel={submitting ? 'Saving new password' : 'Save new password'}

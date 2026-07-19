@@ -124,7 +124,7 @@ function SchoolRow({
             <Octicons
               name={isFavorite ? 'star-fill' : 'star'}
               size={20}
-              color={isFavorite ? '#1B3B36' : '#94A3B8'}
+              color={isFavorite ? '#1B3B36' : '#52645F'}
             />
           </FeedbackPressable>
 
@@ -148,7 +148,7 @@ function SchoolRow({
           <Feather
             name="map-pin"
             size={11}
-            color="#64748b"
+            color="#475569"
             className="mr-[3px]"
           />
           <Text
@@ -186,7 +186,7 @@ function SchoolRow({
           <Octicons
             name={isFavorite ? 'star-fill' : 'star'}
             size={20}
-            color={isFavorite ? '#1B3B36' : '#94A3B8'}
+            color={isFavorite ? '#1B3B36' : '#52645F'}
           />
         </FeedbackPressable>
 
@@ -210,7 +210,7 @@ function SchoolRow({
         <Feather
           name="map-pin"
           size={11}
-          color="#64748b"
+          color="#475569"
           className="mr-[3px]"
         />
         <Text
@@ -663,7 +663,7 @@ export default function HomeScreen() {
             {welcomeMessage}
           </Text>
           <Text 
-            className="text-base text-slate-500/90"
+            className="text-base text-slate-500"
             style={{ fontFamily: 'Outfit_500Medium' }}
           >
             Find a new campus skate spot.
@@ -688,7 +688,7 @@ export default function HomeScreen() {
             onFocus={() => setIsOpen(true)}
             onPressIn={() => setIsOpen(true)}
             placeholder="Search US colleges and universities..."
-            placeholderTextColor="#8E9AA6"
+            placeholderTextColor="#52645F"
             accessibilityLabel="Search colleges and universities"
             accessibilityHint="Type at least three characters to find a school"
             accessibilityState={{ expanded: isOpen }}
@@ -735,8 +735,8 @@ export default function HomeScreen() {
               </View>
 
               {favoriteRefreshError ? (
-                <View className="mb-3 flex-row items-center rounded-2xl border border-[#F3B7B2] bg-[#FBE9E7] px-3 py-2">
-                  <Text className="flex-1 pr-2 font-outfit-medium text-xs text-[#B45F58]">
+                <View className="mb-3 flex-row items-center rounded-2xl border border-[#B45F58] bg-[#FBE9E7] px-3 py-2">
+                  <Text className="flex-1 pr-2 font-outfit-medium text-xs text-[#7F302C]">
                     Something went wrong refreshing favorites.
                   </Text>
                   <FeedbackPressable
@@ -870,7 +870,7 @@ export default function HomeScreen() {
                   <Text
                     accessibilityRole="alert"
                     accessibilityLiveRegion="polite"
-                    className="flex-1 pr-3 text-base text-[#B45F58]"
+                    className="flex-1 pr-3 text-base text-[#7F302C]"
                     style={{ fontFamily: 'Outfit_500Medium' }}
                   >
                     Something went wrong. {searchError}
@@ -934,7 +934,7 @@ export default function HomeScreen() {
           accessibilityLabel={selectedSchool ? `Open ${selectedSchool.name} map` : 'Choose a school to continue'}
           accessibilityState={{ disabled: !selectedSchool }}
           className={`w-full rounded-2xl py-4 flex-row items-center justify-center space-x-2 relative -top-4 ${
-            selectedSchool ? 'bg-[#1B3B36]' : 'bg-slate-300'
+            selectedSchool ? 'bg-[#1B3B36]' : 'bg-[#60756F]'
           }`}
         >
           <Text 

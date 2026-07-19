@@ -190,7 +190,7 @@ export default function SpotImagePicker({
               <Text
                 style={{
                   fontSize: 14,
-                  color: '#8CA19D',
+                  color: '#52645F',
                   textAlign: 'center',
                 }}
               >
@@ -213,7 +213,7 @@ export default function SpotImagePicker({
         <Text
           accessibilityRole="alert"
           accessibilityLiveRegion="polite"
-          className="mt-2 px-2 text-xs text-[#B45F58]"
+          className="mt-2 px-2 text-xs text-[#7F302C]"
         >
           {error}
         </Text>

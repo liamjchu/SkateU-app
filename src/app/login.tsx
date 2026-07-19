@@ -175,7 +175,7 @@ export default function LoginScreen() {
             onChangeText={setEmail}
             placeholder="Email"
             accessibilityLabel="Email address"
-            placeholderTextColor="#8E9AA6"
+            placeholderTextColor="#52645F"
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="email-address"
@@ -189,7 +189,7 @@ export default function LoginScreen() {
               onChangeText={setPassword}
               placeholder="Password"
               accessibilityLabel="Password"
-              placeholderTextColor="#8E9AA6"
+              placeholderTextColor="#52645F"
               secureTextEntry={!showPassword}
               autoCapitalize="none"
               editable={!submitting}
@@ -208,7 +208,7 @@ export default function LoginScreen() {
               <Ionicons
                 name={showPassword ? 'eye-outline' : 'eye-off-outline'}
                 size={22}
-                color="#8E9AA6"
+                color="#52645F"
               />
             </Pressable>
           </View>
@@ -237,7 +237,7 @@ export default function LoginScreen() {
                         : 'ellipse-outline'
                     }
                     size={18}
-                    color={requirement.met ? '#21473F' : '#8E9AA6'}
+                    color={requirement.met ? '#21473F' : '#52645F'}
                   />
                   <Text
                     className={`text-sm ${
@@ -256,7 +256,7 @@ export default function LoginScreen() {
             <Text
               accessibilityRole="alert"
               accessibilityLiveRegion="polite"
-              className="text-sm text-[#B45F58]"
+              className="text-sm text-[#7F302C]"
               style={{ fontFamily: 'Outfit_500Medium' }}
             >
               {error}
@@ -282,7 +282,7 @@ export default function LoginScreen() {
             onPress={handleSubmit}
             disabled={submitting}
             className={`mt-2 items-center justify-center rounded-2xl py-4 ${
-              submitting ? 'bg-[#21473f]/60' : 'bg-[#21473f]'
+              submitting ? 'bg-[#60756F]' : 'bg-[#21473f]'
             }`}
             accessibilityLabel={isSignup ? 'Sign up' : 'Login'}
             accessibilityRole="button"

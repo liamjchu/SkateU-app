@@ -217,7 +217,7 @@ export default function VerifyDeleteAccountScreen() {
             <Text
             accessibilityRole="alert"
             accessibilityLiveRegion="polite"
-            className="font-outfit-medium text-sm text-[#B45F58]">
+            className="font-outfit-medium text-sm text-[#7F302C]">
               {error}
             </Text>
           ) : null}
@@ -238,16 +238,16 @@ export default function VerifyDeleteAccountScreen() {
             onPress={() => submitCode(code)}
             disabled={submitting}
             className={`mt-2 h-14 flex-row items-center justify-center rounded-2xl ${
-              submitting ? 'bg-[#F3B7B2]/60' : 'bg-[#F3B7B2]'
+              submitting ? 'bg-[#60756F]' : 'bg-[#7F302C]'
             }`}
             accessibilityLabel={submitting ? 'Verifying and deleting account' : 'Confirm account deletion'}
             accessibilityRole="button"
             accessibilityState={{ disabled: submitting, busy: submitting }}
           >
             {submitting ? (
-              <ActivityIndicator color="#B45F58" />
+              <ActivityIndicator color="#FFFFFF" />
             ) : (
-              <Text className="font-outfit-bold text-lg text-[#B45F58]">
+              <Text className="font-outfit-bold text-lg text-white">
                 Verify and delete
               </Text>
             )}

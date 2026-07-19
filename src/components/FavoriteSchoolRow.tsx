@@ -98,10 +98,10 @@ export default function FavoriteSchoolRow({
     >
       <View
         pointerEvents="none"
-        className="absolute inset-y-1 right-1 w-[40%] items-center justify-center rounded-3xl bg-[#F3B7B2]"
+        className="absolute inset-y-1 right-1 w-[40%] items-center justify-center rounded-3xl bg-[#FBE9E7]"
       >
-        <Feather name="trash-2" size={18} color="#B45F58" />
-        <Text className="mt-1 font-outfit-bold text-xs text-[#B45F58]">Remove</Text>
+        <Feather name="trash-2" size={18} color="#7F302C" />
+        <Text className="mt-1 font-outfit-bold text-xs text-[#7F302C]">Remove</Text>
       </View>
 
       <GestureDetector gesture={swipeGesture}>
@@ -144,7 +144,7 @@ export default function FavoriteSchoolRow({
               <Feather
                 name="map-pin"
                 size={11}
-                color="#64748b"
+                color="#475569"
                 className="mr-[3px]"
               />
               <Text

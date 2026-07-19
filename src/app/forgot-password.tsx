@@ -112,7 +112,7 @@ export default function ForgotPasswordScreen() {
                 value={email}
                 onChangeText={setEmail}
                 placeholder="Email"
-                placeholderTextColor="#8E9AA6"
+                placeholderTextColor="#52645F"
                 accessibilityLabel="Email address"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -127,7 +127,7 @@ export default function ForgotPasswordScreen() {
                   accessibilityRole="alert"
                   accessibilityLiveRegion="polite"
                   selectable
-                  className="font-outfit-medium text-sm text-[#B45F58]">
+                  className="font-outfit-medium text-sm text-[#7F302C]">
                   {error}
                 </Text>
               ) : null}
@@ -151,7 +151,7 @@ export default function ForgotPasswordScreen() {
                 onPress={handleSubmit}
                 disabled={submitting}
                 className={`mt-2 items-center justify-center rounded-2xl py-4 ${
-                  submitting ? 'bg-[#21473f]/60' : 'bg-[#21473f]'
+                  submitting ? 'bg-[#60756F]' : 'bg-[#21473f]'
                 }`}
                 accessibilityRole="button"
                 accessibilityLabel={submitting ? 'Sending password reset link' : 'Send password reset link'}

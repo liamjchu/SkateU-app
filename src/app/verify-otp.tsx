@@ -257,7 +257,7 @@ function VerifyOtpContent({ email }: { email: string }) {
             <Text
               accessibilityRole="alert"
               accessibilityLiveRegion="polite"
-              className="text-sm text-[#B45F58]"
+              className="text-sm text-[#7F302C]"
               style={{ fontFamily: 'Outfit_500Medium' }}
             >
               {error}
@@ -283,7 +283,7 @@ function VerifyOtpContent({ email }: { email: string }) {
             onPress={() => submitCode(code)}
             disabled={submitting}
             className={`mt-2 h-14 flex-row items-center justify-center rounded-2xl ${
-              submitting ? 'bg-[#21473f]/60' : 'bg-[#21473f]'
+              submitting ? 'bg-[#60756F]' : 'bg-[#21473f]'
             }`}
             accessibilityLabel={submitting ? 'Verifying code' : 'Verify code'}
             accessibilityRole="button"

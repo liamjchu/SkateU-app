@@ -755,7 +755,7 @@ export default function MapScreen() {
             <Octicons
               name={isFavoriteSchool ? 'star-fill' : 'star'}
               size={26}
-              color={isFavoriteSchool ? '#FFFFFF' : 'rgba(255,255,255,0.7)'}
+              color="#FFFFFF"
             />
           </FeedbackPressable>
         ) : (
@@ -763,7 +763,7 @@ export default function MapScreen() {
         )}
       </View>
       <View
-        className="absolute right-4 z-[999] overflow-hidden rounded-full bg-[rgba(0,0,0,0.4)]"
+        className="absolute right-4 z-[999] overflow-hidden rounded-full bg-black"
         style={[styles.toggleButton, { top: 144 }]}
       >
         <FeedbackPressable
@@ -907,7 +907,7 @@ export default function MapScreen() {
         <FeedbackPressable
           haptic="light"
           onPress={() => setShowAttribution(true)}
-          className="absolute left-4 z-[999] h-8 w-8 items-center justify-center rounded-full bg-[rgba(0,0,0,0.4)]"
+          className="absolute left-4 z-[999] h-8 w-8 items-center justify-center rounded-full bg-[#21473f]"
           style={{ bottom: Math.max(insets.bottom, 16) + 8 }}
           accessibilityRole="button"
           accessibilityLabel="Show map attribution"
@@ -932,7 +932,7 @@ export default function MapScreen() {
           <Text className="text-center font-outfit-bold text-xl text-white">
             Map unavailable
           </Text>
-          <Text className="mt-2 text-center font-outfit-medium text-base text-white/80">
+          <Text className="mt-2 text-center font-outfit-medium text-base text-white">
             Check your connection and try again.
           </Text>
           <FeedbackPressable
@@ -948,7 +948,7 @@ export default function MapScreen() {
 
       {mapStatus === 'ready' && error ? (
         <View
-          className="absolute left-4 right-4 z-40 rounded-2xl border border-[#F3B7B2] bg-white px-4 py-3"
+          className="absolute left-4 right-4 z-40 rounded-2xl border border-[#B45F58] bg-white px-4 py-3"
           style={{ top: insets.top + 142 }}
         >
           <View className="flex-row items-center justify-between">
@@ -956,7 +956,7 @@ export default function MapScreen() {
               <Text
                 accessibilityRole="alert"
                 accessibilityLiveRegion="polite"
-                className="font-outfit-bold text-sm text-[#B45F58]"
+                className="font-outfit-bold text-sm text-[#7F302C]"
               >
                 Spots unavailable
               </Text>
@@ -981,7 +981,7 @@ export default function MapScreen() {
         >
           <View
             className={`flex-row items-center rounded-full px-3 py-1.5 ${
-              mapLayer === 'satellite' ? 'bg-black/50' : 'bg-white/90'
+              mapLayer === 'satellite' ? 'bg-[#21473f]' : 'bg-white'
             }`}
           >
             <ActivityIndicator
@@ -1049,7 +1049,7 @@ export default function MapScreen() {
                     {selectedSpot.name}
                   </Text>
                   <View className="mt-1 flex-row items-center">
-                    <Octicons name="person" size={13} color="#64748b" />
+                    <Octicons name="person" size={13} color="#475569" />
                     <Text
                       className="ml-1 font-outfit-medium text-xs text-slate-500"
                   >
@@ -1086,7 +1086,7 @@ export default function MapScreen() {
                     accessibilityRole="button"
                   >
                     {likingSpotId === selectedSpot.id ? (
-                      <ActivityIndicator size="small" color="#B45F58" />
+                      <ActivityIndicator size="small" color="#7F302C" />
                     ) : (
                       <Octicons
                         name={
@@ -1097,8 +1097,8 @@ export default function MapScreen() {
                         size={17}
                         color={
                           selectedSpot.likedByUser === true
-                            ? '#B45F58'
-                            : '#64748b'
+                            ? '#7F302C'
+                            : '#475569'
                         }
                       />
                     )}
@@ -1172,17 +1172,17 @@ export default function MapScreen() {
                 <FeedbackPressable
                   onPress={handleDeleteSelectedSpot}
                   disabled={deletingSpotId !== null}
-                  className="h-12 flex-1 flex-row items-center justify-center rounded-2xl border border-[#F3B7B2] bg-[#FBE9E7]"
+                  className="h-12 flex-1 flex-row items-center justify-center rounded-2xl border border-[#B45F58] bg-[#FBE9E7]"
                   accessibilityLabel={`Delete ${selectedSpot.name}`}
                   accessibilityRole="button"
                 >
                   {deletingSpotId === selectedSpot.id ? (
-                    <ActivityIndicator size="small" color="#F3B7B2" />
+                    <ActivityIndicator size="small" color="#7F302C" />
                   ) : (
-                    <Feather name="trash-2" size={16} color="#B45F58" />
+                    <Feather name="trash-2" size={16} color="#7F302C" />
                   )}
                   <Text
-                    className="ml-2 font-outfit-semibold text-sm text-[#B45F58]"
+                    className="ml-2 font-outfit-semibold text-sm text-[#7F302C]"
                   >
                     Delete spot
                   </Text>

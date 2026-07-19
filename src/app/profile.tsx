@@ -408,11 +408,11 @@ export default function ProfileScreen() {
         </View>
 
         {displayedError && displayedSpots.length > 0 ? (
-          <View className="mt-4 flex-row items-center rounded-2xl border border-[#F3B7B2] bg-[#FBE9E7] px-4 py-3">
+          <View className="mt-4 flex-row items-center rounded-2xl border border-[#B45F58] bg-[#FBE9E7] px-4 py-3">
             <Text
               accessibilityRole="alert"
               accessibilityLiveRegion="polite"
-              className="flex-1 pr-3 font-outfit-medium text-sm text-[#B45F58]"
+              className="flex-1 pr-3 font-outfit-medium text-sm text-[#7F302C]"
             >
               Something went wrong. Your previous content is still shown where possible.
             </Text>
@@ -432,11 +432,11 @@ export default function ProfileScreen() {
             <ActivityIndicator size="small" color="#21473f" />
           </View>
         ) : displayedError ? (
-          <View className="mt-4 items-center rounded-2xl border border-[#F3B7B2] bg-[#FBE9E7] p-5">
+          <View className="mt-4 items-center rounded-2xl border border-[#B45F58] bg-[#FBE9E7] p-5">
             <Text
               accessibilityRole="alert"
               accessibilityLiveRegion="polite"
-              className="text-center font-outfit-medium text-sm text-[#B45F58]"
+              className="text-center font-outfit-medium text-sm text-[#7F302C]"
             >
               Something went wrong while loading your spots.
             </Text>
@@ -481,7 +481,7 @@ export default function ProfileScreen() {
                     />
                   ) : (
                     <View className="h-16 w-16 items-center justify-center rounded-xl bg-slate-100">
-                      <Feather name="image" size={20} color="#94a3b8" />
+                      <Feather name="image" size={20} color="#52645F" />
                     </View>
                   )}
 
@@ -490,7 +490,7 @@ export default function ProfileScreen() {
                       {spot.name}
                     </Text>
                     <View className="mt-0.5 flex-row items-center">
-                      <Feather name="map-pin" size={11} color="#64748b" />
+                      <Feather name="map-pin" size={11} color="#475569" />
                       <Text className="font-outfit-semibold ml-1 flex-1 text-xs text-slate-500" numberOfLines={1}>
                         {spot.schoolName || 'Campus map'}{spot.city || spot.state ? ` · ${spot.city}${spot.city && spot.state ? ', ' : ''}${spot.state}` : ''}
                       </Text>
@@ -499,7 +499,7 @@ export default function ProfileScreen() {
                       {spot.description}
                     </Text>
                     <View className="mt-1 flex-row items-center">
-                      <Octicons name="heart-fill" size={12} color="#B45F58" />
+                      <Octicons name="heart-fill" size={12} color="#7F302C" />
                       <Text className="font-outfit-semibold ml-1 text-xs text-slate-500">
                         {spot.likeCount ?? 0}
                       </Text>
@@ -517,9 +517,9 @@ export default function ProfileScreen() {
                     accessibilityState={{ busy: likingId === spot.id }}
                   >
                     {likingId === spot.id ? (
-                      <ActivityIndicator size="small" color="#B45F58" />
+                      <ActivityIndicator size="small" color="#7F302C" />
                     ) : (
-                      <Octicons name="heart-fill" size={17} color="#B45F58" />
+                      <Octicons name="heart-fill" size={17} color="#7F302C" />
                     )}
                   </FeedbackPressable>
                 ) : deletingId === spot.id ? (
@@ -543,7 +543,7 @@ export default function ProfileScreen() {
                       accessibilityLabel={`Delete ${spot.name}`}
                       accessibilityRole="button"
                     >
-                      <Feather name="trash-2" size={17} color="#B45F58" />
+                      <Feather name="trash-2" size={17} color="#7F302C" />
                     </FeedbackPressable>
                   </View>
                 )}

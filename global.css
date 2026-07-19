@@ -11,4 +11,11 @@
   --color-logoGreen: #3c5853;
   --color-lightGreen: #e8f0ee;
   --color-lightGray: #eff3f2;
+
+  /* Accessible muted and status colors used across the app. */
+  --color-slate-400: #52645f;
+  --color-slate-500: #475569;
+  --color-errorText: #7f302c;
+  --color-errorSurface: #fbe9e7;
+  --color-disabledGreen: #60756f;
 }

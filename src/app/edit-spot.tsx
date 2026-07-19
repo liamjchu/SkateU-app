@@ -237,7 +237,7 @@ export default function EditSpotScreen() {
             />
           </View>
           {showImageError && formErrors.image ? (
-            <Text className="-mt-4 mb-3 text-sm text-[#B45F58]">{formErrors.image}</Text>
+            <Text className="-mt-4 mb-3 text-sm text-[#7F302C]">{formErrors.image}</Text>
           ) : null}
 
           {/* NAME */}
@@ -248,7 +248,7 @@ export default function EditSpotScreen() {
           <TextInput
             style={[styles.input, showNameError && formErrors.name ? styles.inputError : null]}
             placeholder="e.g. Library 5 Stair, Parking Garage Ledge..."
-            placeholderTextColor="#879995"
+            placeholderTextColor="#52645F"
             accessibilityLabel="Spot name, required"
             accessibilityHint="Enter a short name for this skate spot"
             value={name}
@@ -258,7 +258,7 @@ export default function EditSpotScreen() {
           />
           <View className="mt-1 min-h-5 flex-row items-center justify-between">
             <Text
-              className="flex-1 pr-2 text-sm text-[#B45F58]"
+              className="flex-1 pr-2 text-sm text-[#7F302C]"
               numberOfLines={1}
               ellipsizeMode="tail"
             >
@@ -277,7 +277,7 @@ export default function EditSpotScreen() {
           <TextInput
             style={[styles.descriptionInput, showDescriptionError && formErrors.description ? styles.inputError : null]}
             placeholder="Describe the spot — obstacle type, spot condition, security..."
-            placeholderTextColor="#879995"
+            placeholderTextColor="#52645F"
             accessibilityLabel="Spot description, required"
             accessibilityHint="Describe the obstacle, condition, and security details"
             multiline
@@ -289,7 +289,7 @@ export default function EditSpotScreen() {
           />
           <View className="mt-1 min-h-5 flex-row items-center justify-between">
             <Text
-              className="flex-1 pr-2 text-sm text-[#B45F58]"
+              className="flex-1 pr-2 text-sm text-[#7F302C]"
               numberOfLines={1}
               ellipsizeMode="tail"
             >
@@ -345,7 +345,7 @@ export default function EditSpotScreen() {
             <Text
               accessibilityRole="alert"
               accessibilityLiveRegion="polite"
-              className="mb-3 mt-4 text-center text-sm text-[#B45F58]">
+              className="mb-3 mt-4 text-center text-sm text-[#7F302C]">
               {saveError}
             </Text>
           ) : null}
@@ -448,7 +448,7 @@ const styles = StyleSheet.create({
   },
 
   helperText: {
-    color: '#8A9B98',
+    color: '#52645F',
     fontSize: 14,
     marginBottom: 12,
   },
@@ -491,6 +491,6 @@ const styles = StyleSheet.create({
   },
 
   saveButtonDisabled: {
-    backgroundColor: '#BCC8C4',
+    backgroundColor: '#60756F',
   },
 });

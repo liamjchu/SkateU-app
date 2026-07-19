@@ -323,7 +323,7 @@ export default function LocationPicker({
                 `window.toggleLayer(); true;`
               );
             }}
-            className="absolute right-3 top-3 z-20 h-10 w-10 items-center justify-center rounded-full bg-[rgba(0,0,0,0.4)]"
+            className="absolute right-3 top-3 z-20 h-10 w-10 items-center justify-center rounded-full bg-[#21473f]"
             accessibilityRole="button"
             accessibilityLabel={
               mapLayer === 'satellite'
@@ -357,7 +357,7 @@ export default function LocationPicker({
                 <Text className="text-center font-outfit-bold text-base text-white">
                   Location map unavailable
                 </Text>
-                <Text className="mt-1 text-center font-outfit-medium text-sm text-white/80">
+                <Text className="mt-1 text-center font-outfit-medium text-sm text-white">
                   Check your connection and try again.
                 </Text>
                 <FeedbackPressable

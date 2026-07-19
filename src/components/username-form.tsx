@@ -138,11 +138,11 @@ export function UsernameForm({
         />
         <View className="h-6 w-6 items-center justify-center">
           {status === 'checking' ? (
-            <ActivityIndicator size="small" color="#8E9AA6" />
+            <ActivityIndicator size="small" color="#52645F" />
           ) : status === 'available' ? (
             <Ionicons name="checkmark-circle" size={22} color="#1B3B36" />
           ) : status === 'taken' || status === 'invalid' || status === 'rejected' ? (
-            <Ionicons name="close-circle" size={22} color="#F3B7B2" />
+            <Ionicons name="close-circle" size={22} color="#7F302C" />
           ) : null}
         </View>
       </View>
@@ -154,7 +154,7 @@ export function UsernameForm({
         className="mt-2 min-h-[20px] px-1"
       >
         {submitError ? (
-          <Text className="font-outfit-medium text-sm text-[#B45F58]">
+          <Text className="font-outfit-medium text-sm text-[#7F302C]">
             {submitError}
           </Text>
         ) : unchanged ? (
@@ -162,11 +162,11 @@ export function UsernameForm({
             That&apos;s your current username.
           </Text>
         ) : status === 'invalid' && validationError ? (
-          <Text className="font-outfit-medium text-sm text-[#B45F58]">
+          <Text className="font-outfit-medium text-sm text-[#7F302C]">
             {validationError}
           </Text>
         ) : status === 'taken' ? (
-          <Text className="font-outfit-medium text-sm text-[#B45F58]">
+          <Text className="font-outfit-medium text-sm text-[#7F302C]">
             That username is already taken.
           </Text>
         ) : status === 'available' ? (
@@ -184,7 +184,7 @@ export function UsernameForm({
         onPress={handleSubmit}
         disabled={!canSubmit}
         className={`mt-6 w-full items-center justify-center rounded-2xl py-4 ${
-          canSubmit ? 'bg-[#21473f]' : 'bg-slate-300'
+          canSubmit ? 'bg-[#21473f]' : 'bg-[#60756F]'
         }`}
         accessibilityLabel={submitting ? submittingLabel : submitLabel}
         accessibilityRole="button"

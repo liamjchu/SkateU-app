@@ -182,7 +182,7 @@ export default function SettingsBottomSheet({
               onPress={onLogout}
               disabled={loggingOut}
               className={`min-h-12 w-full items-center justify-center rounded-2xl py-4 ${
-                loggingOut ? 'bg-[#21473f]/60' : 'bg-[#21473f]'
+                loggingOut ? 'bg-[#60756F]' : 'bg-[#21473f]'
               }`}
               accessibilityLabel={loggingOut ? 'Logging out' : 'Log out'}
               accessibilityRole="button"
@@ -196,7 +196,7 @@ export default function SettingsBottomSheet({
               onPress={onDeleteAccount}
               disabled={deleteAccountDisabled}
               className={`min-h-12 w-full items-center justify-center rounded-2xl py-4 ${
-                deleteAccountDisabled ? 'bg-[#F3B7B2]/60' : 'bg-[#F3B7B2]'
+                deleteAccountDisabled ? 'bg-[#60756F]' : 'bg-[#FBE9E7]'
               }`}
               accessibilityLabel={
                 deleteAccountDisabled ? 'Sending account deletion code' : 'Delete account'
@@ -207,7 +207,7 @@ export default function SettingsBottomSheet({
                 busy: deleteAccountDisabled,
               }}
             >
-              <Text className="font-outfit-bold text-lg text-[#B45F58]">
+              <Text className={`font-outfit-bold text-lg ${deleteAccountDisabled ? 'text-white' : 'text-[#7F302C]'}`}>
                 {deleteAccountDisabled ? 'Sending code...' : 'Delete account'}
               </Text>
             </Pressable>
