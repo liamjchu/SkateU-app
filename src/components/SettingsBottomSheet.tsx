@@ -17,6 +17,7 @@ import Animated, {
   withTiming
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import FeedbackPressable from './FeedbackPressable';
 
 type SettingsBottomSheetProps = {
   visible: boolean;
@@ -210,6 +211,19 @@ export default function SettingsBottomSheet({
                 {deleteAccountDisabled ? 'Sending code...' : 'Delete account'}
               </Text>
             </Pressable>
+
+            <FeedbackPressable
+              onPress={onClose}
+              haptic="light"
+              className="min-h-12 w-full items-center justify-center rounded-2xl border border-[#21473f] py-4"
+              accessibilityLabel="Cancel"
+              accessibilityRole="button"
+              accessibilityHint="Closes the settings panel"
+            >
+              <Text className="font-outfit-bold text-lg text-[#21473f]">
+                Cancel
+              </Text>
+            </FeedbackPressable>
           </View>
         </Animated.View>
     </View>

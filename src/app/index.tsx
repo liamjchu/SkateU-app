@@ -29,6 +29,7 @@ type SchoolRowProps = {
   school: School;
   displayNumSpots: number;
   isFavorite: boolean;
+  isSelected: boolean;
   onSelect: (school: School) => void;
   onFavoritePress: (
     event: GestureResponderEvent,
@@ -93,6 +94,7 @@ function SchoolRow({
   school,
   displayNumSpots,
   isFavorite,
+  isSelected,
   onSelect,
   onFavoritePress,
   isDropdownItem = false,
@@ -105,7 +107,10 @@ function SchoolRow({
         accessibilityRole="button"
         accessibilityLabel={`Open ${school.name}`}
         accessibilityHint="Opens the campus map"
-        className="flex-row items-center justify-between p-2 mb-3 rounded-3xl border border-slate-200/60 bg-[#F0F5F4]"
+        accessibilityState={{ selected: isSelected }}
+        className={`flex-row items-center justify-between p-2 mb-3 rounded-3xl border bg-[#F0F5F4] ${
+          isSelected ? 'border-[#1B3B36] bg-[#E3ECEA]' : 'border-slate-200/60'
+        }`}
       >
         <View className="min-w-0 flex-1 flex-row items-center pr-2">
           <FeedbackPressable
@@ -144,7 +149,7 @@ function SchoolRow({
             name="map-pin"
             size={11}
             color="#64748b"
-            className="mr-[2px]"
+            className="mr-[3px]"
           />
           <Text
             className="text-base text-[#1B3B36]"
@@ -164,7 +169,10 @@ function SchoolRow({
       accessibilityRole="button"
       accessibilityLabel={`Open ${school.name}`}
       accessibilityHint="Opens the campus map"
-      className="flex-row items-center justify-between py-3 px-4 border-b border-slate-100 bg-white"
+      accessibilityState={{ selected: isSelected }}
+      className={`flex-row items-center justify-between py-3 px-4 border-b bg-white ${
+        isSelected ? 'border-[#1B3B36] bg-[#E3ECEA]' : 'border-slate-100'
+      }`}
     >
       <View className="min-w-0 flex-1 flex-row items-center pr-2">
         <FeedbackPressable
@@ -203,7 +211,7 @@ function SchoolRow({
           name="map-pin"
           size={11}
           color="#64748b"
-          className="mr-[2px]"
+          className="mr-[3px]"
         />
         <Text
           className="text-base text-[#1B3B36]"
@@ -227,6 +235,7 @@ export default function HomeScreen() {
   const {
     favoriteSchoolIds,
     favoriteSchools: storedFavoriteSchools,
+    hasHydrated: hasHydratedFavorites,
     toggleFavoriteSchool,
     upsertFavoriteSchool,
   } = useFavorites();
@@ -240,6 +249,8 @@ export default function HomeScreen() {
   const [searchRetryNonce, setSearchRetryNonce] = useState(0);
   const [favoriteRefreshError, setFavoriteRefreshError] = useState('');
   const [favoriteRefreshNonce, setFavoriteRefreshNonce] = useState(0);
+  const [isHydratingFavoriteSchools, setIsHydratingFavoriteSchools] =
+    useState(true);
   const [searchBarBottom, setSearchBarBottom] = useState(0);
   const [removingFavoriteSchoolId, setRemovingFavoriteSchoolId] = useState<
     string | null
@@ -296,14 +307,21 @@ export default function HomeScreen() {
     'P';
 
   useEffect(() => {
+    if (!hasHydratedFavorites) {
+      setIsHydratingFavoriteSchools(true);
+      return;
+    }
+
     const missingFavoriteSchoolIds = favoriteSchoolIds.filter(
       (schoolId) => !schools.some((school) => school.id === schoolId)
     );
 
     if (missingFavoriteSchoolIds.length === 0) {
+      setIsHydratingFavoriteSchools(false);
       return;
     }
 
+    setIsHydratingFavoriteSchools(true);
     const controller = new AbortController();
 
     const fetchMissingFavoriteSchools = async () => {
@@ -336,6 +354,8 @@ export default function HomeScreen() {
         setFavoriteRefreshError(
           error instanceof Error ? error.message : 'Unable to load favorite schools right now.'
         );
+      } finally {
+        setIsHydratingFavoriteSchools(false);
       }
     };
 
@@ -344,14 +364,21 @@ export default function HomeScreen() {
     return () => {
       controller.abort();
     };
-  }, [favoriteRefreshNonce, favoriteSchoolIds, schools, upsertFavoriteSchool, upsertSchool]);
+  }, [
+    favoriteRefreshNonce,
+    favoriteSchoolIds,
+    hasHydratedFavorites,
+    schools,
+    upsertFavoriteSchool,
+    upsertSchool,
+  ]);
 
   // Re-pull favorite schools' spot counts from the backend whenever the home
   // screen regains focus (e.g. after adding a spot on the map), so the counter
   // reflects the current schools.numspots column.
   useFocusEffect(
     useCallback(() => {
-      if (favoriteSchoolIds.length === 0) {
+      if (!hasHydratedFavorites || favoriteSchoolIds.length === 0) {
         return;
       }
 
@@ -393,7 +420,13 @@ export default function HomeScreen() {
       return () => {
         controller.abort();
       };
-    }, [favoriteRefreshNonce, favoriteSchoolIds, upsertFavoriteSchool, upsertSchool])
+    }, [
+      favoriteRefreshNonce,
+      favoriteSchoolIds,
+      hasHydratedFavorites,
+      upsertFavoriteSchool,
+      upsertSchool,
+    ])
   );
 
   useEffect(() => {
@@ -673,6 +706,7 @@ export default function HomeScreen() {
               <Text className="text-sm font-bold text-slate-400">✕</Text>
             </FeedbackPressable>
           ) : null}
+
         </View>
 
         {/* BACKGROUND SECTION: Stays visible but blocks touch interactions when dropdown is open */}
@@ -694,8 +728,9 @@ export default function HomeScreen() {
                   className="text-sm text-slate-400"
                   style={{ fontFamily: 'Outfit_700Bold' }}
                 >
-                  {favoriteSchools.length}{' '}
-                  {favoriteSchools.length === 1 ? 'school' : 'schools'}
+                  {isHydratingFavoriteSchools
+                    ? '...'
+                    : `${favoriteSchools.length} ${favoriteSchools.length === 1 ? 'school' : 'schools'}`}
                 </Text>
               </View>
 
@@ -719,7 +754,26 @@ export default function HomeScreen() {
               ) : null}
 
               <View className="flex-1 min-h-0">
-                {favoriteSchools.length === 0 ? (
+                {isHydratingFavoriteSchools ? (
+                  <View
+                    className="flex-1 items-center justify-center rounded-2xl bg-white/50 px-6 py-8"
+                    accessibilityLabel="Loading favorite schools"
+                    accessibilityLiveRegion="polite"
+                  >
+                    <Text
+                      className="text-xl text-[#1B3B36]"
+                      style={{ fontFamily: 'Outfit_700Bold' }}
+                    >
+                      Loading favorites...
+                    </Text>
+                    <Text
+                      className="mt-1.5 text-center text-sm leading-5 text-slate-400"
+                      style={{ fontFamily: 'Outfit_500Medium' }}
+                    >
+                      Restoring your saved schools.
+                    </Text>
+                  </View>
+                ) : favoriteSchools.length === 0 ? (
                   <View className="flex-1 items-center justify-center rounded-2xl bg-white/50 px-6 py-8">
                     <View className="h-16 w-16 items-center justify-center rounded-2xl bg-[#E3ECEA]">
                       <Octicons name="star" size={30} color="#1B3B36" />
@@ -851,6 +905,7 @@ export default function HomeScreen() {
                     school={school}
                     displayNumSpots={getDisplaySpotCount(school)}
                     isFavorite={favoriteSchoolIds.includes(school.id)}
+                    isSelected={selectedSchool?.id === school.id}
                     onSelect={handleSchoolSelect}
                     onFavoritePress={handleFavoritePress}
                     isDropdownItem
@@ -886,7 +941,7 @@ export default function HomeScreen() {
             className="text-center text-lg text-white"
             style={{ fontFamily: 'Outfit_700Bold' }}
           >
-            Go
+            View campus map
           </Text>
           <Text 
             className="text-white text-sm"

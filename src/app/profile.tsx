@@ -288,7 +288,7 @@ export default function ProfileScreen() {
   return (
     <View className="flex-1 bg-white">
       <View
-        className="h-[126px] bg-[#21473f] px-6 pb-3 flex-row items-center justify-between"
+        className="h-[136px] bg-[#21473f] px-6 pb-3 flex-row items-center justify-between"
         style={{
           paddingTop: insets.top,
           shadowColor: '#000',

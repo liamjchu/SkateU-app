@@ -8,9 +8,11 @@ import {
 } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
+import images from '../constants/images';
+import { useMapViewStore, type MapLayer } from '../store/mapViewStore';
 import FeedbackPressable from './FeedbackPressable';
 
-type LayerType = 'default' | 'satellite';
+export type LayerType = MapLayer;
 
 type LocationPickerProps = {
   initialLatitude: number;
@@ -30,6 +32,8 @@ export default function LocationPicker({
   const { height, width } = useWindowDimensions();
   const isTabletLayout = width >= 768 && height >= 600;
   const webViewRef = useRef<WebView>(null);
+  const setMapViewLayer = useMapViewStore((state) => state.setMapLayer);
+  const [mapLayer, setMapLayer] = useState<LayerType>(initialLayer);
   const [webViewAttempt, setWebViewAttempt] = useState(0);
   const [mapStatus, setMapStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [mapError, setMapError] = useState('');
@@ -129,12 +133,40 @@ export default function LocationPicker({
         defaultLayer.on('tileerror', reportTileError);
         satelliteLayer.on('tileerror', reportTileError);
 
-        const selectedLayer =
-          '${layer}' === 'satellite'
-            ? satelliteLayer
-            : defaultLayer;
+        // Keep both layers mounted and fully opaque, then swap their z-index so
+        // the selected one always covers the other. This avoids tile reloads
+        // and lets the toggle work reliably for unlimited presses.
+        defaultLayer.addTo(window.map);
+        satelliteLayer.addTo(window.map);
 
-        selectedLayer.addTo(window.map);
+        function showLayer(layer) {
+          const showSatellite = layer === 'satellite';
+
+          defaultLayer.setZIndex(showSatellite ? 1 : 2);
+          satelliteLayer.setZIndex(showSatellite ? 2 : 1);
+
+          window.currentLayer = showSatellite ? satelliteLayer : defaultLayer;
+          document.getElementById('map').classList.toggle('satellite', showSatellite);
+        }
+
+        showLayer('${layer}');
+
+        window.setLayer = function (layer) {
+          if (!window.map || (layer !== 'default' && layer !== 'satellite')) return;
+
+          showLayer(layer);
+          postMessage({
+            type: 'LAYER_TOGGLED',
+            layer: layer,
+          });
+        };
+
+        window.toggleLayer = function () {
+          if (!window.map) return;
+          window.setLayer(
+            window.currentLayer === satelliteLayer ? 'default' : 'satellite'
+          );
+        };
 
         function postCenter() {
           const center = window.map.getCenter();
@@ -213,6 +245,13 @@ export default function LocationPicker({
         );
       }
 
+      if (data.type === 'LAYER_TOGGLED') {
+        const layer: LayerType =
+          data.layer === 'satellite' ? 'satellite' : 'default';
+        setMapLayer(layer);
+        setMapViewLayer(layer);
+      }
+
       if (
         data.type === 'CENTER_CHANGED' &&
         typeof data.latitude === 'number' &&
@@ -275,6 +314,31 @@ export default function LocationPicker({
           onMessage={handleMessage}
           style={{ flex: 1, backgroundColor: '#0b0f14' }}
         />
+
+        {mapStatus === 'ready' ? (
+          <FeedbackPressable
+            haptic="selection"
+            onPress={() => {
+              webViewRef.current?.injectJavaScript(
+                `window.toggleLayer(); true;`
+              );
+            }}
+            className="absolute right-3 top-3 z-20 h-10 w-10 items-center justify-center rounded-full bg-[rgba(0,0,0,0.4)]"
+            accessibilityRole="button"
+            accessibilityLabel={
+              mapLayer === 'satellite'
+                ? 'Switch location map to standard map'
+                : 'Switch location map to satellite map'
+            }
+            accessibilityState={{ selected: mapLayer === 'satellite' }}
+          >
+            <Image
+              source={images.layers}
+              className="h-7 w-7"
+              style={{ tintColor: '#FFFFFF' }}
+            />
+          </FeedbackPressable>
+        ) : null}
 
         {mapStatus !== 'ready' ? (
           <View

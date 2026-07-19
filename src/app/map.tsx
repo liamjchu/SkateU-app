@@ -1,29 +1,31 @@
 ﻿import { Feather, Octicons } from '@expo/vector-icons';
 import {
-    useFocusEffect,
-    useLocalSearchParams,
-    useRouter,
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
 } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    BackHandler,
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
-    useWindowDimensions
+  ActivityIndicator,
+  Alert,
+  BackHandler,
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
-    Easing,
-    SlideInDown,
-    SlideOutDown,
-    useAnimatedStyle,
-    useSharedValue,
-    withTiming,
+  Easing,
+  SlideInDown,
+  SlideOutDown,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
@@ -34,11 +36,18 @@ import { triggerHaptic } from '../lib/haptics';
 import { formatRelativeTime } from '../lib/relativeTime';
 import { useAuthStore } from '../store/authStore';
 import { useFavorites } from '../store/favoritesStore';
+import { useMapViewStore } from '../store/mapViewStore';
 import { useSchools } from '../store/schoolsStore';
 import { useSpotsStore } from '../store/spotsStore';
 import type { School } from '../types/school';
 
 const COLLAPSED_SHEET_HEIGHT = 100;
+
+const MAP_ATTRIBUTIONS = {
+  default: '© OpenStreetMap contributors © CARTO',
+  satellite:
+    'Tiles © Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+} as const;
 
 export default function MapScreen() {
   const webViewRef = useRef<WebView>(null);
@@ -63,20 +72,45 @@ export default function MapScreen() {
   const fetchSpots = useSpotsStore((s) => s.fetchSpots);
   const { schools, upsertSchool } = useSchools();
   const { favoriteSchoolIds, toggleFavoriteSchool } = useFavorites();
+  const sharedMapLayer = useMapViewStore((state) => state.mapLayer);
+  const setSharedMapLayer = useMapViewStore((state) => state.setMapLayer);
   const webViewReadyRef = useRef(false);
+  const hasInitializedMapLayerRef = useRef(false);
   const [mapAttempt, setMapAttempt] = useState(0);
   const [mapStatus, setMapStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [mapError, setMapError] = useState('');
   const [selectedSpotId, setSelectedSpotId] = useState<string | undefined>(initialSpotId);
+  const initialMapLayer: 'default' | 'satellite' =
+    searchParams.layer === 'satellite' ? 'satellite' : 'default';
   const [mapLayer, setMapLayer] = useState<'default' | 'satellite'>(
-    searchParams.layer === 'satellite' ? 'satellite' : 'default'
+    initialMapLayer
   );
+  const [showAttribution, setShowAttribution] = useState(false);
   const [showLoginRequired, setShowLoginRequired] = useState(false);
   const [likingSpotId, setLikingSpotId] = useState<string | null>(null);
   const [deletingSpotId, setDeletingSpotId] = useState<string | null>(null);
   const sheetHeight = useSharedValue(0);
   const sheetTranslateY = useSharedValue(0);
   const sheetStartY = useSharedValue(0);
+
+  useEffect(() => {
+    if (!hasInitializedMapLayerRef.current) {
+      hasInitializedMapLayerRef.current = true;
+      setSharedMapLayer(initialMapLayer);
+      return;
+    }
+
+    if (sharedMapLayer === mapLayer) {
+      return;
+    }
+
+    setMapLayer(sharedMapLayer);
+    if (webViewReadyRef.current) {
+      webViewRef.current?.injectJavaScript(
+        `window.setMapLayer('${sharedMapLayer}'); true;`
+      );
+    }
+  }, [initialMapLayer, mapLayer, setSharedMapLayer, sharedMapLayer]);
 
   const schoolId = Array.isArray(searchParams.schoolId)
     ? searchParams.schoolId[0]
@@ -219,9 +253,18 @@ export default function MapScreen() {
           shadowAnchor: [13, 41],
         });
 
-        window.map = L.map('map', { zoomControl: false }).setView(center, 15.5);
-        const defaultLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png');
-        const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}.png');
+        window.map = L.map('map', {
+          zoomControl: false,
+          attributionControl: false,
+        }).setView(center, 15.5);
+        const defaultLayer = L.tileLayer(
+          'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+          { attribution: '&copy; OpenStreetMap contributors &copy; CARTO' }
+        );
+        const satelliteLayer = L.tileLayer(
+          'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}.png',
+          { attribution: 'Tiles &copy; Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community' }
+        );
         const reportTileError = function () {
           if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
             window.ReactNativeWebView.postMessage(JSON.stringify({
@@ -233,24 +276,49 @@ export default function MapScreen() {
         defaultLayer.on('tileerror', reportTileError);
         satelliteLayer.on('tileerror', reportTileError);
 
-        window.currentLayer = defaultLayer.addTo(window.map);
+        const selectedLayer = '${initialMapLayer}' === 'satellite'
+          ? satelliteLayer
+          : defaultLayer;
+        window.currentLayer = selectedLayer.addTo(window.map);
+        document.getElementById('map').classList.toggle(
+          'satellite',
+          '${initialMapLayer}' === 'satellite'
+        );
 
-        window.toggleLayer = function () {
+        const campusCenter = L.latLng(${validLat}, ${validLng});
+        window.recenterMap = function () {
           if (!window.map) return;
-          if (window.currentLayer === defaultLayer) {
+          window.map.setView(campusCenter, window.map.getZoom(), { animate: true });
+        };
+
+        window.setMapLayer = function (layer) {
+          if (!window.map || (layer !== 'default' && layer !== 'satellite')) return;
+
+          if (layer === 'satellite' && window.currentLayer === defaultLayer) {
             window.map.removeLayer(defaultLayer);
             satelliteLayer.addTo(window.map);
             window.currentLayer = satelliteLayer;
             document.getElementById('map').classList.add('satellite');
-          } else {
+          } else if (layer === 'default' && window.currentLayer === satelliteLayer) {
             window.map.removeLayer(satelliteLayer);
             defaultLayer.addTo(window.map);
             window.currentLayer = defaultLayer;
             document.getElementById('map').classList.remove('satellite');
           }
+
           if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-            window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'LAYER_TOGGLED', layer: window.currentLayer === satelliteLayer ? 'satellite' : 'default' }));
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'LAYER_TOGGLED',
+              layer: window.currentLayer === satelliteLayer ? 'satellite' : 'default',
+            }));
           }
+        };
+
+        window.toggleLayer = function () {
+          if (!window.map) return;
+          window.setMapLayer(
+            window.currentLayer === defaultLayer ? 'satellite' : 'default'
+          );
         };
 
         window.sendCenter = function () {
@@ -508,7 +576,9 @@ export default function MapScreen() {
       return;
     }
 
-    router.push(`/edit-spot?id=${encodeURIComponent(selectedSpot.id)}`);
+    router.push(
+      `/edit-spot?id=${encodeURIComponent(selectedSpot.id)}&layer=${mapLayer}`
+    );
   };
 
   const handleDeleteSelectedSpot = () => {
@@ -586,7 +656,9 @@ export default function MapScreen() {
       }
 
       if (data.type === 'LAYER_TOGGLED') {
-        setMapLayer(data.layer === 'satellite' ? 'satellite' : 'default');
+        const layer = data.layer === 'satellite' ? 'satellite' : 'default';
+        setMapLayer(layer);
+        setSharedMapLayer(layer);
         return;
       }
 
@@ -627,7 +699,7 @@ export default function MapScreen() {
   return (
     <View style={{ flex: 1 }}>
       <View
-        className="absolute left-0 right-0 z-50 h-[126px] bg-[#21473f] border-b border-white/10 px-4 pb-3 flex-row items-center justify-between"
+        className="absolute left-0 right-0 z-50 h-[136px] bg-[#21473f] border-b border-white/10 px-4 pb-3 flex-row items-center justify-between"
         style={{
           top: 0, paddingTop: insets.top,
           
@@ -690,23 +762,44 @@ export default function MapScreen() {
           <View className="h-11 w-11" />
         )}
       </View>
-      <FeedbackPressable
-        haptic="selection"
-        className="absolute right-[10px] z-[999] rounded-full bg-[rgba(0,0,0,0.4)] p-2"
-        style={[styles.toggleButton, { top: 134 }]}
-        onPress={() => {
-          webViewRef.current?.injectJavaScript(`window.toggleLayer(); true;`);
-        }}
-        accessibilityLabel={
-          mapLayer === 'satellite'
-            ? 'Switch to standard map'
-            : 'Switch to satellite map'
-        }
-        accessibilityRole="button"
-        accessibilityState={{ selected: mapLayer === 'satellite' }}
+      <View
+        className="absolute right-4 z-[999] overflow-hidden rounded-full bg-[rgba(0,0,0,0.4)]"
+        style={[styles.toggleButton, { top: 144 }]}
       >
-        <Image source={images.layers} style={styles.icon} />
-      </FeedbackPressable>
+        <FeedbackPressable
+          haptic="selection"
+          onPress={() => {
+            webViewRef.current?.injectJavaScript(`window.toggleLayer(); true;`);
+          }}
+          className="h-12 w-12 items-center justify-center"
+          accessibilityLabel={
+            mapLayer === 'satellite'
+              ? 'Switch to standard map'
+              : 'Switch to satellite map'
+          }
+          accessibilityRole="button"
+          accessibilityState={{ selected: mapLayer === 'satellite' }}
+        >
+          <Image source={images.layers} style={styles.icon} />
+        </FeedbackPressable>
+        <View className="mx-3 h-px bg-white/35" />
+        <FeedbackPressable
+          haptic="light"
+          onPress={() => {
+            webViewRef.current?.injectJavaScript(
+              `window.recenterMap(); true;`
+            );
+          }}
+          disabled={mapStatus !== 'ready'}
+          className="h-12 w-12 items-center justify-center"
+          accessibilityRole="button"
+          accessibilityLabel="Recenter on campus"
+          accessibilityHint="Moves the map back to the campus center"
+          accessibilityState={{ disabled: mapStatus !== 'ready' }}
+        >
+          <Feather name="crosshair" size={22} color="#FFFFFF" />
+        </FeedbackPressable>
+      </View>
       <FeedbackPressable
         haptic="light"
         className="absolute right-4 bg-[#21473f] w-18 h-18 rounded-full items-center justify-center shadow-lg z-50"
@@ -722,6 +815,49 @@ export default function MapScreen() {
         visible={showLoginRequired}
         onCancel={() => setShowLoginRequired(false)}
       />
+      <Modal
+        visible={showAttribution}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowAttribution(false)}
+      >
+        <View
+          className="flex-1 justify-end bg-black/30"
+          accessibilityViewIsModal
+          accessibilityLabel="Map attribution"
+        >
+          <Pressable
+            className="absolute inset-0"
+            onPress={() => setShowAttribution(false)}
+            accessibilityRole="button"
+            accessibilityLabel="Close map attribution"
+          />
+          <View
+            className="rounded-t-3xl bg-white px-5 pt-3"
+            style={{ paddingBottom: Math.max(insets.bottom, 16) }}
+          >
+            <View className="flex-row items-center justify-between">
+              <Text className="font-outfit-bold text-lg text-[#1B3B36]">
+                Map attribution
+              </Text>
+              <FeedbackPressable
+                haptic="light"
+                onPress={() => setShowAttribution(false)}
+                className="rounded-full px-3 py-2"
+                accessibilityRole="button"
+                accessibilityLabel="Close map attribution"
+              >
+                <Text className="font-outfit-semibold text-sm text-[#21473f]">
+                  Close
+                </Text>
+              </FeedbackPressable>
+            </View>
+            <Text className="mt-3 font-outfit-medium text-sm leading-5 text-slate-500">
+              {MAP_ATTRIBUTIONS[mapLayer]}
+            </Text>
+          </View>
+        </View>
+      </Modal>
       <WebView
         accessibilityLabel={`Campus map for ${displayedSchoolName}. ${spots.length} skate ${spots.length === 1 ? 'spot' : 'spots'} available. Use the map or the accessible spot actions to select a spot.`}
         accessibilityActions={spots.map((spot) => ({
@@ -766,6 +902,20 @@ export default function MapScreen() {
         }}
         onMessage={handleWebViewMessage}
       />
+
+      {mapStatus === 'ready' ? (
+        <FeedbackPressable
+          haptic="light"
+          onPress={() => setShowAttribution(true)}
+          className="absolute left-4 z-[999] h-8 w-8 items-center justify-center rounded-full bg-[rgba(0,0,0,0.4)]"
+          style={{ bottom: Math.max(insets.bottom, 16) + 8 }}
+          accessibilityRole="button"
+          accessibilityLabel="Show map attribution"
+          accessibilityHint="Shows attribution for the active map layer"
+        >
+          <Text className="text-sm font-outfit-black text-white">i</Text>
+        </FeedbackPressable>
+      ) : null}
 
       {mapStatus === 'loading' ? (
         <View className="absolute inset-0 z-40 items-center justify-center bg-[#21473f]/90 px-8">
@@ -827,11 +977,22 @@ export default function MapScreen() {
       ) : mapStatus === 'ready' && loading ? (
         <View
           className="absolute left-0 right-0 z-40 items-center"
-          style={{ top: insets.top + 142 }}
+          style={{ top: 140 }}
         >
-          <View className="flex-row items-center rounded-full bg-black/50 px-3 py-1.5">
-            <ActivityIndicator size="small" color="#FFFFFF" />
-            <Text className="ml-2 font-outfit-medium text-xs text-white">
+          <View
+            className={`flex-row items-center rounded-full px-3 py-1.5 ${
+              mapLayer === 'satellite' ? 'bg-black/50' : 'bg-white/90'
+            }`}
+          >
+            <ActivityIndicator
+              size="small"
+              color={mapLayer === 'satellite' ? '#FFFFFF' : '#000000'}
+            />
+            <Text
+              className={`ml-2 font-outfit-medium text-xs ${
+                mapLayer === 'satellite' ? 'text-white' : 'text-black'
+              }`}
+            >
               Loading spots…
             </Text>
           </View>
@@ -953,7 +1114,7 @@ export default function MapScreen() {
                     accessibilityLabel={`Close ${selectedSpot.name} details`}
                   >
                     <Text
-                      className="font-outfit-semibold text-sky-600"
+                      className="font-outfit-semibold text-slate-600"
                     >
                       Close
                     </Text>

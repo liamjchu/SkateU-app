@@ -9,7 +9,50 @@ const RESEND_COOLDOWN = 60;
 export default function VerifyOtpScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ email?: string }>();
-  const email = typeof params.email === 'string' ? params.email : '';
+  const email = typeof params.email === 'string' ? params.email : undefined;
+
+  if (email == null) {
+    const handleReturnToLogin = async () => {
+      try {
+        await useAuthStore.getState().signOut();
+      } catch {
+        // Navigate even when there is no active Supabase session to clear.
+      } finally {
+        router.replace('/login');
+      }
+    };
+
+    return (
+      <View className="flex-1 items-center justify-center bg-white px-6">
+        <Text
+          accessibilityRole="alert"
+          className="text-center text-base text-slate-600"
+          style={{ fontFamily: 'Outfit_500Medium' }}
+        >
+          Session data missing.
+        </Text>
+        <Pressable
+          className="mt-4 rounded-2xl bg-[#21473f] px-5 py-3"
+          onPress={handleReturnToLogin}
+          accessibilityRole="button"
+          accessibilityLabel="Return to Login"
+        >
+          <Text
+            className="text-base text-white"
+            style={{ fontFamily: 'Outfit_700Bold' }}
+          >
+            Return to Login
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  return <VerifyOtpContent email={email} />;
+}
+
+function VerifyOtpContent({ email }: { email: string }) {
+  const router = useRouter();
 
   const verifyOtp = useAuthStore((state) => state.verifyOtp);
   const resendSignUpOtp = useAuthStore((state) => state.resendSignUpOtp);
@@ -116,7 +159,7 @@ export default function VerifyOtpScreen() {
   return (
     <View className="flex-1 bg-white">
       <View
-        className="h-[126px] justify-center bg-[#21473f] px-6 pb-3 pt-[70px]"
+        className="h-[136px] justify-center bg-[#21473f] px-6 pb-3 pt-[70px]"
         style={{
           shadowColor: '#000',
           shadowOffset: { width: 0, height: 4 },

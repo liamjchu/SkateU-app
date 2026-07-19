@@ -22,6 +22,7 @@ import {
 } from '../lib/addSpotForm';
 import { triggerHaptic } from '../lib/haptics';
 import { useAuthStore } from '../store/authStore';
+import { useMapViewStore } from '../store/mapViewStore';
 import { useSpotsStore } from '../store/spotsStore';
 import type { SpotImageAsset } from '../types/spot';
 
@@ -43,6 +44,11 @@ export default function EditSpotScreen() {
   const spotId = Array.isArray(searchParams.id)
     ? searchParams.id[0]
     : searchParams.id;
+  const sharedMapLayer = useMapViewStore((state) => state.mapLayer);
+  const layer =
+    searchParams.layer === 'satellite' || searchParams.layer === 'default'
+      ? searchParams.layer
+      : sharedMapLayer;
 
   const mySpots = useSpotsStore((s) => s.mySpots);
   const myLoading = useSpotsStore((s) => s.myLoading);
@@ -174,7 +180,7 @@ export default function EditSpotScreen() {
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safe}>
       <View
-        className="h-[126px] flex-row items-center justify-between border-b border-white/10 bg-[#21473f] px-4 pb-3"
+        className="h-[136px] flex-row items-center justify-between border-b border-white/10 bg-[#21473f] px-4 pb-3"
         style={[styles.headerShadow, { paddingTop: insets.top }]}
       >
         <FeedbackPressable
@@ -237,7 +243,7 @@ export default function EditSpotScreen() {
           {/* NAME */}
           <View className="mb-2 flex-row items-center">
             <Text style={[styles.sectionLabel, { marginTop: 0, marginBottom: 0 }]}>SPOT NAME</Text>
-            <Text className="ml-2 font-outfit-medium text-xs text-slate-500">Required</Text>
+            <Text className="ml-2 font-outfit-medium text-xs text-slate-500">(Required)</Text>
           </View>
           <TextInput
             style={[styles.input, showNameError && formErrors.name ? styles.inputError : null]}
@@ -250,18 +256,23 @@ export default function EditSpotScreen() {
             onBlur={() => setTouched((current) => ({ ...current, name: true }))}
             onChangeText={setName}
           />
-          <View className="mt-1 flex-row justify-between">
-            <Text className="font-outfit-medium text-xs text-slate-500">1–{SPOT_NAME_MAX} characters</Text>
-            <Text className="font-outfit-medium text-xs text-slate-500">{name.length} / {SPOT_NAME_MAX}</Text>
+          <View className="mt-1 min-h-5 flex-row items-center justify-between">
+            <Text
+              className="flex-1 pr-2 text-sm text-[#B45F58]"
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {showNameError && formErrors.name ? formErrors.name : ' '}
+            </Text>
+            <Text className="font-outfit-medium text-xs text-slate-500">
+              {name.length} / {SPOT_NAME_MAX}
+            </Text>
           </View>
-          {showNameError && formErrors.name ? (
-            <Text className="mt-1 text-sm text-[#B45F58]">{formErrors.name}</Text>
-          ) : null}
 
           {/* DESCRIPTION */}
           <View className="mb-2 mt-4 flex-row items-center">
             <Text style={[styles.sectionLabel, { marginTop: 0, marginBottom: 0 }]}>DESCRIPTION</Text>
-            <Text className="ml-2 font-outfit-medium text-xs text-slate-500">Required</Text>
+            <Text className="ml-2 font-outfit-medium text-xs text-slate-500">(Required)</Text>
           </View>
           <TextInput
             style={[styles.descriptionInput, showDescriptionError && formErrors.description ? styles.inputError : null]}
@@ -276,13 +287,18 @@ export default function EditSpotScreen() {
             onBlur={() => setTouched((current) => ({ ...current, description: true }))}
             onChangeText={setDescription}
           />
-          <View className="mt-1 flex-row justify-between">
-            <Text className="font-outfit-medium text-xs text-slate-500">1–{SPOT_DESCRIPTION_MAX} characters</Text>
-            <Text className="font-outfit-medium text-xs text-slate-500">{description.length} / {SPOT_DESCRIPTION_MAX}</Text>
+          <View className="mt-1 min-h-5 flex-row items-center justify-between">
+            <Text
+              className="flex-1 pr-2 text-sm text-[#B45F58]"
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {showDescriptionError && formErrors.description ? formErrors.description : ' '}
+            </Text>
+            <Text className="font-outfit-medium text-xs text-slate-500">
+              {description.length} / {SPOT_DESCRIPTION_MAX}
+            </Text>
           </View>
-          {showDescriptionError && formErrors.description ? (
-            <Text className="mt-1 text-sm text-[#B45F58]">{formErrors.description}</Text>
-          ) : null}
 
           {/* LOCATION */}
           <Text style={styles.sectionLabel}>LOCATION</Text>
@@ -295,7 +311,7 @@ export default function EditSpotScreen() {
             <LocationPicker
               initialLatitude={selectedLocation.latitude}
               initialLongitude={selectedLocation.longitude}
-              initialLayer="satellite"
+              initialLayer={layer}
               onLocationChange={handleLocationChange}
               onInteractionChange={(isInteracting: boolean) => {
                 if (interactionTimeoutRef.current) {

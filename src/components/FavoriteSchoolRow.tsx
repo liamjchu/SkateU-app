@@ -1,6 +1,6 @@
 import { Feather, Octicons } from '@expo/vector-icons';
 import type { GestureResponderEvent } from 'react-native';
-import { Text, View } from 'react-native';
+import { Alert, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
     runOnJS,
@@ -33,9 +33,32 @@ export default function FavoriteSchoolRow({
     transform: [{ translateX: translateX.value }],
   }));
 
+  const resetSwipe = () => {
+    translateX.value = withTiming(0, { duration: 160 });
+  };
+
+  const confirmRemove = () => {
+    Alert.alert(
+      'Remove favorite school?',
+      `Remove ${school.name} from your favorites?`,
+      [
+        { text: 'Cancel', style: 'cancel', onPress: resetSwipe },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => onRemove(school),
+        },
+      ],
+      {
+        cancelable: true,
+        onDismiss: resetSwipe,
+      }
+    );
+  };
+
   const handleRemove = (event?: GestureResponderEvent) => {
     event?.stopPropagation();
-    onRemove(school);
+    confirmRemove();
   };
 
   const swipeGesture = Gesture.Pan()
@@ -55,7 +78,7 @@ export default function FavoriteSchoolRow({
 
       if (shouldRemove) {
         translateX.value = withTiming(-maxSwipeDistance, { duration: 160 });
-        runOnJS(onRemove)(school);
+        runOnJS(confirmRemove)();
         return;
       }
 
@@ -95,6 +118,7 @@ export default function FavoriteSchoolRow({
                 onPress={handleRemove}
                 className="h-12 w-12 items-center justify-center rounded-2xl bg-[#F0F5F4]"
                 accessibilityLabel={`Remove ${school.name} from favorites`}
+                accessibilityHint="Opens a confirmation before removing this school"
                 accessibilityRole="button"
               >
                 <Octicons name="star-fill" size={20} color="#1B3B36" />
@@ -121,7 +145,7 @@ export default function FavoriteSchoolRow({
                 name="map-pin"
                 size={11}
                 color="#64748b"
-                className="mr-[2px]"
+                className="mr-[3px]"
               />
               <Text
                 className="text-base text-[#1B3B36]"

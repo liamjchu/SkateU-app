@@ -6,6 +6,8 @@ import type { School } from '../types/school';
 type FavoritesStore = {
   favoriteSchoolIds: string[];
   favoriteSchools: School[];
+  hasHydrated: boolean;
+  setHasHydrated: (hasHydrated: boolean) => void;
   addFavoriteSchool: (school: School) => void;
   removeFavoriteSchool: (id: string) => void;
   toggleFavoriteSchool: (school: School) => void;
@@ -26,6 +28,8 @@ export const useFavorites = create<FavoritesStore>()(
     (set, get) => ({
       favoriteSchoolIds: [],
       favoriteSchools: [],
+      hasHydrated: false,
+      setHasHydrated: (hasHydrated: boolean) => set({ hasHydrated }),
       addFavoriteSchool: (school: School) => {
         set((state) => ({
           favoriteSchoolIds: state.favoriteSchoolIds.includes(school.id)
@@ -75,6 +79,9 @@ export const useFavorites = create<FavoritesStore>()(
     {
       name: '@skateu:favorite-schools',
       storage: createJSONStorage(() => AsyncStorage),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
       partialize: (state) => ({
         favoriteSchoolIds: state.favoriteSchoolIds,
       }),

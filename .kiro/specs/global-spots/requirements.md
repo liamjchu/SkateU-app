@@ -16,7 +16,7 @@ Highest-priority improvements requested for this enhancement:
 4. **Product-language alignment** — product copy must describe currently supported spot details accurately: one displayed image, description, creator/timestamp, like count, and owner edit/delete actions; copy must not promise unsupported ratings, videos, comments, or creator capabilities.
 5. **Actionable profile cards** — profile spot cards must show campus name/location, open the campus map and select the spot when tapped, provide explicit unlike behavior for liked spots, and keep owner edit/delete actions secondary to opening the spot.
 6. **Recoverable data errors** — profile loading, school search, favorite-school refresh, map/WebView, and location-picker failures must expose retry actions, preserve stale content where possible, and show an inline refresh error.
-7. **Anonymous-user sign-in modal** — the modal must say “Sign in to like and add spots” and “Create an account to save favorite campuses, like spots, and post your own.” and provide primary “Sign in” and secondary “Cancel” actions.
+7. **Anonymous-user login modal** — the modal must say “Log in to like and add spots” and “Create an account to save favorite campuses, like spots, and post your own.” and provide primary “Log in” and secondary “Cancel” actions.
 
 ## Glossary
 
@@ -265,18 +265,18 @@ Highest-priority improvements requested for this enhancement:
 8. WHEN a school-search or favorite-school request succeeds, THE HomeScreen SHALL replace the corresponding Stale_Content with the returned School records and SHALL clear the associated Inline_Refresh_Error.
 9. THE retry behavior for profile, school search, and favorite-school reads SHALL not create a second backend capability or change the existing API response shape.
 
-### Requirement 14: Anonymous-User Sign-In Modal
+### Requirement 14: Anonymous-User Login Modal
 
-**User Story:** As an anonymous visitor, I want to understand the value of signing in, so that I can choose whether to continue to authentication.
+**User Story:** As an anonymous visitor, I want to understand the value of logging in, so that I can choose whether to continue to authentication.
 
 #### Acceptance Criteria
 
-1. WHEN LoginRequiredModal is visible, THE LoginRequiredModal SHALL show the heading “Sign in to like and add spots”.
+1. WHEN LoginRequiredModal is visible, THE LoginRequiredModal SHALL show the heading “Log in to like and add spots”.
 2. WHEN LoginRequiredModal is visible, THE LoginRequiredModal SHALL show the message “Create an account to save favorite campuses, like spots, and post your own.”
-3. WHEN LoginRequiredModal is visible, THE LoginRequiredModal SHALL show a primary “Sign in” action and a secondary “Cancel” action.
-4. WHEN an anonymous user activates “Sign in”, THE LoginRequiredModal SHALL dismiss and navigate to the existing sign-in route.
+3. WHEN LoginRequiredModal is visible, THE LoginRequiredModal SHALL show a primary “Log in” action and a secondary “Cancel” action.
+4. WHEN an anonymous user activates “Log in”, THE LoginRequiredModal SHALL dismiss and navigate to the existing login route.
 5. WHEN an anonymous user activates “Cancel” or dismisses the modal through the platform request, THE LoginRequiredModal SHALL dismiss without navigation or mutation.
-6. THE LoginRequiredModal SHALL expose accessible labels and roles that distinguish the Sign in and Cancel actions.
+6. THE LoginRequiredModal SHALL expose accessible labels and roles that distinguish the Log in and Cancel actions.
 
 ### Requirement 15: Authentication and Mutation Behavior
 
@@ -306,4 +306,4 @@ Highest-priority improvements requested for this enhancement:
 - The existing server-side Supabase trust boundary, image moderation/upload flow, owner authorization, spot-like endpoint, school API response shape, and Zustand architecture remain in scope.
 - The exact visual styling, spacing, animation, and NativeWind implementation remain design decisions; the required copy, states, actions, and observable outcomes above are product requirements.
 - Open product decision: confirm whether the “location confirmation” affordance should be a dedicated button or a clearly labeled confirmed-status control after the map center changes. Both options must preserve confirmed coordinates and must block saving before confirmation.
-- Open product decision: confirm whether the zero-spots authentication prompt appears as supporting text beside “Add the first spot” or as a separate Sign in action. Anonymous activation must still open LoginRequiredModal and must not open the form.
+- Open product decision: confirm whether the zero-spots authentication prompt appears as supporting text beside “Add the first spot” or as a separate Log in action. Anonymous activation must still open LoginRequiredModal and must not open the form.

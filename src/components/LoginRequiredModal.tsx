@@ -44,13 +44,13 @@ export default function LoginRequiredModal({
             className="text-2xl text-[#1B3B36]"
             style={{ fontFamily: 'Outfit_900Black' }}
           >
-            Sign in to like and add spots
+            Log in to like and add spots
           </Text>
           <Text
             className="mt-3 text-base text-slate-500"
             style={{ fontFamily: 'Outfit_500Medium' }}
           >
-            Create an account to save favorite campuses, like spots, and post your own.
+            Create an account to like spots and post your own.
           </Text>
 
           <View className="mt-6 flex-row gap-3">
@@ -77,7 +77,7 @@ export default function LoginRequiredModal({
                 className="text-base text-white"
                 style={{ fontFamily: 'Outfit_700Bold' }}
               >
-                Sign in
+                Log in
               </Text>
             </Pressable>
           </View>

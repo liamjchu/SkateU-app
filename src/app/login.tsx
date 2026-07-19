@@ -2,15 +2,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    Text,
-    TextInput,
-    View
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View
 } from 'react-native';
 import GoogleSignInButton from '../components/GoogleSignInButton';
+import {
+  getPasswordRequirementStatus,
+  validatePassword,
+} from '../lib/password';
 import { useAuthStore } from '../store/authStore';
 
 export default function LoginScreen() {
@@ -27,6 +31,25 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
 
   const isSignup = mode === 'signup';
+  const passwordRequirementStatus = getPasswordRequirementStatus(password);
+  const passwordRequirements = [
+    {
+      label: 'At least 8 characters',
+      met: passwordRequirementStatus.minLength,
+    },
+    {
+      label: 'Uppercase and lowercase letters',
+      met: passwordRequirementStatus.upperAndLowerCase,
+    },
+    {
+      label: 'At least one number',
+      met: passwordRequirementStatus.number,
+    },
+    {
+      label: 'At least one special character',
+      met: passwordRequirementStatus.specialCharacter,
+    },
+  ];
 
   const goBack = () => {
     if (router.canGoBack()) {
@@ -45,6 +68,15 @@ export default function LoginScreen() {
     if (!email.trim() || !password) {
       setError('Enter your email and password.');
       return;
+    }
+
+    if (isSignup) {
+      const passwordError = validatePassword(password);
+
+      if (passwordError) {
+        setError(passwordError);
+        return;
+      }
     }
 
     setError('');
@@ -81,7 +113,7 @@ export default function LoginScreen() {
   return (
     <View className="flex-1 bg-white">
       <View
-        className="h-[126px] justify-center bg-[#21473f] px-6 pb-3 pt-[70px]"
+        className="h-[136px] justify-center bg-[#21473f] px-6 pb-3 pt-[70px]"
         style={{
           shadowColor: '#000',
           shadowOffset: { width: 0, height: 4 },
@@ -181,6 +213,45 @@ export default function LoginScreen() {
             </Pressable>
           </View>
 
+          {isSignup ? (
+            <View
+              accessible
+              accessibilityLabel="Password requirements"
+              className="rounded-2xl bg-[#F7F9F8] px-4 py-3"
+            >
+              <Text
+                className="text-sm text-[#1B3B36]"
+                style={{ fontFamily: 'Outfit_700Bold' }}
+              >
+                Password requirements
+              </Text>
+              {passwordRequirements.map((requirement) => (
+                <View
+                  key={requirement.label}
+                  className="mt-2 flex-row items-center gap-2"
+                >
+                  <Ionicons
+                    name={
+                      requirement.met
+                        ? 'checkmark-circle'
+                        : 'ellipse-outline'
+                    }
+                    size={18}
+                    color={requirement.met ? '#21473F' : '#8E9AA6'}
+                  />
+                  <Text
+                    className={`text-sm ${
+                      requirement.met ? 'text-[#21473F]' : 'text-slate-500'
+                    }`}
+                    style={{ fontFamily: 'Outfit_500Medium' }}
+                  >
+                    {requirement.label}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
           {error ? (
             <Text
               accessibilityRole="alert"
@@ -256,13 +327,13 @@ export default function LoginScreen() {
             <Pressable
               onPress={() => router.push('/forgot-password')}
               disabled={submitting}
-              className="min-h-12 items-center justify-center px-2 py-1"
+              className="-mt-[14px] min-h-12 items-center justify-center px-2 py-1"
               accessibilityRole="button"
               accessibilityLabel="Forgot password"
             >
               <Text
-                className="text-sm text-slate-400"
-                style={{ fontFamily: 'Outfit_500Medium' }}
+                className="text-base text-slate-500"
+                style={{ fontFamily: 'Outfit_600SemiBold' }}
               >
                 Forgot password?
               </Text>
@@ -286,17 +357,17 @@ export default function LoginScreen() {
             onError={(message) => setError(message)}
           />
 
-          {/* TODO: Sign in with Apple - to be implemented later */}
+          {/* TODO: Log in with Apple - to be implemented later */}
           {/* <Pressable
             className="items-center justify-center rounded-2xl border border-slate-200 py-4"
-            accessibilityLabel="Sign in with Apple"
+            accessibilityLabel="Log in with Apple"
             accessibilityRole="button"
           >
             <Text
               className="text-base text-[#1B3B36]"
               style={{ fontFamily: 'Outfit_700Bold' }}
             >
-              Sign in with Apple
+              Log in with Apple
             </Text>
           </Pressable> */}
         </View>

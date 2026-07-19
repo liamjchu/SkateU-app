@@ -1,9 +1,9 @@
+import { useNavigation } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -38,6 +38,7 @@ const MISSING_SCHOOL_ERROR =
 
 export default function AddSpotScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const searchParams = useLocalSearchParams();
   const insets = useSafeAreaInsets();
 
@@ -53,7 +54,7 @@ export default function AddSpotScreen() {
     ? searchParams.schoolId[0]
     : searchParams.schoolId;
 
-  const [selectedLocation, setSelectedLocation] = useState<Coordinates>({
+  const initialLocationRef = useRef<Coordinates>({
     latitude: Number.isFinite(Number(searchParams.lat))
       ? Number(searchParams.lat)
       : 41.8268,
@@ -61,6 +62,9 @@ export default function AddSpotScreen() {
       ? Number(searchParams.lng)
       : -71.401,
   });
+  const [selectedLocation, setSelectedLocation] = useState<Coordinates>(
+    initialLocationRef.current
+  );
 
   const [scrollEnabled, setScrollEnabled] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -73,6 +77,7 @@ export default function AddSpotScreen() {
   });
 
   const interactionTimeoutRef = useRef<number | null>(null);
+  const allowRemovalRef = useRef(false);
 
   const addSpot = useSpotsStore((s) => s.addSpot);
   const session = useAuthStore((s) => s.session);
@@ -82,6 +87,44 @@ export default function AddSpotScreen() {
   const showImageError = hasSubmitted || touched.image;
   const showNameError = hasSubmitted || touched.name;
   const showDescriptionError = hasSubmitted || touched.description;
+  const hasUnsavedChanges =
+    imageUri !== undefined ||
+    name.length > 0 ||
+    description.length > 0 ||
+    selectedLocation.latitude !== initialLocationRef.current.latitude ||
+    selectedLocation.longitude !== initialLocationRef.current.longitude;
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (event) => {
+      if (!hasUnsavedChanges || allowRemovalRef.current) {
+        allowRemovalRef.current = false;
+        return;
+      }
+
+      event.preventDefault();
+      Alert.alert(
+        'Discard unsaved changes?',
+        'Your changes to this spot will be lost if you leave now.',
+        [
+          {
+            text: 'Keep editing',
+            style: 'cancel',
+          },
+          {
+            text: 'Discard changes',
+            style: 'destructive',
+            onPress: () => {
+              allowRemovalRef.current = true;
+              navigation.dispatch(event.data.action);
+            },
+          },
+        ],
+        { cancelable: true }
+      );
+    });
+
+    return unsubscribe;
+  }, [hasUnsavedChanges, navigation]);
 
   const handleImageSelected = (asset: SpotImageAsset) => {
     setTouched((current) => ({ ...current, image: true }));
@@ -131,6 +174,7 @@ export default function AddSpotScreen() {
       );
       triggerHaptic('success');
       // Success returns to the map, which refetches on focus (Req 10.4).
+      allowRemovalRef.current = true;
       router.back();
     } catch (error) {
       // Keep all entered data and stay on the screen (Req 10.6).
@@ -156,7 +200,7 @@ export default function AddSpotScreen() {
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safe}>
       <View
-        className="h-[126px] flex-row items-center justify-between border-b border-white/10 bg-[#21473f] px-4 pb-3"
+        className="h-[136px] flex-row items-center justify-between border-b border-white/10 bg-[#21473f] px-4 pb-3"
         style={[styles.headerShadow, { paddingTop: insets.top }]}
       >
         <FeedbackPressable
@@ -182,12 +226,7 @@ export default function AddSpotScreen() {
         <View className="w-9" />
       </View>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={insets.top + 126}
-        style={{ flex: 1 }}
-      >
-        <ScrollView
+      <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         scrollEnabled={scrollEnabled}
@@ -351,7 +390,6 @@ export default function AddSpotScreen() {
           </View>
         </FeedbackPressable>
         </ScrollView>
-      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

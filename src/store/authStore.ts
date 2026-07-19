@@ -140,7 +140,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // one active subscription.
     authSubscription?.unsubscribe();
 
-    // Keep the store in sync with sign in, sign out, and token refreshes.
+    // Keep the store in sync with log in, sign out, and token refreshes.
     const { data } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
         deleteAccountProof = null;
@@ -231,7 +231,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
 
     if (!data?.url) {
-      throw new Error('Could not start Google sign in. Try again.');
+      throw new Error('Could not start Google log in. Try again.');
     }
 
     // Open the Google login in an in-app browser sheet. It resolves once the
@@ -262,7 +262,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // Google/Supabase can report failures on the redirect URL itself.
     if (params.error || params.error_description) {
       throw new Error(
-        params.error_description || params.error || 'Google sign in failed.'
+        params.error_description || params.error || 'Google log in failed.'
       );
     }
 
