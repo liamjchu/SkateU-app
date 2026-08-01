@@ -1,7 +1,7 @@
 const images = {
   layers: require('../../assets/images/tabIcons/layers.png'),
-  //logo on home screen header
-  logo: require('../../assets/images/header-icon.png'),
+  // Shared high-resolution SkateU lockup used by the home and native splash.
+  brandLockup: require('../../assets/images/splash-brand.png'),
   landscape: require('../../assets/images/landscape.png'),
 };
 

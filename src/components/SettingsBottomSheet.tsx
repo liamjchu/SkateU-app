@@ -1,20 +1,20 @@
 import { useEffect, useState } from 'react';
 import {
-  BackHandler,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
+    BackHandler,
+    Pressable,
+    StyleSheet,
+    Text,
+    View,
+    useWindowDimensions,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
-  Easing,
-  SlideInDown,
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming
+    Easing,
+    SlideInDown,
+    runOnJS,
+    useAnimatedStyle,
+    useSharedValue,
+    withTiming
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FeedbackPressable from './FeedbackPressable';
@@ -143,17 +143,30 @@ export default function SettingsBottomSheet({
           <GestureDetector gesture={sheetPanGesture}>
             <View>
               <View className="mb-4 h-1.5 w-12 self-center rounded-full bg-slate-300" />
-          <Text
-            accessibilityRole="header"
-            nativeID="settings-sheet-title"
-            className="font-outfit-bold text-xl text-ink"
-          >
-            Settings
-          </Text>
+              <View className="min-h-12 flex-row items-center justify-between">
+                <Text
+                  accessibilityRole="header"
+                  nativeID="settings-sheet-title"
+                  className="font-outfit-bold text-xl text-ink"
+                >
+                  Settings
+                </Text>
+                <FeedbackPressable
+                  onPress={onClose}
+                  haptic="selection"
+                  className="min-h-12 min-w-12 items-center justify-center rounded-full px-2 py-1"
+                  accessibilityRole="button"
+                  accessibilityLabel="Close settings"
+                >
+                  <Text className="font-outfit-semibold text-sm text-slate-600">
+                    Close
+                  </Text>
+                </FeedbackPressable>
+              </View>
             </View>
           </GestureDetector>
 
-          <View className="mt-5 gap-3">
+          <View className="mt-4 gap-3 pb-6">
             <Pressable
               onPress={onChangeUsername}
               className="min-h-12 w-full items-center justify-center rounded-2xl border border-[#21473f] py-4"
@@ -212,18 +225,6 @@ export default function SettingsBottomSheet({
               </Text>
             </Pressable>
 
-            <FeedbackPressable
-              onPress={onClose}
-              haptic="light"
-              className="min-h-12 w-full items-center justify-center rounded-2xl border border-[#21473f] py-4"
-              accessibilityLabel="Cancel"
-              accessibilityRole="button"
-              accessibilityHint="Closes the settings panel"
-            >
-              <Text className="font-outfit-bold text-lg text-darkGreen">
-                Cancel
-              </Text>
-            </FeedbackPressable>
           </View>
         </Animated.View>
     </View>
@@ -259,7 +260,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 28,
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 20,
-    paddingTop: 10,
+    paddingTop: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.2,

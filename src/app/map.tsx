@@ -1,31 +1,31 @@
 ﻿import { Feather, Octicons } from '@expo/vector-icons';
 import {
-  useFocusEffect,
-  useLocalSearchParams,
-  useRouter,
+    useFocusEffect,
+    useLocalSearchParams,
+    useRouter,
 } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  BackHandler,
-  Image,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions
+    ActivityIndicator,
+    Alert,
+    BackHandler,
+    Image,
+    Modal,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
+    useWindowDimensions
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
-  Easing,
-  SlideInDown,
-  SlideOutDown,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
+    Easing,
+    SlideInDown,
+    SlideOutDown,
+    useAnimatedStyle,
+    useSharedValue,
+    withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
@@ -842,28 +842,31 @@ export default function MapScreen() {
             accessibilityLabel="Close map attribution"
           />
           <View
-            className="rounded-t-3xl bg-white px-5 pt-3"
-            style={{ paddingBottom: Math.max(insets.bottom, 16) }}
+            className="rounded-t-[28px] bg-white px-5 pt-3"
+            style={[styles.attributionSheet, { paddingBottom: Math.max(insets.bottom, 16) }]}
           >
-            <View className="flex-row items-center justify-between">
-              <Text className="font-outfit-bold text-lg text-ink">
+            <View className="mb-4 h-1.5 w-12 self-center rounded-full bg-slate-300" />
+            <View className="min-h-12 flex-row items-center justify-between">
+              <Text className="font-outfit-bold text-xl text-ink">
                 Map attribution
               </Text>
               <FeedbackPressable
-                haptic="light"
+                haptic="selection"
                 onPress={() => setShowAttribution(false)}
-                className="rounded-full px-3 py-2"
+                className="min-h-12 min-w-12 items-center justify-center rounded-full px-2 py-1"
                 accessibilityRole="button"
                 accessibilityLabel="Close map attribution"
               >
-                <Text className="font-outfit-semibold text-sm text-darkGreen">
+                <Text className="font-outfit-semibold text-sm text-slate-600">
                   Close
                 </Text>
               </FeedbackPressable>
             </View>
-            <Text className="mt-3 font-outfit-medium text-sm leading-5 text-slate-500">
-              {MAP_ATTRIBUTIONS[mapLayer]}
-            </Text>
+            <View className="mt-4 pb-6">
+              <Text className="font-outfit-medium text-sm leading-5 text-slate-500">
+                {MAP_ATTRIBUTIONS[mapLayer]}
+              </Text>
+            </View>
           </View>
         </View>
       </Modal>
@@ -1031,16 +1034,16 @@ export default function MapScreen() {
               width: tabletSheetWidth,
               maxHeight: '72%',
             },
-            { paddingBottom: Math.max(insets.bottom, 16) + 16 },
+            { paddingBottom: Math.max(insets.bottom, 16) },
             sheetAnimatedStyle,
           ]}
         >
           <GestureDetector gesture={sheetPanGesture}>
             <View>
-              <View className="mb-3 h-1.5 w-12 self-center rounded-full bg-slate-300" />
-              <View className="flex-row items-start justify-between bg-white pb-3">
+              <View className="mb-4 h-1.5 w-12 self-center rounded-full bg-slate-300" />
+              <View className="min-h-12 flex-row items-start justify-between">
                 <View className="flex-1 pr-3">
-                  <Text className="font-outfit-bold text-lg">
+                  <Text className="font-outfit-bold text-xl text-ink">
                     {selectedSpot.name}
                   </Text>
                   <View className="mt-1 flex-row items-center">
@@ -1109,7 +1112,7 @@ export default function MapScreen() {
                     accessibilityLabel={`Close ${selectedSpot.name} details`}
                   >
                     <Text
-                      className="font-outfit-semibold text-slate-600"
+                      className="font-outfit-semibold text-sm text-slate-600"
                     >
                       Close
                     </Text>
@@ -1120,7 +1123,7 @@ export default function MapScreen() {
           </GestureDetector>
 
           <ScrollView
-            contentContainerClassName="pb-[24px]"
+            contentContainerClassName="pb-6"
             showsVerticalScrollIndicator={false}
           >
             {selectedSpot.imageUris.length > 0 ? (
@@ -1128,11 +1131,11 @@ export default function MapScreen() {
                 source={{ uri: selectedSpot.imageUris[0] }}
                 accessibilityLabel={`Photo of ${selectedSpot.name}`}
                 accessible
-                className="mt-5 h-[280px] w-full rounded-3xl"
+                className="mt-4 h-[280px] w-full rounded-3xl"
                 resizeMode="cover"
               />
             ) : (
-              <View className="mt-6 h-80 items-center justify-center rounded-3xl bg-slate-100">
+              <View className="mt-4 h-80 items-center justify-center rounded-3xl bg-slate-100">
                 <Text
                   className="font-outfit-medium text-slate-500"
                 >
@@ -1142,13 +1145,13 @@ export default function MapScreen() {
             )}
 
             <Text
-              className="font-outfit-medium mt-6 text-sm text-slate-500"
+              className="font-outfit-medium mt-4 text-sm text-slate-500"
             >
               {selectedSpot.description}
             </Text>
 
             {selectedSpotIsOwned ? (
-              <View className="mt-5 flex-row gap-3">
+              <View className="mt-4 flex-row gap-3">
                 <FeedbackPressable
                   haptic="light"
                   onPress={handleEditSelectedSpot}
@@ -1192,6 +1195,13 @@ export default function MapScreen() {
 }
 
 const styles = StyleSheet.create({
+  attributionSheet: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 16,
+  },
   sheet: {
     position: 'absolute',
     left: 0,
@@ -1202,8 +1212,8 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    paddingTop: 10,
+    paddingHorizontal: 20,
+    paddingTop: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.2,

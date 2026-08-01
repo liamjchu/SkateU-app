@@ -3,21 +3,21 @@ import Constants from 'expo-constants';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
-  BackHandler,
-  Image,
-  Keyboard,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  useWindowDimensions,
-  View,
-  type GestureResponderEvent
+    BackHandler,
+    Image,
+    Keyboard,
+    Platform,
+    Pressable,
+    ScrollView,
+    Text,
+    TextInput,
+    useWindowDimensions,
+    View,
+    type GestureResponderEvent
 } from 'react-native';
 import {
-  configureReanimatedLogger,
-  ReanimatedLogLevel
+    configureReanimatedLogger,
+    ReanimatedLogLevel
 } from 'react-native-reanimated';
 import FavoriteSchoolRow from '../components/FavoriteSchoolRow';
 import FeedbackPressable from '../components/FeedbackPressable';
@@ -607,18 +607,12 @@ export default function HomeScreen() {
           elevation: 12,
         }}
       >
-        <View className="-ml-[7px] flex-row items-center space-x-3">
-          <Image 
-            source={IMAGES.logo} 
-            className="h-14 w-14"
-            resizeMode="contain"
-          />
-          <Text 
-            className="-ml-[5px] text-4xl text-white tracking-tight font-outfit-black"
-          >
-            SkateU
-          </Text>
-        </View>
+        <Image
+          source={IMAGES.brandLockup}
+          className="-ml-[21px] h-14 w-[177.1px]"
+          resizeMode="contain"
+          accessibilityLabel="SkateU"
+        />
 
         <FeedbackPressable
           haptic="light"
