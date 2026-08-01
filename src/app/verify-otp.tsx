@@ -26,8 +26,7 @@ export default function VerifyOtpScreen() {
       <View className="flex-1 items-center justify-center bg-white px-6">
         <Text
           accessibilityRole="alert"
-          className="text-center text-base text-slate-600"
-          style={{ fontFamily: 'Outfit_500Medium' }}
+          className="text-center text-base text-slate-600 font-outfit-medium"
         >
           Session data missing.
         </Text>
@@ -38,8 +37,7 @@ export default function VerifyOtpScreen() {
           accessibilityLabel="Return to Login"
         >
           <Text
-            className="text-base text-white"
-            style={{ fontFamily: 'Outfit_700Bold' }}
+            className="text-base text-white font-outfit-bold"
           >
             Return to Login
           </Text>
@@ -179,8 +177,7 @@ function VerifyOtpContent({ email }: { email: string }) {
           </Pressable>
 
           <Text
-            className="text-2xl text-white"
-            style={{ fontFamily: 'Outfit_700Bold' }}
+            className="text-2xl text-white font-outfit-bold"
           >
             Verify email
           </Text>
@@ -191,14 +188,12 @@ function VerifyOtpContent({ email }: { email: string }) {
 
       <View className="flex-1 self-center w-full max-w-[640px] px-5 pt-8 pb-8">
         <Text
-          className="text-3xl text-[#1B3B36]"
-          style={{ fontFamily: 'Outfit_900Black' }}
+          className="text-3xl text-ink font-outfit-black"
         >
           Enter your code
         </Text>
         <Text
-          className="mt-2 text-base text-slate-500"
-          style={{ fontFamily: 'Outfit_500Medium' }}
+          className="mt-2 text-base text-slate-500 font-outfit-medium"
         >
           {email
             ? `We sent a 6-digit verification code to ${email}.`
@@ -226,8 +221,7 @@ function VerifyOtpContent({ email }: { email: string }) {
                     }`}
                   >
                     <Text
-                      className="text-2xl text-[#1B3B36]"
-                      style={{ fontFamily: 'Outfit_700Bold' }}
+                      className="text-2xl text-ink font-outfit-bold"
                     >
                       {char}
                     </Text>
@@ -257,8 +251,7 @@ function VerifyOtpContent({ email }: { email: string }) {
             <Text
               accessibilityRole="alert"
               accessibilityLiveRegion="polite"
-              className="text-sm text-[#7F302C]"
-              style={{ fontFamily: 'Outfit_500Medium' }}
+              className="text-sm text-errorText font-outfit-medium"
             >
               {error}
             </Text>
@@ -271,8 +264,7 @@ function VerifyOtpContent({ email }: { email: string }) {
               accessibilityLiveRegion="polite"
               className="rounded-2xl bg-[#EBF2F0] px-4 py-3">
               <Text
-                className="text-sm text-[#1B3B36]"
-                style={{ fontFamily: 'Outfit_600SemiBold' }}
+                className="text-sm text-ink font-outfit-semibold"
               >
                 {notice}
               </Text>
@@ -293,8 +285,7 @@ function VerifyOtpContent({ email }: { email: string }) {
               <ActivityIndicator color="#ffffff" />
             ) : (
               <Text
-                className="text-lg text-white"
-                style={{ fontFamily: 'Outfit_700Bold' }}
+                className="text-lg text-white font-outfit-bold"
               >
                 Verify
               </Text>
@@ -317,9 +308,8 @@ function VerifyOtpContent({ email }: { email: string }) {
           >
             <Text
               className={`text-base ${
-                cooldown > 0 || resending ? 'text-slate-400' : 'text-[#21473f]'
-              }`}
-              style={{ fontFamily: 'Outfit_600SemiBold' }}
+                cooldown > 0 || resending ? 'text-slate-400' : 'text-darkGreen'
+              } font-outfit-semibold`}
             >
               {resending
                 ? 'Sending...'

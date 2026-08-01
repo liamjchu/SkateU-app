@@ -176,24 +176,11 @@ export default function SpotImagePicker({
                 />
               </View>
 
-              <Text
-                style={{
-                  fontSize: 16,
-                  fontWeight: '600',
-                  color: '#173A35',
-                  marginBottom: 4,
-                }}
-              >
+              <Text className="mb-1 font-outfit-semibold text-base text-ink-dark">
                 Add Spot Photo
               </Text>
 
-              <Text
-                style={{
-                  fontSize: 14,
-                  color: '#52645F',
-                  textAlign: 'center',
-                }}
-              >
+              <Text className="text-center font-outfit-medium text-sm text-slate-400">
                 Tap to take a photo or choose from your gallery
               </Text>
             </>
@@ -213,7 +200,7 @@ export default function SpotImagePicker({
         <Text
           accessibilityRole="alert"
           accessibilityLiveRegion="polite"
-          className="mt-2 px-2 text-xs text-[#7F302C]"
+          className="mt-2 px-2 text-xs text-errorText"
         >
           {error}
         </Text>

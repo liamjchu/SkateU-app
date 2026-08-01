@@ -190,7 +190,7 @@ export default function EditSpotScreen() {
           accessibilityLabel="Go back"
           accessibilityRole="button"
         >
-          <Text className="text-xl font-bold text-white">❮</Text>
+          <Text className="text-xl font-outfit-bold text-white">❮</Text>
         </FeedbackPressable>
 
         <View className="max-w-80 flex-1 items-center">
@@ -226,7 +226,7 @@ export default function EditSpotScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View className="mb-2 flex-row items-center">
-            <Text style={[styles.sectionLabel, { marginTop: 0, marginBottom: 0 }]}>PHOTO</Text>
+            <Text className="font-outfit-bold text-[15px] tracking-[0.5px] text-darkGreen">PHOTO</Text>
             <Text className="ml-2 font-outfit-medium text-xs text-slate-500">Required</Text>
           </View>
 
@@ -237,16 +237,17 @@ export default function EditSpotScreen() {
             />
           </View>
           {showImageError && formErrors.image ? (
-            <Text className="-mt-4 mb-3 text-sm text-[#7F302C]">{formErrors.image}</Text>
+            <Text className="-mt-4 mb-3 text-sm text-errorText">{formErrors.image}</Text>
           ) : null}
 
           {/* NAME */}
           <View className="mb-2 flex-row items-center">
-            <Text style={[styles.sectionLabel, { marginTop: 0, marginBottom: 0 }]}>SPOT NAME</Text>
+            <Text className="font-outfit-bold text-[15px] tracking-[0.5px] text-darkGreen">SPOT NAME</Text>
             <Text className="ml-2 font-outfit-medium text-xs text-slate-500">(Required)</Text>
           </View>
           <TextInput
             style={[styles.input, showNameError && formErrors.name ? styles.inputError : null]}
+            className="font-outfit-medium text-sm text-darkGreen"
             placeholder="e.g. Library 5 Stair, Parking Garage Ledge..."
             placeholderTextColor="#52645F"
             accessibilityLabel="Spot name, required"
@@ -258,7 +259,7 @@ export default function EditSpotScreen() {
           />
           <View className="mt-1 min-h-5 flex-row items-center justify-between">
             <Text
-              className="flex-1 pr-2 text-sm text-[#7F302C]"
+              className="flex-1 pr-2 text-sm text-errorText"
               numberOfLines={1}
               ellipsizeMode="tail"
             >
@@ -271,11 +272,12 @@ export default function EditSpotScreen() {
 
           {/* DESCRIPTION */}
           <View className="mb-2 mt-4 flex-row items-center">
-            <Text style={[styles.sectionLabel, { marginTop: 0, marginBottom: 0 }]}>DESCRIPTION</Text>
+            <Text className="font-outfit-bold text-[15px] tracking-[0.5px] text-darkGreen">DESCRIPTION</Text>
             <Text className="ml-2 font-outfit-medium text-xs text-slate-500">(Required)</Text>
           </View>
           <TextInput
             style={[styles.descriptionInput, showDescriptionError && formErrors.description ? styles.inputError : null]}
+            className="font-outfit-medium text-sm text-darkGreen"
             placeholder="Describe the spot — obstacle type, spot condition, security..."
             placeholderTextColor="#52645F"
             accessibilityLabel="Spot description, required"
@@ -289,7 +291,7 @@ export default function EditSpotScreen() {
           />
           <View className="mt-1 min-h-5 flex-row items-center justify-between">
             <Text
-              className="flex-1 pr-2 text-sm text-[#7F302C]"
+              className="flex-1 pr-2 text-sm text-errorText"
               numberOfLines={1}
               ellipsizeMode="tail"
             >
@@ -301,9 +303,9 @@ export default function EditSpotScreen() {
           </View>
 
           {/* LOCATION */}
-          <Text style={styles.sectionLabel}>LOCATION</Text>
+          <Text className="mb-2.5 mt-[15px] font-outfit-bold text-[15px] tracking-[0.5px] text-darkGreen">LOCATION</Text>
 
-          <Text style={styles.helperText}>
+          <Text className="mb-3 font-outfit-medium text-sm text-slate-400">
             Move the map until the pin is over the desired spot.
           </Text>
 
@@ -334,7 +336,7 @@ export default function EditSpotScreen() {
               }}
             />
             <View className="-mt-4 mb-3 flex-row items-center rounded-xl bg-[#EBF2F0] px-3 py-2">
-              <Text className="font-outfit-bold text-sm text-[#21473f]">✓ Spot location selected</Text>
+              <Text className="font-outfit-bold text-sm text-darkGreen">✓ Spot location selected</Text>
               <Text className="ml-2 flex-1 text-right font-outfit-medium text-xs text-slate-500">
                 {selectedLocation.latitude.toFixed(5)}, {selectedLocation.longitude.toFixed(5)}
               </Text>
@@ -345,7 +347,7 @@ export default function EditSpotScreen() {
             <Text
               accessibilityRole="alert"
               accessibilityLiveRegion="polite"
-              className="mb-3 mt-4 text-center text-sm text-[#7F302C]">
+              className="mb-3 mt-4 text-center text-sm text-errorText">
               {saveError}
             </Text>
           ) : null}
@@ -366,12 +368,12 @@ export default function EditSpotScreen() {
               {saving ? (
                 <>
                   <ActivityIndicator color="#ffffff" style={styles.saveIndicator} />
-                  <Text style={styles.saveTextWithMargin}>
+                  <Text className="ml-2 font-outfit-bold text-lg text-white">
                     Saving…
                   </Text>
                 </>
               ) : (
-                <Text style={styles.saveText}>
+                <Text className="font-outfit-bold text-lg text-white">
                   Save Changes
                 </Text>
               )}
@@ -407,15 +409,6 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
 
-  sectionLabel: {
-    color: '#21473f',
-    fontSize: 15,
-    fontWeight: '700',
-    marginBottom: 10,
-    marginTop: 15,
-    letterSpacing: 0.5,
-  },
-
   photoWrapper: {
     marginBottom: 0,
   },
@@ -427,8 +420,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 20,
     paddingVertical: 18,
-    fontSize: 14,
-    color: '#21473f',
   },
 
   inputError: {
@@ -443,14 +434,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 18,
     minHeight: 150,
-    fontSize: 14,
-    color: '#21473f',
-  },
-
-  helperText: {
-    color: '#52645F',
-    fontSize: 14,
-    marginBottom: 12,
   },
 
   mapContainer: {
@@ -475,20 +458,6 @@ const styles = StyleSheet.create({
 
   saveIndicator: {},
 
-  saveText: {
-    color: '#FFFFFF',
-    fontFamily: 'Outfit_700Bold',
-    fontSize: 18,
-    textAlign: 'center',
-  },
-
-  saveTextWithMargin: {
-    color: '#FFFFFF',
-    fontFamily: 'Outfit_700Bold',
-    fontSize: 18,
-    marginLeft: 8,
-    textAlign: 'center',
-  },
 
   saveButtonDisabled: {
     backgroundColor: '#60756F',

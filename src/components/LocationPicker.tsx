@@ -8,8 +8,8 @@ import {
 } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
-import images from '../constants/images';
-import { useMapViewStore, type MapLayer } from '../store/mapViewStore';
+import { buildLocationPickerHtml } from '../lib/locationPickerMap';
+import type { MapLayer } from '../store/mapViewStore';
 import FeedbackPressable from './FeedbackPressable';
 
 export type LayerType = MapLayer;
@@ -32,8 +32,7 @@ export default function LocationPicker({
   const { height, width } = useWindowDimensions();
   const isTabletLayout = width >= 768 && height >= 600;
   const webViewRef = useRef<WebView>(null);
-  const setMapViewLayer = useMapViewStore((state) => state.setMapLayer);
-  const [mapLayer, setMapLayer] = useState<LayerType>(initialLayer);
+  const mapLayerRef = useRef<LayerType>(initialLayer);
   const [webViewAttempt, setWebViewAttempt] = useState(0);
   const [mapStatus, setMapStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [mapError, setMapError] = useState('');
@@ -54,165 +53,15 @@ export default function LocationPicker({
     onLocationChange(selectedLatitude, selectedLongitude);
   }, [selectedLatitude, selectedLongitude, onLocationChange]);
 
-  const html = useMemo(() => {
-    const { latitude, longitude, layer } = initialRef.current;
+  const html = useMemo(
+    () => buildLocationPickerHtml(initialRef.current),
+    []
+  );
 
-    return `
-  <!DOCTYPE html>
-  <html>
-  <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-    <style>
-      html, body {
-        width: 100%;
-        height: 100%;
-        margin: 0;
-        padding: 0;
-        overflow: hidden;
-        background: #0b0f14;
-      }
-
-      #map {
-        height: 100%;
-        width: 100%;
-      }
-
-      .leaflet-control-attribution {
-        display: none;
-      }
-
-      #map:not(.satellite) .leaflet-tile {
-        filter: brightness(.9);
-      }
-
-      #map.satellite .leaflet-tile {
-        filter: brightness(.8);
-      }
-    </style>
-  </head>
-
-  <body>
-    <div id="map"></div>
-
-    <script>
-      function postMessage(message) {
-        if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-          window.ReactNativeWebView.postMessage(JSON.stringify(message));
-        }
-      }
-
-      window.onerror = function(message, source, lineno) {
-        postMessage({ type: 'CONSOLE_ERROR', message: String(message) + ' at line ' + lineno });
-        return true;
-      };
-
-      try {
-        const center = [${latitude}, ${longitude}];
-
-        window.map = L.map('map', {
-          zoomControl: false,
-        }).setView(center, 15.5);
-
-        const defaultUrl =
-          'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
-
-        const satelliteUrl =
-          'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}.png';
-
-        const defaultLayer = L.tileLayer(defaultUrl);
-        const satelliteLayer = L.tileLayer(satelliteUrl);
-        const reportTileError = function () {
-          postMessage({
-            type: 'CONSOLE_ERROR',
-            message: 'Map tiles could not be loaded.',
-          });
-        };
-        defaultLayer.on('tileerror', reportTileError);
-        satelliteLayer.on('tileerror', reportTileError);
-
-        // Keep both layers mounted and fully opaque, then swap their z-index so
-        // the selected one always covers the other. This avoids tile reloads
-        // and lets the toggle work reliably for unlimited presses.
-        defaultLayer.addTo(window.map);
-        satelliteLayer.addTo(window.map);
-
-        function showLayer(layer) {
-          const showSatellite = layer === 'satellite';
-
-          defaultLayer.setZIndex(showSatellite ? 1 : 2);
-          satelliteLayer.setZIndex(showSatellite ? 2 : 1);
-
-          window.currentLayer = showSatellite ? satelliteLayer : defaultLayer;
-          document.getElementById('map').classList.toggle('satellite', showSatellite);
-        }
-
-        showLayer('${layer}');
-
-        window.setLayer = function (layer) {
-          if (!window.map || (layer !== 'default' && layer !== 'satellite')) return;
-
-          showLayer(layer);
-          postMessage({
-            type: 'LAYER_TOGGLED',
-            layer: layer,
-          });
-        };
-
-        window.toggleLayer = function () {
-          if (!window.map) return;
-          window.setLayer(
-            window.currentLayer === satelliteLayer ? 'default' : 'satellite'
-          );
-        };
-
-        function postCenter() {
-          const center = window.map.getCenter();
-          postMessage({
-            type: 'CENTER_CHANGED',
-            latitude: center.lat,
-            longitude: center.lng,
-          });
-        }
-
-        function postInteractionStart() {
-          postMessage({ type: 'INTERACTION_START' });
-        }
-
-        function postInteractionEnd() {
-          postMessage({ type: 'INTERACTION_END' });
-        }
-
-        window.map.on('movestart', postInteractionStart);
-        window.map.on('moveend', function () {
-          postCenter();
-          postInteractionEnd();
-        });
-
-        window.map.on('zoomstart', postInteractionStart);
-        window.map.on('zoomend', function () {
-          postCenter();
-          postInteractionEnd();
-        });
-
-        document.addEventListener('touchstart', postInteractionStart, { passive: true });
-        document.addEventListener('touchend', postInteractionEnd, { passive: true });
-
-        postMessage({ type: 'WEBVIEW_READY' });
-        postCenter();
-      } catch (error) {
-        postMessage({
-          type: 'CONSOLE_ERROR',
-          message: error instanceof Error ? error.message : 'Unable to initialize the location map.',
-        });
-      }
-    </script>
-  </body>
-  </html>
-  `;
-  }, []);
+  const webViewSource = useMemo(
+    () => ({ html, baseUrl: 'https://localhost' }),
+    [html]
+  );
 
   useEffect(() => {
     if (mapStatus !== 'loading') {
@@ -234,6 +83,9 @@ export default function LocationPicker({
       if (data.type === 'WEBVIEW_READY') {
         setMapStatus('ready');
         setMapError('');
+        webViewRef.current?.injectJavaScript(
+          `if (window.setMapLayer) { window.setMapLayer('${mapLayerRef.current}'); } true;`
+        );
       }
 
       if (data.type === 'CONSOLE_ERROR') {
@@ -248,8 +100,7 @@ export default function LocationPicker({
       if (data.type === 'LAYER_TOGGLED') {
         const layer: LayerType =
           data.layer === 'satellite' ? 'satellite' : 'default';
-        setMapLayer(layer);
-        setMapViewLayer(layer);
+        mapLayerRef.current = layer;
       }
 
       if (
@@ -295,10 +146,12 @@ export default function LocationPicker({
           accessible
           ref={webViewRef}
           originWhitelist={['*']}
-          source={{ html, baseUrl: 'https://localhost' }}
+          source={webViewSource}
           javaScriptEnabled
           domStorageEnabled
           mixedContentMode="always"
+          onContentProcessDidTerminate={retryMap}
+          onRenderProcessGone={retryMap}
           onLoadStart={() => {
             setMapStatus('loading');
             setMapError('');
@@ -314,31 +167,6 @@ export default function LocationPicker({
           onMessage={handleMessage}
           style={{ flex: 1, backgroundColor: '#0b0f14' }}
         />
-
-        {mapStatus === 'ready' ? (
-          <FeedbackPressable
-            haptic="selection"
-            onPress={() => {
-              webViewRef.current?.injectJavaScript(
-                `window.toggleLayer(); true;`
-              );
-            }}
-            className="absolute right-3 top-3 z-20 h-10 w-10 items-center justify-center rounded-full bg-[#21473f]"
-            accessibilityRole="button"
-            accessibilityLabel={
-              mapLayer === 'satellite'
-                ? 'Switch location map to standard map'
-                : 'Switch location map to satellite map'
-            }
-            accessibilityState={{ selected: mapLayer === 'satellite' }}
-          >
-            <Image
-              source={images.layers}
-              className="h-7 w-7"
-              style={{ tintColor: '#FFFFFF' }}
-            />
-          </FeedbackPressable>
-        ) : null}
 
         {mapStatus !== 'ready' ? (
           <View
@@ -366,7 +194,7 @@ export default function LocationPicker({
                   accessibilityRole="button"
                   accessibilityLabel="Retry loading location map"
                 >
-                  <Text className="font-outfit-bold text-sm text-[#21473f]">Retry</Text>
+                  <Text className="font-outfit-bold text-sm text-darkGreen">Retry</Text>
                 </FeedbackPressable>
               </>
             )}

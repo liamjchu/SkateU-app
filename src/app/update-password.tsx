@@ -125,7 +125,7 @@ export default function UpdatePasswordScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View className="flex-1 self-center w-full max-w-[640px] px-5 pt-8 pb-8">
-            <Text className="font-outfit-black text-3xl text-[#1B3B36]">
+            <Text className="font-outfit-black text-3xl text-ink">
               Create a new password
             </Text>
             <Text className="mt-2 font-outfit-medium text-base text-slate-500">
@@ -148,7 +148,7 @@ export default function UpdatePasswordScreen() {
                   autoCorrect={false}
                   autoComplete="new-password"
                   editable={!submitting && !success}
-                  className="flex-1 pl-4 pr-5 py-4 font-outfit-semibold text-base text-[#1B3B36]"
+                  className="flex-1 pl-4 pr-5 py-4 font-outfit-semibold text-base text-ink"
                 />
                 <Pressable
                   onPress={() => setShowPassword((visible) => !visible)}
@@ -179,7 +179,7 @@ export default function UpdatePasswordScreen() {
                   autoCorrect={false}
                   autoComplete="new-password"
                   editable={!submitting && !success}
-                  className="flex-1 pl-4 pr-5 py-4 font-outfit-semibold text-base text-[#1B3B36]"
+                  className="flex-1 pl-4 pr-5 py-4 font-outfit-semibold text-base text-ink"
                 />
                 <Pressable
                   onPress={() => setShowConfirmation((visible) => !visible)}
@@ -205,7 +205,7 @@ export default function UpdatePasswordScreen() {
                   accessibilityRole="alert"
                   accessibilityLiveRegion="polite"
                   selectable
-                  className="font-outfit-medium text-sm text-[#7F302C]">
+                  className="font-outfit-medium text-sm text-errorText">
                   {error}
                 </Text>
               ) : null}
@@ -218,7 +218,7 @@ export default function UpdatePasswordScreen() {
                   className="rounded-2xl bg-[#EBF2F0] px-4 py-3">
                   <Text
                     selectable
-                    className="font-outfit-semibold text-sm text-[#1B3B36]"
+                    className="font-outfit-semibold text-sm text-ink"
                   >
                     Your password has been updated. Taking you back to SkateU...
                   </Text>

@@ -134,7 +134,7 @@ export function UsernameForm({
           autoFocus
           maxLength={20}
           editable={!submitting}
-          className="flex-1 py-4 pl-1 pr-2 font-outfit-semibold text-base text-[#1B3B36]"
+          className="flex-1 py-4 pl-1 pr-2 font-outfit-semibold text-base text-ink"
         />
         <View className="h-6 w-6 items-center justify-center">
           {status === 'checking' ? (
@@ -154,7 +154,7 @@ export function UsernameForm({
         className="mt-2 min-h-[20px] px-1"
       >
         {submitError ? (
-          <Text className="font-outfit-medium text-sm text-[#7F302C]">
+          <Text className="font-outfit-medium text-sm text-errorText">
             {submitError}
           </Text>
         ) : unchanged ? (
@@ -162,15 +162,15 @@ export function UsernameForm({
             That&apos;s your current username.
           </Text>
         ) : status === 'invalid' && validationError ? (
-          <Text className="font-outfit-medium text-sm text-[#7F302C]">
+          <Text className="font-outfit-medium text-sm text-errorText">
             {validationError}
           </Text>
         ) : status === 'taken' ? (
-          <Text className="font-outfit-medium text-sm text-[#7F302C]">
+          <Text className="font-outfit-medium text-sm text-errorText">
             That username is already taken.
           </Text>
         ) : status === 'available' ? (
-          <Text className="font-outfit-semibold text-sm text-[#1B3B36]">
+          <Text className="font-outfit-semibold text-sm text-ink">
             Nice — that one&apos;s available.
           </Text>
         ) : status === 'error' ? (

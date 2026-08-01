@@ -160,7 +160,7 @@ export default function VerifyDeleteAccountScreen() {
       </View>
 
       <View className="flex-1 self-center w-full max-w-[640px] px-5 pt-8 pb-8">
-        <Text className="font-outfit-black text-3xl text-[#1B3B36]">
+        <Text className="font-outfit-black text-3xl text-ink">
           Enter your code
         </Text>
         <Text className="mt-2 font-outfit-medium text-base text-slate-500">
@@ -188,7 +188,7 @@ export default function VerifyDeleteAccountScreen() {
                       isActive ? 'border-2 border-[#21473f]' : ''
                     }`}
                   >
-                    <Text className="font-outfit-bold text-2xl text-[#1B3B36]">
+                    <Text className="font-outfit-bold text-2xl text-ink">
                       {char}
                     </Text>
                   </View>
@@ -217,7 +217,7 @@ export default function VerifyDeleteAccountScreen() {
             <Text
             accessibilityRole="alert"
             accessibilityLiveRegion="polite"
-            className="font-outfit-medium text-sm text-[#7F302C]">
+            className="font-outfit-medium text-sm text-errorText">
               {error}
             </Text>
           ) : null}
@@ -228,7 +228,7 @@ export default function VerifyDeleteAccountScreen() {
             accessibilityRole="alert"
             accessibilityLiveRegion="polite"
             className="rounded-2xl bg-[#EBF2F0] px-4 py-3">
-              <Text className="font-outfit-semibold text-sm text-[#1B3B36]">
+              <Text className="font-outfit-semibold text-sm text-ink">
                 {notice}
               </Text>
             </View>
@@ -269,7 +269,7 @@ export default function VerifyDeleteAccountScreen() {
           >
             <Text
               className={`font-outfit-semibold text-base ${
-                cooldown > 0 || resending ? 'text-slate-400' : 'text-[#21473f]'
+                cooldown > 0 || resending ? 'text-slate-400' : 'text-darkGreen'
               }`}
             >
               {resending

@@ -51,7 +51,7 @@ export default function OnboardingScreen() {
       </View>
 
       <View className="flex-1 self-center w-full max-w-[640px] px-5 pt-8 pb-8">
-        <Text className="font-outfit-black text-3xl text-[#1B3B36]">
+        <Text className="font-outfit-black text-3xl text-ink">
           One last step
         </Text>
         <Text className="mt-2 font-outfit-medium text-base text-slate-500">

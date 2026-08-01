@@ -100,7 +100,7 @@ export default function ForgotPasswordScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View className="flex-1 self-center w-full max-w-[640px] px-5 pt-8 pb-8">
-            <Text className="font-outfit-black text-3xl text-[#1B3B36]">
+            <Text className="font-outfit-black text-3xl text-ink">
               Forgot your password?
             </Text>
             <Text className="mt-2 font-outfit-medium text-base text-slate-500">
@@ -119,7 +119,7 @@ export default function ForgotPasswordScreen() {
                 autoComplete="email"
                 keyboardType="email-address"
                 editable={!submitting}
-                className="rounded-2xl bg-[#F0F3F5] pl-4 pr-5 py-4 font-outfit-semibold text-base text-[#1B3B36]"
+                className="rounded-2xl bg-[#F0F3F5] pl-4 pr-5 py-4 font-outfit-semibold text-base text-ink"
               />
 
               {error ? (
@@ -127,7 +127,7 @@ export default function ForgotPasswordScreen() {
                   accessibilityRole="alert"
                   accessibilityLiveRegion="polite"
                   selectable
-                  className="font-outfit-medium text-sm text-[#7F302C]">
+                  className="font-outfit-medium text-sm text-errorText">
                   {error}
                 </Text>
               ) : null}
@@ -140,7 +140,7 @@ export default function ForgotPasswordScreen() {
                   className="rounded-2xl bg-[#EBF2F0] px-4 py-3">
                   <Text
                     selectable
-                    className="font-outfit-semibold text-sm text-[#1B3B36]"
+                    className="font-outfit-semibold text-sm text-ink"
                   >
                     {notice}
                   </Text>

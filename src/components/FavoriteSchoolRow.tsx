@@ -88,20 +88,21 @@ export default function FavoriteSchoolRow({
   return (
     <FeedbackPressable
       disablePressOpacity
+      disablePressScale
       haptic="light"
       disabled={isRemoving}
       onPress={() => onSelect(school)}
       className="relative mb-3 overflow-hidden rounded-3xl bg-white"
       accessibilityRole="button"
       accessibilityLabel={`Open ${school.name}`}
-      accessibilityHint="Opens the campus map"
+      accessibilityHint="Selects this school for the campus map button"
     >
       <View
         pointerEvents="none"
         className="absolute inset-y-1 right-1 w-[40%] items-center justify-center rounded-3xl bg-[#FBE9E7]"
       >
         <Feather name="trash-2" size={18} color="#7F302C" />
-        <Text className="mt-1 font-outfit-bold text-xs text-[#7F302C]">Remove</Text>
+        <Text className="mt-1 font-outfit-bold text-xs text-errorText">Remove</Text>
       </View>
 
       <GestureDetector gesture={swipeGesture}>
@@ -126,14 +127,12 @@ export default function FavoriteSchoolRow({
 
               <View className="ml-4 min-w-0 flex-1">
                 <Text
-                  className="text-lg text-[#1B3B36]"
-                  style={{ fontFamily: 'Outfit_700Bold' }}
+                  className="text-lg text-ink font-outfit-bold"
                 >
                   {school.name}
                 </Text>
                 <Text
-                  className="mt-0.5 text-sm text-slate-400"
-                  style={{ fontFamily: 'Outfit_500Medium' }}
+                  className="mt-0.5 text-sm text-slate-400 font-outfit-medium"
                 >
                   {school.city}, {school.state}
                 </Text>
@@ -148,8 +147,7 @@ export default function FavoriteSchoolRow({
                 className="mr-[3px]"
               />
               <Text
-                className="text-base text-[#1B3B36]"
-                style={{ fontFamily: 'Outfit_700Bold' }}
+                className="text-base text-ink font-outfit-bold"
               >
                 {school.numSpots}
               </Text>

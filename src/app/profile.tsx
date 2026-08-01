@@ -344,7 +344,7 @@ export default function ProfileScreen() {
             </Text>
           </View>
 
-          <Text className="font-outfit-black text-2xl text-[#1B3B36]">
+          <Text className="font-outfit-black text-2xl text-ink">
             {username ? `@${username}` : 'Your Profile'}
           </Text>
 
@@ -384,7 +384,7 @@ export default function ProfileScreen() {
           >
             <Text
               className={`font-outfit-bold text-sm ${
-                !showingLikedSpots ? 'text-[#1B3B36]' : 'text-slate-500'
+                !showingLikedSpots ? 'text-ink' : 'text-slate-500'
               }`}
             >
               Your Spots {mySpots.length > 0 ? `(${mySpots.length})` : ''}
@@ -399,7 +399,7 @@ export default function ProfileScreen() {
           >
             <Text
               className={`font-outfit-bold text-sm ${
-                showingLikedSpots ? 'text-[#1B3B36]' : 'text-slate-500'
+                showingLikedSpots ? 'text-ink' : 'text-slate-500'
               }`}
             >
               Liked Spots {likedSpots.length > 0 ? `(${likedSpots.length})` : ''}
@@ -412,7 +412,7 @@ export default function ProfileScreen() {
             <Text
               accessibilityRole="alert"
               accessibilityLiveRegion="polite"
-              className="flex-1 pr-3 font-outfit-medium text-sm text-[#7F302C]"
+              className="flex-1 pr-3 font-outfit-medium text-sm text-errorText"
             >
               Something went wrong. Your previous content is still shown where possible.
             </Text>
@@ -436,7 +436,7 @@ export default function ProfileScreen() {
             <Text
               accessibilityRole="alert"
               accessibilityLiveRegion="polite"
-              className="text-center font-outfit-medium text-sm text-[#7F302C]"
+              className="text-center font-outfit-medium text-sm text-errorText"
             >
               Something went wrong while loading your spots.
             </Text>
@@ -486,7 +486,7 @@ export default function ProfileScreen() {
                   )}
 
                   <View className="ml-3 min-w-0 flex-1">
-                    <Text className="font-outfit-bold text-base text-[#1B3B36]">
+                    <Text className="font-outfit-bold text-base text-ink">
                       {spot.name}
                     </Text>
                     <View className="mt-0.5 flex-row items-center">

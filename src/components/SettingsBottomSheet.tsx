@@ -146,7 +146,7 @@ export default function SettingsBottomSheet({
           <Text
             accessibilityRole="header"
             nativeID="settings-sheet-title"
-            className="font-outfit-bold text-xl text-[#1B3B36]"
+            className="font-outfit-bold text-xl text-ink"
           >
             Settings
           </Text>
@@ -161,7 +161,7 @@ export default function SettingsBottomSheet({
               accessibilityRole="button"
               accessibilityHint="Opens the username editor"
             >
-              <Text className="font-outfit-bold text-lg text-[#21473f]">
+              <Text className="font-outfit-bold text-lg text-darkGreen">
                 Change username
               </Text>
             </Pressable>
@@ -173,7 +173,7 @@ export default function SettingsBottomSheet({
               accessibilityRole="button"
               accessibilityHint="Opens the password editor"
             >
-              <Text className="font-outfit-bold text-lg text-[#21473f]">
+              <Text className="font-outfit-bold text-lg text-darkGreen">
                 Change password
               </Text>
             </Pressable>
@@ -207,7 +207,7 @@ export default function SettingsBottomSheet({
                 busy: deleteAccountDisabled,
               }}
             >
-              <Text className={`font-outfit-bold text-lg ${deleteAccountDisabled ? 'text-white' : 'text-[#7F302C]'}`}>
+              <Text className={`font-outfit-bold text-lg ${deleteAccountDisabled ? 'text-white' : 'text-errorText'}`}>
                 {deleteAccountDisabled ? 'Sending code...' : 'Delete account'}
               </Text>
             </Pressable>
@@ -220,7 +220,7 @@ export default function SettingsBottomSheet({
               accessibilityRole="button"
               accessibilityHint="Closes the settings panel"
             >
-              <Text className="font-outfit-bold text-lg text-[#21473f]">
+              <Text className="font-outfit-bold text-lg text-darkGreen">
                 Cancel
               </Text>
             </FeedbackPressable>

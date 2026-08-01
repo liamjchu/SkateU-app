@@ -71,8 +71,7 @@ export default function GoogleSignInButton({
         <View className="flex-row items-center gap-2">
           <Ionicons name="logo-google" size={20} color="#1B3B36" />
           <Text
-            className="text-base text-[#1B3B36]"
-            style={{ fontFamily: 'Outfit_700Bold' }}
+            className="text-base text-ink font-outfit-bold"
           >
             Log in with Google
           </Text>

@@ -12,6 +12,7 @@ import { triggerHaptic, type HapticFeedback } from '../lib/haptics';
 
 type FeedbackPressableProps = PressableProps & {
   disablePressOpacity?: boolean;
+  disablePressScale?: boolean;
   haptic?: HapticFeedback;
 };
 
@@ -20,6 +21,7 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 export default function FeedbackPressable({
   disabled,
   disablePressOpacity = false,
+  disablePressScale = false,
   haptic,
   onPress,
   onPressIn,
@@ -53,7 +55,9 @@ export default function FeedbackPressable({
       }}
       onPressIn={(event) => {
         if (!reduceMotion) {
-          scale.value = withTiming(0.98, { duration: 100 });
+          if (!disablePressScale) {
+            scale.value = withTiming(0.98, { duration: 100 });
+          }
           if (!disablePressOpacity) {
             opacity.value = withTiming(0.88, { duration: 100 });
           }
@@ -62,7 +66,9 @@ export default function FeedbackPressable({
       }}
       onPressOut={(event) => {
         if (!reduceMotion) {
-          scale.value = withTiming(1, { duration: 150 });
+          if (!disablePressScale) {
+            scale.value = withTiming(1, { duration: 150 });
+          }
           if (!disablePressOpacity) {
             opacity.value = withTiming(1, { duration: 150 });
           }

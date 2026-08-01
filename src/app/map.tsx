@@ -727,15 +727,13 @@ export default function MapScreen() {
           style={{ top: insets.top, bottom: 12 }}
         >
           <Text
-            style={{ fontFamily: 'Outfit_700Bold' }}
-            className="text-center text-2xl text-white"
+            className="text-center text-2xl text-white font-outfit-bold"
           >
             {displayedSchoolName}
           </Text>
           {locationSubtitle && (
             <Text
-              style={{ fontFamily: 'Outfit_500Medium' }}
-              className="text-center text-m text-[#e8f0ee]"
+              className="text-center font-outfit-medium text-sm text-lightGreen font-outfit-medium"
             >
               {locationSubtitle}
             </Text>
@@ -799,6 +797,17 @@ export default function MapScreen() {
         >
           <Feather name="crosshair" size={22} color="#FFFFFF" />
         </FeedbackPressable>
+        <View className="mx-3 h-px bg-white/35" />
+        <FeedbackPressable
+          haptic="light"
+          onPress={() => setShowAttribution(true)}
+          className="h-12 w-12 items-center justify-center"
+          accessibilityRole="button"
+          accessibilityLabel="Show map attribution"
+          accessibilityHint="Shows attribution for the active map layer"
+        >
+          <Feather name="info" size={22} color="#FFFFFF" />
+        </FeedbackPressable>
       </View>
       <FeedbackPressable
         haptic="light"
@@ -837,7 +846,7 @@ export default function MapScreen() {
             style={{ paddingBottom: Math.max(insets.bottom, 16) }}
           >
             <View className="flex-row items-center justify-between">
-              <Text className="font-outfit-bold text-lg text-[#1B3B36]">
+              <Text className="font-outfit-bold text-lg text-ink">
                 Map attribution
               </Text>
               <FeedbackPressable
@@ -847,7 +856,7 @@ export default function MapScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Close map attribution"
               >
-                <Text className="font-outfit-semibold text-sm text-[#21473f]">
+                <Text className="font-outfit-semibold text-sm text-darkGreen">
                   Close
                 </Text>
               </FeedbackPressable>
@@ -903,20 +912,6 @@ export default function MapScreen() {
         onMessage={handleWebViewMessage}
       />
 
-      {mapStatus === 'ready' ? (
-        <FeedbackPressable
-          haptic="light"
-          onPress={() => setShowAttribution(true)}
-          className="absolute left-4 z-[999] h-8 w-8 items-center justify-center rounded-full bg-[#21473f]"
-          style={{ bottom: Math.max(insets.bottom, 16) + 8 }}
-          accessibilityRole="button"
-          accessibilityLabel="Show map attribution"
-          accessibilityHint="Shows attribution for the active map layer"
-        >
-          <Text className="text-sm font-outfit-black text-white">i</Text>
-        </FeedbackPressable>
-      ) : null}
-
       {mapStatus === 'loading' ? (
         <View className="absolute inset-0 z-40 items-center justify-center bg-[#21473f]/90 px-8">
           <ActivityIndicator color="#FFFFFF" />
@@ -941,7 +936,7 @@ export default function MapScreen() {
             accessibilityRole="button"
             accessibilityLabel="Retry loading campus map"
           >
-            <Text className="font-outfit-bold text-base text-[#21473f]">Retry</Text>
+            <Text className="font-outfit-bold text-base text-darkGreen">Retry</Text>
           </FeedbackPressable>
         </View>
       ) : null}
@@ -956,7 +951,7 @@ export default function MapScreen() {
               <Text
                 accessibilityRole="alert"
                 accessibilityLiveRegion="polite"
-                className="font-outfit-bold text-sm text-[#7F302C]"
+                className="font-outfit-bold text-sm text-errorText"
               >
                 Spots unavailable
               </Text>
@@ -1002,7 +997,7 @@ export default function MapScreen() {
       {mapStatus === 'ready' && !loading && !error && spots.length === 0 ? (
         <View className="absolute left-6 right-6 top-1/2 z-30 -translate-y-1/2 items-center rounded-3xl bg-white px-6 py-6 shadow-lg">
           <Feather name="map-pin" size={28} color="#21473f" />
-          <Text className="mt-3 text-center font-outfit-bold text-xl text-[#1B3B36]">
+          <Text className="mt-3 text-center font-outfit-bold text-xl text-ink">
             No skate spots here yet
           </Text>
           <Text className="mt-1.5 text-center font-outfit-medium text-sm leading-5 text-slate-500">
@@ -1182,7 +1177,7 @@ export default function MapScreen() {
                     <Feather name="trash-2" size={16} color="#7F302C" />
                   )}
                   <Text
-                    className="ml-2 font-outfit-semibold text-sm text-[#7F302C]"
+                    className="ml-2 font-outfit-semibold text-sm text-errorText"
                   >
                     Delete spot
                   </Text>

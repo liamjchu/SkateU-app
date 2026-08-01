@@ -56,7 +56,7 @@ function PasswordField({
         autoCorrect={false}
         autoComplete={autoComplete}
         editable={editable}
-        className="flex-1 pl-4 pr-5 py-4 font-outfit-semibold text-base text-[#1B3B36]"
+        className="flex-1 pl-4 pr-5 py-4 font-outfit-semibold text-base text-ink"
       />
       <Pressable
         onPress={onToggleVisibility}
@@ -132,7 +132,7 @@ export default function ChangePasswordForm({ email }: ChangePasswordFormProps) {
   return (
     <View className="gap-4">
       <View>
-        <Text className="font-outfit-black text-2xl text-[#1B3B36]">
+        <Text className="font-outfit-black text-2xl text-ink">
           Change password
         </Text>
         <Text className="mt-2 font-outfit-medium text-base text-slate-500">
@@ -179,7 +179,7 @@ export default function ChangePasswordForm({ email }: ChangePasswordFormProps) {
           accessibilityRole="alert"
           accessibilityLiveRegion="polite"
           selectable
-          className="font-outfit-medium text-sm text-[#7F302C]"
+          className="font-outfit-medium text-sm text-errorText"
         >
           {error}
         </Text>
@@ -192,7 +192,7 @@ export default function ChangePasswordForm({ email }: ChangePasswordFormProps) {
           accessibilityLiveRegion="polite"
           className="rounded-2xl bg-[#EBF2F0] px-4 py-3"
         >
-          <Text selectable className="font-outfit-semibold text-sm text-[#1B3B36]">
+          <Text selectable className="font-outfit-semibold text-sm text-ink">
             {success}
           </Text>
         </View>

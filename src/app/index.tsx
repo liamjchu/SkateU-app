@@ -3,18 +3,22 @@ import Constants from 'expo-constants';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
-    BackHandler,
-    Image,
-    Keyboard,
-    Platform,
-    Pressable,
-    ScrollView,
-    Text,
-    TextInput,
-    View,
-    useWindowDimensions,
-    type GestureResponderEvent
+  BackHandler,
+  Image,
+  Keyboard,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
+  type GestureResponderEvent
 } from 'react-native';
+import {
+  configureReanimatedLogger,
+  ReanimatedLogLevel
+} from 'react-native-reanimated';
 import FavoriteSchoolRow from '../components/FavoriteSchoolRow';
 import FeedbackPressable from '../components/FeedbackPressable';
 import IMAGES from '../constants/images';
@@ -24,6 +28,12 @@ import { useFavorites } from '../store/favoritesStore';
 import { useProfileStore } from '../store/profileStore';
 import { useSchools } from '../store/schoolsStore';
 import type { School } from '../types/school';
+
+// Call this at the top level of your entry file
+configureReanimatedLogger({
+  level: ReanimatedLogLevel.warn,
+  strict: false, // Disables strict mode warnings
+});
 
 type SchoolRowProps = {
   school: School;
@@ -130,14 +140,12 @@ function SchoolRow({
 
           <View className="ml-4 min-w-0 flex-1">
             <Text
-              className="text-lg text-[#1B3B36]"
-              style={{ fontFamily: 'Outfit_700Bold' }}
+              className="text-lg text-ink font-outfit-bold"
             >
               {school.name}
             </Text>
             <Text
-              className="text-sm text-slate-400 mt-0.5"
-              style={{ fontFamily: 'Outfit_500Medium' }}
+              className="text-sm text-slate-400 mt-0.5 font-outfit-medium"
             >
               {school.city}, {school.state}
             </Text>
@@ -152,8 +160,7 @@ function SchoolRow({
             className="mr-[3px]"
           />
           <Text
-            className="text-base text-[#1B3B36]"
-            style={{ fontFamily: 'Outfit_700Bold' }}
+            className="text-base text-ink font-outfit-bold"
           >
             {formatSpotCount(displayNumSpots)}
           </Text>
@@ -192,14 +199,12 @@ function SchoolRow({
 
         <View className="ml-3 min-w-0 flex-1">
           <Text
-            className="text-base text-[#1B3B36]"
-            style={{ fontFamily: 'Outfit_700Bold' }}
+            className="text-base text-ink font-outfit-bold"
           >
             {school.name}
           </Text>
           <Text
-            className="text-sm text-slate-400 mt-0.5"
-            style={{ fontFamily: 'Outfit_500Medium' }}
+            className="text-sm text-slate-400 mt-0.5 font-outfit-medium"
           >
             {school.city}, {school.state}
           </Text>
@@ -214,8 +219,7 @@ function SchoolRow({
           className="mr-[3px]"
         />
         <Text
-          className="text-base text-[#1B3B36]"
-          style={{ fontFamily: 'Outfit_700Bold' }}
+          className="text-base text-ink font-outfit-bold"
         >
           {formatSpotCount(displayNumSpots)}
         </Text>
@@ -550,8 +554,7 @@ export default function HomeScreen() {
   };
 
   const handleFavoriteSelect = (school: School) => {
-    upsertSchool(school);
-    navigateToSchoolMap(school);
+    handleSchoolSelect(school);
   };
 
   const handleFavoritePress = (
@@ -611,8 +614,7 @@ export default function HomeScreen() {
             resizeMode="contain"
           />
           <Text 
-            className="-ml-[5px] text-4xl text-white tracking-tight"
-            style={{ fontFamily: 'Outfit_900Black' }}
+            className="-ml-[5px] text-4xl text-white tracking-tight font-outfit-black"
           >
             SkateU
           </Text>
@@ -651,20 +653,17 @@ export default function HomeScreen() {
         {/* Welcome Message Card */}
         <View className="bg-[#EBF2F0] rounded-3xl p-6 mb-5">
           <Text 
-            className="text-base text-slate-500 mb-1"
-            style={{ fontFamily: 'Outfit_500Medium' }}
+            className="text-base text-slate-500 mb-1 font-outfit-medium"
           >
             {greeting}
           </Text>
           <Text 
-            className="text-3xl text-[#1B3B36] mb-1.5"
-            style={{ fontFamily: 'Outfit_900Black' }}
+            className="text-3xl text-ink mb-1.5 font-outfit-black"
           >
             {welcomeMessage}
           </Text>
           <Text 
-            className="text-base text-slate-500"
-            style={{ fontFamily: 'Outfit_500Medium' }}
+            className="text-base text-slate-500 font-outfit-medium"
           >
             Find a new campus skate spot.
           </Text>
@@ -679,7 +678,7 @@ export default function HomeScreen() {
             );
           }}
         >
-          <View className="absolute left-4 top-3 z-10">
+          <View className="absolute left-4 inset-y-0 justify-center z-10">
             <Ionicons name="search-outline" size={22} color="#1B3B36" />
           </View>
           <TextInput
@@ -692,19 +691,22 @@ export default function HomeScreen() {
             accessibilityLabel="Search colleges and universities"
             accessibilityHint="Type at least three characters to find a school"
             accessibilityState={{ expanded: isOpen }}
-            className="rounded-2xl bg-[#F0F3F5] py-5 pl-14 pr-12 text-lg text-[#1B3B36]"
-            style={{ fontFamily: 'Outfit_600SemiBold' }}
+            numberOfLines={1}
+            multiline={false}
+            className="h-16 rounded-2xl bg-[#F0F3F5] py-5 pl-14 pr-14 text-lg text-ink font-outfit-semibold"
           />
 
           {searchQuery.length > 0 ? (
-            <FeedbackPressable
-              onPress={handleClearSearch}
-              className="absolute right-4 top-2 h-12 w-12 items-center justify-center rounded-full bg-[#F0F3F5]"
-              accessibilityRole="button"
-              accessibilityLabel="Clear school search"
-            >
-              <Text className="text-sm font-bold text-slate-400">✕</Text>
-            </FeedbackPressable>
+            <View className="absolute right-4 inset-y-0 justify-center z-10">
+              <FeedbackPressable
+                onPress={handleClearSearch}
+                className="h-12 w-12 items-center justify-center rounded-full bg-[#F0F3F5]"
+                accessibilityRole="button"
+                accessibilityLabel="Clear school search"
+              >
+                <Text className="text-sm font-outfit-bold text-slate-400">✕</Text>
+              </FeedbackPressable>
+            </View>
           ) : null}
 
         </View>
@@ -719,14 +721,12 @@ export default function HomeScreen() {
             <View className="flex-1 min-h-0 rounded-3xl bg-[#EBF2F0] p-3">
               <View className="mb-3 flex-row items-center justify-between px-1">
                 <Text
-                  className="text-lg text-[#1B3B36]"
-                  style={{ fontFamily: 'Outfit_900Black' }}
+                  className="text-lg text-ink font-outfit-black"
                 >
                   Favorites
                 </Text>
                 <Text
-                  className="text-sm text-slate-400"
-                  style={{ fontFamily: 'Outfit_700Bold' }}
+                  className="text-sm text-slate-400 font-outfit-bold"
                 >
                   {isHydratingFavoriteSchools
                     ? '...'
@@ -736,7 +736,7 @@ export default function HomeScreen() {
 
               {favoriteRefreshError ? (
                 <View className="mb-3 flex-row items-center rounded-2xl border border-[#B45F58] bg-[#FBE9E7] px-3 py-2">
-                  <Text className="flex-1 pr-2 font-outfit-medium text-xs text-[#7F302C]">
+                  <Text className="flex-1 pr-2 font-outfit-medium text-xs text-errorText">
                     Something went wrong refreshing favorites.
                   </Text>
                   <FeedbackPressable
@@ -761,14 +761,12 @@ export default function HomeScreen() {
                     accessibilityLiveRegion="polite"
                   >
                     <Text
-                      className="text-xl text-[#1B3B36]"
-                      style={{ fontFamily: 'Outfit_700Bold' }}
+                      className="text-xl text-ink font-outfit-bold"
                     >
                       Loading favorites...
                     </Text>
                     <Text
-                      className="mt-1.5 text-center text-sm leading-5 text-slate-400"
-                      style={{ fontFamily: 'Outfit_500Medium' }}
+                      className="mt-1.5 text-center text-sm leading-5 text-slate-400 font-outfit-medium"
                     >
                       Restoring your saved schools.
                     </Text>
@@ -779,14 +777,12 @@ export default function HomeScreen() {
                       <Octicons name="star" size={30} color="#1B3B36" />
                     </View>
                     <Text
-                      className="mt-4 text-xl text-[#1B3B36]"
-                      style={{ fontFamily: 'Outfit_700Bold' }}
+                      className="mt-4 text-xl text-ink font-outfit-bold"
                     >
                       No favorites yet
                     </Text>
                     <Text
-                      className="mt-1.5 text-center text-sm leading-5 text-slate-400"
-                      style={{ fontFamily: 'Outfit_500Medium' }}
+                      className="mt-1.5 text-center text-sm leading-5 text-slate-400 font-outfit-medium"
                     >
                       Tap the{' '}
                       <Octicons name="star-fill" size={13} color="#1B3B36" />
@@ -850,8 +846,7 @@ export default function HomeScreen() {
           >
             <View className="px-4 py-2 bg-slate-50 border-b border-slate-100">
               <Text 
-                className="text-xs text-slate-400"
-                style={{ fontFamily: 'Outfit_700Bold' }}
+                className="text-xs text-slate-400 font-outfit-bold"
               >
                 {searchQuery.trim().length < 3
                   ? 'Type 3 or more characters'
@@ -870,8 +865,7 @@ export default function HomeScreen() {
                   <Text
                     accessibilityRole="alert"
                     accessibilityLiveRegion="polite"
-                    className="flex-1 pr-3 text-base text-[#7F302C]"
-                    style={{ fontFamily: 'Outfit_500Medium' }}
+                    className="flex-1 pr-3 text-base text-errorText font-outfit-medium"
                   >
                     Something went wrong. {searchError}
                   </Text>
@@ -886,15 +880,13 @@ export default function HomeScreen() {
                 </View>
               ) : isSearching ? (
                 <Text
-                  className="px-4 py-4 text-base text-slate-400 bg-white"
-                  style={{ fontFamily: 'Outfit_500Medium' }}
+                  className="px-4 py-4 text-base text-slate-400 bg-white font-outfit-medium"
                 >
                   Searching schools...
                 </Text>
               ) : searchQuery.trim().length < 3 ? (
                 <Text
-                  className="px-4 py-4 text-base text-slate-400 bg-white"
-                  style={{ fontFamily: 'Outfit_500Medium' }}
+                  className="px-4 py-4 text-base text-slate-400 bg-white font-outfit-medium"
                 >
                   Keep typing to search by school&apos;s full name or city
                 </Text>
@@ -913,8 +905,7 @@ export default function HomeScreen() {
                 ))
               ) : (
                 <Text 
-                  className="px-4 py-4 text-base text-slate-400 bg-white"
-                  style={{ fontFamily: 'Outfit_500Medium' }}
+                  className="px-4 py-4 text-base text-slate-400 bg-white font-outfit-medium"
                 >
                   No schools found
                 </Text>
@@ -934,18 +925,22 @@ export default function HomeScreen() {
           accessibilityLabel={selectedSchool ? `Open ${selectedSchool.name} map` : 'Choose a school to continue'}
           accessibilityState={{ disabled: !selectedSchool }}
           className={`w-full rounded-2xl py-4 flex-row items-center justify-center space-x-2 relative -top-4 ${
-            selectedSchool ? 'bg-[#1B3B36]' : 'bg-[#60756F]'
+            selectedSchool
+              ? 'border border-transparent bg-[#1B3B36]'
+              : 'border border-[#5f6f6b] bg-[#5f6f6b]'
           }`}
         >
-          <Text 
-            className="text-center text-lg text-white"
-            style={{ fontFamily: 'Outfit_700Bold' }}
+          <Text
+            className={`font-outfit-bold text-center text-lg ${
+              selectedSchool ? 'text-white' : 'text-[#F3FAF7]'
+            }`}
           >
             View campus map
           </Text>
-          <Text 
-            className="text-white text-sm"
-            style={{ fontFamily: 'Outfit_700Bold' }}
+          <Text
+            className={`font-outfit-bold text-sm ${
+              selectedSchool ? 'text-white' : 'text-[#F3FAF7]'
+            }`}
           >   ❯</Text>
         </FeedbackPressable>
       </View>

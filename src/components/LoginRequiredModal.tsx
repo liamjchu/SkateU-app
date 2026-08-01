@@ -41,14 +41,12 @@ export default function LoginRequiredModal({
           }}
         >
           <Text
-            className="text-2xl text-[#1B3B36]"
-            style={{ fontFamily: 'Outfit_900Black' }}
+            className="text-2xl text-ink font-outfit-black"
           >
             Log in to like and add spots
           </Text>
           <Text
-            className="mt-3 text-base text-slate-500"
-            style={{ fontFamily: 'Outfit_500Medium' }}
+            className="mt-3 text-base text-slate-500 font-outfit-medium"
           >
             Create an account to like spots and post your own.
           </Text>
@@ -61,8 +59,7 @@ export default function LoginRequiredModal({
               accessibilityRole="button"
             >
               <Text
-                className="text-base text-[#1B3B36]"
-                style={{ fontFamily: 'Outfit_700Bold' }}
+                className="text-base text-ink font-outfit-bold"
               >
                 Cancel
               </Text>
@@ -74,8 +71,7 @@ export default function LoginRequiredModal({
               accessibilityRole="button"
             >
               <Text
-                className="text-base text-white"
-                style={{ fontFamily: 'Outfit_700Bold' }}
+                className="text-base text-white font-outfit-bold"
               >
                 Log in
               </Text>

@@ -52,7 +52,7 @@ export default function ChangeUsernameScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <Text className="font-outfit-black text-3xl text-[#1B3B36]">
+          <Text className="font-outfit-black text-3xl text-ink">
             Change your username
           </Text>
           <Text className="mt-2 font-outfit-medium text-base text-slate-500">
