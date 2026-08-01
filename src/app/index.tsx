@@ -15,25 +15,16 @@ import {
     View,
     type GestureResponderEvent
 } from 'react-native';
-import {
-    configureReanimatedLogger,
-    ReanimatedLogLevel
-} from 'react-native-reanimated';
 import FavoriteSchoolRow from '../components/FavoriteSchoolRow';
 import FeedbackPressable from '../components/FeedbackPressable';
 import IMAGES from '../constants/images';
+import { formatSpotCount } from '../lib/formatSpotCount';
 import { triggerHaptic } from '../lib/haptics';
 import { useAuthStore } from '../store/authStore';
 import { useFavorites } from '../store/favoritesStore';
 import { useProfileStore } from '../store/profileStore';
 import { useSchools } from '../store/schoolsStore';
 import type { School } from '../types/school';
-
-// Call this at the top level of your entry file
-configureReanimatedLogger({
-  level: ReanimatedLogLevel.warn,
-  strict: false, // Disables strict mode warnings
-});
 
 type SchoolRowProps = {
   school: School;
@@ -45,7 +36,6 @@ type SchoolRowProps = {
     event: GestureResponderEvent,
     school: School
   ) => void;
-  isDropdownItem?: boolean;
 };
 
 type SchoolsSearchResponse = {
@@ -88,18 +78,6 @@ function getApiUrl(path: string) {
   );
 }
 
-function formatSpotCount(count: number) {
-  if (count < 1000) {
-    return count.toString();
-  }
-
-  if (count < 1000000) {
-    return `${Math.floor(count / 100) / 10}K`;
-  }
-
-  return `${Math.floor(count / 100000) / 10}M`;
-}
-
 function SchoolRow({
   school,
   displayNumSpots,
@@ -107,68 +85,7 @@ function SchoolRow({
   isSelected,
   onSelect,
   onFavoritePress,
-  isDropdownItem = false,
 }: SchoolRowProps) {
-  if (!isDropdownItem) {
-    return (
-      <FeedbackPressable
-        haptic="selection"
-        onPress={() => onSelect(school)}
-        accessibilityRole="button"
-        accessibilityLabel={`Open ${school.name}`}
-        accessibilityHint="Opens the campus map"
-        accessibilityState={{ selected: isSelected }}
-        className={`flex-row items-center justify-between p-2 mb-3 rounded-3xl border bg-[#F0F5F4] ${
-          isSelected ? 'border-[#1B3B36] bg-[#E3ECEA]' : 'border-slate-200/60'
-        }`}
-      >
-        <View className="min-w-0 flex-1 flex-row items-center pr-2">
-          <FeedbackPressable
-            haptic="selection"
-            onPress={(event) => onFavoritePress(event, school)}
-            className="h-12 w-12 items-center justify-center rounded-2xl bg-white"
-            accessibilityRole="button"
-            accessibilityLabel={`${isFavorite ? 'Remove' : 'Add'} ${school.name} ${isFavorite ? 'from' : 'to'} favorites`}
-            accessibilityState={{ selected: isFavorite }}
-          >
-            <Octicons
-              name={isFavorite ? 'star-fill' : 'star'}
-              size={20}
-              color={isFavorite ? '#1B3B36' : '#52645F'}
-            />
-          </FeedbackPressable>
-
-          <View className="ml-4 min-w-0 flex-1">
-            <Text
-              className="text-lg text-ink font-outfit-bold"
-            >
-              {school.name}
-            </Text>
-            <Text
-              className="text-sm text-slate-400 mt-0.5 font-outfit-medium"
-            >
-              {school.city}, {school.state}
-            </Text>
-          </View>
-        </View>
-
-        <View className="w-20 shrink-0 flex-row items-center justify-center space-x-1.5 rounded-xl bg-white/50 px-3 py-1.5">
-          <Feather
-            name="map-pin"
-            size={11}
-            color="#475569"
-            className="mr-[3px]"
-          />
-          <Text
-            className="text-base text-ink font-outfit-bold"
-          >
-            {formatSpotCount(displayNumSpots)}
-          </Text>
-        </View>
-      </FeedbackPressable>
-    );
-  }
-
   return (
     <FeedbackPressable
       haptic="selection"
@@ -256,9 +173,6 @@ export default function HomeScreen() {
   const [isHydratingFavoriteSchools, setIsHydratingFavoriteSchools] =
     useState(true);
   const [searchBarBottom, setSearchBarBottom] = useState(0);
-  const [removingFavoriteSchoolId, setRemovingFavoriteSchoolId] = useState<
-    string | null
-  >(null);
   const { height, width } = useWindowDimensions();
   const isTabletLayout = width >= 768 && height >= 600;
 
@@ -307,7 +221,7 @@ export default function HomeScreen() {
       : `Welcome back, ${profile.username}!`;
   const profileInitial =
     profile?.username?.charAt(0).toUpperCase() ||
-    session?.user.email?.charAt(0).toUpperCase() ||
+    session?.user?.email?.charAt(0).toUpperCase() ||
     'P';
 
   useEffect(() => {
@@ -325,6 +239,7 @@ export default function HomeScreen() {
       return;
     }
 
+    let cancelled = false;
     setIsHydratingFavoriteSchools(true);
     const controller = new AbortController();
 
@@ -345,27 +260,31 @@ export default function HomeScreen() {
         }
 
         const data = (await response.json()) as SchoolsSearchResponse;
-        data.schools.forEach((school) => {
-          upsertSchool(school);
-          upsertFavoriteSchool(school);
-        });
-        setFavoriteRefreshError('');
+        data.schools.forEach(upsertFavoriteSchool);
+        if (!cancelled) {
+          setFavoriteRefreshError('');
+        }
       } catch (error) {
         if (error instanceof Error && error.name === 'AbortError') {
           return;
         }
 
-        setFavoriteRefreshError(
-          error instanceof Error ? error.message : 'Unable to load favorite schools right now.'
-        );
+        if (!cancelled) {
+          setFavoriteRefreshError(
+            error instanceof Error ? error.message : 'Unable to load favorite schools right now.'
+          );
+        }
       } finally {
-        setIsHydratingFavoriteSchools(false);
+        if (!cancelled) {
+          setIsHydratingFavoriteSchools(false);
+        }
       }
     };
 
     fetchMissingFavoriteSchools();
 
     return () => {
+      cancelled = true;
       controller.abort();
     };
   }, [
@@ -374,7 +293,6 @@ export default function HomeScreen() {
     hasHydratedFavorites,
     schools,
     upsertFavoriteSchool,
-    upsertSchool,
   ]);
 
   // Re-pull favorite schools' spot counts from the backend whenever the home
@@ -386,8 +304,9 @@ export default function HomeScreen() {
         return;
       }
 
+      let cancelled = false;
       const controller = new AbortController();
-      if (favoriteRefreshNonce > 0) {
+      if (favoriteRefreshNonce > 0 && !cancelled) {
         setFavoriteRefreshError('');
       }
 
@@ -407,21 +326,26 @@ export default function HomeScreen() {
             upsertSchool(school);
             upsertFavoriteSchool(school);
           });
-          setFavoriteRefreshError('');
+          if (!cancelled) {
+            setFavoriteRefreshError('');
+          }
         } catch (error) {
           if (error instanceof Error && error.name === 'AbortError') {
             return;
           }
 
-          setFavoriteRefreshError(
-            error instanceof Error ? error.message : 'Unable to refresh favorite schools right now.'
-          );
+          if (!cancelled) {
+            setFavoriteRefreshError(
+              error instanceof Error ? error.message : 'Unable to refresh favorite schools right now.'
+            );
+          }
         }
       };
 
       refreshFavoriteSchools();
 
       return () => {
+        cancelled = true;
         controller.abort();
       };
     }, [
@@ -567,14 +491,8 @@ export default function HomeScreen() {
   };
 
   const handleRemoveFavoriteSchool = (school: School) => {
-    if (removingFavoriteSchoolId) {
-      return;
-    }
-
-    setRemovingFavoriteSchoolId(school.id);
     triggerHaptic('warning');
     toggleFavoriteSchool(school);
-    setRemovingFavoriteSchoolId(null);
   };
 
   const handleGoPress = () => {
@@ -731,7 +649,7 @@ export default function HomeScreen() {
               {favoriteRefreshError ? (
                 <View className="mb-3 flex-row items-center rounded-2xl border border-[#B45F58] bg-[#FBE9E7] px-3 py-2">
                   <Text className="flex-1 pr-2 font-outfit-medium text-xs text-errorText">
-                    Something went wrong refreshing favorites.
+                    {favoriteRefreshError}
                   </Text>
                   <FeedbackPressable
                     onPress={() => {
@@ -795,7 +713,7 @@ export default function HomeScreen() {
                       <FavoriteSchoolRow
                         key={school.id}
                         school={school}
-                        isRemoving={removingFavoriteSchoolId === school.id}
+                        isSelected={selectedSchool?.id === school.id}
                         onRemove={handleRemoveFavoriteSchool}
                         onSelect={handleFavoriteSelect}
                       />
@@ -894,7 +812,6 @@ export default function HomeScreen() {
                     isSelected={selectedSchool?.id === school.id}
                     onSelect={handleSchoolSelect}
                     onFavoritePress={handleFavoritePress}
-                    isDropdownItem
                   />
                 ))
               ) : (

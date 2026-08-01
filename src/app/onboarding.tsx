@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { UsernameForm } from '../components/username-form';
 import { slugifyUsername } from '../lib/username';
@@ -50,33 +50,42 @@ export default function OnboardingScreen() {
         </Text>
       </View>
 
-      <View className="flex-1 self-center w-full max-w-[640px] px-5 pt-8 pb-8">
-        <Text className="font-outfit-black text-3xl text-ink">
-          One last step
-        </Text>
-        <Text className="mt-2 font-outfit-medium text-base text-slate-500">
-          Pick a unique username. This is how other skaters will see you — your
-          email stays private.
-        </Text>
-        <UsernameForm
-          initialUsername={suggestedUsername}
-          submitLabel="Continue"
-          submittingLabel="Saving..."
-          showWelcomeOnSave
-          onSaved={() => undefined}
-        />
-      </View>
-
-      <Pressable
-        onPress={handleSignOut}
-        className="min-h-12 items-center justify-center px-5 py-5"
-        accessibilityRole="button"
-        accessibilityLabel="Sign out"
+      <KeyboardAvoidingView
+        className="flex-1"
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <Text className="font-outfit-semibold text-base text-slate-500">
-          Sign out
-        </Text>
-      </Pressable>
+        <ScrollView
+          className="flex-1"
+          contentContainerClassName="flex-grow self-center w-full max-w-[640px] px-5 pt-8 pb-8"
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <Text className="font-outfit-black text-3xl text-ink">
+            One last step
+          </Text>
+          <Text className="mt-2 font-outfit-medium text-base text-slate-500">
+            Pick a unique username. This is how other skaters will see you — your
+            email stays private.
+          </Text>
+          <UsernameForm
+            initialUsername={suggestedUsername}
+            submitLabel="Continue"
+            submittingLabel="Saving..."
+            showWelcomeOnSave
+            onSaved={() => undefined}
+          />
+          <Pressable
+            onPress={handleSignOut}
+            className="mt-auto min-h-12 items-center justify-center py-5"
+            accessibilityRole="button"
+            accessibilityLabel="Sign out"
+          >
+            <Text className="font-outfit-semibold text-base text-slate-500">
+              Sign out
+            </Text>
+          </Pressable>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }

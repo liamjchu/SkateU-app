@@ -12,12 +12,21 @@ import * as WebBrowser from 'expo-web-browser';
 import { useEffect } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import {
+    configureReanimatedLogger,
+    ReanimatedLogLevel,
+} from 'react-native-reanimated';
 import '../../global.css';
 import { useAuthStore } from '../store/authStore';
 import { useProfileStore } from '../store/profileStore';
 import { useSpotsStore } from '../store/spotsStore';
 
 SplashScreen.preventAutoHideAsync();
+
+configureReanimatedLogger({
+  level: ReanimatedLogLevel.warn,
+  strict: false,
+});
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({

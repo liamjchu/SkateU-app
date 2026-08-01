@@ -42,6 +42,7 @@ import { useSpotsStore } from '../store/spotsStore';
 import type { School } from '../types/school';
 
 const COLLAPSED_SHEET_HEIGHT = 100;
+const TILE_ERROR_THRESHOLD = 3;
 
 const MAP_ATTRIBUTIONS = {
   default: '© OpenStreetMap contributors © CARTO',
@@ -75,13 +76,16 @@ export default function MapScreen() {
   const sharedMapLayer = useMapViewStore((state) => state.mapLayer);
   const setSharedMapLayer = useMapViewStore((state) => state.setMapLayer);
   const webViewReadyRef = useRef(false);
+  const tileErrorCountRef = useRef(0);
   const hasInitializedMapLayerRef = useRef(false);
   const [mapAttempt, setMapAttempt] = useState(0);
   const [mapStatus, setMapStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [mapError, setMapError] = useState('');
   const [selectedSpotId, setSelectedSpotId] = useState<string | undefined>(initialSpotId);
   const initialMapLayer: 'default' | 'satellite' =
-    searchParams.layer === 'satellite' ? 'satellite' : 'default';
+    searchParams.layer === 'satellite' || searchParams.layer === 'default'
+      ? searchParams.layer
+      : sharedMapLayer;
   const [mapLayer, setMapLayer] = useState<'default' | 'satellite'>(
     initialMapLayer
   );
@@ -268,7 +272,7 @@ export default function MapScreen() {
         const reportTileError = function () {
           if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
             window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'CONSOLE_ERROR',
+              type: 'TILE_ERROR',
               message: 'Map tiles could not be loaded.'
             }));
           }
@@ -433,6 +437,7 @@ export default function MapScreen() {
 
   const retryMap = useCallback(() => {
     webViewReadyRef.current = false;
+    tileErrorCountRef.current = 0;
     setMapError('');
     setMapStatus('loading');
     setMapAttempt((attempt) => attempt + 1);
@@ -637,10 +642,23 @@ export default function MapScreen() {
 
       // When the WebView finishes loading, it will notify us so we can send markers
       if (data.type === 'WEBVIEW_READY') {
+        tileErrorCountRef.current = 0;
         webViewReadyRef.current = true;
         setMapStatus('ready');
         setMapError('');
         sendMarkers();
+        return;
+      }
+
+      if (data.type === 'TILE_ERROR') {
+        tileErrorCountRef.current += 1;
+        if (tileErrorCountRef.current < TILE_ERROR_THRESHOLD) {
+          return;
+        }
+
+        webViewReadyRef.current = false;
+        setMapStatus('error');
+        setMapError('Map tiles could not be loaded.');
         return;
       }
 
@@ -769,6 +787,7 @@ export default function MapScreen() {
           onPress={() => {
             webViewRef.current?.injectJavaScript(`window.toggleLayer(); true;`);
           }}
+          disabled={mapStatus !== 'ready'}
           className="h-12 w-12 items-center justify-center"
           accessibilityLabel={
             mapLayer === 'satellite'
@@ -776,7 +795,10 @@ export default function MapScreen() {
               : 'Switch to satellite map'
           }
           accessibilityRole="button"
-          accessibilityState={{ selected: mapLayer === 'satellite' }}
+          accessibilityState={{
+            disabled: mapStatus !== 'ready',
+            selected: mapLayer === 'satellite',
+          }}
         >
           <Image source={images.layers} style={styles.icon} />
         </FeedbackPressable>
@@ -801,10 +823,12 @@ export default function MapScreen() {
         <FeedbackPressable
           haptic="light"
           onPress={() => setShowAttribution(true)}
+          disabled={mapStatus !== 'ready'}
           className="h-12 w-12 items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel="Show map attribution"
           accessibilityHint="Shows attribution for the active map layer"
+          accessibilityState={{ disabled: mapStatus !== 'ready' }}
         >
           <Feather name="info" size={22} color="#FFFFFF" />
         </FeedbackPressable>
@@ -863,7 +887,7 @@ export default function MapScreen() {
               </FeedbackPressable>
             </View>
             <View className="mt-4 pb-6">
-              <Text className="font-outfit-medium text-sm leading-5 text-slate-500">
+              <Text className="font-outfit-medium text-sm leading-5 text-muted-strong">
                 {MAP_ATTRIBUTIONS[mapLayer]}
               </Text>
             </View>
@@ -899,6 +923,7 @@ export default function MapScreen() {
         mixedContentMode="always"
         onLoadStart={() => {
           webViewReadyRef.current = false;
+          tileErrorCountRef.current = 0;
           setMapStatus('loading');
           setMapError('');
         }}
@@ -958,7 +983,7 @@ export default function MapScreen() {
               >
                 Spots unavailable
               </Text>
-              <Text className="mt-0.5 font-outfit-medium text-xs text-slate-500">
+              <Text className="mt-0.5 font-outfit-medium text-xs text-muted-strong">
                 The map loaded, but spots could not be refreshed.
               </Text>
             </View>
@@ -1003,7 +1028,7 @@ export default function MapScreen() {
           <Text className="mt-3 text-center font-outfit-bold text-xl text-ink">
             No skate spots here yet
           </Text>
-          <Text className="mt-1.5 text-center font-outfit-medium text-sm leading-5 text-slate-500">
+          <Text className="mt-1.5 text-center font-outfit-medium text-sm leading-5 text-muted-strong">
             Be the first to add a spot to this campus.
           </Text>
           <FeedbackPressable
@@ -1049,7 +1074,7 @@ export default function MapScreen() {
                   <View className="mt-1 flex-row items-center">
                     <Octicons name="person" size={13} color="#475569" />
                     <Text
-                      className="ml-1 font-outfit-medium text-xs text-slate-500"
+                      className="ml-1 font-outfit-medium text-xs text-muted-strong"
                   >
                       {selectedSpot.creatorUsername
                         ? `@${selectedSpot.creatorUsername}`
@@ -1058,12 +1083,12 @@ export default function MapScreen() {
                     {spotTimeInfo ? (
                       <>
                         <Text
-                          className="mx-1.5 font-outfit-medium text-xs text-slate-400"
+                          className="mx-1.5 font-outfit-medium text-xs text-muted"
                         >
                           ·
                         </Text>
                         <Text
-                          className="font-outfit-medium text-xs text-slate-500"
+                          className="font-outfit-medium text-xs text-muted-strong"
                         >
                           {`${spotTimeInfo.label} ${spotTimeInfo.relative}`}
                         </Text>
@@ -1137,7 +1162,7 @@ export default function MapScreen() {
             ) : (
               <View className="mt-4 h-80 items-center justify-center rounded-3xl bg-slate-100">
                 <Text
-                  className="font-outfit-medium text-slate-500"
+                  className="font-outfit-medium text-muted-strong"
                 >
                   No image available
                 </Text>
@@ -1145,7 +1170,7 @@ export default function MapScreen() {
             )}
 
             <Text
-              className="font-outfit-medium mt-4 text-sm text-slate-500"
+              className="font-outfit-medium mt-4 text-sm text-muted-strong"
             >
               {selectedSpot.description}
             </Text>

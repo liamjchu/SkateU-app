@@ -2,29 +2,32 @@ import { useNavigation } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import FeedbackPressable from '../components/FeedbackPressable';
-import LocationPicker from '../components/LocationPicker';
+import LocationPicker, {
+    type LocationPickerStatus,
+} from '../components/LocationPicker';
 import SpotImagePicker from '../components/SpotImagePicker';
 import {
-  getSpotFormErrors,
-  isAddSpotFormValid,
-  SPOT_DESCRIPTION_MAX,
-  SPOT_NAME_MAX,
+    getSpotFormErrors,
+    isAddSpotFormValid,
+    SPOT_DESCRIPTION_MAX,
+    SPOT_NAME_MAX,
 } from '../lib/addSpotForm';
 import { triggerHaptic } from '../lib/haptics';
 import { useAuthStore } from '../store/authStore';
+import { useMapViewStore } from '../store/mapViewStore';
 import { useSpotsStore } from '../store/spotsStore';
-
-
 import type { SpotImageAsset } from '../types/spot';
 
 type Coordinates = {
@@ -47,8 +50,11 @@ export default function AddSpotScreen() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
 
+  const sharedMapLayer = useMapViewStore((state) => state.mapLayer);
   const layer =
-    searchParams.layer === 'satellite' ? 'satellite' : 'default';
+    searchParams.layer === 'satellite' || searchParams.layer === 'default'
+      ? searchParams.layer
+      : sharedMapLayer;
 
   const schoolId = Array.isArray(searchParams.schoolId)
     ? searchParams.schoolId[0]
@@ -67,6 +73,8 @@ export default function AddSpotScreen() {
   );
 
   const [scrollEnabled, setScrollEnabled] = useState(true);
+  const [locationPickerStatus, setLocationPickerStatus] =
+    useState<LocationPickerStatus>('loading');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [hasSubmitted, setHasSubmitted] = useState(false);
@@ -87,6 +95,10 @@ export default function AddSpotScreen() {
   const showImageError = hasSubmitted || touched.image;
   const showNameError = hasSubmitted || touched.name;
   const showDescriptionError = hasSubmitted || touched.description;
+  const locationError =
+    locationPickerStatus === 'error'
+      ? 'Location map is unavailable. Retry it before saving.'
+      : 'Wait for the location map to finish loading.';
   const hasUnsavedChanges =
     imageUri !== undefined ||
     name.length > 0 ||
@@ -141,7 +153,7 @@ export default function AddSpotScreen() {
 
   const handleSave = async () => {
     setHasSubmitted(true);
-    if (!isFormValid || saving) return;
+    if (!isFormValid || locationPickerStatus !== 'ready' || saving) return;
 
     // A school is required to associate the spot with the campus.
     if (!schoolId) {
@@ -226,12 +238,17 @@ export default function AddSpotScreen() {
         <View className="w-9" />
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-        scrollEnabled={scrollEnabled}
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={insets.top + 126}
+        style={{ flex: 1 }}
       >
+        <ScrollView
+          contentContainerClassName="w-full max-w-[720px] self-center px-5 pb-10 pt-4"
+          keyboardShouldPersistTaps="handled"
+          scrollEnabled={scrollEnabled}
+          showsVerticalScrollIndicator={false}
+        >
         <View className="mb-2 flex-row items-center">
           <Text className="font-outfit-bold text-[15px] tracking-[0.5px] text-darkGreen">PHOTO</Text>
           <Text className="ml-2 font-outfit-medium text-xs text-slate-500">(Required)</Text>
@@ -253,8 +270,12 @@ export default function AddSpotScreen() {
           <Text className="ml-2 font-outfit-medium text-xs text-slate-500">(Required)</Text>
         </View>
         <TextInput
-          style={[styles.input, showNameError && formErrors.name ? styles.inputError : null]}
-          className="font-outfit-medium text-sm text-darkGreen"
+          style={styles.input}
+          className={`border bg-white font-outfit-medium text-sm text-darkGreen ${
+            showNameError && formErrors.name
+              ? 'border-[#B45F58]'
+              : 'border-[#DDE4E1]'
+          }`}
           placeholder="e.g. Library 5 Stair, Parking Garage Ledge..."
           placeholderTextColor="#52645F"
           accessibilityLabel="Spot name, required"
@@ -283,8 +304,12 @@ export default function AddSpotScreen() {
           <Text className="ml-2 font-outfit-medium text-xs text-slate-500">(Required)</Text>
         </View>
         <TextInput
-          style={[styles.descriptionInput, showDescriptionError && formErrors.description ? styles.inputError : null]}
-          className="font-outfit-medium text-sm text-darkGreen"
+          style={styles.descriptionInput}
+          className={`border bg-white font-outfit-medium text-sm text-darkGreen ${
+            showDescriptionError && formErrors.description
+              ? 'border-[#B45F58]'
+              : 'border-[#DDE4E1]'
+          }`}
           placeholder="Describe the spot — obstacle type, spot condition, security..."
           placeholderTextColor="#52645F"
           accessibilityLabel="Spot description, required"
@@ -322,6 +347,7 @@ export default function AddSpotScreen() {
             initialLongitude={selectedLocation.longitude}
             initialLayer={layer}
             onLocationChange={handleLocationChange}
+            onStatusChange={(status) => setLocationPickerStatus(status)}
             onInteractionChange={(isInteracting: boolean) => {
               if (interactionTimeoutRef.current) {
                 clearTimeout(
@@ -342,12 +368,22 @@ export default function AddSpotScreen() {
               }
             }}
           />
-          <View className="-mt-4 mb-3 flex-row items-center rounded-xl bg-[#EBF2F0] px-3 py-2">
-            <Text className="font-outfit-bold text-sm text-darkGreen">✓ Spot location selected</Text>
-            <Text className="ml-2 flex-1 text-right font-outfit-medium text-xs text-slate-500">
-              {selectedLocation.latitude.toFixed(5)}, {selectedLocation.longitude.toFixed(5)}
+          {locationPickerStatus === 'ready' ? (
+            <View className="-mt-4 mb-3 flex-row items-center rounded-xl bg-[#EBF2F0] px-3 py-2">
+              <Text className="font-outfit-bold text-sm text-darkGreen">✓ Spot location selected</Text>
+              <Text className="ml-2 flex-1 text-right font-outfit-medium text-xs text-slate-500">
+                {selectedLocation.latitude.toFixed(5)}, {selectedLocation.longitude.toFixed(5)}
+              </Text>
+            </View>
+          ) : hasSubmitted ? (
+            <Text
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
+              className="-mt-4 mb-3 text-sm text-errorText"
+            >
+              {locationError}
             </Text>
-          </View>
+          ) : null}
         </View>
 
         {saveError ? (
@@ -392,6 +428,7 @@ export default function AddSpotScreen() {
           </View>
         </FeedbackPressable>
         </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -410,36 +447,17 @@ const styles = StyleSheet.create({
     elevation: 12,
   },
 
-  content: {
-    alignSelf: 'center',
-    width: '100%',
-    maxWidth: 720,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 40,
-  },
-
   photoWrapper: {
     marginBottom: 0,
   },
 
   input: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#DDE4E1',
     borderRadius: 16,
     paddingHorizontal: 20,
     paddingVertical: 18,
   },
 
-  inputError: {
-    borderColor: '#B45F58',
-  },
-
   descriptionInput: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#DDE4E1',
     borderRadius: 16,
     paddingHorizontal: 20,
     paddingVertical: 18,

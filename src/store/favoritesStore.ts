@@ -79,8 +79,10 @@ export const useFavorites = create<FavoritesStore>()(
     {
       name: '@skateu:favorite-schools',
       storage: createJSONStorage(() => AsyncStorage),
-      onRehydrateStorage: () => (state) => {
-        state?.setHasHydrated(true);
+      onRehydrateStorage: () => () => {
+        // The hydration listener runs for successful and failed rehydration.
+        // Zustand omits `state` on errors, so read from the initialized store.
+        useFavorites.getState().setHasHydrated(true);
       },
       partialize: (state) => ({
         favoriteSchoolIds: state.favoriteSchoolIds,

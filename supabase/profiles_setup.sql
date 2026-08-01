@@ -17,8 +17,16 @@ create table if not exists public.profiles (
   updated_at timestamptz default now()
 );
 
+-- Clear legacy values that cannot meet the username format before the
+-- constraint is installed. Nullifying invalid values avoids changing identities
+-- or creating case-insensitive uniqueness collisions during migration.
+update public.profiles
+set username = null
+where username is not null
+  and username !~ '^[a-z][a-z0-9_]{2,19}$';
+
 -- Adds the format guard for projects that already created the profiles table.
--- NOT VALID preserves legacy profile rows while enforcing the rule for every
+-- NOT VALID preserves validated legacy rows while enforcing the rule for every
 -- new or updated username.
 do $$
 begin

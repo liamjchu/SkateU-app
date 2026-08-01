@@ -7,8 +7,8 @@ import {
     Image,
     Text,
     View,
-    useWindowDimensions
 } from 'react-native';
+import { useIsTabletLayout } from '../hooks/useIsTabletLayout';
 import type { SpotImageAsset } from '../types/spot';
 import FeedbackPressable from './FeedbackPressable';
 
@@ -56,8 +56,7 @@ export default function SpotImagePicker({
   imageUri,
   onImageSelected,
 }: SpotImagePickerProps) {
-  const { height, width } = useWindowDimensions();
-  const isTabletLayout = width >= 768 && height >= 600;
+  const isTabletLayout = useIsTabletLayout();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
@@ -140,8 +139,6 @@ export default function SpotImagePicker({
         {imageUri ? (
           <Image
             source={{ uri: imageUri }}
-            accessibilityLabel="Selected spot photo"
-            accessible
             resizeMode="cover"
             style={{
               position: 'absolute',

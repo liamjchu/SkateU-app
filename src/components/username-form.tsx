@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
-import { validateUsername } from '../lib/username';
+import { USERNAME_MAX, validateUsername } from '../lib/username';
 import { useAuthStore } from '../store/authStore';
 import { useProfileStore } from '../store/profileStore';
 
@@ -83,7 +83,11 @@ export function UsernameForm({
     setValue(text.toLowerCase().replace(/[^a-z0-9_]/g, ''));
   };
 
-  const canSubmit = status === 'available' && !submitting && !unchanged;
+  const canSubmit =
+    status === 'available' &&
+    Boolean(accessToken) &&
+    !submitting &&
+    !unchanged;
 
   const handleSubmit = async () => {
     if (!accessToken || !canSubmit) {
@@ -132,7 +136,7 @@ export function UsernameForm({
           autoCapitalize="none"
           autoCorrect={false}
           autoFocus
-          maxLength={20}
+          maxLength={USERNAME_MAX}
           editable={!submitting}
           className="flex-1 py-4 pl-1 pr-2 font-outfit-semibold text-base text-ink"
         />

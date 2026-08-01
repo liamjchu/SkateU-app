@@ -2,18 +2,18 @@ import { Feather, Octicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    ScrollView,
-    Text,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  ScrollView,
+  Text,
+  View,
 } from 'react-native';
 import Animated, {
-    Easing,
-    useAnimatedStyle,
-    useSharedValue,
-    withTiming,
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FeedbackPressable from '../components/FeedbackPressable';
@@ -196,12 +196,20 @@ export default function ProfileScreen() {
   };
 
   const handleSpotPress = (spot: Spot) => {
+    if (!spot.schoolId) {
+      Alert.alert(
+        'Campus map unavailable',
+        'This spot is not linked to a campus, so its map cannot be opened.'
+      );
+      return;
+    }
+
     router.push({
       pathname: '/map',
       params: {
         lat: spot.latitude.toString(),
         lng: spot.longitude.toString(),
-        schoolId: spot.schoolId ?? '',
+        schoolId: spot.schoolId,
         schoolName: spot.schoolName || 'Campus map',
         schoolCity: spot.city,
         schoolState: spot.state,
@@ -234,6 +242,7 @@ export default function ProfileScreen() {
   const handleRetryDisplayedSpots = () => {
     const accessToken = session?.access_token;
     if (!accessToken) {
+      Alert.alert('Log in again', 'You must log in again before refreshing your spots.');
       return;
     }
 
@@ -414,7 +423,7 @@ export default function ProfileScreen() {
               accessibilityLiveRegion="polite"
               className="flex-1 pr-3 font-outfit-medium text-sm text-errorText"
             >
-              Something went wrong. Your previous content is still shown where possible.
+              {displayedError} Your previous content is still shown where possible.
             </Text>
             <FeedbackPressable
               onPress={handleRetryDisplayedSpots}
@@ -438,7 +447,7 @@ export default function ProfileScreen() {
               accessibilityLiveRegion="polite"
               className="text-center font-outfit-medium text-sm text-errorText"
             >
-              Something went wrong while loading your spots.
+              {displayedError}
             </Text>
             <FeedbackPressable
               onPress={handleRetryDisplayedSpots}

@@ -48,7 +48,7 @@ export default function LoginRequiredModal({
           <Text
             className="mt-3 text-base text-slate-500 font-outfit-medium"
           >
-            Create an account to like spots and post your own.
+            Create an account to save favorite campuses, like spots, and post your own.
           </Text>
 
           <View className="mt-6 flex-row gap-3">

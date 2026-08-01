@@ -117,12 +117,12 @@ export default function SettingsBottomSheet({
 
   return (
     <View
-      style={styles.modalRoot}
+      className="absolute inset-0 z-[100]"
       accessibilityViewIsModal
       accessibilityLabel="Settings"
     >
       <Pressable
-        style={styles.backdrop}
+        className="absolute inset-0 z-0 bg-black/35"
         onPress={onClose}
         accessibilityLabel="Close settings"
         accessibilityRole="button"
@@ -134,8 +134,9 @@ export default function SettingsBottomSheet({
           onLayout={(event) => {
             sheetHeight.value = event.nativeEvent.layout.height;
           }}
+          className="absolute bottom-0 left-0 right-0 z-10 rounded-t-[28px] bg-white px-5 pt-3"
           style={[
-            styles.sheet,
+            styles.sheetShadow,
             { paddingBottom: Math.max(insets.bottom, 16) },
             sheetAnimatedStyle,
           ]}
@@ -167,7 +168,8 @@ export default function SettingsBottomSheet({
           </GestureDetector>
 
           <View className="mt-4 gap-3 pb-6">
-            <Pressable
+            <FeedbackPressable
+              haptic="selection"
               onPress={onChangeUsername}
               className="min-h-12 w-full items-center justify-center rounded-2xl border border-[#21473f] py-4"
               accessibilityLabel="Change username"
@@ -177,9 +179,10 @@ export default function SettingsBottomSheet({
               <Text className="font-outfit-bold text-lg text-darkGreen">
                 Change username
               </Text>
-            </Pressable>
+            </FeedbackPressable>
 
-            <Pressable
+            <FeedbackPressable
+              haptic="selection"
               onPress={onChangePassword}
               className="min-h-12 w-full items-center justify-center rounded-2xl border border-[#21473f] py-4"
               accessibilityLabel="Change password"
@@ -189,9 +192,10 @@ export default function SettingsBottomSheet({
               <Text className="font-outfit-bold text-lg text-darkGreen">
                 Change password
               </Text>
-            </Pressable>
+            </FeedbackPressable>
 
-            <Pressable
+            <FeedbackPressable
+              haptic="light"
               onPress={onLogout}
               disabled={loggingOut}
               className={`min-h-12 w-full items-center justify-center rounded-2xl py-4 ${
@@ -204,8 +208,9 @@ export default function SettingsBottomSheet({
               <Text className="font-outfit-bold text-lg text-white">
                 {loggingOut ? 'Logging out...' : 'Log out'}
               </Text>
-            </Pressable>
-            <Pressable
+            </FeedbackPressable>
+            <FeedbackPressable
+              haptic="warning"
               onPress={onDeleteAccount}
               disabled={deleteAccountDisabled}
               className={`min-h-12 w-full items-center justify-center rounded-2xl py-4 ${
@@ -223,7 +228,7 @@ export default function SettingsBottomSheet({
               <Text className={`font-outfit-bold text-lg ${deleteAccountDisabled ? 'text-white' : 'text-errorText'}`}>
                 {deleteAccountDisabled ? 'Sending code...' : 'Delete account'}
               </Text>
-            </Pressable>
+            </FeedbackPressable>
 
           </View>
         </Animated.View>
@@ -232,35 +237,7 @@ export default function SettingsBottomSheet({
 }
 
 const styles = StyleSheet.create({
-  modalRoot: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    zIndex: 100,
-    elevation: 100,
-  },
-  backdrop: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    zIndex: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.35)',
-  },
-  sheet: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 1,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 20,
-    paddingTop: 12,
+  sheetShadow: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.2,

@@ -4,21 +4,42 @@ import {
     Image,
     Text,
     View,
-    useWindowDimensions,
 } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
+import { useIsTabletLayout } from '../hooks/useIsTabletLayout';
 import { buildLocationPickerHtml } from '../lib/locationPickerMap';
 import type { MapLayer } from '../store/mapViewStore';
 import FeedbackPressable from './FeedbackPressable';
 
 export type LayerType = MapLayer;
+export type LocationPickerStatus = 'loading' | 'ready' | 'error';
+
+type LocationPickerWebViewMessage =
+  | { type: 'WEBVIEW_READY' }
+  | { type: 'CONSOLE_ERROR'; message?: unknown }
+  | { type: 'LAYER_TOGGLED'; layer?: unknown }
+  | { type: 'CENTER_CHANGED'; latitude?: unknown; longitude?: unknown }
+  | { type: 'INTERACTION_START' }
+  | { type: 'INTERACTION_END' };
+
+function isLocationPickerWebViewMessage(
+  value: unknown
+): value is LocationPickerWebViewMessage {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'type' in value &&
+    typeof value.type === 'string'
+  );
+}
 
 type LocationPickerProps = {
   initialLatitude: number;
   initialLongitude: number;
   initialLayer: LayerType;
   onLocationChange: (latitude: number, longitude: number) => void;
+  onStatusChange?: (status: LocationPickerStatus, error: string) => void;
   onInteractionChange?: (isInteracting: boolean) => void;
 };
 
@@ -27,10 +48,10 @@ export default function LocationPicker({
   initialLongitude,
   initialLayer,
   onLocationChange,
+  onStatusChange,
   onInteractionChange,
 }: LocationPickerProps) {
-  const { height, width } = useWindowDimensions();
-  const isTabletLayout = width >= 768 && height >= 600;
+  const isTabletLayout = useIsTabletLayout();
   const webViewRef = useRef<WebView>(null);
   const mapLayerRef = useRef<LayerType>(initialLayer);
   const [webViewAttempt, setWebViewAttempt] = useState(0);
@@ -50,8 +71,14 @@ export default function LocationPicker({
     useState<number>(initialLongitude);
 
   useEffect(() => {
-    onLocationChange(selectedLatitude, selectedLongitude);
-  }, [selectedLatitude, selectedLongitude, onLocationChange]);
+    if (mapStatus === 'ready') {
+      onLocationChange(selectedLatitude, selectedLongitude);
+    }
+  }, [mapStatus, onLocationChange, selectedLatitude, selectedLongitude]);
+
+  useEffect(() => {
+    onStatusChange?.(mapStatus, mapError);
+  }, [mapError, mapStatus, onStatusChange]);
 
   const html = useMemo(
     () => buildLocationPickerHtml(initialRef.current),
@@ -78,7 +105,10 @@ export default function LocationPicker({
 
   const handleMessage = (event: WebViewMessageEvent) => {
     try {
-      const data = JSON.parse(event.nativeEvent.data);
+      const data: unknown = JSON.parse(event.nativeEvent.data);
+      if (!isLocationPickerWebViewMessage(data)) {
+        return;
+      }
 
       if (data.type === 'WEBVIEW_READY') {
         setMapStatus('ready');
@@ -200,24 +230,24 @@ export default function LocationPicker({
             )}
           </View>
         ) : null}
-
-
-        <View className="absolute left-1/2 top-1/2 w-[50px] h-[60px] -ml-[25px] -mt-[50px] items-center justify-start pointer-events-none">
-          <Image
-            source={{
-              uri: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-            }}
-            className="absolute w-[41px] h-[41px] left-[12px] top-[8px]"
-          />
-
-          <Svg width={50} height={50} viewBox="0 0 24 24">
-            <Path
-              d="M12 22s7-6.4 7-12a7 7 0 1 0-14 0c0 5.6 7 12 7 12z"
-              fill="#FFFFFF"
+        {mapStatus === 'ready' ? (
+          <View className="absolute left-1/2 top-1/2 h-[60px] w-[50px] -ml-[25px] -mt-[50px] items-center justify-start pointer-events-none">
+            <Image
+              source={{
+                uri: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+              }}
+              className="absolute left-[12px] top-[8px] h-[41px] w-[41px]"
             />
-            <Circle cx="12" cy="10" r="2.5" fill="#21473f" />
-          </Svg>
-        </View>
+
+            <Svg width={50} height={50} viewBox="0 0 24 24">
+              <Path
+                d="M12 22s7-6.4 7-12a7 7 0 1 0-14 0c0 5.6 7 12 7 12z"
+                fill="#FFFFFF"
+              />
+              <Circle cx="12" cy="10" r="2.5" fill="#21473f" />
+            </Svg>
+          </View>
+        ) : null}
       </View>
     </View>
   );

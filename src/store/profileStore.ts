@@ -41,6 +41,8 @@ type ProfileState = {
   ) => Promise<UsernameClaimResult>;
 };
 
+const USERNAME_MODERATION_TIMEOUT_MS = 10_000;
+
 let profileRequestVersion = 0;
 
 export const useProfileStore = create<ProfileState>((set, get) => ({
@@ -97,7 +99,10 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
   // This only provides typing feedback. The server-side claim remains the
   // source of truth so concurrent requests cannot reserve the same username.
   isUsernameAvailable: async (username, excludingUserId) => {
-    const query = supabase.from('profiles').select('id').eq('username', username);
+    const query = supabase
+      .from('profiles')
+      .select('id')
+      .ilike('username', username);
     const { data, error } = excludingUserId
       ? await query.neq('id', excludingUserId).maybeSingle()
       : await query.maybeSingle();
@@ -110,55 +115,71 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
   },
 
   claimUsername: async (accessToken, username, showWelcomeOnSave = false) => {
-    const response = await fetch(getApiUrl('/api/moderate-username'), {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ username }),
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () => controller.abort(),
+      USERNAME_MODERATION_TIMEOUT_MS
+    );
 
-    const data = (await response.json().catch(() => null)) as
-      | UsernameClaimResponse
-      | null;
+    try {
+      const response = await fetch(getApiUrl('/api/moderate-username'), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username }),
+        signal: controller.signal,
+      });
 
-    if (!response.ok) {
-      throw new Error(
-        data?.error ?? 'Could not save the username right now. Try again.'
-      );
+      const data = (await response.json().catch(() => null)) as
+        | UsernameClaimResponse
+        | null;
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ?? 'Could not save the username right now. Try again.'
+        );
+      }
+
+      if (!data?.allowed) {
+        return {
+          ok: false,
+          taken: data?.taken === true,
+          message: data?.reason ?? "That username isn't allowed. Please pick another.",
+        };
+      }
+
+      const profile = data.profile;
+      if (!profile?.id || profile.username !== username) {
+        throw new Error('Could not save the username right now. Try again.');
+      }
+
+      const previousUsername = get().profile?.username;
+      const welcomeAboardUserId = get().welcomeAboardUserId;
+      profileRequestVersion += 1;
+      set({
+        profile,
+        welcomeAboardUserId: showWelcomeOnSave ? profile.id : welcomeAboardUserId,
+        loading: false,
+        loaded: true,
+        error: null,
+      });
+
+      if (previousUsername && previousUsername !== username) {
+        useSpotsStore
+          .getState()
+          .replaceCreatorUsername(previousUsername, username);
+      }
+
+      return { ok: true };
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('Saving the username timed out. Please try again.');
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
     }
-
-    if (!data?.allowed) {
-      return {
-        ok: false,
-        taken: data?.taken === true,
-        message: data?.reason ?? "That username isn't allowed. Please pick another.",
-      };
-    }
-
-    const profile = data.profile;
-    if (!profile?.id || profile.username !== username) {
-      throw new Error('Could not save the username right now. Try again.');
-    }
-
-    const previousUsername = get().profile?.username;
-    const welcomeAboardUserId = get().welcomeAboardUserId;
-    profileRequestVersion += 1;
-    set({
-      profile,
-      welcomeAboardUserId: showWelcomeOnSave ? profile.id : welcomeAboardUserId,
-      loading: false,
-      loaded: true,
-      error: null,
-    });
-
-    if (previousUsername && previousUsername !== username) {
-      useSpotsStore
-        .getState()
-        .replaceCreatorUsername(previousUsername, username);
-    }
-
-    return { ok: true };
   },
 }));

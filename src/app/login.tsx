@@ -2,18 +2,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    ScrollView,
+    Text,
+    TextInput,
+    View
 } from 'react-native';
 import GoogleSignInButton from '../components/GoogleSignInButton';
 import {
-  getPasswordRequirementStatus,
-  validatePassword,
+    getPasswordRequirementStatus,
+    validatePassword,
 } from '../lib/password';
 import { useAuthStore } from '../store/authStore';
 
@@ -211,7 +211,12 @@ export default function LoginScreen() {
           {isSignup ? (
             <View
               accessible
-              accessibilityLabel="Password requirements"
+              accessibilityLabel={`Password requirements. ${passwordRequirements
+                .map(
+                  (requirement) =>
+                    `${requirement.label}: ${requirement.met ? 'met' : 'not met'}`
+                )
+                .join('. ')}.`}
               className="rounded-2xl bg-[#F7F9F8] px-4 py-3"
             >
               <Text

@@ -1,18 +1,22 @@
+import { useNavigation } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
+    Alert,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
     StyleSheet,
     Text,
     TextInput,
-    View,
+    View
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import FeedbackPressable from '../components/FeedbackPressable';
-import LocationPicker from '../components/LocationPicker';
+import LocationPicker, {
+    type LocationPickerStatus,
+} from '../components/LocationPicker';
 import SpotImagePicker from '../components/SpotImagePicker';
 import {
     getSpotFormErrors,
@@ -38,6 +42,7 @@ const MISSING_SPOT_ERROR =
 
 export default function EditSpotScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const searchParams = useLocalSearchParams();
   const insets = useSafeAreaInsets();
 
@@ -76,6 +81,8 @@ export default function EditSpotScreen() {
   });
 
   const [scrollEnabled, setScrollEnabled] = useState(true);
+  const [locationPickerStatus, setLocationPickerStatus] =
+    useState<LocationPickerStatus>('loading');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [hasSubmitted, setHasSubmitted] = useState(false);
@@ -86,6 +93,7 @@ export default function EditSpotScreen() {
   });
 
   const interactionTimeoutRef = useRef<number | null>(null);
+  const allowRemovalRef = useRef(false);
 
   useEffect(() => {
     const accessToken = session?.access_token;
@@ -115,6 +123,18 @@ export default function EditSpotScreen() {
   const showImageError = hasSubmitted || touched.image;
   const showNameError = hasSubmitted || touched.name;
   const showDescriptionError = hasSubmitted || touched.description;
+  const locationError =
+    locationPickerStatus === 'error'
+      ? 'Location map is unavailable. Retry it before saving.'
+      : 'Wait for the location map to finish loading.';
+  const hasUnsavedChanges = Boolean(
+    spot &&
+      (name !== spot.name ||
+        description !== spot.description ||
+        imageChanged ||
+        selectedLocation.latitude !== spot.latitude ||
+        selectedLocation.longitude !== spot.longitude)
+  );
 
   const handleImageSelected = (asset: SpotImageAsset) => {
     setTouched((current) => ({ ...current, image: true }));
@@ -131,6 +151,35 @@ export default function EditSpotScreen() {
   );
 
   useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (event) => {
+      if (!hasUnsavedChanges || allowRemovalRef.current) {
+        allowRemovalRef.current = false;
+        return;
+      }
+
+      event.preventDefault();
+      Alert.alert(
+        'Discard unsaved changes?',
+        'Your changes to this spot will be lost if you leave now.',
+        [
+          { text: 'Keep editing', style: 'cancel' },
+          {
+            text: 'Discard changes',
+            style: 'destructive',
+            onPress: () => {
+              allowRemovalRef.current = true;
+              navigation.dispatch(event.data.action);
+            },
+          },
+        ],
+        { cancelable: true }
+      );
+    });
+
+    return unsubscribe;
+  }, [hasUnsavedChanges, navigation]);
+
+  useEffect(() => {
     return () => {
       if (interactionTimeoutRef.current) {
         clearTimeout(interactionTimeoutRef.current as unknown as number);
@@ -141,7 +190,7 @@ export default function EditSpotScreen() {
 
   const handleSave = async () => {
     setHasSubmitted(true);
-    if (!isFormValid || saving || !spotId) return;
+    if (!isFormValid || locationPickerStatus !== 'ready' || saving || !spotId) return;
 
     const accessToken = session?.access_token;
     if (!accessToken) {
@@ -165,6 +214,7 @@ export default function EditSpotScreen() {
         accessToken
       );
       triggerHaptic('success');
+      allowRemovalRef.current = true;
       router.back();
     } catch (error) {
       setSaveError(
@@ -220,11 +270,11 @@ export default function EditSpotScreen() {
           style={{ flex: 1 }}
         >
           <ScrollView
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
-          scrollEnabled={scrollEnabled}
-          showsVerticalScrollIndicator={false}
-        >
+            contentContainerClassName="w-full max-w-[720px] self-center px-5 pb-10 pt-4"
+            keyboardShouldPersistTaps="handled"
+            scrollEnabled={scrollEnabled}
+            showsVerticalScrollIndicator={false}
+          >
           <View className="mb-2 flex-row items-center">
             <Text className="font-outfit-bold text-[15px] tracking-[0.5px] text-darkGreen">PHOTO</Text>
             <Text className="ml-2 font-outfit-medium text-xs text-slate-500">Required</Text>
@@ -246,8 +296,12 @@ export default function EditSpotScreen() {
             <Text className="ml-2 font-outfit-medium text-xs text-slate-500">(Required)</Text>
           </View>
           <TextInput
-            style={[styles.input, showNameError && formErrors.name ? styles.inputError : null]}
-            className="font-outfit-medium text-sm text-darkGreen"
+            style={styles.input}
+            className={`border bg-white font-outfit-medium text-sm text-darkGreen ${
+              showNameError && formErrors.name
+                ? 'border-[#B45F58]'
+                : 'border-[#DDE4E1]'
+            }`}
             placeholder="e.g. Library 5 Stair, Parking Garage Ledge..."
             placeholderTextColor="#52645F"
             accessibilityLabel="Spot name, required"
@@ -276,8 +330,12 @@ export default function EditSpotScreen() {
             <Text className="ml-2 font-outfit-medium text-xs text-slate-500">(Required)</Text>
           </View>
           <TextInput
-            style={[styles.descriptionInput, showDescriptionError && formErrors.description ? styles.inputError : null]}
-            className="font-outfit-medium text-sm text-darkGreen"
+            style={styles.descriptionInput}
+            className={`border bg-white font-outfit-medium text-sm text-darkGreen ${
+              showDescriptionError && formErrors.description
+                ? 'border-[#B45F58]'
+                : 'border-[#DDE4E1]'
+            }`}
             placeholder="Describe the spot — obstacle type, spot condition, security..."
             placeholderTextColor="#52645F"
             accessibilityLabel="Spot description, required"
@@ -315,6 +373,7 @@ export default function EditSpotScreen() {
               initialLongitude={selectedLocation.longitude}
               initialLayer={layer}
               onLocationChange={handleLocationChange}
+              onStatusChange={(status) => setLocationPickerStatus(status)}
               onInteractionChange={(isInteracting: boolean) => {
                 if (interactionTimeoutRef.current) {
                   clearTimeout(
@@ -335,12 +394,22 @@ export default function EditSpotScreen() {
                 }
               }}
             />
-            <View className="-mt-4 mb-3 flex-row items-center rounded-xl bg-[#EBF2F0] px-3 py-2">
-              <Text className="font-outfit-bold text-sm text-darkGreen">✓ Spot location selected</Text>
-              <Text className="ml-2 flex-1 text-right font-outfit-medium text-xs text-slate-500">
-                {selectedLocation.latitude.toFixed(5)}, {selectedLocation.longitude.toFixed(5)}
+            {locationPickerStatus === 'ready' ? (
+              <View className="-mt-4 mb-3 flex-row items-center rounded-xl bg-[#EBF2F0] px-3 py-2">
+                <Text className="font-outfit-bold text-sm text-darkGreen">✓ Spot location selected</Text>
+                <Text className="ml-2 flex-1 text-right font-outfit-medium text-xs text-slate-500">
+                  {selectedLocation.latitude.toFixed(5)}, {selectedLocation.longitude.toFixed(5)}
+                </Text>
+              </View>
+            ) : hasSubmitted ? (
+              <Text
+                accessibilityRole="alert"
+                accessibilityLiveRegion="polite"
+                className="-mt-4 mb-3 text-sm text-errorText"
+              >
+                {locationError}
               </Text>
-            </View>
+            ) : null}
           </View>
 
           {saveError ? (
@@ -400,36 +469,17 @@ const styles = StyleSheet.create({
     elevation: 12,
   },
 
-  content: {
-    alignSelf: 'center',
-    width: '100%',
-    maxWidth: 720,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 40,
-  },
-
   photoWrapper: {
     marginBottom: 0,
   },
 
   input: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#DDE4E1',
     borderRadius: 16,
     paddingHorizontal: 20,
     paddingVertical: 18,
   },
 
-  inputError: {
-    borderColor: '#B45F58',
-  },
-
   descriptionInput: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#DDE4E1',
     borderRadius: 16,
     paddingHorizontal: 20,
     paddingVertical: 18,
