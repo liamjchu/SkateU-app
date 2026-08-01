@@ -11,10 +11,37 @@
 -- -----------------------------------------------------------------------------
 create table if not exists public.profiles (
   id         uuid primary key references auth.users (id) on delete cascade,
-  username   text unique,
+  username   text unique constraint profiles_username_format_check
+    check (username is null or username ~ '^[a-z][a-z0-9_]{2,19}$'),
   avatar_url text,
   updated_at timestamptz default now()
 );
+
+-- Clear legacy values that cannot meet the username format before the
+-- constraint is installed. Nullifying invalid values avoids changing identities
+-- or creating case-insensitive uniqueness collisions during migration.
+update public.profiles
+set username = null
+where username is not null
+  and username !~ '^[a-z][a-z0-9_]{2,19}$';
+
+-- Adds the format guard for projects that already created the profiles table.
+-- NOT VALID preserves validated legacy rows while enforcing the rule for every
+-- new or updated username.
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'profiles_username_format_check'
+      and conrelid = 'public.profiles'::regclass
+  ) then
+    alter table public.profiles
+      add constraint profiles_username_format_check
+      check (username is null or username ~ '^[a-z][a-z0-9_]{2,19}$') not valid;
+  end if;
+end;
+$$;
 
 -- Fast, case-insensitive uniqueness/lookup for usernames.
 -- (The `unique` above is case-sensitive; this index makes "John" == "john".)

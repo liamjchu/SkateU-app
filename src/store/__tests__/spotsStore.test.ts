@@ -440,14 +440,14 @@ describe('spotsStore liked spots', () => {
   it('preserves loaded likes and exposes the server reason when loading fails', async () => {
     const existing = makeSpot({ id: 'liked', likedByUser: true });
     useSpotsStore.setState({ likedSpots: [existing] });
-    fetchMock.mockResolvedValue(mockResponse({ reason: 'Sign in again.' }, { ok: false, status: 401 }));
+    fetchMock.mockResolvedValue(mockResponse({ reason: 'Log in again.' }, { ok: false, status: 401 }));
 
     await useSpotsStore.getState().fetchLikedSpots('expired-token');
 
     expect(useSpotsStore.getState()).toMatchObject({
       likedSpots: [existing],
       likedLoading: false,
-      likedError: 'Sign in again.',
+      likedError: 'Log in again.',
     });
   });
 

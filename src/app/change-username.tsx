@@ -1,11 +1,13 @@
 import { useRouter } from 'expo-router';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
-import ChangePasswordForm from '../components/ChangePasswordForm';
-import { useAuthStore } from '../store/authStore';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { UsernameForm } from '../components/username-form';
+import { useProfileStore } from '../store/profileStore';
 
-export default function ChangePasswordScreen() {
+export default function ChangeUsernameScreen() {
   const router = useRouter();
-  const email = useAuthStore((state) => state.user?.email ?? '');
+  const insets = useSafeAreaInsets();
+  const username = useProfileStore((state) => state.profile?.username ?? '');
 
   const goBack = () => {
     if (router.canGoBack()) {
@@ -19,8 +21,9 @@ export default function ChangePasswordScreen() {
   return (
     <View className="flex-1 bg-white">
       <View
-        className="h-[136px] justify-center bg-[#21473f] px-6 pb-3 pt-[70px]"
+        className="justify-center bg-[#21473f] px-6 pb-3"
         style={{
+          paddingTop: insets.top + 16,
           shadowColor: '#000',
           shadowOffset: { width: 0, height: 4 },
           shadowOpacity: 0.25,
@@ -37,12 +40,8 @@ export default function ChangePasswordScreen() {
           >
             <Text className="text-xl text-white">❮</Text>
           </Pressable>
-
-          <Text className="font-outfit-bold text-2xl text-white">
-            Account settings
-          </Text>
-
-          <View className="h-11 w-11" />
+          <Text className="font-outfit-bold text-2xl text-white">Username</Text>
+          <View className="h-12 w-12" />
         </View>
       </View>
 
@@ -52,13 +51,23 @@ export default function ChangePasswordScreen() {
       >
         <ScrollView
           className="flex-1"
-          contentContainerClassName="flex-grow"
+          contentContainerClassName="flex-grow self-center w-full max-w-[640px] px-5 pt-8 pb-8"
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View className="flex-1 self-center w-full max-w-[640px] px-5 pt-8 pb-8">
-            <ChangePasswordForm email={email} />
-          </View>
+          <Text className="font-outfit-black text-3xl text-ink">
+            Change your username
+          </Text>
+          <Text className="mt-2 font-outfit-medium text-base text-slate-500">
+            Your new username will appear on every spot you&apos;ve added.
+          </Text>
+          <UsernameForm
+            initialUsername={username}
+            currentUsername={username}
+            submitLabel="Save username"
+            submittingLabel="Saving..."
+            onSaved={goBack}
+          />
         </ScrollView>
       </KeyboardAvoidingView>
     </View>

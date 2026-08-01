@@ -11,6 +11,10 @@ import {
     View
 } from 'react-native';
 import GoogleSignInButton from '../components/GoogleSignInButton';
+import {
+    getPasswordRequirementStatus,
+    validatePassword,
+} from '../lib/password';
 import { useAuthStore } from '../store/authStore';
 
 export default function LoginScreen() {
@@ -27,6 +31,25 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
 
   const isSignup = mode === 'signup';
+  const passwordRequirementStatus = getPasswordRequirementStatus(password);
+  const passwordRequirements = [
+    {
+      label: 'At least 8 characters',
+      met: passwordRequirementStatus.minLength,
+    },
+    {
+      label: 'Uppercase and lowercase letters',
+      met: passwordRequirementStatus.upperAndLowerCase,
+    },
+    {
+      label: 'At least one number',
+      met: passwordRequirementStatus.number,
+    },
+    {
+      label: 'At least one special character',
+      met: passwordRequirementStatus.specialCharacter,
+    },
+  ];
 
   const goBack = () => {
     if (router.canGoBack()) {
@@ -45,6 +68,15 @@ export default function LoginScreen() {
     if (!email.trim() || !password) {
       setError('Enter your email and password.');
       return;
+    }
+
+    if (isSignup) {
+      const passwordError = validatePassword(password);
+
+      if (passwordError) {
+        setError(passwordError);
+        return;
+      }
     }
 
     setError('');
@@ -81,7 +113,7 @@ export default function LoginScreen() {
   return (
     <View className="flex-1 bg-white">
       <View
-        className="h-[126px] justify-center bg-[#21473f] px-6 pb-3 pt-[70px]"
+        className="h-[136px] justify-center bg-[#21473f] px-6 pb-3 pt-[70px]"
         style={{
           shadowColor: '#000',
           shadowOffset: { width: 0, height: 4 },
@@ -93,7 +125,7 @@ export default function LoginScreen() {
         <View className="flex-row items-center justify-between">
           <Pressable
             onPress={goBack}
-            className="h-11 w-11 items-center justify-center rounded-full"
+            className="h-12 w-12 items-center justify-center rounded-full"
             accessibilityLabel="Go back"
             accessibilityRole="button"
           >
@@ -101,8 +133,7 @@ export default function LoginScreen() {
           </Pressable>
 
           <Text
-            className="text-2xl text-white"
-            style={{ fontFamily: 'Outfit_700Bold' }}
+            className="text-2xl text-white font-outfit-bold"
           >
             {isSignup ? 'Sign up' : 'Login'}
           </Text>
@@ -121,16 +152,14 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View className="flex-1 px-5 pt-8">
+          <View className="flex-1 self-center w-full max-w-[640px] px-5 pt-8 pb-8">
         <Text
-          className="text-3xl text-[#1B3B36]"
-          style={{ fontFamily: 'Outfit_900Black' }}
+          className="text-3xl text-ink font-outfit-black"
         >
           {isSignup ? 'Create your account' : 'Welcome back'}
         </Text>
         <Text
-          className="mt-2 text-base text-slate-500"
-          style={{ fontFamily: 'Outfit_500Medium' }}
+          className="mt-2 text-base text-slate-500 font-outfit-medium"
         >
           {isSignup
             ? 'Sign up to add and share campus skate spots.'
@@ -142,56 +171,103 @@ export default function LoginScreen() {
             value={email}
             onChangeText={setEmail}
             placeholder="Email"
-            placeholderTextColor="#8E9AA6"
+            accessibilityLabel="Email address"
+            placeholderTextColor="#52645F"
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="email-address"
             editable={!submitting}
-            className="rounded-2xl bg-[#F0F3F5] pl-4 pr-5 py-4 text-base text-[#1B3B36]"
-            style={{ fontFamily: 'Outfit_600SemiBold' }}
+            className="rounded-2xl bg-[#F0F3F5] pl-4 pr-5 py-4 text-base text-ink font-outfit-semibold"
           />
           <View className="flex-row items-center rounded-2xl bg-[#F0F3F5] pr-3">
             <TextInput
               value={password}
               onChangeText={setPassword}
               placeholder="Password"
-              placeholderTextColor="#8E9AA6"
+              accessibilityLabel="Password"
+              placeholderTextColor="#52645F"
               secureTextEntry={!showPassword}
               autoCapitalize="none"
               editable={!submitting}
-              className="flex-1 pl-4 pr-5 py-4 text-base text-[#1B3B36]"
-              style={{ fontFamily: 'Outfit_600SemiBold' }}
+              className="flex-1 pl-4 pr-5 py-4 text-base text-ink font-outfit-semibold"
             />
             <Pressable
               onPress={() => setShowPassword((prev) => !prev)}
               disabled={submitting}
               hitSlop={8}
-              className="h-9 w-9 items-center justify-center"
+              className="h-12 w-12 items-center justify-center"
               accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
               accessibilityRole="button"
+              accessibilityState={{ disabled: submitting }}
             >
               <Ionicons
                 name={showPassword ? 'eye-outline' : 'eye-off-outline'}
                 size={22}
-                color="#8E9AA6"
+                color="#52645F"
               />
             </Pressable>
           </View>
 
+          {isSignup ? (
+            <View
+              accessible
+              accessibilityLabel={`Password requirements. ${passwordRequirements
+                .map(
+                  (requirement) =>
+                    `${requirement.label}: ${requirement.met ? 'met' : 'not met'}`
+                )
+                .join('. ')}.`}
+              className="rounded-2xl bg-[#F7F9F8] px-4 py-3"
+            >
+              <Text
+                className="text-sm text-ink font-outfit-bold"
+              >
+                Password requirements
+              </Text>
+              {passwordRequirements.map((requirement) => (
+                <View
+                  key={requirement.label}
+                  className="mt-2 flex-row items-center gap-2"
+                >
+                  <Ionicons
+                    name={
+                      requirement.met
+                        ? 'checkmark-circle'
+                        : 'ellipse-outline'
+                    }
+                    size={18}
+                    color={requirement.met ? '#21473F' : '#52645F'}
+                  />
+                  <Text
+                    className={`text-sm ${
+                      requirement.met ? 'text-darkGreen' : 'text-slate-500'
+                    } font-outfit-medium`}
+                  >
+                    {requirement.label}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
           {error ? (
             <Text
-              className="text-sm text-red-500"
-              style={{ fontFamily: 'Outfit_500Medium' }}
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
+              className="text-sm text-errorText font-outfit-medium"
             >
               {error}
             </Text>
           ) : null}
 
           {notice ? (
-            <View className="rounded-2xl bg-[#EBF2F0] px-4 py-3">
+            <View
+              accessible
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
+              className="rounded-2xl bg-[#EBF2F0] px-4 py-3">
               <Text
-                className="text-sm text-[#1B3B36]"
-                style={{ fontFamily: 'Outfit_600SemiBold' }}
+                className="text-sm text-ink font-outfit-semibold"
               >
                 {notice}
               </Text>
@@ -202,14 +278,14 @@ export default function LoginScreen() {
             onPress={handleSubmit}
             disabled={submitting}
             className={`mt-2 items-center justify-center rounded-2xl py-4 ${
-              submitting ? 'bg-[#21473f]/60' : 'bg-[#21473f]'
+              submitting ? 'bg-[#60756F]' : 'bg-[#21473f]'
             }`}
             accessibilityLabel={isSignup ? 'Sign up' : 'Login'}
             accessibilityRole="button"
+            accessibilityState={{ disabled: submitting, busy: submitting }}
           >
             <Text
-              className="text-lg text-white"
-              style={{ fontFamily: 'Outfit_700Bold' }}
+              className="text-lg text-white font-outfit-bold"
             >
               {submitting
                 ? 'Please wait...'
@@ -226,12 +302,14 @@ export default function LoginScreen() {
               setMode(isSignup ? 'login' : 'signup');
             }}
             disabled={submitting}
-            className="items-center justify-center py-1"
+            className="min-h-12 items-center justify-center px-2 py-1"
             accessibilityRole="button"
+            accessibilityLabel={
+              isSignup ? 'Switch to login' : 'Switch to sign up'
+            }
           >
             <Text
-              className="text-base text-slate-500"
-              style={{ fontFamily: 'Outfit_600SemiBold' }}
+              className="text-base text-slate-500 font-outfit-semibold"
             >
               {isSignup
                 ? 'Already have an account? Login'
@@ -243,13 +321,12 @@ export default function LoginScreen() {
             <Pressable
               onPress={() => router.push('/forgot-password')}
               disabled={submitting}
-              className="items-center justify-center py-1"
+              className="-mt-[14px] min-h-12 items-center justify-center px-2 py-1"
               accessibilityRole="button"
               accessibilityLabel="Forgot password"
             >
               <Text
-                className="text-sm text-slate-400"
-                style={{ fontFamily: 'Outfit_500Medium' }}
+                className="text-base text-slate-500 font-outfit-semibold"
               >
                 Forgot password?
               </Text>
@@ -259,8 +336,7 @@ export default function LoginScreen() {
           <View className="flex-row items-center">
             <View className="h-px flex-1 bg-slate-200" />
             <Text
-              className="mx-3 text-sm text-slate-400"
-              style={{ fontFamily: 'Outfit_600SemiBold' }}
+              className="mx-3 text-sm text-slate-400 font-outfit-semibold"
             >
               or
             </Text>
@@ -273,17 +349,16 @@ export default function LoginScreen() {
             onError={(message) => setError(message)}
           />
 
-          {/* TODO: Sign in with Apple - to be implemented later */}
+          {/* TODO: Log in with Apple - to be implemented later */}
           {/* <Pressable
             className="items-center justify-center rounded-2xl border border-slate-200 py-4"
-            accessibilityLabel="Sign in with Apple"
+            accessibilityLabel="Log in with Apple"
             accessibilityRole="button"
           >
             <Text
-              className="text-base text-[#1B3B36]"
-              style={{ fontFamily: 'Outfit_700Bold' }}
+              className="text-base text-ink font-outfit-bold"
             >
-              Sign in with Apple
+              Log in with Apple
             </Text>
           </Pressable> */}
         </View>

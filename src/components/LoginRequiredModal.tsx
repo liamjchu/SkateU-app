@@ -26,10 +26,12 @@ export default function LoginRequiredModal({
     >
       <View
         className="flex-1 items-center justify-center px-6"
+        accessibilityViewIsModal
+        accessibilityLabel="Login required"
         style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}
       >
         <View
-          className="w-full rounded-3xl bg-white p-6"
+          className="w-full max-w-[480px] rounded-3xl bg-white p-6"
           style={{
             shadowColor: '#000',
             shadowOffset: { width: 0, height: 4 },
@@ -39,16 +41,14 @@ export default function LoginRequiredModal({
           }}
         >
           <Text
-            className="text-2xl text-[#1B3B36]"
-            style={{ fontFamily: 'Outfit_900Black' }}
+            className="text-2xl text-ink font-outfit-black"
           >
-            Login required
+            Log in to like and add spots
           </Text>
           <Text
-            className="mt-3 text-base text-slate-500"
-            style={{ fontFamily: 'Outfit_500Medium' }}
+            className="mt-3 text-base text-slate-500 font-outfit-medium"
           >
-            You need to login for this.
+            Create an account to save favorite campuses, like spots, and post your own.
           </Text>
 
           <View className="mt-6 flex-row gap-3">
@@ -59,8 +59,7 @@ export default function LoginRequiredModal({
               accessibilityRole="button"
             >
               <Text
-                className="text-base text-[#1B3B36]"
-                style={{ fontFamily: 'Outfit_700Bold' }}
+                className="text-base text-ink font-outfit-bold"
               >
                 Cancel
               </Text>
@@ -72,10 +71,9 @@ export default function LoginRequiredModal({
               accessibilityRole="button"
             >
               <Text
-                className="text-base text-white"
-                style={{ fontFamily: 'Outfit_700Bold' }}
+                className="text-base text-white font-outfit-bold"
               >
-                Login
+                Log in
               </Text>
             </Pressable>
           </View>

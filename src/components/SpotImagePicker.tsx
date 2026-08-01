@@ -5,11 +5,12 @@ import {
     ActivityIndicator,
     Alert,
     Image,
-    Pressable,
     Text,
     View,
 } from 'react-native';
+import { useIsTabletLayout } from '../hooks/useIsTabletLayout';
 import type { SpotImageAsset } from '../types/spot';
+import FeedbackPressable from './FeedbackPressable';
 
 type SpotImagePickerProps = {
   imageUri?: string;
@@ -55,6 +56,7 @@ export default function SpotImagePicker({
   imageUri,
   onImageSelected,
 }: SpotImagePickerProps) {
+  const isTabletLayout = useIsTabletLayout();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
@@ -118,13 +120,20 @@ export default function SpotImagePicker({
 
   return (
     <View className="mb-6">
-      <Pressable
+      <FeedbackPressable
+        haptic="light"
+        disabled={loading}
         onPress={handlePickImage}
-        className="h-78 overflow-hidden rounded-[16px] items-center justify-center bg-white"
+        className="overflow-hidden rounded-[16px] items-center justify-center bg-white"
+        accessibilityRole="button"
+        accessibilityLabel={imageUri ? 'Change spot photo' : 'Add spot photo'}
+        accessibilityHint="Opens camera or photo library"
+        accessibilityState={{ disabled: loading, busy: loading }}
         style={{
           borderWidth: 1,
           borderColor: '#DDE4E1',
           borderStyle: 'solid',
+          height: isTabletLayout ? 320 : 312,
         }}
       >
         {imageUri ? (
@@ -164,33 +173,32 @@ export default function SpotImagePicker({
                 />
               </View>
 
-              <Text
-                style={{
-                  fontSize: 16,
-                  fontWeight: '600',
-                  color: '#173A35',
-                  marginBottom: 4,
-                }}
-              >
+              <Text className="mb-1 font-outfit-semibold text-base text-ink-dark">
                 Add Spot Photo
               </Text>
 
-              <Text
-                style={{
-                  fontSize: 14,
-                  color: '#8CA19D',
-                  textAlign: 'center',
-                }}
-              >
+              <Text className="text-center font-outfit-medium text-sm text-slate-400">
                 Tap to take a photo or choose from your gallery
               </Text>
             </>
           )}
         </View>
-      </Pressable>
+        {imageUri && !loading ? (
+          <View className="absolute bottom-4 flex-row items-center rounded-full bg-black/60 px-4 py-2">
+            <Feather name="camera" size={16} color="#FFFFFF" />
+            <Text className="ml-2 font-outfit-bold text-sm text-white">
+              Change photo
+            </Text>
+          </View>
+        ) : null}
+      </FeedbackPressable>
 
       {error ? (
-        <Text className="mt-2 px-2 text-xs text-red-600">
+        <Text
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+          className="mt-2 px-2 text-xs text-errorText"
+        >
           {error}
         </Text>
       ) : null}

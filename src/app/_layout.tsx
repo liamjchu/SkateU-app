@@ -12,12 +12,21 @@ import * as WebBrowser from 'expo-web-browser';
 import { useEffect } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import {
+    configureReanimatedLogger,
+    ReanimatedLogLevel,
+} from 'react-native-reanimated';
 import '../../global.css';
 import { useAuthStore } from '../store/authStore';
 import { useProfileStore } from '../store/profileStore';
 import { useSpotsStore } from '../store/spotsStore';
 
 SplashScreen.preventAutoHideAsync();
+
+configureReanimatedLogger({
+  level: ReanimatedLogLevel.warn,
+  strict: false,
+});
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
@@ -167,7 +176,10 @@ export default function RootLayout() {
   if (userId && profileError) {
     return (
       <View className="flex-1 items-center justify-center bg-white px-6">
-        <Text className="text-center font-outfit-medium text-base text-slate-600">
+        <Text
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+          className="text-center font-outfit-medium text-base text-slate-600">
           {profileError}
         </Text>
         <Pressable
@@ -189,6 +201,12 @@ export default function RootLayout() {
         <Stack.Screen name="onboarding" />
         <Stack.Screen
           name="profile"
+          options={{
+            animation: 'slide_from_right',
+          }}
+        />
+        <Stack.Screen
+          name="change-username"
           options={{
             animation: 'slide_from_right',
           }}

@@ -88,7 +88,7 @@ export default function UpdatePasswordScreen() {
   return (
     <View className="flex-1 bg-white">
       <View
-        className="h-[126px] justify-center bg-[#21473f] px-6 pb-3 pt-[70px]"
+        className="h-[136px] justify-center bg-[#21473f] px-6 pb-3 pt-[70px]"
         style={{
           shadowColor: '#000',
           shadowOffset: { width: 0, height: 4 },
@@ -101,7 +101,7 @@ export default function UpdatePasswordScreen() {
           <Pressable
             onPress={() => router.replace('/login')}
             disabled={submitting || success}
-            className="h-11 w-11 items-center justify-center rounded-full"
+            className="h-12 w-12 items-center justify-center rounded-full"
             accessibilityRole="button"
             accessibilityLabel="Back to login"
           >
@@ -124,8 +124,8 @@ export default function UpdatePasswordScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View className="flex-1 px-5 pt-8">
-            <Text className="font-outfit-black text-3xl text-[#1B3B36]">
+          <View className="flex-1 self-center w-full max-w-[640px] px-5 pt-8 pb-8">
+            <Text className="font-outfit-black text-3xl text-ink">
               Create a new password
             </Text>
             <Text className="mt-2 font-outfit-medium text-base text-slate-500">
@@ -141,26 +141,28 @@ export default function UpdatePasswordScreen() {
                   value={password}
                   onChangeText={setPassword}
                   placeholder="New password"
-                  placeholderTextColor="#8E9AA6"
+                  placeholderTextColor="#52645F"
+                  accessibilityLabel="New password"
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
                   autoCorrect={false}
                   autoComplete="new-password"
                   editable={!submitting && !success}
-                  className="flex-1 pl-4 pr-5 py-4 font-outfit-semibold text-base text-[#1B3B36]"
+                  className="flex-1 pl-4 pr-5 py-4 font-outfit-semibold text-base text-ink"
                 />
                 <Pressable
                   onPress={() => setShowPassword((visible) => !visible)}
                   disabled={submitting || success}
                   hitSlop={8}
-                  className="h-9 w-9 items-center justify-center"
+                  className="h-12 w-12 items-center justify-center"
                   accessibilityRole="button"
                   accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                  accessibilityState={{ disabled: submitting || success }}
                 >
                   <Ionicons
                     name={showPassword ? 'eye-outline' : 'eye-off-outline'}
                     size={22}
-                    color="#8E9AA6"
+                    color="#52645F"
                   />
                 </Pressable>
               </View>
@@ -170,43 +172,53 @@ export default function UpdatePasswordScreen() {
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   placeholder="Confirm new password"
-                  placeholderTextColor="#8E9AA6"
+                  placeholderTextColor="#52645F"
+                  accessibilityLabel="Confirm new password"
                   secureTextEntry={!showConfirmation}
                   autoCapitalize="none"
                   autoCorrect={false}
                   autoComplete="new-password"
                   editable={!submitting && !success}
-                  className="flex-1 pl-4 pr-5 py-4 font-outfit-semibold text-base text-[#1B3B36]"
+                  className="flex-1 pl-4 pr-5 py-4 font-outfit-semibold text-base text-ink"
                 />
                 <Pressable
                   onPress={() => setShowConfirmation((visible) => !visible)}
                   disabled={submitting || success}
                   hitSlop={8}
-                  className="h-9 w-9 items-center justify-center"
+                  className="h-12 w-12 items-center justify-center"
                   accessibilityRole="button"
                   accessibilityLabel={
                     showConfirmation ? 'Hide password confirmation' : 'Show password confirmation'
                   }
+                  accessibilityState={{ disabled: submitting || success }}
                 >
                   <Ionicons
                     name={showConfirmation ? 'eye-outline' : 'eye-off-outline'}
                     size={22}
-                    color="#8E9AA6"
+                    color="#52645F"
                   />
                 </Pressable>
               </View>
 
               {error ? (
-                <Text selectable className="font-outfit-medium text-sm text-red-500">
+                <Text
+                  accessibilityRole="alert"
+                  accessibilityLiveRegion="polite"
+                  selectable
+                  className="font-outfit-medium text-sm text-errorText">
                   {error}
                 </Text>
               ) : null}
 
               {success ? (
-                <View className="rounded-2xl bg-[#EBF2F0] px-4 py-3">
+                <View
+                  accessible
+                  accessibilityRole="alert"
+                  accessibilityLiveRegion="polite"
+                  className="rounded-2xl bg-[#EBF2F0] px-4 py-3">
                   <Text
                     selectable
-                    className="font-outfit-semibold text-sm text-[#1B3B36]"
+                    className="font-outfit-semibold text-sm text-ink"
                   >
                     Your password has been updated. Taking you back to SkateU...
                   </Text>
@@ -216,10 +228,11 @@ export default function UpdatePasswordScreen() {
                   onPress={handleSubmit}
                   disabled={submitting}
                   className={`mt-2 items-center justify-center rounded-2xl py-4 ${
-                    submitting ? 'bg-[#21473f]/60' : 'bg-[#21473f]'
+                    submitting ? 'bg-[#60756F]' : 'bg-[#21473f]'
                   }`}
                   accessibilityRole="button"
-                  accessibilityLabel="Save new password"
+                  accessibilityLabel={submitting ? 'Saving new password' : 'Save new password'}
+                  accessibilityState={{ disabled: submitting, busy: submitting }}
                 >
                   <Text className="font-outfit-bold text-lg text-white">
                     {submitting ? 'Saving password...' : 'Save new password'}

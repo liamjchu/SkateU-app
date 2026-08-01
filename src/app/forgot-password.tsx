@@ -64,7 +64,7 @@ export default function ForgotPasswordScreen() {
   return (
     <View className="flex-1 bg-white">
       <View
-        className="h-[126px] justify-center bg-[#21473f] px-6 pb-3 pt-[70px]"
+        className="h-[136px] justify-center bg-[#21473f] px-6 pb-3 pt-[70px]"
         style={{
           shadowColor: '#000',
           shadowOffset: { width: 0, height: 4 },
@@ -76,7 +76,7 @@ export default function ForgotPasswordScreen() {
         <View className="flex-row items-center justify-between">
           <Pressable
             onPress={() => router.replace('/login')}
-            className="h-11 w-11 items-center justify-center rounded-full"
+            className="h-12 w-12 items-center justify-center rounded-full"
             accessibilityRole="button"
             accessibilityLabel="Back to login"
           >
@@ -99,8 +99,8 @@ export default function ForgotPasswordScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View className="flex-1 px-5 pt-8">
-            <Text className="font-outfit-black text-3xl text-[#1B3B36]">
+          <View className="flex-1 self-center w-full max-w-[640px] px-5 pt-8 pb-8">
+            <Text className="font-outfit-black text-3xl text-ink">
               Forgot your password?
             </Text>
             <Text className="mt-2 font-outfit-medium text-base text-slate-500">
@@ -112,26 +112,35 @@ export default function ForgotPasswordScreen() {
                 value={email}
                 onChangeText={setEmail}
                 placeholder="Email"
-                placeholderTextColor="#8E9AA6"
+                placeholderTextColor="#52645F"
+                accessibilityLabel="Email address"
                 autoCapitalize="none"
                 autoCorrect={false}
                 autoComplete="email"
                 keyboardType="email-address"
                 editable={!submitting}
-                className="rounded-2xl bg-[#F0F3F5] pl-4 pr-5 py-4 font-outfit-semibold text-base text-[#1B3B36]"
+                className="rounded-2xl bg-[#F0F3F5] pl-4 pr-5 py-4 font-outfit-semibold text-base text-ink"
               />
 
               {error ? (
-                <Text selectable className="font-outfit-medium text-sm text-red-500">
+                <Text
+                  accessibilityRole="alert"
+                  accessibilityLiveRegion="polite"
+                  selectable
+                  className="font-outfit-medium text-sm text-errorText">
                   {error}
                 </Text>
               ) : null}
 
               {notice ? (
-                <View className="rounded-2xl bg-[#EBF2F0] px-4 py-3">
+                <View
+                  accessible
+                  accessibilityRole="alert"
+                  accessibilityLiveRegion="polite"
+                  className="rounded-2xl bg-[#EBF2F0] px-4 py-3">
                   <Text
                     selectable
-                    className="font-outfit-semibold text-sm text-[#1B3B36]"
+                    className="font-outfit-semibold text-sm text-ink"
                   >
                     {notice}
                   </Text>
@@ -142,10 +151,11 @@ export default function ForgotPasswordScreen() {
                 onPress={handleSubmit}
                 disabled={submitting}
                 className={`mt-2 items-center justify-center rounded-2xl py-4 ${
-                  submitting ? 'bg-[#21473f]/60' : 'bg-[#21473f]'
+                  submitting ? 'bg-[#60756F]' : 'bg-[#21473f]'
                 }`}
                 accessibilityRole="button"
-                accessibilityLabel="Send password reset link"
+                accessibilityLabel={submitting ? 'Sending password reset link' : 'Send password reset link'}
+                accessibilityState={{ disabled: submitting, busy: submitting }}
               >
                 <Text className="font-outfit-bold text-lg text-white">
                   {submitting ? 'Sending link...' : 'Send reset link'}

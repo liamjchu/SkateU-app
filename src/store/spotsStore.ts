@@ -31,6 +31,7 @@ type SpotsState = {
     accessToken: string
   ) => Promise<Spot>;
   deleteSpot: (id: string, accessToken: string) => Promise<void>;
+  replaceCreatorUsername: (previousUsername: string, username: string) => void;
   clearMySpots: () => void;
   clearLikedSpots: () => void;
   reset: () => void;
@@ -528,6 +529,25 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
       mySpots: state.mySpots.filter((spot) => spot.id !== id),
       spots: state.spots.filter((spot) => spot.id !== id),
       likedSpots: state.likedSpots.filter((spot) => spot.id !== id),
+    }));
+  },
+
+  // Existing spot records cache the public creator name, so update every
+  // collection immediately after the profile username has changed.
+  replaceCreatorUsername: (previousUsername, username) => {
+    if (previousUsername === username) {
+      return;
+    }
+
+    const replace = (spot: Spot): Spot =>
+      spot.creatorUsername === previousUsername
+        ? { ...spot, creatorUsername: username }
+        : spot;
+
+    set((state) => ({
+      spots: state.spots.map(replace),
+      mySpots: state.mySpots.map(replace),
+      likedSpots: state.likedSpots.map(replace),
     }));
   },
 

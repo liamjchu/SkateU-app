@@ -6,6 +6,8 @@ import type { School } from '../types/school';
 type FavoritesStore = {
   favoriteSchoolIds: string[];
   favoriteSchools: School[];
+  hasHydrated: boolean;
+  setHasHydrated: (hasHydrated: boolean) => void;
   addFavoriteSchool: (school: School) => void;
   removeFavoriteSchool: (id: string) => void;
   toggleFavoriteSchool: (school: School) => void;
@@ -26,34 +28,36 @@ export const useFavorites = create<FavoritesStore>()(
     (set, get) => ({
       favoriteSchoolIds: [],
       favoriteSchools: [],
+      hasHydrated: false,
+      setHasHydrated: (hasHydrated: boolean) => set({ hasHydrated }),
       addFavoriteSchool: (school: School) => {
-        set((state) => {
-          return {
-            favoriteSchoolIds: state.favoriteSchoolIds.includes(school.id)
-              ? state.favoriteSchoolIds
-              : [...state.favoriteSchoolIds, school.id],
-            favoriteSchools: mergeFavoriteSchools([
-              ...state.favoriteSchools,
-              school,
-            ]),
-          };
-        });
+        set((state) => ({
+          favoriteSchoolIds: state.favoriteSchoolIds.includes(school.id)
+            ? state.favoriteSchoolIds
+            : [...state.favoriteSchoolIds, school.id],
+          favoriteSchools: mergeFavoriteSchools([
+            ...state.favoriteSchools,
+            school,
+          ]),
+        }));
       },
       removeFavoriteSchool: (id: string) => {
         set((state) => ({
-          favoriteSchoolIds: state.favoriteSchoolIds.filter((schoolId) => schoolId !== id),
-          favoriteSchools: state.favoriteSchools.filter((school) => school.id !== id),
+          favoriteSchoolIds: state.favoriteSchoolIds.filter(
+            (schoolId) => schoolId !== id
+          ),
+          favoriteSchools: state.favoriteSchools.filter(
+            (school) => school.id !== id
+          ),
         }));
       },
       toggleFavoriteSchool: (school: School) => {
-        const { addFavoriteSchool, isFavoriteSchool, removeFavoriteSchool } = get();
-
-        if (isFavoriteSchool(school.id)) {
-          removeFavoriteSchool(school.id);
+        if (get().isFavoriteSchool(school.id)) {
+          get().removeFavoriteSchool(school.id);
           return;
         }
 
-        addFavoriteSchool(school);
+        get().addFavoriteSchool(school);
       },
       upsertFavoriteSchool: (school: School) => {
         set((state) => {
@@ -69,11 +73,17 @@ export const useFavorites = create<FavoritesStore>()(
           };
         });
       },
-      isFavoriteSchool: (id: string) => get().favoriteSchoolIds.includes(id),
+      isFavoriteSchool: (id: string) =>
+        get().favoriteSchoolIds.includes(id),
     }),
     {
       name: '@skateu:favorite-schools',
       storage: createJSONStorage(() => AsyncStorage),
+      onRehydrateStorage: () => () => {
+        // The hydration listener runs for successful and failed rehydration.
+        // Zustand omits `state` on errors, so read from the initialized store.
+        useFavorites.getState().setHasHydrated(true);
+      },
       partialize: (state) => ({
         favoriteSchoolIds: state.favoriteSchoolIds,
       }),

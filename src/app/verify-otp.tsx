@@ -9,7 +9,48 @@ const RESEND_COOLDOWN = 60;
 export default function VerifyOtpScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ email?: string }>();
-  const email = typeof params.email === 'string' ? params.email : '';
+  const email = typeof params.email === 'string' ? params.email : undefined;
+
+  if (email == null) {
+    const handleReturnToLogin = async () => {
+      try {
+        await useAuthStore.getState().signOut();
+      } catch {
+        // Navigate even when there is no active Supabase session to clear.
+      } finally {
+        router.replace('/login');
+      }
+    };
+
+    return (
+      <View className="flex-1 items-center justify-center bg-white px-6">
+        <Text
+          accessibilityRole="alert"
+          className="text-center text-base text-slate-600 font-outfit-medium"
+        >
+          Session data missing.
+        </Text>
+        <Pressable
+          className="mt-4 rounded-2xl bg-[#21473f] px-5 py-3"
+          onPress={handleReturnToLogin}
+          accessibilityRole="button"
+          accessibilityLabel="Return to Login"
+        >
+          <Text
+            className="text-base text-white font-outfit-bold"
+          >
+            Return to Login
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  return <VerifyOtpContent email={email} />;
+}
+
+function VerifyOtpContent({ email }: { email: string }) {
+  const router = useRouter();
 
   const verifyOtp = useAuthStore((state) => state.verifyOtp);
   const resendSignUpOtp = useAuthStore((state) => state.resendSignUpOtp);
@@ -116,7 +157,7 @@ export default function VerifyOtpScreen() {
   return (
     <View className="flex-1 bg-white">
       <View
-        className="h-[126px] justify-center bg-[#21473f] px-6 pb-3 pt-[70px]"
+        className="h-[136px] justify-center bg-[#21473f] px-6 pb-3 pt-[70px]"
         style={{
           shadowColor: '#000',
           shadowOffset: { width: 0, height: 4 },
@@ -128,7 +169,7 @@ export default function VerifyOtpScreen() {
         <View className="flex-row items-center justify-between">
           <Pressable
             onPress={goBack}
-            className="h-11 w-11 items-center justify-center rounded-full"
+            className="h-12 w-12 items-center justify-center rounded-full"
             accessibilityLabel="Go back"
             accessibilityRole="button"
           >
@@ -136,8 +177,7 @@ export default function VerifyOtpScreen() {
           </Pressable>
 
           <Text
-            className="text-2xl text-white"
-            style={{ fontFamily: 'Outfit_700Bold' }}
+            className="text-2xl text-white font-outfit-bold"
           >
             Verify email
           </Text>
@@ -146,16 +186,14 @@ export default function VerifyOtpScreen() {
         </View>
       </View>
 
-      <View className="flex-1 px-5 pt-8">
+      <View className="flex-1 self-center w-full max-w-[640px] px-5 pt-8 pb-8">
         <Text
-          className="text-3xl text-[#1B3B36]"
-          style={{ fontFamily: 'Outfit_900Black' }}
+          className="text-3xl text-ink font-outfit-black"
         >
           Enter your code
         </Text>
         <Text
-          className="mt-2 text-base text-slate-500"
-          style={{ fontFamily: 'Outfit_500Medium' }}
+          className="mt-2 text-base text-slate-500 font-outfit-medium"
         >
           {email
             ? `We sent a 6-digit verification code to ${email}.`
@@ -164,7 +202,12 @@ export default function VerifyOtpScreen() {
 
         <View className="mt-8 gap-4">
           {/* A single input drives the six visible cells. */}
-          <Pressable onPress={() => inputRef.current?.focus()}>
+          <Pressable
+            onPress={() => inputRef.current?.focus()}
+            accessibilityRole="button"
+            accessibilityLabel={`Verification code, ${code.length} of ${CODE_LENGTH} digits entered`}
+            accessibilityHint="Opens the 6-digit verification code input"
+          >
             <View className="flex-row justify-between">
               {cells.map((_, index) => {
                 const char = code[index] ?? '';
@@ -173,13 +216,12 @@ export default function VerifyOtpScreen() {
                 return (
                   <View
                     key={index}
-                    className={`h-14 w-12 items-center justify-center rounded-2xl bg-[#F0F3F5] ${
+                    className={`h-14 flex-1 mx-1 items-center justify-center rounded-2xl bg-[#F0F3F5] ${
                       isActive ? 'border-2 border-[#21473f]' : ''
                     }`}
                   >
                     <Text
-                      className="text-2xl text-[#1B3B36]"
-                      style={{ fontFamily: 'Outfit_700Bold' }}
+                      className="text-2xl text-ink font-outfit-bold"
                     >
                       {char}
                     </Text>
@@ -197,6 +239,9 @@ export default function VerifyOtpScreen() {
             textContentType="oneTimeCode"
             autoComplete="sms-otp"
             maxLength={CODE_LENGTH}
+            accessibilityLabel="6-digit verification code"
+            accessibilityHint="Enter the code sent to your email"
+            accessibilityValue={{ text: `${code.length} of ${CODE_LENGTH} digits entered` }}
             editable={!submitting}
             autoFocus
             className="absolute h-px w-px opacity-0"
@@ -204,18 +249,22 @@ export default function VerifyOtpScreen() {
 
           {error ? (
             <Text
-              className="text-sm text-red-500"
-              style={{ fontFamily: 'Outfit_500Medium' }}
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
+              className="text-sm text-errorText font-outfit-medium"
             >
               {error}
             </Text>
           ) : null}
 
           {notice ? (
-            <View className="rounded-2xl bg-[#EBF2F0] px-4 py-3">
+            <View
+              accessible
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
+              className="rounded-2xl bg-[#EBF2F0] px-4 py-3">
               <Text
-                className="text-sm text-[#1B3B36]"
-                style={{ fontFamily: 'Outfit_600SemiBold' }}
+                className="text-sm text-ink font-outfit-semibold"
               >
                 {notice}
               </Text>
@@ -226,17 +275,17 @@ export default function VerifyOtpScreen() {
             onPress={() => submitCode(code)}
             disabled={submitting}
             className={`mt-2 h-14 flex-row items-center justify-center rounded-2xl ${
-              submitting ? 'bg-[#21473f]/60' : 'bg-[#21473f]'
+              submitting ? 'bg-[#60756F]' : 'bg-[#21473f]'
             }`}
-            accessibilityLabel="Verify code"
+            accessibilityLabel={submitting ? 'Verifying code' : 'Verify code'}
             accessibilityRole="button"
+            accessibilityState={{ disabled: submitting, busy: submitting }}
           >
             {submitting ? (
               <ActivityIndicator color="#ffffff" />
             ) : (
               <Text
-                className="text-lg text-white"
-                style={{ fontFamily: 'Outfit_700Bold' }}
+                className="text-lg text-white font-outfit-bold"
               >
                 Verify
               </Text>
@@ -246,15 +295,21 @@ export default function VerifyOtpScreen() {
           <Pressable
             onPress={handleResend}
             disabled={resending || cooldown > 0}
-            className="items-center justify-center py-1"
+            className="min-h-12 items-center justify-center px-2 py-1"
             accessibilityRole="button"
-            accessibilityLabel="Resend code"
+            accessibilityLabel={
+              resending
+                ? 'Sending a new verification code'
+                : cooldown > 0
+                  ? `Resend verification code in ${cooldown} seconds`
+                  : 'Resend verification code'
+            }
+            accessibilityState={{ disabled: resending || cooldown > 0, busy: resending }}
           >
             <Text
               className={`text-base ${
-                cooldown > 0 || resending ? 'text-slate-400' : 'text-[#21473f]'
-              }`}
-              style={{ fontFamily: 'Outfit_600SemiBold' }}
+                cooldown > 0 || resending ? 'text-slate-400' : 'text-darkGreen'
+              } font-outfit-semibold`}
             >
               {resending
                 ? 'Sending...'

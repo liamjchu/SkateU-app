@@ -1,13 +1,13 @@
 # SkateU
 
-SkateU helps students discover, share, and rate skateable spots around their school or university campus.
+SkateU helps students discover and share skateable spots around their school or university campus.
 
 ## What it does
 
 - Lets people search for a school or university and explore its campus map.
-- Shows community-contributed skate spots with images, details, likes, and creator information.
+- Shows community-contributed skate spots with a photo, description, likes, and creator information.
 - Lets authenticated users create, edit, like, and manage their own spots.
-- Supports email, Google, and Apple authentication through Supabase.
+- Supports email and Google authentication through Supabase.
 
 ## Stack
 
