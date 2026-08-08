@@ -3,12 +3,13 @@ import { useState } from 'react';
 import {
     KeyboardAvoidingView,
     Platform,
-    Pressable,
     ScrollView,
     Text,
     TextInput,
     View,
 } from 'react-native';
+import FeedbackPressable from '../components/FeedbackPressable';
+import ScreenHeader from '../components/screen-header';
 import { requestPasswordResetEmail } from '../lib/password-reset';
 
 const SUCCESS_MESSAGE =
@@ -62,32 +63,12 @@ export default function ForgotPasswordScreen() {
   };
 
   return (
-    <View className="flex-1 bg-white">
-      <View
-        className="h-[136px] justify-center bg-[#21473f] px-6 pb-3 pt-[70px]"
-        style={{
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.25,
-          shadowRadius: 8,
-          elevation: 12,
-        }}
-      >
-        <View className="flex-row items-center justify-between">
-          <Pressable
-            onPress={() => router.replace('/login')}
-            className="h-12 w-12 items-center justify-center rounded-full"
-            accessibilityRole="button"
-            accessibilityLabel="Back to login"
-          >
-            <Text className="text-xl text-white">❮</Text>
-          </Pressable>
-          <Text className="font-outfit-bold text-2xl text-white">
-            Reset password
-          </Text>
-          <View className="h-11 w-11" />
-        </View>
-      </View>
+    <View className="flex-1 bg-surface">
+      <ScreenHeader
+        title="Reset password"
+        onBack={() => router.replace('/login')}
+        backAccessibilityLabel="Back to login"
+      />
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -108,19 +89,30 @@ export default function ForgotPasswordScreen() {
             </Text>
 
             <View className="mt-8 gap-4">
-              <TextInput
-                value={email}
-                onChangeText={setEmail}
-                placeholder="Email"
-                placeholderTextColor="#52645F"
-                accessibilityLabel="Email address"
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoComplete="email"
-                keyboardType="email-address"
-                editable={!submitting}
-                className="rounded-2xl bg-[#F0F3F5] pl-4 pr-5 py-4 font-outfit-semibold text-base text-ink"
-              />
+              <View className="gap-2">
+                <Text
+                  nativeID="reset-email-label"
+                  className="font-outfit-semibold text-sm text-ink"
+                >
+                  Email address
+                </Text>
+                <TextInput
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="name@email.com"
+                  placeholderTextColor="#94A3B8"
+                  accessibilityLabelledBy="reset-email-label"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="email"
+                  textContentType="emailAddress"
+                  keyboardType="email-address"
+                  returnKeyType="send"
+                  onSubmitEditing={() => void handleSubmit()}
+                  editable={!submitting}
+                  className="min-h-14 rounded-2xl border border-border-soft bg-field px-4 py-4 font-outfit-medium text-base text-ink"
+                />
+              </View>
 
               {error ? (
                 <Text
@@ -135,9 +127,8 @@ export default function ForgotPasswordScreen() {
               {notice ? (
                 <View
                   accessible
-                  accessibilityRole="alert"
                   accessibilityLiveRegion="polite"
-                  className="rounded-2xl bg-[#EBF2F0] px-4 py-3">
+                  className="rounded-2xl bg-surface-tinted px-4 py-3">
                   <Text
                     selectable
                     className="font-outfit-semibold text-sm text-ink"
@@ -147,11 +138,12 @@ export default function ForgotPasswordScreen() {
                 </View>
               ) : null}
 
-              <Pressable
+              <FeedbackPressable
+                haptic="light"
                 onPress={handleSubmit}
                 disabled={submitting}
-                className={`mt-2 items-center justify-center rounded-2xl py-4 ${
-                  submitting ? 'bg-[#60756F]' : 'bg-[#21473f]'
+                className={`mt-2 min-h-14 items-center justify-center rounded-2xl py-4 ${
+                  submitting ? 'bg-disabledGreen' : 'bg-brand'
                 }`}
                 accessibilityRole="button"
                 accessibilityLabel={submitting ? 'Sending password reset link' : 'Send password reset link'}
@@ -160,7 +152,20 @@ export default function ForgotPasswordScreen() {
                 <Text className="font-outfit-bold text-lg text-white">
                   {submitting ? 'Sending link...' : 'Send reset link'}
                 </Text>
-              </Pressable>
+              </FeedbackPressable>
+
+              {notice === SUCCESS_MESSAGE ? (
+                <FeedbackPressable
+                  onPress={() => router.replace('/login')}
+                  className="min-h-12 items-center justify-center rounded-2xl border border-brand px-4 py-3"
+                  accessibilityRole="button"
+                  accessibilityLabel="Back to login"
+                >
+                  <Text className="font-outfit-bold text-base text-brand">
+                    Back to login
+                  </Text>
+                </FeedbackPressable>
+              ) : null}
             </View>
           </View>
         </ScrollView>

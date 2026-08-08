@@ -1,3 +1,4 @@
+import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -7,16 +8,16 @@ import {
     KeyboardAvoidingView,
     Platform,
     ScrollView,
-    StyleSheet,
     Text,
     TextInput,
     View
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import FeedbackPressable from '../components/FeedbackPressable';
 import LocationPicker, {
     type LocationPickerStatus,
 } from '../components/LocationPicker';
+import ScreenHeader from '../components/screen-header';
 import SpotImagePicker from '../components/SpotImagePicker';
 import {
     getSpotFormErrors,
@@ -43,7 +44,6 @@ export default function AddSpotScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const searchParams = useLocalSearchParams();
-  const insets = useSafeAreaInsets();
 
   const [imageUri, setImageUri] = useState<string | undefined>();
   const [imageAsset, setImageAsset] = useState<SpotImageAsset | undefined>();
@@ -91,6 +91,7 @@ export default function AddSpotScreen() {
   const session = useAuthStore((s) => s.session);
 
   const isFormValid = isAddSpotFormValid(imageUri, name, description);
+  const isSaveDisabled = saving;
   const formErrors = getSpotFormErrors(imageUri, name, description);
   const showImageError = hasSubmitted || touched.image;
   const showNameError = hasSubmitted || touched.name;
@@ -153,7 +154,13 @@ export default function AddSpotScreen() {
 
   const handleSave = async () => {
     setHasSubmitted(true);
-    if (!isFormValid || locationPickerStatus !== 'ready' || saving) return;
+    setTouched({ image: true, name: true, description: true });
+    setSaveError(null);
+
+    if (!isFormValid || locationPickerStatus !== 'ready' || saving) {
+      triggerHaptic('warning');
+      return;
+    }
 
     // A school is required to associate the spot with the campus.
     if (!schoolId) {
@@ -210,37 +217,15 @@ export default function AddSpotScreen() {
   }, []);
 
   return (
-    <SafeAreaView edges={['left', 'right']} style={styles.safe}>
-      <View
-        className="h-[136px] flex-row items-center justify-between border-b border-white/10 bg-[#21473f] px-4 pb-3"
-        style={[styles.headerShadow, { paddingTop: insets.top }]}
-      >
-        <FeedbackPressable
-          haptic="light"
-          onPress={() => router.back()}
-          className="h-12 w-12 items-center justify-center rounded-full"
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-        >
-          <Text className="text-xl font-outfit-bold text-white">❮</Text>
-        </FeedbackPressable>
-
-        <View className="max-w-80 flex-1 items-center">
-          <Text
-            className="font-outfit-bold text-2xl text-white"
-            numberOfLines={1}
-            ellipsizeMode="tail"
-          >
-            Add New Spot
-          </Text>
-        </View>
-
-        <View className="w-9" />
-      </View>
+    <SafeAreaView
+      edges={['left', 'right']}
+      style={{ flex: 1, backgroundColor: '#FFFFFF' }}
+    >
+      <ScreenHeader title="Add spot" onBack={() => router.back()} />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={insets.top + 126}
+        keyboardVerticalOffset={80}
         style={{ flex: 1 }}
       >
         <ScrollView
@@ -249,70 +234,81 @@ export default function AddSpotScreen() {
           scrollEnabled={scrollEnabled}
           showsVerticalScrollIndicator={false}
         >
-        <View className="mb-2 flex-row items-center">
-          <Text className="font-outfit-bold text-[15px] tracking-[0.5px] text-darkGreen">PHOTO</Text>
-          <Text className="ml-2 font-outfit-medium text-xs text-slate-500">(Required)</Text>
-        </View>
-
-        <View style={styles.photoWrapper}>
-          <SpotImagePicker
-            imageUri={imageUri}
-            onImageSelected={handleImageSelected}
-          />
-        </View>
-        {showImageError && formErrors.image ? (
-          <Text className="-mt-4 mb-3 text-sm text-errorText">{formErrors.image}</Text>
-        ) : null}
-
-        {/* NAME */}
-        <View className="mb-2 flex-row items-center">
-          <Text className="font-outfit-bold text-[15px] tracking-[0.5px] text-darkGreen">SPOT NAME</Text>
-          <Text className="ml-2 font-outfit-medium text-xs text-slate-500">(Required)</Text>
+        <View className="mb-2 flex-row items-baseline">
+          <Text
+            nativeID="spot-name-label"
+            className="font-outfit-bold text-base text-ink"
+          >
+            Spot name
+          </Text>
+          <Text className="ml-2 font-outfit-medium text-xs text-muted">Required</Text>
         </View>
         <TextInput
-          style={styles.input}
-          className={`border bg-white font-outfit-medium text-sm text-darkGreen ${
+          className={`min-h-14 rounded-2xl border bg-surface px-[18px] py-4 font-outfit-medium text-base text-ink ${
             showNameError && formErrors.name
-              ? 'border-[#B45F58]'
-              : 'border-[#DDE4E1]'
+              ? 'border-errorBorder'
+              : 'border-border-soft'
           }`}
-          placeholder="e.g. Library 5 Stair, Parking Garage Ledge..."
+          placeholder="e.g. Library five-stair"
           placeholderTextColor="#52645F"
-          accessibilityLabel="Spot name, required"
+          accessibilityLabelledBy="spot-name-label"
           accessibilityHint="Enter a short name for this skate spot"
           value={name}
           maxLength={SPOT_NAME_MAX}
           onBlur={() => setTouched((current) => ({ ...current, name: true }))}
           onChangeText={setName}
         />
-        <View className="mt-1 min-h-5 flex-row items-center justify-between">
+        <View className="mt-1 min-h-5 flex-row items-start justify-between">
           <Text
-            className="flex-1 pr-2 text-sm text-errorText"
-            numberOfLines={1}
-            ellipsizeMode="tail"
+            accessibilityLiveRegion="polite"
+            className="flex-1 pr-3 font-outfit-medium text-sm text-errorText"
           >
             {showNameError && formErrors.name ? formErrors.name : ' '}
           </Text>
-          <Text className="font-outfit-medium text-xs text-slate-500">
+          <Text
+            className="font-outfit-medium text-xs text-muted"
+            style={{ fontVariant: ['tabular-nums'] }}
+          >
             {name.length} / {SPOT_NAME_MAX}
           </Text>
         </View>
 
-        {/* DESCRIPTION */}
-        <View className="mb-2 mt-4 flex-row items-center">
-          <Text className="font-outfit-bold text-[15px] tracking-[0.5px] text-darkGreen">DESCRIPTION</Text>
-          <Text className="ml-2 font-outfit-medium text-xs text-slate-500">(Required)</Text>
+        <View className="mb-2 mt-5 flex-row items-baseline">
+          <Text className="font-outfit-bold text-base text-ink">Spot photo</Text>
+          <Text className="ml-2 font-outfit-medium text-xs text-muted">Required</Text>
+        </View>
+        <SpotImagePicker
+          imageUri={imageUri}
+          onImageSelected={handleImageSelected}
+        />
+        {showImageError && formErrors.image ? (
+          <Text
+            accessibilityRole="alert"
+            accessibilityLiveRegion="polite"
+            className="mt-2 font-outfit-medium text-sm text-errorText"
+          >
+            {formErrors.image}
+          </Text>
+        ) : null}
+
+        <View className="mb-2 mt-5 flex-row items-baseline">
+          <Text
+            nativeID="spot-description-label"
+            className="font-outfit-bold text-base text-ink"
+          >
+            Description
+          </Text>
+          <Text className="ml-2 font-outfit-medium text-xs text-muted">Required</Text>
         </View>
         <TextInput
-          style={styles.descriptionInput}
-          className={`border bg-white font-outfit-medium text-sm text-darkGreen ${
+          className={`min-h-32 rounded-2xl border bg-surface px-[18px] py-4 font-outfit-medium text-base text-ink ${
             showDescriptionError && formErrors.description
-              ? 'border-[#B45F58]'
-              : 'border-[#DDE4E1]'
+              ? 'border-errorBorder'
+              : 'border-border-soft'
           }`}
-          placeholder="Describe the spot — obstacle type, spot condition, security..."
+          placeholder="Describe the obstacle, condition, and security…"
           placeholderTextColor="#52645F"
-          accessibilityLabel="Spot description, required"
+          accessibilityLabelledBy="spot-description-label"
           accessibilityHint="Describe the obstacle, condition, and security details"
           multiline
           maxLength={SPOT_DESCRIPTION_MAX}
@@ -321,27 +317,30 @@ export default function AddSpotScreen() {
           onBlur={() => setTouched((current) => ({ ...current, description: true }))}
           onChangeText={setDescription}
         />
-        <View className="mt-1 min-h-5 flex-row items-center justify-between">
+        <View className="mt-1 min-h-5 flex-row items-start justify-between">
           <Text
-            className="flex-1 pr-2 text-sm text-errorText"
-            numberOfLines={1}
-            ellipsizeMode="tail"
+            accessibilityLiveRegion="polite"
+            className="flex-1 pr-3 font-outfit-medium text-sm text-errorText"
           >
             {showDescriptionError && formErrors.description ? formErrors.description : ' '}
           </Text>
-          <Text className="font-outfit-medium text-xs text-slate-500">
+          <Text
+            className="font-outfit-medium text-xs text-muted"
+            style={{ fontVariant: ['tabular-nums'] }}
+          >
             {description.length} / {SPOT_DESCRIPTION_MAX}
           </Text>
         </View>
 
-        {/* LOCATION */}
-        <Text className="mb-2.5 mt-[15px] font-outfit-bold text-[15px] tracking-[0.5px] text-darkGreen">LOCATION</Text>
-
-        <Text className="mb-3 font-outfit-medium text-sm text-slate-400">
-          Move the map until the pin is over the desired spot.
+        <Text className="mb-2 mt-5 font-outfit-bold text-base text-ink">
+          Location
         </Text>
 
-        <View style={styles.mapContainer}>
+        <Text className="mb-3 font-outfit-medium text-sm leading-5 text-muted">
+          Move the map until the pin is directly over the skate spot.
+        </Text>
+
+        <View className="overflow-hidden">
           <LocationPicker
             initialLatitude={selectedLocation.latitude}
             initialLongitude={selectedLocation.longitude}
@@ -369,10 +368,13 @@ export default function AddSpotScreen() {
             }}
           />
           {locationPickerStatus === 'ready' ? (
-            <View className="-mt-4 mb-3 flex-row items-center rounded-xl bg-[#EBF2F0] px-3 py-2">
-              <Text className="font-outfit-bold text-sm text-darkGreen">✓ Spot location selected</Text>
-              <Text className="ml-2 flex-1 text-right font-outfit-medium text-xs text-slate-500">
-                {selectedLocation.latitude.toFixed(5)}, {selectedLocation.longitude.toFixed(5)}
+            <View
+              accessible
+              accessibilityLiveRegion="polite"
+              className="-mt-4 mb-3 flex-row items-center rounded-xl bg-surface-tinted px-3 py-2.5"
+            >
+              <Text className="font-outfit-bold text-sm text-brand">
+                ✓ Location selected
               </Text>
             </View>
           ) : hasSubmitted ? (
@@ -396,33 +398,35 @@ export default function AddSpotScreen() {
         ) : null}
 
         <FeedbackPressable
-          style={[
-            styles.saveButton,
-            saving && styles.saveButtonDisabled,
-          ]}
+          haptic="light"
           onPress={handleSave}
-          disabled={saving}
+          disabled={isSaveDisabled}
+          className={`min-h-14 items-center justify-center rounded-2xl px-5 py-4 ${
+            isSaveDisabled ? 'bg-disabledGreen' : 'bg-brand'
+          }`}
           accessibilityRole="button"
           accessibilityLabel={saving ? 'Saving spot' : 'Save spot'}
-          accessibilityHint={!isFormValid ? 'Review the required fields and fix the highlighted errors' : undefined}
-          accessibilityState={{ disabled: saving, busy: saving }}
+          accessibilityHint={
+            !isFormValid || locationPickerStatus !== 'ready'
+              ? 'Checks the form and highlights anything that needs attention'
+              : undefined
+          }
+          accessibilityState={{ disabled: isSaveDisabled, busy: saving }}
         >
           <View className="flex-row items-center">
             {saving ? (
               <>
-                <ActivityIndicator color="#ffffff" />
-                <Text className="ml-2 text-center font-outfit-bold text-lg text-white">
+                <ActivityIndicator color="#FFFFFF" />
+                <Text className="ml-2 font-outfit-bold text-lg text-white">
                   Saving…
                 </Text>
               </>
             ) : (
               <>
-                <Text className="text-center font-outfit-bold text-lg text-white">
-                  Save Spot
+                <Text className="font-outfit-bold text-lg text-white">
+                  Save spot
                 </Text>
-                <Text className="ml-1.5 font-outfit-bold text-sm text-white">
-                  ❯
-                </Text>
+                <Feather name="chevron-right" size={20} color="#FFFFFF" />
               </>
             )}
           </View>
@@ -432,53 +436,3 @@ export default function AddSpotScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: '#fdfdfd',
-  },
-
-  headerShadow: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 12,
-  },
-
-  photoWrapper: {
-    marginBottom: 0,
-  },
-
-  input: {
-    borderRadius: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 18,
-  },
-
-  descriptionInput: {
-    borderRadius: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 18,
-    minHeight: 150,
-  },
-
-  mapContainer: {
-    overflow: 'hidden',
-    borderRadius: 0,
-    marginBottom: 0,
-  },
-
-  saveButton: {
-    height: 52,
-    borderRadius: 16,
-    backgroundColor: '#3c5853',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  saveButtonDisabled: {
-    backgroundColor: '#60756F',
-  },
-});

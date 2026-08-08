@@ -10,6 +10,7 @@ import {
     TextInput,
     View,
 } from 'react-native';
+import ScreenHeader from '../components/screen-header';
 import { PASSWORD_REQUIREMENTS, validatePassword } from '../lib/password';
 import { updatePassword } from '../lib/password-reset';
 import { useAuthStore } from '../store/authStore';
@@ -86,33 +87,13 @@ export default function UpdatePasswordScreen() {
   };
 
   return (
-    <View className="flex-1 bg-white">
-      <View
-        className="h-[136px] justify-center bg-[#21473f] px-6 pb-3 pt-[70px]"
-        style={{
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.25,
-          shadowRadius: 8,
-          elevation: 12,
-        }}
-      >
-        <View className="flex-row items-center justify-between">
-          <Pressable
-            onPress={() => router.replace('/login')}
-            disabled={submitting || success}
-            className="h-12 w-12 items-center justify-center rounded-full"
-            accessibilityRole="button"
-            accessibilityLabel="Back to login"
-          >
-            <Text className="text-xl text-white">❮</Text>
-          </Pressable>
-          <Text className="font-outfit-bold text-2xl text-white">
-            New password
-          </Text>
-          <View className="h-11 w-11" />
-        </View>
-      </View>
+    <View className="flex-1 bg-surface">
+      <ScreenHeader
+        title="New password"
+        onBack={() => router.replace('/login')}
+        backAccessibilityLabel="Back to login"
+        backDisabled={submitting || success}
+      />
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -128,15 +109,15 @@ export default function UpdatePasswordScreen() {
             <Text className="font-outfit-black text-3xl text-ink">
               Create a new password
             </Text>
-            <Text className="mt-2 font-outfit-medium text-base text-slate-500">
+            <Text className="mt-2 font-outfit-medium text-base text-muted">
               Choose a password you have not used before.
             </Text>
-            <Text className="mt-2 font-outfit-medium text-sm text-slate-400">
+            <Text className="mt-2 font-outfit-medium text-sm text-muted">
               {PASSWORD_REQUIREMENTS}
             </Text>
 
             <View className="mt-8 gap-4">
-              <View className="flex-row items-center rounded-2xl bg-[#F0F3F5] pr-3">
+              <View className="flex-row items-center rounded-2xl bg-field pr-3">
                 <TextInput
                   value={password}
                   onChangeText={setPassword}
@@ -167,7 +148,7 @@ export default function UpdatePasswordScreen() {
                 </Pressable>
               </View>
 
-              <View className="flex-row items-center rounded-2xl bg-[#F0F3F5] pr-3">
+              <View className="flex-row items-center rounded-2xl bg-field pr-3">
                 <TextInput
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
@@ -215,7 +196,7 @@ export default function UpdatePasswordScreen() {
                   accessible
                   accessibilityRole="alert"
                   accessibilityLiveRegion="polite"
-                  className="rounded-2xl bg-[#EBF2F0] px-4 py-3">
+                  className="rounded-2xl bg-surface-tinted px-4 py-3">
                   <Text
                     selectable
                     className="font-outfit-semibold text-sm text-ink"
@@ -228,7 +209,7 @@ export default function UpdatePasswordScreen() {
                   onPress={handleSubmit}
                   disabled={submitting}
                   className={`mt-2 items-center justify-center rounded-2xl py-4 ${
-                    submitting ? 'bg-[#60756F]' : 'bg-[#21473f]'
+                    submitting ? 'bg-disabledGreen' : 'bg-brand'
                   }`}
                   accessibilityRole="button"
                   accessibilityLabel={submitting ? 'Saving new password' : 'Save new password'}

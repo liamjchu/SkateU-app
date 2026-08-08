@@ -3,10 +3,11 @@ import {
     ActivityIndicator,
     Image,
     Text,
-    View,
+    View
 } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
+import IMAGES from '../constants/images';
 import { useIsTabletLayout } from '../hooks/useIsTabletLayout';
 import { buildLocationPickerHtml } from '../lib/locationPickerMap';
 import type { MapLayer } from '../store/mapViewStore';
@@ -161,11 +162,7 @@ export default function LocationPicker({
   };
 
   return (
-    <View
-      className="mb-6 overflow-hidden rounded-2xl border border-[#dce5e2] bg-[#f7f8f8]"
-      accessible
-      accessibilityLabel={`Location picker. Selected latitude ${selectedLatitude.toFixed(5)}, longitude ${selectedLongitude.toFixed(5)}. Drag the map to change the location.`}
-    >
+    <View className="mb-6 overflow-hidden rounded-2xl border border-border-soft bg-surface-soft">
       <View
         className="relative bg-black"
         style={{ height: isTabletLayout ? 320 : 224 }}
@@ -233,10 +230,9 @@ export default function LocationPicker({
         {mapStatus === 'ready' ? (
           <View className="absolute left-1/2 top-1/2 h-[60px] w-[50px] -ml-[25px] -mt-[50px] items-center justify-start pointer-events-none">
             <Image
-              source={{
-                uri: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-              }}
+              source={IMAGES.markerShadow}
               className="absolute left-[12px] top-[8px] h-[41px] w-[41px]"
+              accessible={false}
             />
 
             <Svg width={50} height={50} viewBox="0 0 24 24">
