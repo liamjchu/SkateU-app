@@ -152,8 +152,17 @@ export default function EditSpotScreen() {
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (event) => {
-      if (!hasUnsavedChanges || allowRemovalRef.current) {
+      if (allowRemovalRef.current) {
         allowRemovalRef.current = false;
+        return;
+      }
+
+      if (saving) {
+        event.preventDefault();
+        return;
+      }
+
+      if (!hasUnsavedChanges) {
         return;
       }
 
@@ -177,7 +186,7 @@ export default function EditSpotScreen() {
     });
 
     return unsubscribe;
-  }, [hasUnsavedChanges, navigation]);
+  }, [hasUnsavedChanges, navigation, saving]);
 
   useEffect(() => {
     return () => {
@@ -238,7 +247,11 @@ export default function EditSpotScreen() {
       edges={['left', 'right']}
       style={{ flex: 1, backgroundColor: '#FFFFFF' }}
     >
-      <ScreenHeader title="Edit spot" onBack={() => router.back()} />
+      <ScreenHeader
+        title="Edit spot"
+        onBack={() => router.back()}
+        backDisabled={saving}
+      />
 
       {!spot ? (
         <View

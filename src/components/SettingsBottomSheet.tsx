@@ -224,7 +224,7 @@ export default function SettingsBottomSheet({
               onPress={onLogout}
               disabled={loggingOut}
               className={`min-h-12 w-full items-center justify-center rounded-2xl py-4 ${
-                loggingOut ? 'bg-[#90A39F]' : 'bg-[#21473f]'
+                loggingOut ? 'bg-actionDisabled' : 'bg-[#21473f]'
               }`}
               accessibilityLabel={loggingOut ? 'Logging out' : 'Log out'}
               accessibilityRole="button"
@@ -239,7 +239,7 @@ export default function SettingsBottomSheet({
               onPress={onDeleteAccount}
               disabled={deleteAccountDisabled}
               className={`min-h-12 w-full items-center justify-center rounded-2xl py-4 ${
-                deleteAccountDisabled ? 'bg-[#7A918C]' : 'bg-[#FBE9E7]'
+                deleteAccountDisabled ? 'bg-destructiveActionDisabled' : 'bg-[#FBE9E7]'
               }`}
               accessibilityLabel={
                 deleteAccountDisabled ? 'Sending account deletion code' : 'Delete account'

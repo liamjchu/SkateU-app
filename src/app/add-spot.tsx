@@ -109,8 +109,17 @@ export default function AddSpotScreen() {
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (event) => {
-      if (!hasUnsavedChanges || allowRemovalRef.current) {
+      if (allowRemovalRef.current) {
         allowRemovalRef.current = false;
+        return;
+      }
+
+      if (saving) {
+        event.preventDefault();
+        return;
+      }
+
+      if (!hasUnsavedChanges) {
         return;
       }
 
@@ -137,7 +146,7 @@ export default function AddSpotScreen() {
     });
 
     return unsubscribe;
-  }, [hasUnsavedChanges, navigation]);
+  }, [hasUnsavedChanges, navigation, saving]);
 
   const handleImageSelected = (asset: SpotImageAsset) => {
     setTouched((current) => ({ ...current, image: true }));
@@ -221,7 +230,11 @@ export default function AddSpotScreen() {
       edges={['left', 'right']}
       style={{ flex: 1, backgroundColor: '#FFFFFF' }}
     >
-      <ScreenHeader title="Add spot" onBack={() => router.back()} />
+      <ScreenHeader
+        title="Add spot"
+        onBack={() => router.back()}
+        backDisabled={saving}
+      />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}

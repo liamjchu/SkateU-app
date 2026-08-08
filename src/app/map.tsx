@@ -943,7 +943,10 @@ export default function MapScreen() {
       />
 
       {mapStatus === 'loading' ? (
-        <View className="absolute inset-0 z-40 items-center justify-center bg-[#21473f]/90 px-8">
+        <View
+          className="absolute inset-0 z-40 items-center justify-center bg-[#21473f]/90 px-8"
+          style={{ top: insets.top + 80 }}
+        >
           <ActivityIndicator color="#FFFFFF" />
           <Text className="mt-3 text-center font-outfit-medium text-base text-white">
             Loading campus map…
