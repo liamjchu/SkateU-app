@@ -717,16 +717,16 @@ export default function MapScreen() {
   return (
     <View style={{ flex: 1 }}>
       <View
-        className="absolute left-0 right-0 z-50 h-[136px] bg-[#21473f] border-b border-white/10 px-4 pb-3 flex-row items-center justify-between"
+        className="absolute left-0 right-0 z-50 flex-row items-center justify-between border-b border-white/10 bg-brand px-5"
         style={{
-          top: 0, paddingTop: insets.top,
-          
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.25,
-          shadowRadius: 8,
-
-          elevation: 12,
+          top: 0,
+          height: insets.top + 80,
+          paddingTop: insets.top,
+          shadowColor: '#000000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.12,
+          shadowRadius: 6,
+          elevation: 6,
         }}
       >
         <FeedbackPressable
@@ -736,22 +736,24 @@ export default function MapScreen() {
           accessibilityLabel="Go back"
           accessibilityRole="button"
         >
-          <Text className="text-white text-xl">❮</Text>
+          <Feather name="chevron-left" size={28} color="#FFFFFF" />
         </FeedbackPressable>
 
         <View
           pointerEvents="none"
           className="absolute left-0 right-0 items-center justify-center px-20"
-          style={{ top: insets.top, bottom: 12 }}
+          style={{ top: insets.top, bottom: 0 }}
         >
           <Text
-            className="text-center text-2xl text-white font-outfit-bold"
+            className="text-center font-outfit-bold text-2xl text-white"
+            numberOfLines={1}
           >
             {displayedSchoolName}
           </Text>
           {locationSubtitle && (
             <Text
-              className="text-center font-outfit-medium text-sm text-lightGreen font-outfit-medium"
+              className="text-center font-outfit-medium text-sm text-lightGreen"
+              numberOfLines={1}
             >
               {locationSubtitle}
             </Text>
@@ -780,7 +782,7 @@ export default function MapScreen() {
       </View>
       <View
         className="absolute right-4 z-[999] overflow-hidden rounded-full bg-black"
-        style={[styles.toggleButton, { top: 144 }]}
+        style={[styles.toggleButton, { top: insets.top + 88 }]}
       >
         <FeedbackPressable
           haptic="selection"
@@ -941,7 +943,10 @@ export default function MapScreen() {
       />
 
       {mapStatus === 'loading' ? (
-        <View className="absolute inset-0 z-40 items-center justify-center bg-[#21473f]/90 px-8">
+        <View
+          className="absolute inset-0 z-40 items-center justify-center bg-[#21473f]/90 px-8"
+          style={{ top: insets.top + 80 }}
+        >
           <ActivityIndicator color="#FFFFFF" />
           <Text className="mt-3 text-center font-outfit-medium text-base text-white">
             Loading campus map…
@@ -1000,7 +1005,7 @@ export default function MapScreen() {
       ) : mapStatus === 'ready' && loading ? (
         <View
           className="absolute left-0 right-0 z-40 items-center"
-          style={{ top: 140 }}
+          style={{ top: 154 }}
         >
           <View
             className={`flex-row items-center rounded-full px-3 py-1.5 ${

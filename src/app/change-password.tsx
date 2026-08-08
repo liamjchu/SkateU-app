@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import ChangePasswordForm from '../components/ChangePasswordForm';
+import ScreenHeader from '../components/screen-header';
 import { useAuthStore } from '../store/authStore';
 
 export default function ChangePasswordScreen() {
@@ -17,34 +18,8 @@ export default function ChangePasswordScreen() {
   };
 
   return (
-    <View className="flex-1 bg-white">
-      <View
-        className="h-[136px] justify-center bg-[#21473f] px-6 pb-3 pt-[70px]"
-        style={{
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.25,
-          shadowRadius: 8,
-          elevation: 12,
-        }}
-      >
-        <View className="flex-row items-center justify-between">
-          <Pressable
-            onPress={goBack}
-            className="h-12 w-12 items-center justify-center rounded-full"
-            accessibilityLabel="Go back"
-            accessibilityRole="button"
-          >
-            <Text className="text-xl text-white">❮</Text>
-          </Pressable>
-
-          <Text className="font-outfit-bold text-2xl text-white">
-            Account settings
-          </Text>
-
-          <View className="h-11 w-11" />
-        </View>
-      </View>
+    <View className="flex-1 bg-surface">
+      <ScreenHeader title="Account settings" onBack={goBack} />
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}

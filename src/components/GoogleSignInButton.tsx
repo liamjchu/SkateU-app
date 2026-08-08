@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 import { useAuthStore } from '../store/authStore';
+import FeedbackPressable from './FeedbackPressable';
 
 // Lets the in-app browser finish any pending auth session when the app is
 // brought back to the foreground. Safe to call at module load.
@@ -55,10 +56,11 @@ export default function GoogleSignInButton({
   };
 
   return (
-    <Pressable
+    <FeedbackPressable
+      haptic="light"
       onPress={handlePress}
       disabled={isDisabled}
-      className={`flex-row items-center justify-center gap-2 rounded-2xl border border-slate-200 py-4 ${
+      className={`min-h-12 flex-row items-center justify-center gap-2 rounded-2xl border border-border-soft bg-surface py-4 ${
         isDisabled ? 'opacity-60' : ''
       }`}
       accessibilityLabel="Log in with Google"
@@ -77,6 +79,6 @@ export default function GoogleSignInButton({
           </Text>
         </View>
       )}
-    </Pressable>
+    </FeedbackPressable>
   );
 }

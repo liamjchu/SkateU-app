@@ -125,8 +125,8 @@ export function UsernameForm({
 
   return (
     <View className="mt-8">
-      <View className="flex-row items-center rounded-2xl bg-[#F0F3F5] pl-4 pr-3">
-        <Text className="font-outfit-bold text-base text-slate-400">@</Text>
+      <View className="flex-row items-center rounded-2xl bg-field pl-4 pr-3">
+        <Text className="font-outfit-bold text-base text-muted">@</Text>
         <TextInput
           value={value}
           onChangeText={handleChange}
@@ -162,7 +162,7 @@ export function UsernameForm({
             {submitError}
           </Text>
         ) : unchanged ? (
-          <Text className="font-outfit-medium text-sm text-slate-400">
+          <Text className="font-outfit-medium text-sm text-muted">
             That&apos;s your current username.
           </Text>
         ) : status === 'invalid' && validationError ? (
@@ -178,7 +178,7 @@ export function UsernameForm({
             Nice — that one&apos;s available.
           </Text>
         ) : status === 'error' ? (
-          <Text className="font-outfit-medium text-sm text-slate-400">
+          <Text className="font-outfit-medium text-sm text-muted">
             Couldn&apos;t check right now. Try again.
           </Text>
         ) : null}
@@ -188,7 +188,7 @@ export function UsernameForm({
         onPress={handleSubmit}
         disabled={!canSubmit}
         className={`mt-6 w-full items-center justify-center rounded-2xl py-4 ${
-          canSubmit ? 'bg-[#21473f]' : 'bg-[#60756F]'
+          canSubmit ? 'bg-brand' : 'bg-disabledGreen'
         }`}
         accessibilityLabel={submitting ? submittingLabel : submitLabel}
         accessibilityRole="button"

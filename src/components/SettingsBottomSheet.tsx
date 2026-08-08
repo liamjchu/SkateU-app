@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type ElementRef } from 'react';
 import {
+    AccessibilityInfo,
     BackHandler,
     Pressable,
     StyleSheet,
     Text,
     View,
-    useWindowDimensions,
+    findNodeHandle,
+    useWindowDimensions
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -13,6 +15,7 @@ import Animated, {
     SlideInDown,
     runOnJS,
     useAnimatedStyle,
+    useReducedMotion,
     useSharedValue,
     withTiming
 } from 'react-native-reanimated';
@@ -42,6 +45,8 @@ export default function SettingsBottomSheet({
 }: SettingsBottomSheetProps) {
   const insets = useSafeAreaInsets();
   const { height: screenHeight } = useWindowDimensions();
+  const reduceMotion = useReducedMotion();
+  const titleRef = useRef<ElementRef<typeof Text>>(null);
   const [rendered, setRendered] = useState(visible);
   const sheetHeight = useSharedValue(0);
   const sheetTranslateY = useSharedValue(0);
@@ -59,14 +64,14 @@ export default function SettingsBottomSheet({
 
     sheetTranslateY.value = withTiming(
       sheetHeight.value || screenHeight,
-      { duration: 220, easing: Easing.out(Easing.cubic) },
+      { duration: reduceMotion ? 0 : 220, easing: Easing.out(Easing.cubic) },
       (finished) => {
         if (finished) {
           runOnJS(setRendered)(false);
         }
       }
     );
-  }, [rendered, screenHeight, sheetHeight, sheetTranslateY, visible]);
+  }, [reduceMotion, rendered, screenHeight, sheetHeight, sheetTranslateY, visible]);
 
   useEffect(() => {
     if (!visible) {
@@ -83,6 +88,21 @@ export default function SettingsBottomSheet({
 
     return () => subscription.remove();
   }, [onClose, visible]);
+
+  useEffect(() => {
+    if (!visible || !rendered) {
+      return;
+    }
+
+    const focusTimeout = setTimeout(() => {
+      const titleNode = findNodeHandle(titleRef.current);
+      if (titleNode) {
+        AccessibilityInfo.setAccessibilityFocus(titleNode);
+      }
+    }, reduceMotion ? 0 : 260);
+
+    return () => clearTimeout(focusTimeout);
+  }, [reduceMotion, rendered, visible]);
 
   const sheetAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: sheetTranslateY.value }],
@@ -106,7 +126,7 @@ export default function SettingsBottomSheet({
       }
 
       sheetTranslateY.value = withTiming(0, {
-        duration: 180,
+        duration: reduceMotion ? 0 : 180,
         easing: Easing.out(Easing.cubic),
       });
     });
@@ -122,7 +142,7 @@ export default function SettingsBottomSheet({
       accessibilityLabel="Settings"
     >
       <Pressable
-        className="absolute inset-0 z-0 bg-black/35"
+        className="absolute inset-0 z-0 bg-slate-950/50"
         onPress={onClose}
         accessibilityLabel="Close settings"
         accessibilityRole="button"
@@ -130,7 +150,11 @@ export default function SettingsBottomSheet({
       />
 
       <Animated.View
-          entering={SlideInDown.duration(240).easing(Easing.out(Easing.cubic))}
+          entering={
+            reduceMotion
+              ? undefined
+              : SlideInDown.duration(240).easing(Easing.out(Easing.cubic))
+          }
           onLayout={(event) => {
             sheetHeight.value = event.nativeEvent.layout.height;
           }}
@@ -146,6 +170,7 @@ export default function SettingsBottomSheet({
               <View className="mb-4 h-1.5 w-12 self-center rounded-full bg-slate-300" />
               <View className="min-h-12 flex-row items-center justify-between">
                 <Text
+                  ref={titleRef}
                   accessibilityRole="header"
                   nativeID="settings-sheet-title"
                   className="font-outfit-bold text-xl text-ink"
@@ -199,7 +224,7 @@ export default function SettingsBottomSheet({
               onPress={onLogout}
               disabled={loggingOut}
               className={`min-h-12 w-full items-center justify-center rounded-2xl py-4 ${
-                loggingOut ? 'bg-[#60756F]' : 'bg-[#21473f]'
+                loggingOut ? 'bg-actionDisabled' : 'bg-[#21473f]'
               }`}
               accessibilityLabel={loggingOut ? 'Logging out' : 'Log out'}
               accessibilityRole="button"
@@ -214,7 +239,7 @@ export default function SettingsBottomSheet({
               onPress={onDeleteAccount}
               disabled={deleteAccountDisabled}
               className={`min-h-12 w-full items-center justify-center rounded-2xl py-4 ${
-                deleteAccountDisabled ? 'bg-[#60756F]' : 'bg-[#FBE9E7]'
+                deleteAccountDisabled ? 'bg-destructiveActionDisabled' : 'bg-[#FBE9E7]'
               }`}
               accessibilityLabel={
                 deleteAccountDisabled ? 'Sending account deletion code' : 'Delete account'

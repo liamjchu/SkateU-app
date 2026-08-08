@@ -12,9 +12,9 @@ import {
     Text,
     TextInput,
     useWindowDimensions,
-    View,
-    type GestureResponderEvent
+    View
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FavoriteSchoolRow from '../components/FavoriteSchoolRow';
 import FeedbackPressable from '../components/FeedbackPressable';
 import IMAGES from '../constants/images';
@@ -32,10 +32,7 @@ type SchoolRowProps = {
   isFavorite: boolean;
   isSelected: boolean;
   onSelect: (school: School) => void;
-  onFavoritePress: (
-    event: GestureResponderEvent,
-    school: School
-  ) => void;
+  onFavoritePress: (school: School) => void;
 };
 
 type SchoolsSearchResponse = {
@@ -87,66 +84,58 @@ function SchoolRow({
   onFavoritePress,
 }: SchoolRowProps) {
   return (
-    <FeedbackPressable
-      haptic="selection"
-      onPress={() => onSelect(school)}
-      accessibilityRole="button"
-      accessibilityLabel={`Open ${school.name}`}
-      accessibilityHint="Opens the campus map"
-      accessibilityState={{ selected: isSelected }}
-      className={`flex-row items-center justify-between py-3 px-4 border-b bg-white ${
-        isSelected ? 'border-[#1B3B36] bg-[#E3ECEA]' : 'border-slate-100'
+    <View
+      className={`flex-row items-center border-b bg-surface px-3 py-2 ${
+        isSelected ? 'border-brand bg-surface-tinted' : 'border-border-soft'
       }`}
     >
-      <View className="min-w-0 flex-1 flex-row items-center pr-2">
-        <FeedbackPressable
-          haptic="selection"
-          onPress={(event) => onFavoritePress(event, school)}
-          className="h-12 w-12 items-center justify-center rounded-2xl bg-[#F0F5F4]"
-          accessibilityRole="button"
-          accessibilityLabel={`${isFavorite ? 'Remove' : 'Add'} ${school.name} ${isFavorite ? 'from' : 'to'} favorites`}
-          accessibilityState={{ selected: isFavorite }}
-        >
-          <Octicons
-            name={isFavorite ? 'star-fill' : 'star'}
-            size={20}
-            color={isFavorite ? '#1B3B36' : '#52645F'}
-          />
-        </FeedbackPressable>
+      <FeedbackPressable
+        haptic="selection"
+        onPress={() => onFavoritePress(school)}
+        className="h-12 w-12 items-center justify-center rounded-2xl bg-surface-soft"
+        accessibilityRole="button"
+        accessibilityLabel={`${isFavorite ? 'Remove' : 'Add'} ${school.name} ${isFavorite ? 'from' : 'to'} favorites`}
+        accessibilityState={{ selected: isFavorite }}
+      >
+        <Octicons
+          name={isFavorite ? 'star-fill' : 'star'}
+          size={20}
+          color={isFavorite ? '#1B3B36' : '#52645F'}
+        />
+      </FeedbackPressable>
 
-        <View className="ml-3 min-w-0 flex-1">
-          <Text
-            className="text-base text-ink font-outfit-bold"
-          >
+      <FeedbackPressable
+        haptic="selection"
+        onPress={() => onSelect(school)}
+        className="ml-2 min-h-12 min-w-0 flex-1 flex-row items-center justify-between rounded-xl px-1"
+        accessibilityRole="button"
+        accessibilityLabel={`Select ${school.name}`}
+        accessibilityHint="Selects this school for the campus map button"
+        accessibilityState={{ selected: isSelected }}
+      >
+        <View className="min-w-0 flex-1 pr-2">
+          <Text className="font-outfit-bold text-base text-ink">
             {school.name}
           </Text>
-          <Text
-            className="text-sm text-slate-400 mt-0.5 font-outfit-medium"
-          >
+          <Text className="mt-0.5 font-outfit-medium text-sm text-muted">
             {school.city}, {school.state}
           </Text>
         </View>
-      </View>
 
-      <View className="w-20 shrink-0 flex-row items-center justify-end space-x-1.5">
-        <Feather
-          name="map-pin"
-          size={11}
-          color="#475569"
-          className="mr-[3px]"
-        />
-        <Text
-          className="text-base text-ink font-outfit-bold"
-        >
-          {formatSpotCount(displayNumSpots)}
-        </Text>
-      </View>
-    </FeedbackPressable>
+        <View className="w-20 shrink-0 flex-row items-center justify-end">
+          <Feather name="map-pin" size={12} color="#475569" />
+          <Text className="ml-1.5 font-outfit-bold text-base text-ink">
+            {formatSpotCount(displayNumSpots)}
+          </Text>
+        </View>
+      </FeedbackPressable>
+    </View>
   );
 }
 
 export default function HomeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { schools, upsertSchool } = useSchools();
   const session = useAuthStore((state) => state.session);
   const profile = useProfileStore((state) => state.profile);
@@ -481,11 +470,7 @@ export default function HomeScreen() {
     handleSchoolSelect(school);
   };
 
-  const handleFavoritePress = (
-    event: GestureResponderEvent,
-    school: School
-  ) => {
-    event.stopPropagation();
+  const handleFavoritePress = (school: School) => {
     upsertSchool(school);
     toggleFavoriteSchool(school);
   };
@@ -513,57 +498,50 @@ export default function HomeScreen() {
   };
 
   return (
-    <View className="flex-1 bg-white">
-      {/* Top Header Banner Section */}
+    <View className="flex-1 bg-surface">
       <View
-        className="bg-[#21473f] pt-25 pb-8 px-6 flex-row items-center justify-between"
+        className="bg-brand px-6 pb-6"
         style={{
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.25,
-          shadowRadius: 8,
-          elevation: 12,
+          paddingTop: insets.top + 32,
+          shadowColor: '#000000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.12,
+          shadowRadius: 6,
+          elevation: 6,
         }}
       >
-        <Image
-          source={IMAGES.brandLockup}
-          className="-ml-[21px] h-14 w-[177.1px]"
-          resizeMode="contain"
-          accessibilityLabel="SkateU"
-        />
+        <View className="h-14 flex-row items-center justify-between">
+          <Image
+            source={IMAGES.brandLockup}
+            className="-ml-[21px] h-14 w-[177px]"
+            resizeMode="contain"
+            accessibilityLabel="SkateU"
+          />
 
-        <FeedbackPressable
-          haptic="light"
-          onPress={handleProfilePress}
-          className="h-12 w-12 items-center justify-center rounded-full bg-white/15 border border-white/25"
-          accessibilityLabel="Open profile"
-          accessibilityRole="button"
-        >
-          {session ? (
-            <Text
-              className="font-outfit-black text-xl text-white"
-              accessibilityLabel={`Profile initial ${profileInitial}`}
-            >
-              {profileInitial}
-            </Text>
-          ) : (
-            <Octicons
-              name="person"
-              size={22}
-              color="white"
-              style={{
-                textShadowColor: 'white',
-                textShadowOffset: { width: 0, height: 0 },
-                textShadowRadius: 1.2,
-              }}
-            />
-          )}
-        </FeedbackPressable>
+          <FeedbackPressable
+            haptic="light"
+            onPress={handleProfilePress}
+            className="h-12 w-12 items-center justify-center rounded-full border border-white/25 bg-white/15"
+            accessibilityLabel="Open profile"
+            accessibilityRole="button"
+          >
+            {session ? (
+              <Text
+                className="font-outfit-black text-xl text-white"
+                accessibilityLabel={`Profile initial ${profileInitial}`}
+              >
+                {profileInitial}
+              </Text>
+            ) : (
+              <Octicons name="person" size={22} color="#FFFFFF" />
+            )}
+          </FeedbackPressable>
+        </View>
       </View>
 
-      <View className="flex-1 self-center w-full max-w-[760px] px-5 pt-6 relative">
+      <View className="relative w-full max-w-[760px] flex-1 self-center px-5 pt-6">
         {/* Welcome Message Card */}
-        <View className="bg-[#EBF2F0] rounded-3xl p-6 mb-5">
+        <View className="mb-5 rounded-3xl bg-surface-tinted p-5">
           <Text 
             className="text-base text-slate-500 mb-1 font-outfit-medium"
           >
@@ -605,7 +583,7 @@ export default function HomeScreen() {
             accessibilityState={{ expanded: isOpen }}
             numberOfLines={1}
             multiline={false}
-            className="h-16 rounded-2xl bg-[#F0F3F5] py-5 pl-14 pr-14 text-lg text-ink font-outfit-semibold"
+            className="h-16 rounded-2xl border border-border-soft bg-field py-5 pl-14 pr-14 font-outfit-semibold text-lg text-ink"
           />
 
           {searchQuery.length > 0 ? (
@@ -624,13 +602,13 @@ export default function HomeScreen() {
         </View>
 
         {/* BACKGROUND SECTION: Stays visible but blocks touch interactions when dropdown is open */}
-        <View 
-          className="flex-1" 
+        <View
+          className="min-h-0 flex-1"
           pointerEvents={isOpen ? 'none' : 'auto'}
         >
           {/* Favorites Card */}
-          <View className="flex-1 min-h-0">
-            <View className="flex-1 min-h-0 rounded-3xl bg-[#EBF2F0] p-3">
+          <View className="min-h-0 flex-1">
+            <View className="min-h-0 flex-1 rounded-3xl bg-surface-tinted p-3">
               <View className="mb-3 flex-row items-center justify-between px-1">
                 <Text
                   className="text-lg text-ink font-outfit-black"
@@ -665,10 +643,10 @@ export default function HomeScreen() {
                 </View>
               ) : null}
 
-              <View className="flex-1 min-h-0">
+              <View className="min-h-0 flex-1">
                 {isHydratingFavoriteSchools ? (
                   <View
-                    className="flex-1 items-center justify-center rounded-2xl bg-white/50 px-6 py-8"
+                    className="flex-1 items-center justify-center rounded-2xl bg-white/60 px-6 py-6"
                     accessibilityLabel="Loading favorite schools"
                     accessibilityLiveRegion="polite"
                   >
@@ -684,7 +662,7 @@ export default function HomeScreen() {
                     </Text>
                   </View>
                 ) : favoriteSchools.length === 0 ? (
-                  <View className="flex-1 items-center justify-center rounded-2xl bg-white/50 px-6 py-8">
+                  <View className="flex-1 items-center justify-center rounded-2xl bg-white/60 px-6 py-6">
                     <View className="h-16 w-16 items-center justify-center rounded-2xl bg-[#E3ECEA]">
                       <Octicons name="star" size={30} color="#1B3B36" />
                     </View>
@@ -706,6 +684,7 @@ export default function HomeScreen() {
                   <ScrollView
                     className="flex-1"
                     contentContainerClassName="pb-1"
+                    keyboardShouldPersistTaps="handled"
                     nestedScrollEnabled
                     showsVerticalScrollIndicator={false}
                   >
@@ -724,12 +703,12 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {/* LANDSCAPE IMAGE BANNER */}
-          <View className="w-full h-35 mt-4 mb-4 -mx-5">            
-            <Image 
-              source={IMAGES.landscape} 
-              style={{ width: '110%', height: '100%' }} 
+          <View className="-mx-5 mt-4 h-36">
+            <Image
+              source={IMAGES.landscape}
+              className="h-full w-full"
               resizeMode="cover"
+              accessible={false}
             />
           </View>
         </View>
@@ -750,15 +729,22 @@ export default function HomeScreen() {
         {/* Dropdown Overlay Menu Results Container */}
         {isOpen && (
           <View
-            className="absolute left-5 right-5 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-xl z-50"
+            nativeID="school-search-results"
+            className="absolute left-5 right-5 z-50 overflow-hidden rounded-2xl border border-border-soft bg-surface"
             style={{
               maxHeight: isTabletLayout ? 440 : 320,
               top: searchBarBottom + 8,
+              shadowColor: '#000000',
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.12,
+              shadowRadius: 20,
+              elevation: 12,
             }}
           >
             <View className="px-4 py-2 bg-slate-50 border-b border-slate-100">
-              <Text 
-                className="text-xs text-slate-400 font-outfit-bold"
+              <Text
+                accessibilityLiveRegion="polite"
+                className="font-outfit-bold text-xs text-muted"
               >
                 {searchQuery.trim().length < 3
                   ? 'Type 3 or more characters'
@@ -826,8 +812,11 @@ export default function HomeScreen() {
         )}
       </View>
 
-      {/* Sticky Bottom Action Trigger */}
-      <View className="self-center w-full max-w-[760px] p-5 pb-6" pointerEvents={isOpen ? 'none' : 'auto'}>
+      <View
+        className="border-t border-border-soft bg-surface px-5 pt-3"
+        style={{ paddingBottom: Math.max(insets.bottom, 12) }}
+        pointerEvents={isOpen ? 'none' : 'auto'}
+      >
         <FeedbackPressable
           haptic="light"
           onPress={handleGoPress}
@@ -835,24 +824,16 @@ export default function HomeScreen() {
           accessibilityRole="button"
           accessibilityLabel={selectedSchool ? `Open ${selectedSchool.name} map` : 'Choose a school to continue'}
           accessibilityState={{ disabled: !selectedSchool }}
-          className={`w-full rounded-2xl py-4 flex-row items-center justify-center space-x-2 relative -top-4 ${
-            selectedSchool
-              ? 'border border-transparent bg-[#1B3B36]'
-              : 'border border-[#5f6f6b] bg-[#5f6f6b]'
+          className={`min-h-14 w-full max-w-[720px] self-center flex-row items-center justify-center rounded-2xl px-5 py-4 ${
+            selectedSchool ? 'bg-brand' : 'bg-disabledGreen'
           }`}
         >
-          <Text
-            className={`font-outfit-bold text-center text-lg ${
-              selectedSchool ? 'text-white' : 'text-[#F3FAF7]'
-            }`}
-          >
-            View campus map
+          <Text className="font-outfit-bold text-center text-lg text-white">
+            {selectedSchool ? 'View campus map' : 'Select a school to continue'}
           </Text>
-          <Text
-            className={`font-outfit-bold text-sm ${
-              selectedSchool ? 'text-white' : 'text-[#F3FAF7]'
-            }`}
-          >   ❯</Text>
+          {selectedSchool ? (
+            <Feather name="chevron-right" size={20} color="#FFFFFF" />
+          ) : null}
         </FeedbackPressable>
       </View>
     </View>

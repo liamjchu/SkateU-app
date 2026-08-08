@@ -135,10 +135,10 @@ export default function ChangePasswordForm({ email }: ChangePasswordFormProps) {
         <Text className="font-outfit-black text-2xl text-ink">
           Change password
         </Text>
-        <Text className="mt-2 font-outfit-medium text-base text-slate-500">
+        <Text className="mt-2 font-outfit-medium text-base text-muted">
           Verify your current password before choosing a new one.
         </Text>
-        <Text className="mt-2 font-outfit-medium text-sm text-slate-400">
+        <Text className="mt-2 font-outfit-medium text-sm text-muted">
           {PASSWORD_REQUIREMENTS}
         </Text>
       </View>
@@ -190,7 +190,7 @@ export default function ChangePasswordForm({ email }: ChangePasswordFormProps) {
           accessible
           accessibilityRole="alert"
           accessibilityLiveRegion="polite"
-          className="rounded-2xl bg-[#EBF2F0] px-4 py-3"
+          className="rounded-2xl bg-surface-tinted px-4 py-3"
         >
           <Text selectable className="font-outfit-semibold text-sm text-ink">
             {success}
@@ -202,7 +202,7 @@ export default function ChangePasswordForm({ email }: ChangePasswordFormProps) {
         onPress={handleSubmit}
         disabled={submitting}
         className={`items-center justify-center rounded-2xl py-4 ${
-          submitting ? 'bg-[#60756F]' : 'bg-[#21473f]'
+          submitting ? 'bg-disabledGreen' : 'bg-brand'
         }`}
         accessibilityRole="button"
         accessibilityLabel={submitting ? 'Updating password' : 'Update password'}

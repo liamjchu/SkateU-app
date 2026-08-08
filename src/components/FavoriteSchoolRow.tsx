@@ -1,5 +1,4 @@
 import { Feather, Octicons } from '@expo/vector-icons';
-import type { GestureResponderEvent } from 'react-native';
 import { Alert, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -57,8 +56,7 @@ export default function FavoriteSchoolRow({
     );
   };
 
-  const handleRemove = (event?: GestureResponderEvent) => {
-    event?.stopPropagation();
+  const handleRemove = () => {
     confirmRemove();
   };
 
@@ -86,22 +84,14 @@ export default function FavoriteSchoolRow({
     });
 
   return (
-    <FeedbackPressable
-      disablePressOpacity
-      disablePressScale
-      haptic="light"
-      onPress={() => onSelect(school)}
-      className={`relative mb-3 overflow-hidden rounded-3xl border bg-white ${
-        isSelected ? 'border-[#1B3B36] bg-[#E3ECEA]' : 'border-white'
+    <View
+      className={`relative mb-3 overflow-hidden rounded-3xl border bg-surface ${
+        isSelected ? 'border-brand' : 'border-transparent'
       }`}
-      accessibilityRole="button"
-      accessibilityLabel={`Open ${school.name}`}
-      accessibilityHint="Selects this school for the campus map button"
-      accessibilityState={{ selected: isSelected }}
     >
       <View
         pointerEvents="none"
-        className="absolute inset-y-1 right-1 items-center justify-center rounded-3xl bg-[#FBE9E7]"
+        className="absolute inset-y-1 right-1 items-center justify-center rounded-3xl bg-errorSurface"
         style={{ width: `${SWIPE_ACTION_RATIO * 100}%` }}
       >
         <Feather name="trash-2" size={18} color="#7F302C" />
@@ -115,48 +105,45 @@ export default function FavoriteSchoolRow({
           }}
           style={rowAnimatedStyle}
         >
-          <View className="flex-row items-center justify-between rounded-3xl border-2 border-white bg-white p-2">
-            <View className="min-w-0 flex-1 flex-row items-center pr-2">
-              <FeedbackPressable
-                onPress={handleRemove}
-                className="h-12 w-12 items-center justify-center rounded-2xl bg-[#F0F5F4]"
-                accessibilityLabel={`Remove ${school.name} from favorites`}
-                accessibilityHint="Opens a confirmation before removing this school"
-                accessibilityRole="button"
-              >
-                <Octicons name="star-fill" size={20} color="#1B3B36" />
-              </FeedbackPressable>
+          <View className="flex-row items-center rounded-3xl border-2 border-white bg-surface p-2">
+            <FeedbackPressable
+              onPress={handleRemove}
+              className="h-12 w-12 items-center justify-center rounded-2xl bg-surface-soft"
+              accessibilityLabel={`Remove ${school.name} from favorites`}
+              accessibilityHint="Opens a confirmation before removing this school"
+              accessibilityRole="button"
+            >
+              <Octicons name="star-fill" size={20} color="#1B3B36" />
+            </FeedbackPressable>
 
-              <View className="ml-4 min-w-0 flex-1">
-                <Text
-                  className="text-lg text-ink font-outfit-bold"
-                >
+            <FeedbackPressable
+              haptic="light"
+              onPress={() => onSelect(school)}
+              className="ml-2 min-h-12 min-w-0 flex-1 flex-row items-center justify-between rounded-2xl px-2"
+              accessibilityRole="button"
+              accessibilityLabel={`Select ${school.name}`}
+              accessibilityHint="Selects this school for the campus map button"
+              accessibilityState={{ selected: isSelected }}
+            >
+              <View className="min-w-0 flex-1 pr-2">
+                <Text className="font-outfit-bold text-lg text-ink">
                   {school.name}
                 </Text>
-                <Text
-                  className="mt-0.5 text-sm text-slate-400 font-outfit-medium"
-                >
+                <Text className="mt-0.5 font-outfit-medium text-sm text-muted">
                   {school.city}, {school.state}
                 </Text>
               </View>
-            </View>
 
-            <View className="w-20 shrink-0 flex-row items-center justify-center space-x-1.5 rounded-xl bg-white/50 px-3 py-1.5">
-              <Feather
-                name="map-pin"
-                size={11}
-                color="#475569"
-                className="mr-[3px]"
-              />
-              <Text
-                className="text-base text-ink font-outfit-bold"
-              >
-                {formatSpotCount(school.numSpots)}
-              </Text>
-            </View>
+              <View className="w-20 shrink-0 flex-row items-center justify-end rounded-xl px-2 py-1.5">
+                <Feather name="map-pin" size={12} color="#475569" />
+                <Text className="ml-1.5 font-outfit-bold text-base text-ink">
+                  {formatSpotCount(school.numSpots)}
+                </Text>
+              </View>
+            </FeedbackPressable>
           </View>
         </Animated.View>
       </GestureDetector>
-    </FeedbackPressable>
+    </View>
   );
 }

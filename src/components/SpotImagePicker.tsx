@@ -119,34 +119,24 @@ export default function SpotImagePicker({
   }
 
   return (
-    <View className="mb-6">
+    <View>
       <FeedbackPressable
         haptic="light"
         disabled={loading}
         onPress={handlePickImage}
-        className="overflow-hidden rounded-[16px] items-center justify-center bg-white"
+        className="items-center justify-center overflow-hidden rounded-2xl border border-border-soft bg-surface"
         accessibilityRole="button"
         accessibilityLabel={imageUri ? 'Change spot photo' : 'Add spot photo'}
         accessibilityHint="Opens camera or photo library"
         accessibilityState={{ disabled: loading, busy: loading }}
-        style={{
-          borderWidth: 1,
-          borderColor: '#DDE4E1',
-          borderStyle: 'solid',
-          height: isTabletLayout ? 320 : 312,
-        }}
+        style={{ height: isTabletLayout ? 260 : 200 }}
       >
         {imageUri ? (
           <Image
             source={{ uri: imageUri }}
             resizeMode="cover"
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-            }}
+            className="absolute inset-0 h-full w-full"
+            accessible={false}
           />
         ) : null}
 
@@ -155,30 +145,16 @@ export default function SpotImagePicker({
             <ActivityIndicator size="small" color="#355650" />
           ) : imageUri ? null : (
             <>
-              <View
-                style={{
-                  width: 72,
-                  height: 72,
-                  borderRadius: 20,
-                  backgroundColor: '#E9EEEC',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  marginBottom: 18,
-                }}
-              >
-                <Feather
-                  name="camera"
-                  size={26}
-                  color="#355650"
-                />
+              <View className="mb-3 h-14 w-14 items-center justify-center rounded-2xl bg-surface-tinted">
+                <Feather name="camera" size={24} color="#21473F" />
               </View>
 
-              <Text className="mb-1 font-outfit-semibold text-base text-ink-dark">
-                Add Spot Photo
+              <Text className="mb-1 font-outfit-semibold text-base text-ink">
+                Add a spot photo
               </Text>
 
-              <Text className="text-center font-outfit-medium text-sm text-slate-400">
-                Tap to take a photo or choose from your gallery
+              <Text className="text-center font-outfit-medium text-sm text-muted">
+                Take a photo or choose one from your gallery
               </Text>
             </>
           )}

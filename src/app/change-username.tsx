@@ -1,12 +1,11 @@
 import { useRouter } from 'expo-router';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
+import ScreenHeader from '../components/screen-header';
 import { UsernameForm } from '../components/username-form';
 import { useProfileStore } from '../store/profileStore';
 
 export default function ChangeUsernameScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const username = useProfileStore((state) => state.profile?.username ?? '');
 
   const goBack = () => {
@@ -19,31 +18,8 @@ export default function ChangeUsernameScreen() {
   };
 
   return (
-    <View className="flex-1 bg-white">
-      <View
-        className="justify-center bg-[#21473f] px-6 pb-3"
-        style={{
-          paddingTop: insets.top + 16,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.25,
-          shadowRadius: 8,
-          elevation: 12,
-        }}
-      >
-        <View className="flex-row items-center justify-between">
-          <Pressable
-            onPress={goBack}
-            className="h-12 w-12 items-center justify-center rounded-full"
-            accessibilityLabel="Go back"
-            accessibilityRole="button"
-          >
-            <Text className="text-xl text-white">❮</Text>
-          </Pressable>
-          <Text className="font-outfit-bold text-2xl text-white">Username</Text>
-          <View className="h-12 w-12" />
-        </View>
-      </View>
+    <View className="flex-1 bg-surface">
+      <ScreenHeader title="Username" onBack={goBack} />
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}

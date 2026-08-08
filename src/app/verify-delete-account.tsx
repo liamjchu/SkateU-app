@@ -8,6 +8,7 @@ import {
     TextInput,
     View,
 } from 'react-native';
+import ScreenHeader from '../components/screen-header';
 import { useAuthStore } from '../store/authStore';
 
 const CODE_LENGTH = 6;
@@ -130,34 +131,8 @@ export default function VerifyDeleteAccountScreen() {
   const cells = Array.from({ length: CODE_LENGTH });
 
   return (
-    <View className="flex-1 bg-white">
-      <View
-        className="h-[136px] justify-center bg-[#21473f] px-6 pb-3 pt-[70px]"
-        style={{
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.25,
-          shadowRadius: 8,
-          elevation: 12,
-        }}
-      >
-        <View className="flex-row items-center justify-between">
-          <Pressable
-            onPress={goBack}
-            className="h-12 w-12 items-center justify-center rounded-full"
-            accessibilityLabel="Go back"
-            accessibilityRole="button"
-          >
-            <Text className="text-xl text-white">❮</Text>
-          </Pressable>
-
-          <Text className="font-outfit-bold text-2xl text-white">
-            Delete account
-          </Text>
-
-          <View className="h-11 w-11" />
-        </View>
-      </View>
+    <View className="flex-1 bg-surface">
+      <ScreenHeader title="Delete account" onBack={goBack} />
 
       <View className="flex-1 self-center w-full max-w-[640px] px-5 pt-8 pb-8">
         <Text className="font-outfit-black text-3xl text-ink">
@@ -227,7 +202,7 @@ export default function VerifyDeleteAccountScreen() {
             accessible
             accessibilityRole="alert"
             accessibilityLiveRegion="polite"
-            className="rounded-2xl bg-[#EBF2F0] px-4 py-3">
+            className="rounded-2xl bg-surface-tinted px-4 py-3">
               <Text className="font-outfit-semibold text-sm text-ink">
                 {notice}
               </Text>
@@ -238,7 +213,7 @@ export default function VerifyDeleteAccountScreen() {
             onPress={() => submitCode(code)}
             disabled={submitting}
             className={`mt-2 h-14 flex-row items-center justify-center rounded-2xl ${
-              submitting ? 'bg-[#60756F]' : 'bg-[#7F302C]'
+              submitting ? 'bg-disabledGreen' : 'bg-errorText'
             }`}
             accessibilityLabel={submitting ? 'Verifying and deleting account' : 'Confirm account deletion'}
             accessibilityRole="button"
@@ -269,7 +244,7 @@ export default function VerifyDeleteAccountScreen() {
           >
             <Text
               className={`font-outfit-semibold text-base ${
-                cooldown > 0 || resending ? 'text-slate-400' : 'text-darkGreen'
+                cooldown > 0 || resending ? 'text-muted' : 'text-brand'
               }`}
             >
               {resending

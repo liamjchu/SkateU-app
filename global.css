@@ -7,17 +7,32 @@
   --font-outfit-bold: "Outfit_700Bold";
   --font-outfit-black: "Outfit_900Black";
 
-  --color-ink: #1B3B36;
-  --color-ink-dark: #173A35;
+  /* Core brand and text colors. */
+  --color-brand: #21473f;
+  --color-brand-dark: #173a35;
+  --color-ink: #1b3b36;
+  --color-ink-dark: #173a35;
+  --color-muted: #52645f;
+  --color-muted-strong: #475569;
+
+  /* Semantic surfaces and borders. */
+  --color-surface: #ffffff;
+  --color-surface-soft: #f7f9f8;
+  --color-surface-tinted: #ebf2f0;
+  --color-field: #f0f3f5;
+  --color-border-soft: #dce5e2;
+
+  /* Status colors. */
+  --color-errorText: #7f302c;
+  --color-errorSurface: #fbe9e7;
+  --color-errorBorder: #b45f58;
+  --color-actionDisabled: #90a39f;
+  --color-destructiveActionDisabled: #7a918c;
+  --color-disabledGreen: #90a39f;
+
+  /* Backward-compatible aliases while existing screens are migrated. */
   --color-darkGreen: #21473f;
   --color-logoGreen: #3c5853;
   --color-lightGreen: #e8f0ee;
   --color-lightGray: #eff3f2;
-
-  /* Accessible muted and status colors used across the app. */
-  --color-muted: #52645f;
-  --color-muted-strong: #475569;
-  --color-errorText: #7f302c;
-  --color-errorSurface: #fbe9e7;
-  --color-disabledGreen: #60756f;
 }

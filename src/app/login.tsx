@@ -1,16 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
     KeyboardAvoidingView,
     Platform,
-    Pressable,
     ScrollView,
     Text,
     TextInput,
     View
 } from 'react-native';
+import FeedbackPressable from '../components/FeedbackPressable';
 import GoogleSignInButton from '../components/GoogleSignInButton';
+import ScreenHeader from '../components/screen-header';
 import {
     getPasswordRequirementStatus,
     validatePassword,
@@ -19,6 +20,7 @@ import { useAuthStore } from '../store/authStore';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const passwordInputRef = useRef<TextInput>(null);
   const signIn = useAuthStore((state) => state.signIn);
   const signUp = useAuthStore((state) => state.signUp);
 
@@ -111,36 +113,11 @@ export default function LoginScreen() {
   };
 
   return (
-    <View className="flex-1 bg-white">
-      <View
-        className="h-[136px] justify-center bg-[#21473f] px-6 pb-3 pt-[70px]"
-        style={{
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.25,
-          shadowRadius: 8,
-          elevation: 12,
-        }}
-      >
-        <View className="flex-row items-center justify-between">
-          <Pressable
-            onPress={goBack}
-            className="h-12 w-12 items-center justify-center rounded-full"
-            accessibilityLabel="Go back"
-            accessibilityRole="button"
-          >
-            <Text className="text-xl text-white">❮</Text>
-          </Pressable>
-
-          <Text
-            className="text-2xl text-white font-outfit-bold"
-          >
-            {isSignup ? 'Sign up' : 'Login'}
-          </Text>
-
-          <View className="h-11 w-11" />
-        </View>
-      </View>
+    <View className="flex-1 bg-surface">
+      <ScreenHeader
+        title={isSignup ? 'Sign up' : 'Login'}
+        onBack={goBack}
+      />
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -167,45 +144,72 @@ export default function LoginScreen() {
         </Text>
 
         <View className="mt-8 gap-4">
-          <TextInput
-            value={email}
-            onChangeText={setEmail}
-            placeholder="Email"
-            accessibilityLabel="Email address"
-            placeholderTextColor="#52645F"
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="email-address"
-            editable={!submitting}
-            className="rounded-2xl bg-[#F0F3F5] pl-4 pr-5 py-4 text-base text-ink font-outfit-semibold"
-          />
-          <View className="flex-row items-center rounded-2xl bg-[#F0F3F5] pr-3">
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Password"
-              accessibilityLabel="Password"
-              placeholderTextColor="#52645F"
-              secureTextEntry={!showPassword}
-              autoCapitalize="none"
-              editable={!submitting}
-              className="flex-1 pl-4 pr-5 py-4 text-base text-ink font-outfit-semibold"
-            />
-            <Pressable
-              onPress={() => setShowPassword((prev) => !prev)}
-              disabled={submitting}
-              hitSlop={8}
-              className="h-12 w-12 items-center justify-center"
-              accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
-              accessibilityRole="button"
-              accessibilityState={{ disabled: submitting }}
+          <View className="gap-2">
+            <Text
+              nativeID="login-email-label"
+              className="font-outfit-semibold text-sm text-ink"
             >
-              <Ionicons
-                name={showPassword ? 'eye-outline' : 'eye-off-outline'}
-                size={22}
-                color="#52645F"
+              Email address
+            </Text>
+            <TextInput
+              value={email}
+              onChangeText={setEmail}
+              placeholder="name@email.com"
+              placeholderTextColor="#94A3B8"
+              accessibilityLabelledBy="login-email-label"
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="email"
+              textContentType="emailAddress"
+              keyboardType="email-address"
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => passwordInputRef.current?.focus()}
+              editable={!submitting}
+              className="min-h-14 rounded-2xl border border-border-soft bg-field px-4 py-4 font-outfit-medium text-base text-ink"
+            />
+          </View>
+
+          <View className="gap-2">
+            <Text
+              nativeID="login-password-label"
+              className="font-outfit-semibold text-sm text-ink"
+            >
+              Password
+            </Text>
+            <View className="min-h-14 flex-row items-center rounded-2xl border border-border-soft bg-field pr-2">
+              <TextInput
+                ref={passwordInputRef}
+                value={password}
+                onChangeText={setPassword}
+                placeholder={isSignup ? 'Create a strong password' : 'Enter your password'}
+                placeholderTextColor="#94A3B8"
+                accessibilityLabelledBy="login-password-label"
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete={isSignup ? 'new-password' : 'current-password'}
+                textContentType={isSignup ? 'newPassword' : 'password'}
+                returnKeyType="go"
+                onSubmitEditing={() => void handleSubmit()}
+                editable={!submitting}
+                className="flex-1 px-4 py-4 font-outfit-medium text-base text-ink"
               />
-            </Pressable>
+              <FeedbackPressable
+                onPress={() => setShowPassword((prev) => !prev)}
+                disabled={submitting}
+                className="h-12 w-12 items-center justify-center rounded-full"
+                accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: submitting }}
+              >
+                <Ionicons
+                  name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+                  size={22}
+                  color="#52645F"
+                />
+              </FeedbackPressable>
+            </View>
           </View>
 
           {isSignup ? (
@@ -217,7 +221,7 @@ export default function LoginScreen() {
                     `${requirement.label}: ${requirement.met ? 'met' : 'not met'}`
                 )
                 .join('. ')}.`}
-              className="rounded-2xl bg-[#F7F9F8] px-4 py-3"
+              className="rounded-2xl border border-border-soft bg-surface-soft px-4 py-3"
             >
               <Text
                 className="text-sm text-ink font-outfit-bold"
@@ -263,29 +267,30 @@ export default function LoginScreen() {
           {notice ? (
             <View
               accessible
-              accessibilityRole="alert"
               accessibilityLiveRegion="polite"
-              className="rounded-2xl bg-[#EBF2F0] px-4 py-3">
+              className="rounded-2xl bg-surface-tinted px-4 py-3">
               <Text
-                className="text-sm text-ink font-outfit-semibold"
+                selectable
+                className="font-outfit-semibold text-sm text-ink"
               >
                 {notice}
               </Text>
             </View>
           ) : null}
 
-          <Pressable
+          <FeedbackPressable
+            haptic="light"
             onPress={handleSubmit}
             disabled={submitting}
-            className={`mt-2 items-center justify-center rounded-2xl py-4 ${
-              submitting ? 'bg-[#60756F]' : 'bg-[#21473f]'
+            className={`mt-2 min-h-14 items-center justify-center rounded-2xl py-4 ${
+              submitting ? 'bg-disabledGreen' : 'bg-brand'
             }`}
             accessibilityLabel={isSignup ? 'Sign up' : 'Login'}
             accessibilityRole="button"
             accessibilityState={{ disabled: submitting, busy: submitting }}
           >
             <Text
-              className="text-lg text-white font-outfit-bold"
+              className="font-outfit-bold text-lg text-white"
             >
               {submitting
                 ? 'Please wait...'
@@ -293,45 +298,47 @@ export default function LoginScreen() {
                   ? 'Sign up'
                   : 'Login'}
             </Text>
-          </Pressable>
+          </FeedbackPressable>
 
-          <Pressable
-            onPress={() => {
-              setError('');
-              setNotice('');
-              setMode(isSignup ? 'login' : 'signup');
-            }}
-            disabled={submitting}
-            className="min-h-12 items-center justify-center px-2 py-1"
-            accessibilityRole="button"
-            accessibilityLabel={
-              isSignup ? 'Switch to login' : 'Switch to sign up'
-            }
-          >
-            <Text
-              className="text-base text-slate-500 font-outfit-semibold"
-            >
-              {isSignup
-                ? 'Already have an account? Login'
-                : "Don't have an account? Sign up"}
-            </Text>
-          </Pressable>
-
-          {!isSignup ? (
-            <Pressable
-              onPress={() => router.push('/forgot-password')}
+          <View className="gap-1">
+            <FeedbackPressable
+              onPress={() => {
+                setError('');
+                setNotice('');
+                setMode(isSignup ? 'login' : 'signup');
+              }}
               disabled={submitting}
-              className="-mt-[14px] min-h-12 items-center justify-center px-2 py-1"
+              className="min-h-12 items-center justify-center rounded-xl px-2"
               accessibilityRole="button"
-              accessibilityLabel="Forgot password"
+              accessibilityLabel={
+                isSignup ? 'Switch to login' : 'Switch to sign up'
+              }
             >
               <Text
-                className="text-base text-slate-500 font-outfit-semibold"
+                className="font-outfit-semibold text-base text-muted"
               >
-                Forgot password?
+                {isSignup
+                  ? 'Already have an account? Login'
+                  : "Don't have an account? Sign up"}
               </Text>
-            </Pressable>
-          ) : null}
+            </FeedbackPressable>
+
+            {!isSignup ? (
+              <FeedbackPressable
+                onPress={() => router.push('/forgot-password')}
+                disabled={submitting}
+                className="min-h-12 items-center justify-center rounded-xl px-2"
+                accessibilityRole="button"
+                accessibilityLabel="Forgot password"
+              >
+                <Text
+                  className="font-outfit-semibold text-base text-muted"
+                >
+                  Forgot password?
+                </Text>
+              </FeedbackPressable>
+            ) : null}
+          </View>
 
           <View className="flex-row items-center">
             <View className="h-px flex-1 bg-slate-200" />

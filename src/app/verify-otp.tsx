@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
+import ScreenHeader from '../components/screen-header';
 import { useAuthStore } from '../store/authStore';
 
 const CODE_LENGTH = 6;
@@ -155,36 +156,8 @@ function VerifyOtpContent({ email }: { email: string }) {
   const cells = Array.from({ length: CODE_LENGTH });
 
   return (
-    <View className="flex-1 bg-white">
-      <View
-        className="h-[136px] justify-center bg-[#21473f] px-6 pb-3 pt-[70px]"
-        style={{
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.25,
-          shadowRadius: 8,
-          elevation: 12,
-        }}
-      >
-        <View className="flex-row items-center justify-between">
-          <Pressable
-            onPress={goBack}
-            className="h-12 w-12 items-center justify-center rounded-full"
-            accessibilityLabel="Go back"
-            accessibilityRole="button"
-          >
-            <Text className="text-xl text-white">❮</Text>
-          </Pressable>
-
-          <Text
-            className="text-2xl text-white font-outfit-bold"
-          >
-            Verify email
-          </Text>
-
-          <View className="h-11 w-11" />
-        </View>
-      </View>
+    <View className="flex-1 bg-surface">
+      <ScreenHeader title="Verify email" onBack={goBack} />
 
       <View className="flex-1 self-center w-full max-w-[640px] px-5 pt-8 pb-8">
         <Text
@@ -262,7 +235,7 @@ function VerifyOtpContent({ email }: { email: string }) {
               accessible
               accessibilityRole="alert"
               accessibilityLiveRegion="polite"
-              className="rounded-2xl bg-[#EBF2F0] px-4 py-3">
+              className="rounded-2xl bg-surface-tinted px-4 py-3">
               <Text
                 className="text-sm text-ink font-outfit-semibold"
               >
@@ -275,7 +248,7 @@ function VerifyOtpContent({ email }: { email: string }) {
             onPress={() => submitCode(code)}
             disabled={submitting}
             className={`mt-2 h-14 flex-row items-center justify-center rounded-2xl ${
-              submitting ? 'bg-[#60756F]' : 'bg-[#21473f]'
+              submitting ? 'bg-disabledGreen' : 'bg-brand'
             }`}
             accessibilityLabel={submitting ? 'Verifying code' : 'Verify code'}
             accessibilityRole="button"
@@ -308,7 +281,7 @@ function VerifyOtpContent({ email }: { email: string }) {
           >
             <Text
               className={`text-base ${
-                cooldown > 0 || resending ? 'text-slate-400' : 'text-darkGreen'
+                cooldown > 0 || resending ? 'text-muted' : 'text-brand'
               } font-outfit-semibold`}
             >
               {resending

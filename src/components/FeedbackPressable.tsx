@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { forwardRef, useEffect, useState } from 'react';
 import {
     AccessibilityInfo,
     Pressable,
     type PressableProps,
+    type View
 } from 'react-native';
 import Animated, {
     useSharedValue,
@@ -18,7 +19,8 @@ type FeedbackPressableProps = PressableProps & {
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-export default function FeedbackPressable({
+const FeedbackPressable = forwardRef<View, FeedbackPressableProps>(
+  function FeedbackPressable({
   disabled,
   disablePressOpacity = false,
   disablePressScale = false,
@@ -28,7 +30,7 @@ export default function FeedbackPressable({
   onPressOut,
   style,
   ...props
-}: FeedbackPressableProps) {
+}: FeedbackPressableProps, ref) {
   const [reduceMotion, setReduceMotion] = useState(false);
   const scale = useSharedValue(1);
   const opacity = useSharedValue(1);
@@ -45,6 +47,7 @@ export default function FeedbackPressable({
 
   return (
     <AnimatedPressable
+      ref={ref}
       {...props}
       disabled={disabled}
       onPress={(event) => {
@@ -84,4 +87,7 @@ export default function FeedbackPressable({
       ]}
     />
   );
-}
+  }
+);
+
+export default FeedbackPressable;

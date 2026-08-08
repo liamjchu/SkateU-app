@@ -1,22 +1,25 @@
 import { Feather, Octicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  ScrollView,
-  Text,
-  View,
+    AccessibilityInfo,
+    ActivityIndicator,
+    Alert,
+    findNodeHandle,
+    Image,
+    ScrollView,
+    Text,
+    View
 } from 'react-native';
 import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
+    Easing,
+    useAnimatedStyle,
+    useReducedMotion,
+    useSharedValue,
+    withTiming
 } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FeedbackPressable from '../components/FeedbackPressable';
+import ScreenHeader from '../components/screen-header';
 import SettingsBottomSheet from '../components/SettingsBottomSheet';
 import { triggerHaptic } from '../lib/haptics';
 import { useAuthStore } from '../store/authStore';
@@ -26,7 +29,8 @@ import type { Spot } from '../types/spot';
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const reduceMotion = useReducedMotion();
+  const settingsButtonRef = useRef<View>(null);
   const user = useAuthStore((state) => state.user);
   const session = useAuthStore((state) => state.session);
   const signOut = useAuthStore((state) => state.signOut);
@@ -63,7 +67,7 @@ export default function ProfileScreen() {
       transform: [
         {
           translateX: withTiming(showingLikedSpots ? optionWidth : 0, {
-            duration: 180,
+            duration: reduceMotion ? 0 : 180,
             easing: Easing.out(Easing.cubic),
           }),
         },
@@ -75,27 +79,38 @@ export default function ProfileScreen() {
     setShowSettingsSheet(true);
   };
 
-  const closeSettingsSheet = () => {
+  const hideSettingsSheet = () => {
     setShowSettingsSheet(false);
   };
 
+  const closeSettingsSheet = () => {
+    hideSettingsSheet();
+
+    setTimeout(() => {
+      const settingsButtonNode = findNodeHandle(settingsButtonRef.current);
+      if (settingsButtonNode) {
+        AccessibilityInfo.setAccessibilityFocus(settingsButtonNode);
+      }
+    }, reduceMotion ? 0 : 240);
+  };
+
   const handleChangeUsername = () => {
-    closeSettingsSheet();
+    hideSettingsSheet();
     router.push('/change-username');
   };
 
   const handleChangePassword = () => {
-    closeSettingsSheet();
+    hideSettingsSheet();
     router.push('/change-password');
   };
 
   const handleSettingsLogout = () => {
-    closeSettingsSheet();
+    hideSettingsSheet();
     handleLogout();
   };
 
   const handleSettingsDeleteAccount = () => {
-    closeSettingsSheet();
+    hideSettingsSheet();
     handleDeleteAccount();
   };
 
@@ -295,71 +310,57 @@ export default function ProfileScreen() {
   };
 
   return (
-    <View className="flex-1 bg-white">
-      <View
-        className="h-[136px] bg-[#21473f] px-6 pb-3 flex-row items-center justify-between"
-        style={{
-          paddingTop: insets.top,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.25,
-          shadowRadius: 8,
-          elevation: 12,
+    <View className="flex-1 bg-surface">
+      <ScreenHeader
+        title="Profile"
+        onBack={() => {
+          if (router.canGoBack()) {
+            router.back();
+            return;
+          }
+
+          router.replace('/');
         }}
-      >
-        <FeedbackPressable
-          haptic="light"
-          onPress={() => {
-            if (router.canGoBack()) {
-              router.back();
-              return;
-            }
-
-            router.replace('/');
-          }}
-          className="h-12 w-12 items-center justify-center rounded-full"
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-        >
-          <Text className="text-xl text-white">❮</Text>
-        </FeedbackPressable>
-
-        <Text
-          className="font-outfit-bold text-2xl text-white"
-        >
-          Profile
-        </Text>
-
-        <FeedbackPressable
-          haptic="light"
-          onPress={handleSettingsPress}
-          className="h-12 w-12 items-center justify-center rounded-full"
-          accessibilityLabel="Open settings"
-          accessibilityRole="button"
-        >
-          <Feather name="settings" size={23} color="#FFFFFF" />
-        </FeedbackPressable>
-      </View>
+        rightAction={
+          <FeedbackPressable
+            ref={settingsButtonRef}
+            haptic="light"
+            onPress={handleSettingsPress}
+            className="h-12 w-12 items-center justify-center rounded-full"
+            accessibilityLabel="Open settings"
+            accessibilityRole="button"
+          >
+            <Feather name="settings" size={23} color="#FFFFFF" />
+          </FeedbackPressable>
+        }
+      />
 
       <ScrollView
         className="flex-1"
         contentContainerClassName="self-center w-full max-w-[720px] px-5 pb-6 pt-6"
         showsVerticalScrollIndicator={false}
       >
-        <View className="items-center rounded-3xl bg-[#EBF2F0] p-6">
-          <View className="mb-4 h-24 w-24 items-center justify-center rounded-full bg-[#21473f]">
+        <View className="items-center rounded-3xl bg-surface-tinted p-6">
+          <View className="mb-4 h-24 w-24 items-center justify-center rounded-full bg-brand">
             <Text className="font-outfit-black text-4xl text-white">
               {avatarLetter}
             </Text>
           </View>
 
-          <Text className="font-outfit-black text-2xl text-ink">
+          <Text
+            className="max-w-full px-4 text-center font-outfit-black text-2xl text-ink"
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
             {username ? `@${username}` : 'Your Profile'}
           </Text>
 
           {email ? (
             <Text
-              className="mt-1 font-outfit-medium text-base text-slate-500"
+              selectable
+              className="mt-1 max-w-full px-4 text-center font-outfit-medium text-base text-muted"
+              numberOfLines={1}
+              ellipsizeMode="middle"
             >
               {email}
             </Text>
@@ -367,7 +368,7 @@ export default function ProfileScreen() {
         </View>
 
         <View
-          className="relative mt-8 flex-row rounded-2xl bg-[#F4F7F6] p-1"
+          className="relative mt-8 flex-row rounded-2xl bg-surface-soft p-1"
           onLayout={(event) => {
             spotToggleWidth.value = event.nativeEvent.layout.width;
           }}
@@ -437,8 +438,16 @@ export default function ProfileScreen() {
         ) : null}
 
         {displayedLoading && displayedSpots.length === 0 ? (
-          <View className="mt-6 items-center">
-            <ActivityIndicator size="small" color="#21473f" />
+          <View
+            accessible
+            accessibilityRole="progressbar"
+            accessibilityLabel={`Loading ${showingLikedSpots ? 'liked' : 'your'} spots`}
+            className="mt-6 items-center rounded-2xl bg-surface-soft px-4 py-6"
+          >
+            <ActivityIndicator size="small" color="#21473F" />
+            <Text className="mt-2 font-outfit-medium text-sm text-muted">
+              Loading spots…
+            </Text>
           </View>
         ) : displayedError ? (
           <View className="mt-4 items-center rounded-2xl border border-[#B45F58] bg-[#FBE9E7] p-5">
@@ -487,15 +496,23 @@ export default function ProfileScreen() {
                       source={{ uri: spot.imageUris[0] }}
                       className="h-16 w-16 rounded-xl"
                       resizeMode="cover"
+                      accessible={false}
                     />
                   ) : (
-                    <View className="h-16 w-16 items-center justify-center rounded-xl bg-slate-100">
+                    <View
+                      accessible={false}
+                      importantForAccessibility="no-hide-descendants"
+                      className="h-16 w-16 items-center justify-center rounded-xl bg-slate-100"
+                    >
                       <Feather name="image" size={20} color="#52645F" />
                     </View>
                   )}
 
                   <View className="ml-3 min-w-0 flex-1">
-                    <Text className="font-outfit-bold text-base text-ink">
+                    <Text
+                      className="font-outfit-bold text-base text-ink"
+                      numberOfLines={1}
+                    >
                       {spot.name}
                     </Text>
                     <View className="mt-0.5 flex-row items-center">
@@ -520,7 +537,7 @@ export default function ProfileScreen() {
                   <FeedbackPressable
                     onPress={() => handleUnlike(spot)}
                     disabled={likingId === spot.id}
-                    className="ml-2 h-10 w-10 items-center justify-center rounded-full bg-[#FBE9E7]"
+                    className="ml-2 h-12 w-12 items-center justify-center rounded-full bg-errorSurface"
                     accessibilityLabel={`Unlike ${spot.name}`}
                     accessibilityRole="button"
                     accessibilityState={{ busy: likingId === spot.id }}
@@ -532,7 +549,12 @@ export default function ProfileScreen() {
                     )}
                   </FeedbackPressable>
                 ) : deletingId === spot.id ? (
-                  <View className="ml-2 h-10 w-10 items-center justify-center">
+                  <View
+                    accessible
+                    accessibilityRole="progressbar"
+                    accessibilityLabel={`Deleting ${spot.name}`}
+                    className="ml-2 h-12 w-12 items-center justify-center"
+                  >
                     <ActivityIndicator size="small" color="#21473f" />
                   </View>
                 ) : (
@@ -540,7 +562,7 @@ export default function ProfileScreen() {
                     <FeedbackPressable
                       haptic="light"
                       onPress={() => handleEdit(spot)}
-                      className="h-10 w-10 items-center justify-center rounded-full"
+                      className="h-12 w-12 items-center justify-center rounded-full"
                       accessibilityLabel={`Edit ${spot.name}`}
                       accessibilityRole="button"
                     >
@@ -548,7 +570,7 @@ export default function ProfileScreen() {
                     </FeedbackPressable>
                     <FeedbackPressable
                       onPress={() => handleDelete(spot)}
-                      className="h-10 w-10 items-center justify-center rounded-full"
+                      className="h-12 w-12 items-center justify-center rounded-full"
                       accessibilityLabel={`Delete ${spot.name}`}
                       accessibilityRole="button"
                     >
