@@ -9,6 +9,7 @@ import {
     TextInput,
     View
 } from 'react-native';
+import AppleSignInButton from '../components/AppleSignInButton';
 import FeedbackPressable from '../components/FeedbackPressable';
 import GoogleSignInButton from '../components/GoogleSignInButton';
 import ScreenHeader from '../components/screen-header';
@@ -356,18 +357,10 @@ export default function LoginScreen() {
             onError={(message) => setError(message)}
           />
 
-          {/* TODO: Log in with Apple - to be implemented later */}
-          {/* <Pressable
-            className="items-center justify-center rounded-2xl border border-slate-200 py-4"
-            accessibilityLabel="Log in with Apple"
-            accessibilityRole="button"
-          >
-            <Text
-              className="text-base text-ink font-outfit-bold"
-            >
-              Log in with Apple
-            </Text>
-          </Pressable> */}
+          <AppleSignInButton
+            disabled={submitting}
+            onError={(message) => setError(message)}
+          />
         </View>
           </View>
         </ScrollView>

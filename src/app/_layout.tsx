@@ -17,6 +17,7 @@ import {
     ReanimatedLogLevel,
 } from 'react-native-reanimated';
 import '../../global.css';
+import { checkAppleCredentialStatus } from '../lib/appleAuthentication';
 import { useAuthStore } from '../store/authStore';
 import { useProfileStore } from '../store/profileStore';
 import { useSpotsStore } from '../store/spotsStore';
@@ -58,6 +59,14 @@ export default function RootLayout() {
     // Restore any persisted Supabase session and subscribe to auth changes.
     initAuth();
   }, [initAuth]);
+
+  useEffect(() => {
+    // Apple only returns an ID token during sign-in, so retain its stable user
+    // ID and verify that Apple still considers that credential authorized.
+    void checkAppleCredentialStatus().catch((error: unknown) => {
+      console.warn('Could not verify the Apple credential status.', error);
+    });
+  }, []);
 
   // Load (or clear) the profile whenever the signed-in user changes. Keyed on
   // the user id so token refreshes don't trigger needless refetches.
