@@ -6,7 +6,6 @@ import { change, cleanup, render, submit, waitFor } from "../../test/react-dom";
 import { WaitlistForm } from "./waitlist-form";
 
 const email = "skater@example.test";
-const storageKey = "skateu.waitlistEmail";
 let fetchMock: ReturnType<typeof vi.fn>;
 
 function emailInput(container: HTMLElement): HTMLInputElement {
@@ -50,7 +49,7 @@ describe("WaitlistForm", () => {
     expect(container.textContent).toContain("No spam. Just the invite when we drop.");
   });
 
-  it("submits a normalized synthetic email and stores it after success", async () => {
+  it("submits a normalized synthetic email", async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 200 }));
     const container = render(<WaitlistForm />);
     const input = emailInput(container);
@@ -65,20 +64,23 @@ describe("WaitlistForm", () => {
       body: JSON.stringify({ email }),
     });
     await waitFor(() => expect(container.textContent).toContain("You’re subscribed."));
-    expect(window.localStorage.getItem(storageKey)).toBe(email);
     expect(input.value).toBe("");
   });
 
-  it("does not submit an email that is already stored on this device", () => {
-    window.localStorage.setItem(storageKey, email);
+  it("submits an email even when a stale local value exists", async () => {
+    window.localStorage.setItem("skateu.waitlistEmail", email);
+    fetchMock.mockResolvedValue(new Response(null, { status: 200 }));
     const container = render(<WaitlistForm />);
 
-    expect(container.textContent).toContain("already subscribed");
     change(emailInput(container), email);
     submit(form(container));
 
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(container.textContent).toContain("already subscribed");
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    expect(fetchMock).toHaveBeenCalledWith("/api/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
   });
 
   it("shows an error when the request fails", async () => {
@@ -91,18 +93,6 @@ describe("WaitlistForm", () => {
     await waitFor(() => expect(container.textContent).toContain("couldn’t add you"));
   });
 
-  it("keeps the success message when local storage is unavailable", async () => {
-    fetchMock.mockResolvedValue(new Response(null, { status: 200 }));
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
-      throw new Error("Storage unavailable");
-    });
-    const container = render(<WaitlistForm />);
-
-    change(emailInput(container), email);
-    submit(form(container));
-
-    await waitFor(() => expect(container.textContent).toContain("You’re subscribed."));
-  });
 
   it("disables controls while a request is pending", async () => {
     let resolveResponse!: (response: Response) => void;
