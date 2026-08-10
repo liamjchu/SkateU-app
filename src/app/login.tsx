@@ -2,19 +2,20 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import {
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    Text,
-    TextInput,
-    View
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Text,
+  TextInput,
+  View
 } from 'react-native';
+import AppleSignInButton from '../components/AppleSignInButton';
 import FeedbackPressable from '../components/FeedbackPressable';
 import GoogleSignInButton from '../components/GoogleSignInButton';
 import ScreenHeader from '../components/screen-header';
 import {
-    getPasswordRequirementStatus,
-    validatePassword,
+  getPasswordRequirementStatus,
+  validatePassword,
 } from '../lib/password';
 import { useAuthStore } from '../store/authStore';
 
@@ -356,18 +357,11 @@ export default function LoginScreen() {
             onError={(message) => setError(message)}
           />
 
-          {/* TODO: Log in with Apple - to be implemented later */}
-          {/* <Pressable
-            className="items-center justify-center rounded-2xl border border-slate-200 py-4"
-            accessibilityLabel="Log in with Apple"
-            accessibilityRole="button"
-          >
-            <Text
-              className="text-base text-ink font-outfit-bold"
-            >
-              Log in with Apple
-            </Text>
-          </Pressable> */}
+          <AppleSignInButton
+            disabled={submitting}
+            onSuccess={() => router.replace('/')}
+            onError={(message) => setError(message)}
+          />
         </View>
           </View>
         </ScrollView>

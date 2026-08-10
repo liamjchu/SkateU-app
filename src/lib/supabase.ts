@@ -1,6 +1,6 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import 'react-native-url-polyfill/auto';
+import { getClientStorage, isWebServerRendering } from './clientStorage';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
@@ -13,9 +13,9 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    storage: AsyncStorage,
-    autoRefreshToken: true,
-    persistSession: true,
+    storage: getClientStorage(),
+    autoRefreshToken: !isWebServerRendering,
+    persistSession: !isWebServerRendering,
     // Native apps use the PKCE flow: OAuth redirects back with a one-time
     // "?code=" that we exchange for a session. This is more reliable than the
     // implicit flow on mobile and survives the app reloading on a deep link.

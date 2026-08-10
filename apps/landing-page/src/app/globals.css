@@ -1,0 +1,36 @@
+@import "tailwindcss";
+@config "../../tailwind.config.ts";
+
+@theme inline {
+  --font-sans: var(--font-outfit);
+
+  /* Keep the landing page aligned with the mobile app's semantic palette. */
+  --color-brand: #21473f;
+  --color-brand-dark: #173a35;
+  --color-ink: #1b3b36;
+  --color-muted: #52645f;
+  --color-surface: #ffffff;
+  --color-surface-tinted: #ebf2f0;
+  --color-field: #f0f3f5;
+  --color-border-soft: #dce5e2;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: #f0f3f5;
+  color: #1b3b36;
+}
+
+body {
+  font-family: var(--font-outfit), sans-serif;
+}
+
+::selection {
+  background: #21473f;
+  color: #ffffff;
+}

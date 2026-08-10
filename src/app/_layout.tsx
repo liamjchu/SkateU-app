@@ -10,18 +10,22 @@ import * as Linking from 'expo-linking';
 import { SplashScreen, Stack, useRouter, useSegments } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Platform, Pressable, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import {
     configureReanimatedLogger,
     ReanimatedLogLevel,
 } from 'react-native-reanimated';
 import '../../global.css';
+import { checkAppleCredentialStatus } from '../lib/appleAuthentication';
 import { useAuthStore } from '../store/authStore';
+import { useFavorites } from '../store/favoritesStore';
 import { useProfileStore } from '../store/profileStore';
 import { useSpotsStore } from '../store/spotsStore';
 
-SplashScreen.preventAutoHideAsync();
+if (Platform.OS !== 'web') {
+  void SplashScreen.preventAutoHideAsync();
+}
 
 configureReanimatedLogger({
   level: ReanimatedLogLevel.warn,
@@ -58,6 +62,20 @@ export default function RootLayout() {
     // Restore any persisted Supabase session and subscribe to auth changes.
     initAuth();
   }, [initAuth]);
+
+  useEffect(() => {
+    // Persistent favorites are browser/device state, so restore them only
+    // after client mounting instead of during the web server render.
+    void useFavorites.persist.rehydrate();
+  }, []);
+
+  useEffect(() => {
+    // Apple only returns an ID token during sign-in, so retain its stable user
+    // ID and verify that Apple still considers that credential authorized.
+    void checkAppleCredentialStatus().catch((error: unknown) => {
+      console.warn('Could not verify the Apple credential status.', error);
+    });
+  }, []);
 
   // Load (or clear) the profile whenever the signed-in user changes. Keyed on
   // the user id so token refreshes don't trigger needless refetches.
@@ -156,10 +174,10 @@ export default function RootLayout() {
   }, [appReady, needsOnboarding, onOnboarding, router]);
 
   useEffect(() => {
-    // Keep the native splash up until we're both ready and on the correct
-    // screen. This prevents any flicker of the wrong screen during the check.
-    if (appReady && routeSettled) {
-      SplashScreen.hideAsync();
+    // Keep the native splash up until routing has settled, avoiding a flash
+    // of the wrong screen during session and profile restoration.
+    if (Platform.OS !== 'web' && appReady && routeSettled) {
+      void SplashScreen.hideAsync();
     }
   }, [appReady, routeSettled]);
 
@@ -168,8 +186,9 @@ export default function RootLayout() {
     return <Text>Font Load Error: {fontError.message}</Text>;
   }
 
-  // 2. This keeps the app loading until the fonts are ready
-  if (!fontsLoaded) {
+  // Native waits for its splash to hand off with the correct font. Web renders
+  // immediately so server/browser output cannot be blank while fonts load.
+  if (!fontsLoaded && Platform.OS !== 'web') {
     return null;
   }
 
