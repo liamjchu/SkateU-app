@@ -1,7 +1,6 @@
 "use client";
 
 import { type FormEvent, useState } from "react";
-import { supabase } from "../../lib/supabase";
 
 type SubmissionStatus = "idle" | "success" | "error";
 
@@ -21,12 +20,15 @@ export function WaitlistForm() {
     setStatus("idle");
 
     try {
-      const normalizedEmail = email.trim().toLowerCase();
-      const { error } = await supabase.rpc("subscribe_email", {
-        p_email: normalizedEmail,
+      const response = await fetch("/api/subscribe", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
       });
 
-      if (error) {
+      if (!response.ok) {
         setStatus("error");
         return;
       }
