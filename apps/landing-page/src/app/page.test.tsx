@@ -21,6 +21,18 @@ describe("Home", () => {
     expect(container.textContent).toContain("Locals know the spots,");
     expect(container.textContent).toContain("Now you do too");
     expect(container.querySelector('form[aria-label="Join the SkateU waitlist"]')).not.toBeNull();
-    expect(container.textContent).toContain("Find a new campus skate spot");
+    const socialLinks = [
+      ["Instagram", "https://www.instagram.com/skateu.app/"],
+      ["TikTok", "https://www.tiktok.com/@skateu.app?is_from_webapp=1&sender_device=pc"],
+      ["YouTube", "https://www.youtube.com/@liam_chu"],
+    ] as const;
+
+    for (const [platform, href] of socialLinks) {
+      const link = container.querySelector(`a[aria-label="Follow SkateU on ${platform}"]`);
+
+      expect(link?.getAttribute("href")).toBe(href);
+      expect(link?.getAttribute("target")).toBe("_blank");
+      expect(link?.getAttribute("rel")).toBe("noopener noreferrer");
+    }
   });
 });
