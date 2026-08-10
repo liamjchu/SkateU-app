@@ -1,17 +1,46 @@
 "use client";
 
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useState, useSyncExternalStore } from "react";
 
-type SubmissionStatus = "idle" | "success" | "error";
+type SubmissionStatus = "idle" | "success" | "alreadySubscribed" | "error";
+
+const subscribedEmailStorageKey = "skateu.waitlistEmail";
 
 function normalizedEmail(email: string): string {
   return email.trim().toLowerCase();
+}
+
+function getStoredSubscribedEmail(): string | null {
+  try {
+    return window.localStorage.getItem(subscribedEmailStorageKey);
+  } catch {
+    return null;
+  }
+}
+
+function subscribeToStoredEmail(onStoreChange: () => void): () => void {
+  window.addEventListener("storage", onStoreChange);
+
+  return () => window.removeEventListener("storage", onStoreChange);
+}
+
+function getServerStoredEmail(): null {
+  return null;
 }
 
 export function WaitlistForm() {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<SubmissionStatus>("idle");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const storedSubscribedEmail = useSyncExternalStore(
+    subscribeToStoredEmail,
+    getStoredSubscribedEmail,
+    getServerStoredEmail
+  );
+  const displayedStatus =
+    status === "idle" && email.length === 0 && storedSubscribedEmail
+      ? "alreadySubscribed"
+      : status;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -21,6 +50,11 @@ export function WaitlistForm() {
     }
 
     const submittedEmail = normalizedEmail(email);
+
+    if (storedSubscribedEmail === submittedEmail) {
+      setStatus("alreadySubscribed");
+      return;
+    }
 
     setIsSubmitting(true);
     setStatus("idle");
@@ -39,6 +73,12 @@ export function WaitlistForm() {
         return;
       }
 
+      try {
+        window.localStorage.setItem(subscribedEmailStorageKey, submittedEmail);
+      } catch {
+        // The current-session success message remains available without storage.
+      }
+
       setEmail("");
       setStatus("success");
     } catch {
@@ -48,7 +88,8 @@ export function WaitlistForm() {
     }
   }
 
-  const isError = status === "error";
+  const isError =
+    displayedStatus === "error" || displayedStatus === "alreadySubscribed";
 
   return (
     <>
@@ -95,9 +136,11 @@ export function WaitlistForm() {
         role={isError ? "alert" : "status"}
         aria-live="polite"
       >
-        {status === "success"
+        {displayedStatus === "success"
           ? "You’re subscribed. Check your inbox and confirm your email address."
-          : status === "error"
+          : displayedStatus === "alreadySubscribed"
+            ? "You’re already subscribed. Check your inbox to confirm your email address."
+            : displayedStatus === "error"
               ? "We couldn’t add you to the waitlist. Please try again."
               : "No spam. Just the invite when we drop."}
       </p>
