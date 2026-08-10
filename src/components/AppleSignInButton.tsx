@@ -1,14 +1,13 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
+import * as Crypto from 'expo-crypto';
 import { useEffect, useState } from 'react';
 import { Alert, View } from 'react-native';
-import {
-    sendIdentityTokenToBackend,
-    storeAppleUserId,
-} from '../lib/appleAuthentication';
+import { signInWithAppleIdentityToken } from '../lib/appleAuthentication';
 
 type AppleSignInButtonProps = {
   disabled?: boolean;
   onError?: (message: string) => void;
+  onSuccess?: () => void;
 };
 
 type AppleAuthenticationError = { code?: string };
@@ -21,9 +20,16 @@ function isRequestCanceled(error: unknown): boolean {
   );
 }
 
+function createNonce(): string {
+  return Array.from(Crypto.getRandomBytes(32), (byte) =>
+    byte.toString(16).padStart(2, '0')
+  ).join('');
+}
+
 export default function AppleSignInButton({
   disabled = false,
   onError,
+  onSuccess,
 }: AppleSignInButtonProps) {
   const [available, setAvailable] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -42,27 +48,29 @@ export default function AppleSignInButton({
     setLoading(true);
 
     try {
+      const nonce = createNonce();
+      const hashedNonce = await Crypto.digestStringAsync(
+        Crypto.CryptoDigestAlgorithm.SHA256,
+        nonce
+      );
       const credential = await AppleAuthentication.signInAsync({
         requestedScopes: [
           AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
           AppleAuthentication.AppleAuthenticationScope.EMAIL,
         ],
+        nonce: hashedNonce,
       });
 
       if (!credential.identityToken) {
         throw new Error('Apple did not return an identity token. Please try again.');
       }
 
-      const payload = {
+      await signInWithAppleIdentityToken({
         identityToken: credential.identityToken,
         user: credential.user,
-        fullName: credential.fullName,
-        email: credential.email,
-      };
-
-      console.log('Apple sign-in credential:', payload);
-      await storeAppleUserId(credential.user);
-      await sendIdentityTokenToBackend(payload);
+        nonce,
+      });
+      onSuccess?.();
     } catch (error) {
       if (isRequestCanceled(error)) {
         return;

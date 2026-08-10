@@ -130,7 +130,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   init: () => {
     supabase.auth
       .getSession()
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) {
+          console.warn('Could not restore the saved session.', error);
+          set({ session: null, user: null, initializing: false });
+          return;
+        }
+
         set({
           session: data.session,
           user: data.session?.user ?? null,

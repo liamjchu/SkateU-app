@@ -2,20 +2,20 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import {
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    Text,
-    TextInput,
-    View
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Text,
+  TextInput,
+  View
 } from 'react-native';
 import AppleSignInButton from '../components/AppleSignInButton';
 import FeedbackPressable from '../components/FeedbackPressable';
 import GoogleSignInButton from '../components/GoogleSignInButton';
 import ScreenHeader from '../components/screen-header';
 import {
-    getPasswordRequirementStatus,
-    validatePassword,
+  getPasswordRequirementStatus,
+  validatePassword,
 } from '../lib/password';
 import { useAuthStore } from '../store/authStore';
 
@@ -359,6 +359,7 @@ export default function LoginScreen() {
 
           <AppleSignInButton
             disabled={submitting}
+            onSuccess={() => router.replace('/')}
             onError={(message) => setError(message)}
           />
         </View>

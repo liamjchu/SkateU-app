@@ -19,7 +19,7 @@ Use this guide when cloning the project on a new development computer or running
 
 ### Prerequisites
 
-- Git, a supported Node.js LTS release, and npm. The repository does not currently pin a Node version.
+- Git, Node.js 20.19.0 (pinned in `.nvmrc` and EAS), and npm.
 - Access to this repository and, for data-backed features, access to either the existing Supabase project or a new Supabase project you configure.
 - An Android device with Expo Go for quick testing, or an EAS account and a development build for full native-device testing. iOS simulator builds require macOS; iOS device builds also require the appropriate Apple Developer credentials.
 
@@ -59,6 +59,14 @@ EXPO_PUBLIC_API_URL=https://api.example.com
 ```
 
 Do not include a path such as `/api` or a trailing slash. Changing an `EXPO_PUBLIC_*` value requires restarting Expo; values used in an EAS build must be present in that build's environment before the build is created.
+
+### Landing page and confirmation emails
+
+The Next.js landing page is a separate workspace. From `apps/landing-page`, run `npm ci` and `npm run dev` for local development; use `npm run build` followed by `npm run start` to run its production build.
+
+Create `apps/landing-page/.env.local` through a secure channel with the public `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`, plus the server-only `SUPABASE_SERVICE_ROLE_KEY` and `SUBSCRIPTION_DISPATCH_SECRET`. The subscription route limits each IP to five requests per 60 seconds by default; configure `WAITLIST_RATE_LIMIT_MAX_REQUESTS` and `WAITLIST_RATE_LIMIT_WINDOW_MS` to change that per-process limit. For the deployed `send-confirmation` Edge Function, configure `APP_URL`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `SUBSCRIPTION_DISPATCH_SECRET`, and its Supabase service credentials as deployment secrets. Never expose the service-role key, dispatch secret, or Resend key to the browser.
+
+To smoke-test confirmation email delivery, submit a test address on the landing page, check that the message arrives, open its confirmation link, and verify that the confirmation page succeeds. See the [Deployment guide](docs/deployment.md) for the Expo build and API deployment workflow.
 
 ## Backend options
 
@@ -123,8 +131,8 @@ For normal local Expo sessions, requests to the project's Expo Router API routes
 Prefer a development build when validating the actual native app configuration, custom `skateu` deep links, or native integrations. Sign in to the EAS account that owns the configured project, create an internal build, install the resulting artifact on the device, then start Expo for the development client:
 
 ```bash
-npx eas login
-npx eas build --profile development --platform android
+npx eas-cli@latest login
+npx eas-cli@latest build --profile development --platform android
 npx expo start --dev-client
 ```
 
@@ -159,7 +167,7 @@ Run these checks before opening a pull request:
 ```bash
 npm run lint
 npm test
-npx tsc --noEmit
+npm run typecheck
 ```
 
 Use `npm run test:watch` only for local, interactive test work.

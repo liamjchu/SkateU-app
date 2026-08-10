@@ -1,6 +1,7 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { Platform } from 'react-native';
 import { getClientStorage } from './clientStorage';
+import { supabase } from './supabase';
 
 const APPLE_USER_ID_STORAGE_KEY = 'skateu.appleUserId';
 const appleUserIdStorage = getClientStorage();
@@ -8,8 +9,7 @@ const appleUserIdStorage = getClientStorage();
 export type AppleIdentityTokenPayload = {
   identityToken: string;
   user: string;
-  fullName: AppleAuthentication.AppleAuthenticationFullName | null;
-  email: string | null;
+  nonce: string;
 };
 
 export async function storeAppleUserId(user: string): Promise<void> {
@@ -34,15 +34,25 @@ export async function checkAppleCredentialStatus(): Promise<AppleAuthentication.
   return credentialState;
 }
 
-export async function sendIdentityTokenToBackend({
+export async function signInWithAppleIdentityToken({
   identityToken,
   user,
-  fullName,
-  email,
+  nonce,
 }: AppleIdentityTokenPayload): Promise<void> {
-  void identityToken;
-  void user;
-  void fullName;
-  void email;
-  // TODO: Send this payload to your server, Supabase, Firebase, or other auth provider.
+  // Supabase Auth validates the Apple JWT's issuer, audience, expiration,
+  // signature, and nonce before exchanging it for the app session.
+  const { data, error } = await supabase.auth.signInWithIdToken({
+    provider: 'apple',
+    token: identityToken,
+    nonce,
+  });
+
+  if (error) {
+    throw error;
+  }
+  if (!data.session) {
+    throw new Error('Could not create an app session. Please try again.');
+  }
+
+  await storeAppleUserId(user);
 }

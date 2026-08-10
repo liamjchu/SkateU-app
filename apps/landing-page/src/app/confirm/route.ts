@@ -1,4 +1,4 @@
-import { supabaseAdmin } from "../../lib/supabase-server";
+import { getSupabaseAdmin } from "../../lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +28,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const { data: confirmed, error } = await supabaseAdmin.rpc(
+    const { data: confirmed, error } = await getSupabaseAdmin().rpc(
       "confirm_subscription",
       { p_token: token }
     );

@@ -4,12 +4,7 @@ type Database = {
   public: {
     Tables: Record<never, never>;
     Views: Record<never, never>;
-    Functions: {
-      subscribe_email: {
-        Args: { p_email: string };
-        Returns: null;
-      };
-    };
+    Functions: Record<never, never>;
     Enums: Record<never, string>;
     CompositeTypes: Record<never, never>;
   };

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 type Database = {
   public: {
@@ -21,6 +21,8 @@ type Database = {
   };
 };
 
+let supabaseAdmin: SupabaseClient<Database> | null = null;
+
 function requiredEnvironmentValue(name: string): string {
   const value = process.env[name];
 
@@ -31,16 +33,19 @@ function requiredEnvironmentValue(name: string): string {
   return value;
 }
 
-const supabaseUrl = requiredEnvironmentValue("NEXT_PUBLIC_SUPABASE_URL");
-const serviceRoleKey = requiredEnvironmentValue("SUPABASE_SERVICE_ROLE_KEY");
-
-export const supabaseAdmin = createClient<Database>(
-  supabaseUrl,
-  serviceRoleKey,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
+export function getSupabaseAdmin(): SupabaseClient<Database> {
+  if (!supabaseAdmin) {
+    supabaseAdmin = createClient<Database>(
+      requiredEnvironmentValue("NEXT_PUBLIC_SUPABASE_URL"),
+      requiredEnvironmentValue("SUPABASE_SERVICE_ROLE_KEY"),
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
+    );
   }
-);
+
+  return supabaseAdmin;
+}

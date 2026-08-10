@@ -10,6 +10,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
+    "typecheck": "npx tsc --noEmit && npm run typecheck:functions",
+    "typecheck:functions": "deno check supabase/functions/send-confirmation/index.ts",
     "test": "jest",
     "test:watch": "jest --watch"
   },

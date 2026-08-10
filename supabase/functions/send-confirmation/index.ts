@@ -1,4 +1,5 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.110.0";
+import { timingSafeEqual } from "jsr:@std/crypto/timing-safe-equal";
 
 type SubscriberConfirmation = {
   email: string;
@@ -13,6 +14,7 @@ type DispatchRequest = {
 };
 
 const emailPattern = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const textEncoder = new TextEncoder();
 
 function requiredEnvironmentValue(name: string): string {
   const value = Deno.env.get(name);
@@ -34,6 +36,23 @@ function isDispatchRequest(value: unknown): value is DispatchRequest {
     value !== null &&
     "email" in value &&
     typeof value.email === "string"
+  );
+}
+
+function hasValidDispatchSecret(
+  providedSecret: string | null,
+  dispatchSecret: string
+): boolean {
+  if (!providedSecret) {
+    return false;
+  }
+
+  const providedBytes = textEncoder.encode(providedSecret);
+  const expectedBytes = textEncoder.encode(dispatchSecret);
+
+  return (
+    providedBytes.length === expectedBytes.length &&
+    timingSafeEqual(providedBytes, expectedBytes)
   );
 }
 
@@ -61,7 +80,10 @@ Deno.serve(async (request) => {
   );
 
   if (
-    request.headers.get("x-subscription-dispatch-secret") !== dispatchSecret
+    !hasValidDispatchSecret(
+      request.headers.get("x-subscription-dispatch-secret"),
+      dispatchSecret
+    )
   ) {
     return response(401);
   }
@@ -154,6 +176,7 @@ Deno.serve(async (request) => {
         html: `<p>Confirm your SkateU email address by clicking the link below.</p><p><a href="${escapeHtml(confirmationUrl.toString())}">Confirm my email</a></p>`,
         text: `Confirm your SkateU email address: ${confirmationUrl.toString()}`,
       }),
+      signal: AbortSignal.timeout(10_000),
     });
   } catch {
     return response(502);

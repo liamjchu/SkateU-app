@@ -90,7 +90,7 @@ export function WaitlistForm() {
         aria-live="polite"
       >
         {status === "success"
-          ? "You’re on the waitlist. We’ll be in touch."
+          ? "Check your inbox and confirm your email address to join the waitlist."
           : isError
             ? "We couldn’t add you to the waitlist. Please try again."
             : "No spam. Just the invite when we drop."}

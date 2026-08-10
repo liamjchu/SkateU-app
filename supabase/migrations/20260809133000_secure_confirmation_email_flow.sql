@@ -87,3 +87,4 @@ revoke all on function public.subscribe_email(text) from public;
 revoke all on function public.subscribe_email(text) from anon;
 revoke all on function public.subscribe_email(text) from authenticated;
 grant execute on function public.subscribe_email(text) to service_role;
+grant execute on function public.confirm_subscription(uuid) to service_role;
