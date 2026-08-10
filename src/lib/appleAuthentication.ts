@@ -1,8 +1,9 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { Platform } from 'react-native';
+import { getClientStorage } from './clientStorage';
 
 const APPLE_USER_ID_STORAGE_KEY = 'skateu.appleUserId';
+const appleUserIdStorage = getClientStorage();
 
 export type AppleIdentityTokenPayload = {
   identityToken: string;
@@ -12,7 +13,7 @@ export type AppleIdentityTokenPayload = {
 };
 
 export async function storeAppleUserId(user: string): Promise<void> {
-  await AsyncStorage.setItem(APPLE_USER_ID_STORAGE_KEY, user);
+  await appleUserIdStorage.setItem(APPLE_USER_ID_STORAGE_KEY, user);
 }
 
 export async function checkAppleCredentialStatus(): Promise<AppleAuthentication.AppleAuthenticationCredentialState | null> {
@@ -20,14 +21,14 @@ export async function checkAppleCredentialStatus(): Promise<AppleAuthentication.
     return null;
   }
 
-  const user = await AsyncStorage.getItem(APPLE_USER_ID_STORAGE_KEY);
+  const user = await appleUserIdStorage.getItem(APPLE_USER_ID_STORAGE_KEY);
   if (!user) {
     return null;
   }
 
   const credentialState = await AppleAuthentication.getCredentialStateAsync(user);
   if (credentialState !== AppleAuthentication.AppleAuthenticationCredentialState.AUTHORIZED) {
-    await AsyncStorage.removeItem(APPLE_USER_ID_STORAGE_KEY);
+    await appleUserIdStorage.removeItem(APPLE_USER_ID_STORAGE_KEY);
   }
 
   return credentialState;

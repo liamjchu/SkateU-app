@@ -128,13 +128,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   passwordRecovery: false,
 
   init: () => {
-    supabase.auth.getSession().then(({ data }) => {
-      set({
-        session: data.session,
-        user: data.session?.user ?? null,
-        initializing: false,
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        set({
+          session: data.session,
+          user: data.session?.user ?? null,
+          initializing: false,
+        });
+      })
+      .catch((error: unknown) => {
+        console.warn('Could not restore the saved session.', error);
+        set({ session: null, user: null, initializing: false });
       });
-    });
 
     // Drop any previous listener before subscribing again so we only ever keep
     // one active subscription.

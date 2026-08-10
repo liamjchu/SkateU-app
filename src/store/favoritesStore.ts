@@ -1,6 +1,6 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import { getClientStorage } from '../lib/clientStorage';
 import type { School } from '../types/school';
 
 type FavoritesStore = {
@@ -78,7 +78,8 @@ export const useFavorites = create<FavoritesStore>()(
     }),
     {
       name: '@skateu:favorite-schools',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(getClientStorage),
+      skipHydration: true,
       onRehydrateStorage: () => () => {
         // The hydration listener runs for successful and failed rehydration.
         // Zustand omits `state` on errors, so read from the initialized store.
