@@ -341,27 +341,31 @@ export default function LoginScreen() {
             ) : null}
           </View>
 
-          <View className="flex-row items-center">
-            <View className="h-px flex-1 bg-slate-200" />
-            <Text
-              className="mx-3 text-sm text-slate-400 font-outfit-semibold"
-            >
-              or
-            </Text>
-            <View className="h-px flex-1 bg-slate-200" />
-          </View>
+          {!isSignup ? (
+            <>
+              <View className="flex-row items-center">
+                <View className="h-px flex-1 bg-slate-200" />
+                <Text
+                  className="mx-3 text-sm text-slate-400 font-outfit-semibold"
+                >
+                  or
+                </Text>
+                <View className="h-px flex-1 bg-slate-200" />
+              </View>
 
-          <GoogleSignInButton
-            disabled={submitting}
-            onSuccess={() => router.replace('/')}
-            onError={(message) => setError(message)}
-          />
+              <GoogleSignInButton
+                disabled={submitting}
+                onSuccess={() => router.replace('/')}
+                onError={(message) => setError(message)}
+              />
 
-          <AppleSignInButton
-            disabled={submitting}
-            onSuccess={() => router.replace('/')}
-            onError={(message) => setError(message)}
-          />
+              <AppleSignInButton
+                disabled={submitting}
+                onSuccess={() => router.replace('/')}
+                onError={(message) => setError(message)}
+              />
+            </>
+          ) : null}
         </View>
           </View>
         </ScrollView>
