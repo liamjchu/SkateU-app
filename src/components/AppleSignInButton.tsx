@@ -1,8 +1,10 @@
+import { Ionicons } from '@expo/vector-icons';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
 import { useEffect, useState } from 'react';
-import { Alert, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 import { signInWithAppleIdentityToken } from '../lib/appleAuthentication';
+import FeedbackPressable from './FeedbackPressable';
 
 type AppleSignInButtonProps = {
   disabled?: boolean;
@@ -40,8 +42,10 @@ export default function AppleSignInButton({
       .catch(() => setAvailable(false));
   }, []);
 
+  const isDisabled = disabled || loading;
+
   const handlePress = async () => {
-    if (disabled || loading) {
+    if (isDisabled) {
       return;
     }
 
@@ -76,12 +80,11 @@ export default function AppleSignInButton({
         return;
       }
 
-      const message =
+      onError?.(
         error instanceof Error
           ? error.message
-          : 'Could not sign in with Apple. Please try again.';
-      Alert.alert('Apple sign in failed', message);
-      onError?.(message);
+          : 'Could not log in with Apple. Try again.'
+      );
     } finally {
       setLoading(false);
     }
@@ -91,20 +94,28 @@ export default function AppleSignInButton({
     return null;
   }
 
-  const isDisabled = disabled || loading;
-
   return (
-    <View
-      pointerEvents={isDisabled ? 'none' : 'auto'}
-      className={isDisabled ? 'opacity-60' : undefined}
+    <FeedbackPressable
+      haptic="light"
+      onPress={() => void handlePress()}
+      disabled={isDisabled}
+      className={`min-h-12 flex-row items-center justify-center gap-2 rounded-2xl border border-border-soft bg-surface py-4 ${
+        isDisabled ? 'opacity-60' : ''
+      }`}
+      accessibilityLabel="Log in with Apple"
+      accessibilityRole="button"
+      accessibilityState={{ disabled: isDisabled, busy: loading }}
     >
-      <AppleAuthentication.AppleAuthenticationButton
-        buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
-        buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
-        cornerRadius={16}
-        onPress={() => void handlePress()}
-        style={{ height: 56, width: '100%' }}
-      />
-    </View>
+      {loading ? (
+        <ActivityIndicator color="#1B3B36" />
+      ) : (
+        <View className="flex-row items-center gap-2">
+          <Ionicons name="logo-apple" size={20} color="#1B3B36" />
+          <Text className="text-base text-ink font-outfit-bold">
+            Log in with Apple
+          </Text>
+        </View>
+      )}
+    </FeedbackPressable>
   );
 }
