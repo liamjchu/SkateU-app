@@ -43,10 +43,6 @@ function isAbsoluteUrl(url: string) {
   return /^https?:\/\//i.test(url);
 }
 
-function isCollegeOrUniversity(school: School) {
-  return school.type === 'higher_ed';
-}
-
 function getApiUrl(path: string) {
   const configuredUrl = process.env.EXPO_PUBLIC_API_URL;
 
@@ -394,13 +390,12 @@ export default function HomeScreen() {
         }
 
         const data = (await response.json()) as SchoolsSearchResponse;
-        const collegeResults = data.schools.filter(isCollegeOrUniversity);
 
-        collegeResults.forEach((school) => {
+        data.schools.forEach((school) => {
           upsertSchool(school);
           upsertFavoriteSchool(school);
         });
-        setSearchResults(collegeResults);
+        setSearchResults(data.schools);
       } catch (error) {
         if (error instanceof Error && error.name === 'AbortError') {
           return;
@@ -576,9 +571,9 @@ export default function HomeScreen() {
             onChangeText={handleSearchChange}
             onFocus={() => setIsOpen(true)}
             onPressIn={() => setIsOpen(true)}
-            placeholder="Search US colleges and universities..."
+            placeholder="Search schools..."
             placeholderTextColor="#52645F"
-            accessibilityLabel="Search colleges and universities"
+            accessibilityLabel="Search schools"
             accessibilityHint="Type at least three characters to find a school"
             accessibilityState={{ expanded: isOpen }}
             numberOfLines={1}

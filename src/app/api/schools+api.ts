@@ -140,17 +140,17 @@ export async function GET(request: Request) {
     const [schoolsByName, schoolsByCity, schoolsByState] = await Promise.all([
       fetchSchoolRows(
         config,
-        { name: `ilike.*${escapedSearch}*`, type: 'eq.higher_ed' },
+        { name: `ilike.*${escapedSearch}*` },
         SEARCH_LIMIT
       ),
       fetchSchoolRows(
         config,
-        { city: `ilike.*${escapedSearch}*`, type: 'eq.higher_ed' },
+        { city: `ilike.*${escapedSearch}*` },
         SEARCH_LIMIT
       ),
       fetchSchoolRows(
         config,
-        { state: `ilike.*${escapedSearch}*`, type: 'eq.higher_ed' },
+        { state: `ilike.*${escapedSearch}*` },
         SEARCH_LIMIT
       ),
     ]);
