@@ -121,7 +121,7 @@ export function WaitlistForm() {
         />
         <button
           type="submit"
-          className="min-h-14 rounded-xl bg-accent px-6 text-sm font-bold text-brand transition-colors hover:bg-accent-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus:ring-offset-2 focus:ring-offset-surface motion-reduce:transition-none"
+          className="min-h-14 rounded-xl bg-accent px-6 text-sm font-bold text-brand transition-colors hover:bg-accent-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus:ring-offset-2 focus:ring-offset-surface disabled:bg-actionDisabled disabled:text-muted motion-reduce:transition-none"
           disabled={isSubmitting}
         >
           Get early access

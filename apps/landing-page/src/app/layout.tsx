@@ -11,6 +11,12 @@ const outfit = Outfit({
 export const metadata: Metadata = {
   title: "SkateU — Track spots. Land tricks.",
   description: "The all-in-one skate spot map for your campus.",
+  applicationName: "SkateU",
+  openGraph: {
+    title: "SkateU — Track spots. Land tricks.",
+    description: "The all-in-one skate spot map for your campus.",
+    type: "website",
+  },
 };
 
 export const viewport: Viewport = {

@@ -4,19 +4,25 @@
 @theme inline {
   --font-sans: var(--font-outfit);
 
-  /* Keep the landing page aligned with the mobile app's semantic palette. */
+  /* Yearbook paper, strawberry rose. Keep in sync with the mobile app palette. */
   --color-brand: #2a2224;
   --color-brand-dark: #1c1718;
   --color-accent: #e67a90;
   --color-accent-dark: #cf5e78;
   --color-ink: #2a2224;
+  --color-ink-dark: #1c1718;
   --color-muted: #6e6568;
   --color-muted-soft: #afa8ab;
+  --color-muted-strong: #4e474a;
   --color-surface: #f7f4f0;
+  --color-surface-soft: #eeeae6;
   --color-surface-tinted: #fbfaf7;
   --color-field: #ffffff;
   --color-border-soft: #ddd6d1;
   --color-errorText: #a63b32;
+  --color-errorSurface: #f4e6e3;
+  --color-errorBorder: #e0c4be;
+  --color-actionDisabled: #d9d3cf;
 }
 
 * {
