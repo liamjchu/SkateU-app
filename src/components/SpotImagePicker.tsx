@@ -15,6 +15,7 @@ import FeedbackPressable from './FeedbackPressable';
 type SpotImagePickerProps = {
   imageUri?: string;
   onImageSelected: (asset: SpotImageAsset) => void;
+  highlighted?: boolean;
 };
 
 type ImageSource = 'camera' | 'gallery';
@@ -30,15 +31,15 @@ function chooseImageSource(): Promise<ImageSource | undefined> {
     };
 
     Alert.alert(
-      'Add Spot Photo',
-      'Choose how you want to add a photo.',
+      'Add a photo',
+      'Camera or camera roll?',
       [
         {
-          text: 'Take Photo',
+          text: 'Take photo',
           onPress: () => finish('camera'),
         },
         {
-          text: 'Choose from Gallery',
+          text: 'Choose from gallery',
           onPress: () => finish('gallery'),
         },
         {
@@ -55,6 +56,7 @@ function chooseImageSource(): Promise<ImageSource | undefined> {
 export default function SpotImagePicker({
   imageUri,
   onImageSelected,
+  highlighted = false,
 }: SpotImagePickerProps) {
   const isTabletLayout = useIsTabletLayout();
   const [loading, setLoading] = useState(false);
@@ -77,8 +79,8 @@ export default function SpotImagePicker({
       if (!permission.granted) {
         setError(
           source === 'camera'
-            ? 'Camera permission is required to take a photo.'
-            : 'Photo library permission is required to choose a photo.'
+            ? 'Need camera access for that.'
+            : 'Need photo library access for that.'
         );
         return;
       }
@@ -109,8 +111,8 @@ export default function SpotImagePicker({
     } catch (exception) {
       setError(
         source === 'camera'
-          ? 'Unable to open the camera. Please try again.'
-          : 'Unable to open the photo library. Please try again.'
+          ? 'Couldn’t open the camera. Try again?'
+          : 'Couldn’t open your photos. Try again?'
       );
       console.error(exception);
     } finally {
@@ -124,7 +126,9 @@ export default function SpotImagePicker({
         haptic="light"
         disabled={loading}
         onPress={handlePickImage}
-        className="items-center justify-center overflow-hidden rounded-2xl border border-border-soft bg-surface"
+        className={`items-center justify-center overflow-hidden rounded-2xl border bg-surface ${
+          highlighted ? 'border-errorBorder' : 'border-border-soft'
+        }`}
         accessibilityRole="button"
         accessibilityLabel={imageUri ? 'Change spot photo' : 'Add spot photo'}
         accessibilityHint="Opens camera or photo library"
@@ -145,16 +149,11 @@ export default function SpotImagePicker({
             <ActivityIndicator size="small" color="#355650" />
           ) : imageUri ? null : (
             <>
-              <View className="mb-3 h-14 w-14 items-center justify-center rounded-2xl bg-surface-tinted">
-                <Feather name="camera" size={24} color="#21473F" />
+              <View className="mb-2 h-12 w-12 items-center justify-center rounded-2xl bg-surface-tinted">
+                <Feather name="camera" size={22} color="#21473F" />
               </View>
-
-              <Text className="mb-1 font-outfit-semibold text-base text-ink">
-                Add a spot photo
-              </Text>
-
-              <Text className="text-center font-outfit-medium text-sm text-muted">
-                Take a photo or choose one from your gallery
+              <Text className="font-outfit-semibold text-base text-ink">
+                Add photo
               </Text>
             </>
           )}

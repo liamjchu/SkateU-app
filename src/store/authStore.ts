@@ -114,7 +114,7 @@ async function createDeleteAccountProof(accessToken: string): Promise<string> {
 
   if (!response.ok || !data?.proof) {
     throw new Error(
-      data?.error ?? 'Could not verify account deletion right now. Please try again.'
+      data?.error ?? 'Couldn’t verify account deletion right now. Try again in a sec.'
     );
   }
 
@@ -361,7 +361,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     const accessToken = data.session?.access_token;
     if (!accessToken) {
-      throw new Error('Could not verify account deletion. Please try again.');
+      throw new Error('Couldn’t verify account deletion. Try again in a sec.');
     }
 
     deleteAccountProof = await createDeleteAccountProof(accessToken);
@@ -373,7 +373,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const proof = deleteAccountProof;
 
     if (!accessToken) {
-      throw new Error('You must be signed in to delete your account.');
+      throw new Error('Sign in to delete your account.');
     }
     if (!proof) {
       throw new Error('Enter a new email verification code to delete your account.');
@@ -392,7 +392,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         | { error?: string }
         | null;
       throw new Error(
-        body?.error ?? 'Could not delete your account right now. Try again.'
+        body?.error ?? 'Couldn’t delete your account right now. Try again in a sec.'
       );
     }
 

@@ -1,11 +1,9 @@
 import { Feather, Octicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
-    AccessibilityInfo,
     ActivityIndicator,
     Alert,
-    findNodeHandle,
     Image,
     ScrollView,
     Text,
@@ -20,8 +18,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import FeedbackPressable from '../components/FeedbackPressable';
 import ScreenHeader from '../components/screen-header';
-import SettingsBottomSheet from '../components/SettingsBottomSheet';
 import { triggerHaptic } from '../lib/haptics';
+import { toUserFacingError } from '../lib/userFacingError';
 import { useAuthStore } from '../store/authStore';
 import { useProfileStore } from '../store/profileStore';
 import { useSpotsStore } from '../store/spotsStore';
@@ -30,10 +28,8 @@ import type { Spot } from '../types/spot';
 export default function ProfileScreen() {
   const router = useRouter();
   const reduceMotion = useReducedMotion();
-  const settingsButtonRef = useRef<View>(null);
   const user = useAuthStore((state) => state.user);
   const session = useAuthStore((state) => state.session);
-  const signOut = useAuthStore((state) => state.signOut);
   const username = useProfileStore((state) => state.profile?.username ?? '');
 
   const mySpots = useSpotsStore((state) => state.mySpots);
@@ -47,16 +43,9 @@ export default function ProfileScreen() {
   const deleteSpot = useSpotsStore((state) => state.deleteSpot);
   const toggleSpotLike = useSpotsStore((state) => state.toggleSpotLike);
 
-  const sendDeleteAccountOtp = useAuthStore(
-    (state) => state.sendDeleteAccountOtp
-  );
-
   const [spotTab, setSpotTab] = useState<'created' | 'liked'>('created');
-  const [loggingOut, setLoggingOut] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [likingId, setLikingId] = useState<string | null>(null);
-  const [sendingDeleteOtp, setSendingDeleteOtp] = useState(false);
-  const [showSettingsSheet, setShowSettingsSheet] = useState(false);
   const spotToggleWidth = useSharedValue(0);
   const showingLikedSpots = spotTab === 'liked';
   const spotToggleIndicatorStyle = useAnimatedStyle(() => {
@@ -75,45 +64,6 @@ export default function ProfileScreen() {
     };
   });
 
-  const handleSettingsPress = () => {
-    setShowSettingsSheet(true);
-  };
-
-  const hideSettingsSheet = () => {
-    setShowSettingsSheet(false);
-  };
-
-  const closeSettingsSheet = () => {
-    hideSettingsSheet();
-
-    setTimeout(() => {
-      const settingsButtonNode = findNodeHandle(settingsButtonRef.current);
-      if (settingsButtonNode) {
-        AccessibilityInfo.setAccessibilityFocus(settingsButtonNode);
-      }
-    }, reduceMotion ? 0 : 240);
-  };
-
-  const handleChangeUsername = () => {
-    hideSettingsSheet();
-    router.push('/change-username');
-  };
-
-  const handleChangePassword = () => {
-    hideSettingsSheet();
-    router.push('/change-password');
-  };
-
-  const handleSettingsLogout = () => {
-    hideSettingsSheet();
-    handleLogout();
-  };
-
-  const handleSettingsDeleteAccount = () => {
-    hideSettingsSheet();
-    handleDeleteAccount();
-  };
-
   const email = user?.email ?? '';
   // Prefer the username for the avatar initial, falling back to the email.
   const avatarLetter =
@@ -128,10 +78,6 @@ export default function ProfileScreen() {
         fetchMySpots(accessToken);
         fetchLikedSpots(accessToken);
       }
-
-      return () => {
-        setShowSettingsSheet(false);
-      };
     }, [fetchLikedSpots, fetchMySpots, session?.access_token])
   );
 
@@ -148,73 +94,11 @@ export default function ProfileScreen() {
     triggerHaptic('selection');
   };
 
-  const performLogout = async () => {
-    if (loggingOut) {
-      return;
-    }
-
-    setLoggingOut(true);
-
-    try {
-      await signOut();
-      router.replace('/');
-    } catch (error) {
-      console.warn('Failed to log out', error);
-      setLoggingOut(false);
-    }
-  };
-
-  const handleLogout = () => {
-    triggerHaptic('warning');
-    Alert.alert('Log out?', 'Are you sure you want to log out?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Log out', style: 'destructive', onPress: performLogout },
-    ]);
-  };
-
-  const performDeleteAccount = async () => {
-    if (sendingDeleteOtp || !email) {
-      return;
-    }
-
-    setSendingDeleteOtp(true);
-
-    try {
-      await sendDeleteAccountOtp(email);
-      router.push(`/verify-delete-account?email=${encodeURIComponent(email)}`);
-    } catch (error) {
-      Alert.alert(
-        'Could not send verification code',
-        error instanceof Error && error.message.length > 0
-          ? error.message
-          : 'Please try again.'
-      );
-    } finally {
-      setSendingDeleteOtp(false);
-    }
-  };
-
-  const handleDeleteAccount = () => {
-    triggerHaptic('warning');
-    Alert.alert(
-      'Delete your account?',
-      'This will permanently delete your account and profile. This cannot be undone. Your uploaded spots will remain, but will no longer be linked to your account.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: performDeleteAccount,
-        },
-      ]
-    );
-  };
-
   const handleSpotPress = (spot: Spot) => {
     if (!spot.schoolId) {
       Alert.alert(
         'Campus map unavailable',
-        'This spot is not linked to a campus, so its map cannot be opened.'
+        'This spot isn’t tied to a campus, so there’s no map to open.'
       );
       return;
     }
@@ -244,10 +128,8 @@ export default function ProfileScreen() {
       await toggleSpotLike(spot.id, true, accessToken);
     } catch (error) {
       Alert.alert(
-        'Could not unlike spot',
-        error instanceof Error && error.message.length > 0
-          ? error.message
-          : 'Please try again.'
+        'Couldn’t unlike that spot',
+        toUserFacingError(error, 'Try again in a sec.')
       );
     } finally {
       setLikingId(null);
@@ -257,7 +139,7 @@ export default function ProfileScreen() {
   const handleRetryDisplayedSpots = () => {
     const accessToken = session?.access_token;
     if (!accessToken) {
-      Alert.alert('Log in again', 'You must log in again before refreshing your spots.');
+      Alert.alert('Sign in again', 'Sign in again to refresh your spots.');
       return;
     }
 
@@ -275,8 +157,8 @@ export default function ProfileScreen() {
   const handleDelete = (spot: Spot) => {
     triggerHaptic('warning');
     Alert.alert(
-      'Delete spot?',
-      `"${spot.name}" will be permanently removed for everyone. This cannot be undone.`,
+      'Delete this spot?',
+      `"${spot.name}" will be gone for everyone.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -285,7 +167,7 @@ export default function ProfileScreen() {
           onPress: async () => {
             const accessToken = session?.access_token;
             if (!accessToken) {
-              Alert.alert('You must be signed in to delete a spot.');
+              Alert.alert('Sign in to delete a spot.');
               return;
             }
 
@@ -295,10 +177,8 @@ export default function ProfileScreen() {
               await deleteSpot(spot.id, accessToken);
             } catch (error) {
               Alert.alert(
-                'Could not delete spot',
-                error instanceof Error && error.message.length > 0
-                  ? error.message
-                  : 'Please try again.'
+                'Couldn’t delete that spot',
+                toUserFacingError(error, 'Try again in a sec.')
               );
             } finally {
               setDeletingId(null);
@@ -323,9 +203,8 @@ export default function ProfileScreen() {
         }}
         rightAction={
           <FeedbackPressable
-            ref={settingsButtonRef}
             haptic="light"
-            onPress={handleSettingsPress}
+            onPress={() => router.push('/settings')}
             className="h-12 w-12 items-center justify-center rounded-full"
             accessibilityLabel="Open settings"
             accessibilityRole="button"
@@ -394,7 +273,7 @@ export default function ProfileScreen() {
           >
             <Text
               className={`font-outfit-bold text-sm ${
-                !showingLikedSpots ? 'text-ink' : 'text-slate-500'
+                !showingLikedSpots ? 'text-ink' : 'text-muted'
               }`}
             >
               Your Spots {mySpots.length > 0 ? `(${mySpots.length})` : ''}
@@ -409,7 +288,7 @@ export default function ProfileScreen() {
           >
             <Text
               className={`font-outfit-bold text-sm ${
-                showingLikedSpots ? 'text-ink' : 'text-slate-500'
+                showingLikedSpots ? 'text-ink' : 'text-muted'
               }`}
             >
               Liked Spots {likedSpots.length > 0 ? `(${likedSpots.length})` : ''}
@@ -418,17 +297,17 @@ export default function ProfileScreen() {
         </View>
 
         {displayedError && displayedSpots.length > 0 ? (
-          <View className="mt-4 flex-row items-center rounded-2xl border border-[#B45F58] bg-[#FBE9E7] px-4 py-3">
+          <View className="mt-4 flex-row items-center rounded-2xl border border-errorBorder bg-errorSurface px-4 py-3">
             <Text
               accessibilityRole="alert"
               accessibilityLiveRegion="polite"
               className="flex-1 pr-3 font-outfit-medium text-sm text-errorText"
             >
-              {displayedError} Your previous content is still shown where possible.
+              {displayedError} Showing what we already had.
             </Text>
             <FeedbackPressable
               onPress={handleRetryDisplayedSpots}
-              className="rounded-xl bg-[#21473f] px-3 py-2"
+              className="rounded-xl bg-brand px-3 py-2"
               accessibilityRole="button"
               accessibilityLabel={`Retry loading ${showingLikedSpots ? 'liked' : 'created'} spots`}
             >
@@ -450,7 +329,7 @@ export default function ProfileScreen() {
             </Text>
           </View>
         ) : displayedError ? (
-          <View className="mt-4 items-center rounded-2xl border border-[#B45F58] bg-[#FBE9E7] p-5">
+          <View className="mt-4 items-center rounded-2xl border border-errorBorder bg-errorSurface p-5">
             <Text
               accessibilityRole="alert"
               accessibilityLiveRegion="polite"
@@ -460,7 +339,7 @@ export default function ProfileScreen() {
             </Text>
             <FeedbackPressable
               onPress={handleRetryDisplayedSpots}
-              className="mt-3 rounded-xl bg-[#21473f] px-4 py-2"
+              className="mt-3 rounded-xl bg-brand px-4 py-2"
               accessibilityRole="button"
               accessibilityLabel={`Retry loading ${showingLikedSpots ? 'liked' : 'created'} spots`}
             >
@@ -468,13 +347,13 @@ export default function ProfileScreen() {
             </FeedbackPressable>
           </View>
         ) : displayedSpots.length === 0 ? (
-          <View className="mt-4 rounded-2xl bg-[#F4F7F6] p-6">
+          <View className="mt-4 rounded-2xl bg-surface-tinted p-6">
             <Text
-              className="font-outfit-medium text-center text-sm text-slate-500"
+              className="font-outfit-medium text-center text-sm text-muted"
             >
               {showingLikedSpots
-                ? 'Spots you like will appear here.'
-                : 'You haven\'t added any spots yet. Find a campus map and tap the + button to add your first spot.'}
+                ? 'Spots you like will show up here.'
+                : 'No spots yet. Hit + on a campus map to add one.'}
             </Text>
           </View>
         ) : (
@@ -517,16 +396,16 @@ export default function ProfileScreen() {
                     </Text>
                     <View className="mt-0.5 flex-row items-center">
                       <Feather name="map-pin" size={11} color="#475569" />
-                      <Text className="font-outfit-semibold ml-1 flex-1 text-xs text-slate-500" numberOfLines={1}>
+                      <Text className="font-outfit-semibold ml-1 flex-1 text-xs text-muted" numberOfLines={1}>
                         {spot.schoolName || 'Campus map'}{spot.city || spot.state ? ` · ${spot.city}${spot.city && spot.state ? ', ' : ''}${spot.state}` : ''}
                       </Text>
                     </View>
-                    <Text className="font-outfit-medium mt-0.5 text-sm text-slate-500" numberOfLines={2}>
+                    <Text className="font-outfit-medium mt-0.5 text-sm text-muted" numberOfLines={2}>
                       {spot.description}
                     </Text>
                     <View className="mt-1 flex-row items-center">
                       <Octicons name="heart-fill" size={12} color="#7F302C" />
-                      <Text className="font-outfit-semibold ml-1 text-xs text-slate-500">
+                      <Text className="font-outfit-semibold ml-1 text-xs text-muted">
                         {spot.likeCount ?? 0}
                       </Text>
                     </View>
@@ -583,17 +462,6 @@ export default function ProfileScreen() {
           </View>
         )}
       </ScrollView>
-
-      <SettingsBottomSheet
-        visible={showSettingsSheet}
-        onClose={closeSettingsSheet}
-        onChangeUsername={handleChangeUsername}
-        onChangePassword={handleChangePassword}
-        onLogout={handleSettingsLogout}
-        onDeleteAccount={handleSettingsDeleteAccount}
-        deleteAccountDisabled={sendingDeleteOtp}
-        loggingOut={loggingOut}
-      />
     </View>
   );
 }

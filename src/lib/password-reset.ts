@@ -18,7 +18,7 @@ export const updatePassword = async (
   isPasswordRecovery: boolean
 ): Promise<void> => {
   if (!isPasswordRecovery) {
-    throw new Error('Password recovery is required to reset your password.');
+    throw new Error('Open the reset link from your email first.');
   }
 
   const { error } = await supabase.auth.updateUser({ password });

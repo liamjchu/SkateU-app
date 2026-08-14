@@ -1,6 +1,6 @@
 import { validateUsername } from '../../lib/username';
 import type { Profile } from '../../types/profile';
-import { getSupabaseConfig, resolveUserId } from './spots+api';
+import { getSupabaseConfig, resolveUserId, authUserMessage } from './spots+api';
 
 // Server-side username moderation. The OpenAI key lives only here (never
 // EXPO_PUBLIC_*), so it is never shipped in the client bundle.
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
   const accessToken = readBearerToken(request);
   if (!accessToken) {
     return Response.json(
-      { error: 'Authentication is required to moderate a username.' },
+      { error: authUserMessage('missing') },
       { status: 401 }
     );
   }
@@ -80,11 +80,7 @@ export async function POST(request: Request) {
 
   const auth = await resolveUserId(config, accessToken);
   if (!auth.ok) {
-    const message =
-      auth.reason === 'expired'
-        ? 'The access token is expired.'
-        : 'The access token is invalid.';
-    return Response.json({ error: message }, { status: 401 });
+    return Response.json({ error: authUserMessage(auth.reason) }, { status: 401 });
   }
 
   const apiKey = process.env.OPENAI_API_KEY;

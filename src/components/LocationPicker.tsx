@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Image,
+    StyleSheet,
     Text,
     View
 } from 'react-native';
@@ -55,6 +56,7 @@ export default function LocationPicker({
   const isTabletLayout = useIsTabletLayout();
   const webViewRef = useRef<WebView>(null);
   const mapLayerRef = useRef<LayerType>(initialLayer);
+  const [mapLayer, setMapLayer] = useState<LayerType>(initialLayer);
   const [webViewAttempt, setWebViewAttempt] = useState(0);
   const [mapStatus, setMapStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [mapError, setMapError] = useState('');
@@ -132,6 +134,7 @@ export default function LocationPicker({
         const layer: LayerType =
           data.layer === 'satellite' ? 'satellite' : 'default';
         mapLayerRef.current = layer;
+        setMapLayer(layer);
       }
 
       if (
@@ -162,7 +165,7 @@ export default function LocationPicker({
   };
 
   return (
-    <View className="mb-6 overflow-hidden rounded-2xl border border-border-soft bg-surface-soft">
+    <View className="overflow-hidden rounded-2xl border border-border-soft bg-surface-soft">
       <View
         className="relative bg-black"
         style={{ height: isTabletLayout ? 320 : 224 }}
@@ -228,6 +231,27 @@ export default function LocationPicker({
           </View>
         ) : null}
         {mapStatus === 'ready' ? (
+          <FeedbackPressable
+            haptic="selection"
+            onPress={() => {
+              webViewRef.current?.injectJavaScript(
+                `window.toggleLayer(); true;`
+              );
+            }}
+            className="absolute right-3 top-3 z-10 h-11 w-11 items-center justify-center rounded-full bg-white"
+            style={styles.mapControl}
+            accessibilityRole="button"
+            accessibilityLabel={
+              mapLayer === 'satellite'
+                ? 'Switch to standard map'
+                : 'Switch to satellite map'
+            }
+            accessibilityState={{ selected: mapLayer === 'satellite' }}
+          >
+            <Image source={IMAGES.layers} style={styles.mapControlIcon} />
+          </FeedbackPressable>
+        ) : null}
+        {mapStatus === 'ready' ? (
           <View className="absolute left-1/2 top-1/2 h-[60px] w-[50px] -ml-[25px] -mt-[50px] items-center justify-start pointer-events-none">
             <Image
               source={IMAGES.markerShadow}
@@ -248,3 +272,18 @@ export default function LocationPicker({
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  mapControl: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
+    elevation: 6,
+  },
+  mapControlIcon: {
+    width: 18,
+    height: 18,
+    tintColor: '#21473F',
+  },
+});

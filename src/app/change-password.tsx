@@ -14,12 +14,12 @@ export default function ChangePasswordScreen() {
       return;
     }
 
-    router.replace('/profile');
+    router.replace('/settings');
   };
 
   return (
     <View className="flex-1 bg-surface">
-      <ScreenHeader title="Account settings" onBack={goBack} />
+      <ScreenHeader title="Change password" onBack={goBack} />
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}

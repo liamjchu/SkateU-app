@@ -23,7 +23,7 @@ export default function ScreenHeader({
 
   return (
     <View
-      className="bg-brand px-5"
+      className="bg-brand px-6"
       style={{
         paddingTop: insets.top,
         shadowColor: '#000000',

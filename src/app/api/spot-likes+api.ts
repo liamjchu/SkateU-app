@@ -2,6 +2,7 @@ import {
     getSupabaseConfig,
     mapSpot,
     resolveUserId,
+    authUserMessage,
     SPOT_SELECT_COLUMNS,
     validateSpotId,
     type DatabaseSpot,
@@ -32,22 +33,8 @@ function readBearerToken(request: Request): string | null {
 }
 
 function authError(reason: 'invalid' | 'expired' | 'timeout'): Response {
-  if (reason === 'timeout') {
-    return Response.json(
-      { error: 'Account verification timed out. Please try again.' },
-      { status: 503 }
-    );
-  }
-
-  return Response.json(
-    {
-      error:
-        reason === 'expired'
-          ? 'The access token is expired.'
-          : 'The access token is invalid.',
-    },
-    { status: 401 }
-  );
+  const status = reason === 'timeout' ? 503 : 401;
+  return Response.json({ error: authUserMessage(reason) }, { status });
 }
 
 async function requireUser(
@@ -57,7 +44,7 @@ async function requireUser(
   const accessToken = readBearerToken(request);
   if (!accessToken) {
     return Response.json(
-      { error: 'Authentication is required for spot likes.' },
+      { error: authUserMessage('missing') },
       { status: 401 }
     );
   }

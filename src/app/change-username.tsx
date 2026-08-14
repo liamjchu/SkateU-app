@@ -14,7 +14,7 @@ export default function ChangeUsernameScreen() {
       return;
     }
 
-    router.replace('/profile');
+    router.replace('/settings');
   };
 
   return (

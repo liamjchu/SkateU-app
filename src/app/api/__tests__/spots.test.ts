@@ -404,6 +404,41 @@ describe('GET /api/spots', () => {
     expect(response.status).toBe(400);
   });
 
+  it('returns recent spots without a schoolId', async () => {
+    setConfigured();
+    const row: DatabaseSpot = {
+      id: 'spot-recent',
+      school_id: 'school1',
+      name: 'Ledge',
+      description: 'A ledge',
+      latitude: 10,
+      longitude: 20,
+      image_urls: ['https://img/2.jpg'],
+      created_at: '2024-06-01T00:00:00.000Z',
+      updated_at: '2024-06-01T00:00:00.000Z',
+      likes_count: 1,
+      schools: { name: 'UT Austin', city: 'Austin', state: 'TX' },
+      creator: { username: 'skater_jane' },
+    };
+    const fetchMock = jest.fn(async () => jsonResponse([row]));
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await GET(
+      new Request('https://app.test/api/spots?recent=1')
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { spots: Array<{ id: string }> };
+    expect(body.spots).toEqual([
+      expect.objectContaining({
+        id: 'spot-recent',
+        name: 'Ledge',
+        schoolId: 'school1',
+        schoolName: 'UT Austin',
+      }),
+    ]);
+    expect(fetchMock).toHaveBeenCalled();
+  });
+
   it('returns 400 when schoolId is invalid', async () => {
     setConfigured();
     const response = await GET(
@@ -465,7 +500,7 @@ describe('POST /api/spots', () => {
     const response = await POST(makePostRequest(validForm()));
     expect(response.status).toBe(401);
     const body = (await response.json()) as { error: string };
-    expect(body.error.toLowerCase()).toContain('authentication');
+    expect(body.error.toLowerCase()).toContain('sign in');
   });
 
   it('returns 401 when the token is invalid', async () => {
@@ -479,7 +514,7 @@ describe('POST /api/spots', () => {
     );
     expect(response.status).toBe(401);
     const body = (await response.json()) as { error: string };
-    expect(body.error.toLowerCase()).toContain('invalid');
+    expect(body.error.toLowerCase()).toContain('sign in');
   });
 
   it('returns 401 when the token is expired', async () => {

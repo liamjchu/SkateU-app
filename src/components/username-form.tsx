@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
 import { USERNAME_MAX, validateUsername } from '../lib/username';
+import { toUserFacingError } from '../lib/userFacingError';
 import { useAuthStore } from '../store/authStore';
 import { useProfileStore } from '../store/profileStore';
 
@@ -114,9 +115,7 @@ export function UsernameForm({
     } catch (error) {
       setStatus('error');
       setSubmitError(
-        error instanceof Error && error.message.length > 0
-          ? error.message
-          : 'Could not save the username. Try again.'
+        toUserFacingError(error, 'Could not save the username. Try again.')
       );
     } finally {
       setSubmitting(false);
@@ -125,7 +124,7 @@ export function UsernameForm({
 
   return (
     <View className="mt-8">
-      <View className="flex-row items-center rounded-2xl bg-field pl-4 pr-3">
+      <View className="flex-row items-center rounded-2xl bg-field pl-6 pr-3">
         <Text className="font-outfit-bold text-base text-muted">@</Text>
         <TextInput
           value={value}

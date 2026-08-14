@@ -1,5 +1,5 @@
 export const PASSWORD_REQUIREMENTS =
-  'Use at least 8 characters with uppercase, lowercase, a number, and a special character.';
+  'At least 8 characters, with uppercase, lowercase, a number, and a special character.';
 
 export const getPasswordRequirementStatus = (password: string) => ({
   minLength: password.length >= 8,
@@ -17,16 +17,16 @@ export const validatePassword = (password: string): string | null => {
   const requirements = getPasswordRequirementStatus(password);
 
   if (!requirements.minLength) {
-    return 'Password must be at least 8 characters.';
+    return 'Need at least 8 characters.';
   }
   if (!requirements.upperAndLowerCase) {
-    return 'Password must include uppercase and lowercase letters.';
+    return 'Mix in uppercase and lowercase letters.';
   }
   if (!requirements.number) {
-    return 'Password must include a number.';
+    return 'Add a number.';
   }
   if (!requirements.specialCharacter) {
-    return 'Password must include a special character.';
+    return 'Add a special character.';
   }
 
   return null;

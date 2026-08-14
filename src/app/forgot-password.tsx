@@ -22,7 +22,7 @@ const getRequestErrorMessage = (requestError: unknown): string => {
     return 'Check your internet connection and try again.';
   }
 
-  return 'We could not send a reset link right now. Please try again.';
+  return 'Couldn’t send a reset link right now. Try again in a sec.';
 };
 
 export default function ForgotPasswordScreen() {
@@ -36,6 +36,15 @@ export default function ForgotPasswordScreen() {
       : ''
   );
   const [submitting, setSubmitting] = useState(false);
+
+  const goBackToSignIn = () => {
+    if (resetError === 'expired' || !router.canGoBack()) {
+      router.replace('/login');
+      return;
+    }
+
+    router.back();
+  };
 
   const handleSubmit = async () => {
     if (submitting) {
@@ -66,8 +75,8 @@ export default function ForgotPasswordScreen() {
     <View className="flex-1 bg-surface">
       <ScreenHeader
         title="Reset password"
-        onBack={() => router.replace('/login')}
-        backAccessibilityLabel="Back to login"
+        onBack={goBackToSignIn}
+        backAccessibilityLabel="Back to sign in"
       />
 
       <KeyboardAvoidingView
@@ -110,7 +119,7 @@ export default function ForgotPasswordScreen() {
                   returnKeyType="send"
                   onSubmitEditing={() => void handleSubmit()}
                   editable={!submitting}
-                  className="min-h-14 rounded-2xl border border-border-soft bg-field px-4 py-4 font-outfit-medium text-base text-ink"
+                  className="min-h-14 rounded-2xl border border-border-soft bg-field px-7 py-4 font-outfit-medium text-base text-ink"
                 />
               </View>
 
@@ -156,13 +165,13 @@ export default function ForgotPasswordScreen() {
 
               {notice === SUCCESS_MESSAGE ? (
                 <FeedbackPressable
-                  onPress={() => router.replace('/login')}
+                  onPress={goBackToSignIn}
                   className="min-h-12 items-center justify-center rounded-2xl border border-brand px-4 py-3"
                   accessibilityRole="button"
-                  accessibilityLabel="Back to login"
+                  accessibilityLabel="Back to sign in"
                 >
                   <Text className="font-outfit-bold text-base text-brand">
-                    Back to login
+                    Back to sign in
                   </Text>
                 </FeedbackPressable>
               ) : null}

@@ -25,7 +25,7 @@ const getUpdateErrorMessage = (updateError: unknown): string => {
     return 'Check your internet connection and try again.';
   }
 
-  return 'We could not update your password right now. Please try again.';
+  return 'Couldn’t update your password right now. Try again in a sec.';
 };
 
 export default function UpdatePasswordScreen() {
@@ -91,7 +91,7 @@ export default function UpdatePasswordScreen() {
       <ScreenHeader
         title="New password"
         onBack={() => router.replace('/login')}
-        backAccessibilityLabel="Back to login"
+        backAccessibilityLabel="Back to sign in"
         backDisabled={submitting || success}
       />
 
@@ -129,7 +129,7 @@ export default function UpdatePasswordScreen() {
                   autoCorrect={false}
                   autoComplete="new-password"
                   editable={!submitting && !success}
-                  className="flex-1 pl-4 pr-5 py-4 font-outfit-semibold text-base text-ink"
+                  className="flex-1 pl-7 pr-5 py-4 font-outfit-semibold text-base text-ink"
                 />
                 <Pressable
                   onPress={() => setShowPassword((visible) => !visible)}
@@ -160,7 +160,7 @@ export default function UpdatePasswordScreen() {
                   autoCorrect={false}
                   autoComplete="new-password"
                   editable={!submitting && !success}
-                  className="flex-1 pl-4 pr-5 py-4 font-outfit-semibold text-base text-ink"
+                  className="flex-1 pl-7 pr-5 py-4 font-outfit-semibold text-base text-ink"
                 />
                 <Pressable
                   onPress={() => setShowConfirmation((visible) => !visible)}

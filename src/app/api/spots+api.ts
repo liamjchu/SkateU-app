@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 
+import { HOME_RAIL_PAGE_SIZE, parseOffset } from '../../lib/homeFeed';
 import { imageFileToDataUrl, moderateSpotSubmission } from '../../lib/spotModeration';
 import type { Spot } from '../../types/spot';
 
@@ -27,6 +28,9 @@ const IMAGE_EXTENSIONS: Record<string, string> = {
 
 export const SPOT_SELECT_COLUMNS =
   'id,school_id,name,description,latitude,longitude,image_urls,created_at,updated_at,likes_count,schools(name,city,state),creator:profiles(username)';
+const RECENT_SPOT_SELECT_COLUMNS =
+  'id,school_id,name,description,latitude,longitude,image_urls,created_at,updated_at,likes_count,schools!inner(name,city,state,type),creator:profiles(username)';
+const VALID_SCHOOL_TYPES = ['k12_public', 'k12_private', 'higher_ed'] as const;
 
 /**
  * Reads Supabase configuration from server-side environment variables only.
@@ -354,6 +358,21 @@ export type AuthResult =
   | { ok: true; userId: string }
   | { ok: false; reason: 'invalid' | 'expired' | 'timeout' };
 
+export function authUserMessage(
+  reason: 'invalid' | 'expired' | 'timeout' | 'missing'
+): string {
+  switch (reason) {
+    case 'expired':
+      return 'Your session expired. Sign in again.';
+    case 'timeout':
+      return 'That took too long. Try again in a sec.';
+    case 'missing':
+      return 'Sign in to continue.';
+    default:
+      return 'Sign in again to keep going.';
+  }
+}
+
 /**
  * Verifies the bearer token against Supabase auth. Returns the user id on 200,
  * otherwise signals whether the token is invalid or expired for 401 messaging.
@@ -593,6 +612,11 @@ export async function GET(request: Request): Promise<Response> {
     return getMySpots(request, config);
   }
 
+  const isRecentRequest = url.searchParams.get('recent') === '1';
+  if (isRecentRequest) {
+    return getRecentSpots(request, config);
+  }
+
   const validation = validateSchoolId(url.searchParams.get('schoolId'));
   if (!validation.ok) {
     return Response.json({ error: validation.message }, { status: 400 });
@@ -630,7 +654,65 @@ export async function GET(request: Request): Promise<Response> {
   } catch (error) {
     console.error('Loading spots failed:', error);
     return Response.json(
-      { error: 'Unable to load spots right now.' },
+      { error: 'Couldn’t load spots right now.' },
+      { status: 500 }
+    );
+  }
+}
+
+async function getRecentSpots(
+  request: Request,
+  config: SupabaseConfig
+): Promise<Response> {
+  const url = new URL(request.url);
+  const typeFilter = (url.searchParams.get('type') ?? '')
+    .split(',')
+    .map((type) => type.trim())
+    .filter((type): type is (typeof VALID_SCHOOL_TYPES)[number] =>
+      VALID_SCHOOL_TYPES.includes(type as (typeof VALID_SCHOOL_TYPES)[number])
+    );
+
+  try {
+    const query = new URL(`${config.url}/rest/v1/spots`);
+    if (typeFilter.length > 0) {
+      query.searchParams.set('select', RECENT_SPOT_SELECT_COLUMNS);
+      query.searchParams.set('schools.type', `in.(${typeFilter.join(',')})`);
+    } else {
+      query.searchParams.set('select', SPOT_SELECT_COLUMNS);
+    }
+    query.searchParams.set('order', 'created_at.desc');
+    query.searchParams.set('limit', String(HOME_RAIL_PAGE_SIZE));
+    const offset = parseOffset(url.searchParams.get('offset'));
+    if (offset > 0) {
+      query.searchParams.set('offset', String(offset));
+    }
+
+    const response = await fetch(query.toString(), {
+      headers: {
+        apikey: config.apiKey,
+        Authorization: `Bearer ${config.apiKey}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+
+    const rows = (await response.json()) as DatabaseSpot[];
+    let userId: string | null = null;
+    const accessToken = readBearerToken(request);
+    if (accessToken) {
+      const auth = await resolveUserId(config, accessToken);
+      if (auth.ok) {
+        userId = auth.userId;
+      }
+    }
+
+    return Response.json({ spots: await mapSpotsForUser(config, rows, userId) });
+  } catch (error) {
+    console.error('Loading recent spots failed:', error);
+    return Response.json(
+      { error: 'Couldn’t load recent spots right now.' },
       { status: 500 }
     );
   }
@@ -647,17 +729,14 @@ async function getMySpots(
   const accessToken = readBearerToken(request);
   if (!accessToken) {
     return Response.json(
-      { error: 'Authentication is required to load your spots.' },
+      { error: authUserMessage('missing') },
       { status: 401 }
     );
   }
 
   const auth = await resolveUserId(config, accessToken);
   if (!auth.ok) {
-    const message =
-      auth.reason === 'expired'
-        ? 'The access token is expired.'
-        : 'The access token is invalid.';
+    const message = authUserMessage(auth.reason);
     return Response.json({ error: message }, { status: 401 });
   }
 
@@ -695,7 +774,7 @@ export async function POST(request: Request): Promise<Response> {
   const accessToken = readBearerToken(request);
   if (!accessToken) {
     return Response.json(
-      { error: 'Authentication is required to create a spot.' },
+      { error: authUserMessage('missing') },
       { status: 401 }
     );
   }
@@ -710,10 +789,7 @@ export async function POST(request: Request): Promise<Response> {
 
   const auth = await resolveUserId(config, accessToken);
   if (!auth.ok) {
-    const message =
-      auth.reason === 'expired'
-        ? 'The access token is expired.'
-        : 'The access token is invalid.';
+    const message = authUserMessage(auth.reason);
     return Response.json({ error: message }, { status: 401 });
   }
 
@@ -769,7 +845,7 @@ export async function POST(request: Request): Promise<Response> {
   } catch (error) {
     console.error('Spot moderation failed before create:', error);
     return Response.json(
-      { error: 'Content moderation is temporarily unavailable. Please try again.' },
+      { error: 'Content check is paused. Try again in a sec.' },
       { status: 503 }
     );
   }
@@ -816,7 +892,7 @@ export async function POST(request: Request): Promise<Response> {
   } catch (error) {
     console.error('Creating spot failed:', error);
     return Response.json(
-      { error: 'Unable to save this spot right now.' },
+      { error: 'Couldn’t save this spot right now.' },
       { status: 500 }
     );
   }
@@ -828,7 +904,7 @@ export async function PATCH(request: Request): Promise<Response> {
   const accessToken = readBearerToken(request);
   if (!accessToken) {
     return Response.json(
-      { error: 'Authentication is required to edit a spot.' },
+      { error: authUserMessage('missing') },
       { status: 401 }
     );
   }
@@ -848,10 +924,7 @@ export async function PATCH(request: Request): Promise<Response> {
 
   const auth = await resolveUserId(config, accessToken);
   if (!auth.ok) {
-    const message =
-      auth.reason === 'expired'
-        ? 'The access token is expired.'
-        : 'The access token is invalid.';
+    const message = authUserMessage(auth.reason);
     return Response.json({ error: message }, { status: 401 });
   }
 
@@ -930,7 +1003,7 @@ export async function PATCH(request: Request): Promise<Response> {
   } catch (error) {
     console.error('Spot moderation failed before update:', error);
     return Response.json(
-      { error: 'Content moderation is temporarily unavailable. Please try again.' },
+      { error: 'Content check is paused. Try again in a sec.' },
       { status: 503 }
     );
   }
@@ -1010,7 +1083,7 @@ export async function DELETE(request: Request): Promise<Response> {
   const accessToken = readBearerToken(request);
   if (!accessToken) {
     return Response.json(
-      { error: 'Authentication is required to delete a spot.' },
+      { error: authUserMessage('missing') },
       { status: 401 }
     );
   }
@@ -1030,10 +1103,7 @@ export async function DELETE(request: Request): Promise<Response> {
 
   const auth = await resolveUserId(config, accessToken);
   if (!auth.ok) {
-    const message =
-      auth.reason === 'expired'
-        ? 'The access token is expired.'
-        : 'The access token is invalid.';
+    const message = authUserMessage(auth.reason);
     return Response.json({ error: message }, { status: 401 });
   }
 

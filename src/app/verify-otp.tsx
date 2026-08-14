@@ -32,15 +32,15 @@ export default function VerifyOtpScreen() {
           Session data missing.
         </Text>
         <Pressable
-          className="mt-4 rounded-2xl bg-[#21473f] px-5 py-3"
+          className="mt-4 rounded-2xl bg-brand px-5 py-3"
           onPress={handleReturnToLogin}
           accessibilityRole="button"
-          accessibilityLabel="Return to Login"
+          accessibilityLabel="Return to sign in"
         >
           <Text
             className="text-base text-white font-outfit-bold"
           >
-            Return to Login
+            Return to sign in
           </Text>
         </Pressable>
       </View>

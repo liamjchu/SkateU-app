@@ -36,3 +36,25 @@ export function formatRelativeTime(
 
   return ago(Math.round(seconds / YEAR), 'year');
 }
+
+// Compact labels for tight UI like home rails ("2h ago", "3d ago").
+export function formatCompactRelativeTime(
+  isoDate: string | null | undefined,
+  now: Date = new Date()
+): string {
+  if (!isoDate) return '';
+
+  const then = new Date(isoDate).getTime();
+  if (Number.isNaN(then)) return '';
+
+  const seconds = Math.max(0, Math.floor((now.getTime() - then) / 1000));
+
+  if (seconds < 45) return 'just now';
+  if (seconds < HOUR) return `${Math.max(1, Math.round(seconds / MINUTE))}m ago`;
+  if (seconds < DAY) return `${Math.max(1, Math.round(seconds / HOUR))}h ago`;
+  if (seconds < WEEK) return `${Math.max(1, Math.round(seconds / DAY))}d ago`;
+  if (seconds < MONTH) return `${Math.max(1, Math.round(seconds / WEEK))}w ago`;
+  if (seconds < YEAR) return `${Math.max(1, Math.round(seconds / MONTH))}mo ago`;
+
+  return `${Math.max(1, Math.round(seconds / YEAR))}y ago`;
+}

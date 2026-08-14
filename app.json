@@ -10,7 +10,10 @@
     "ios": {
       "icon": "./assets/images/app-icon.png",
       "bundleIdentifier": "app.skateu.mobile",
-      "usesAppleSignIn": true
+      "usesAppleSignIn": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "app.skateu.mobile",
@@ -31,8 +34,8 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#21473F",
-          "image": "./assets/images/splash-brand.png",
-          "imageWidth": 337,
+          "image": "./assets/images/splash-centered.png",
+          "imageWidth": 260,
           "resizeMode": "contain"
         }
       ],

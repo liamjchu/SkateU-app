@@ -29,7 +29,7 @@ const getChangePasswordErrorMessage = (changeError: unknown): string => {
     return 'Check your internet connection and try again.';
   }
 
-  return 'We could not update your password right now. Please try again.';
+  return 'Couldn’t update your password right now. Try again in a sec.';
 };
 
 function PasswordField({
@@ -43,7 +43,7 @@ function PasswordField({
   editable,
 }: PasswordFieldProps) {
   return (
-    <View className="flex-row items-center rounded-2xl bg-[#F0F3F5] pr-3">
+    <View className="flex-row items-center rounded-2xl bg-field pr-3">
       <TextInput
         value={value}
         onChangeText={onChangeText}
@@ -56,7 +56,7 @@ function PasswordField({
         autoCorrect={false}
         autoComplete={autoComplete}
         editable={editable}
-        className="flex-1 pl-4 pr-5 py-4 font-outfit-semibold text-base text-ink"
+        className="flex-1 pl-7 pr-5 py-4 font-outfit-semibold text-base text-ink"
       />
       <Pressable
         onPress={onToggleVisibility}
@@ -93,7 +93,7 @@ export default function ChangePasswordForm({ email }: ChangePasswordFormProps) {
     }
 
     if (!email) {
-      setError('You must be signed in to change your password.');
+      setError('Sign in to change your password.');
       return;
     }
     if (!currentPassword) {

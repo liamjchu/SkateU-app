@@ -54,7 +54,7 @@ export default function VerifyDeleteAccountScreen() {
       return;
     }
 
-    router.replace('/profile');
+    router.replace('/settings');
   };
 
   const handleChangeCode = (value: string) => {

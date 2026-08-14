@@ -35,7 +35,7 @@ export default function OnboardingScreen() {
   return (
     <View className="flex-1 bg-white">
       <View
-        className="bg-[#21473f] px-6 pb-4"
+        className="bg-brand px-6 pb-4"
         style={{
           paddingTop: insets.top + 16,
           shadowColor: '#000',
@@ -63,7 +63,7 @@ export default function OnboardingScreen() {
           <Text className="font-outfit-black text-3xl text-ink">
             One last step
           </Text>
-          <Text className="mt-2 font-outfit-medium text-base text-slate-500">
+          <Text className="mt-2 font-outfit-medium text-base text-muted">
             Pick a unique username. This is how other skaters will see you — your
             email stays private.
           </Text>
@@ -80,7 +80,7 @@ export default function OnboardingScreen() {
             accessibilityRole="button"
             accessibilityLabel="Sign out"
           >
-            <Text className="font-outfit-semibold text-base text-slate-500">
+            <Text className="font-outfit-semibold text-base text-muted">
               Sign out
             </Text>
           </Pressable>

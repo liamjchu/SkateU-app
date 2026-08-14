@@ -23,19 +23,19 @@ export function getSpotFormErrors(
   const descriptionLength = description.trim().length;
 
   if (!imageUri) {
-    errors.image = 'Add a photo to continue.';
+    errors.image = 'Add a photo.';
   }
 
   if (nameLength < SPOT_NAME_MIN) {
-    errors.name = 'Enter a spot name.';
+    errors.name = 'Add a name.';
   } else if (nameLength > SPOT_NAME_MAX) {
-    errors.name = `Keep the spot name to ${SPOT_NAME_MAX} characters or fewer.`;
+    errors.name = `Keep the name under ${SPOT_NAME_MAX} characters.`;
   }
 
   if (descriptionLength < SPOT_DESCRIPTION_MIN) {
-    errors.description = 'Enter a description.';
+    errors.description = 'Add a short description.';
   } else if (descriptionLength > SPOT_DESCRIPTION_MAX) {
-    errors.description = `Keep the description to ${SPOT_DESCRIPTION_MAX} characters or fewer.`;
+    errors.description = `Keep the description under ${SPOT_DESCRIPTION_MAX} characters.`;
   }
 
   return errors;
@@ -47,4 +47,34 @@ export function isAddSpotFormValid(
   description: string
 ): boolean {
   return Object.keys(getSpotFormErrors(imageUri, name, description)).length === 0;
+}
+
+export function getSpotFormMissingSummary(
+  imageUri: string | undefined,
+  name: string,
+  description: string
+): string | null {
+  const missing: string[] = [];
+
+  if (!imageUri) {
+    missing.push('photo');
+  }
+  if (name.trim().length < SPOT_NAME_MIN) {
+    missing.push('name');
+  }
+  if (description.trim().length < SPOT_DESCRIPTION_MIN) {
+    missing.push('description');
+  }
+
+  if (missing.length === 0) {
+    return null;
+  }
+  if (missing.length === 3) {
+    return 'Needs a name, photo, and description.';
+  }
+  if (missing.length === 2) {
+    return `Needs a ${missing[0]} and ${missing[1]}.`;
+  }
+
+  return `Needs a ${missing[0]}.`;
 }
