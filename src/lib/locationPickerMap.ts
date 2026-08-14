@@ -1,3 +1,5 @@
+import { colors } from '../constants/colors';
+
 export type LocationMapLayer = 'default' | 'satellite';
 
 type LocationMapHtmlOptions = {
@@ -25,7 +27,7 @@ export function buildLocationPickerHtml({
       margin: 0;
       padding: 0;
       overflow: hidden;
-      background: #0b0f14;
+      background: ${colors.brand};
     }
     #map { height: 100%; width: 100%; }
     .leaflet-control-attribution { display: none; }

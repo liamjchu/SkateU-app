@@ -1,6 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { useRef, type ReactNode } from 'react';
 import { ActivityIndicator, Image, ScrollView, Text, View } from 'react-native';
+import { colors } from '../constants/colors';
 import FeedbackPressable from './FeedbackPressable';
 
 type HomeRailCardProps = {
@@ -24,51 +25,52 @@ export default function HomeRailCard({
 }: HomeRailCardProps) {
   return (
     <View className="w-[188px]" pointerEvents="box-none">
-      <FeedbackPressable
-        haptic="light"
-        onPress={onPress}
-        className="overflow-hidden rounded-3xl bg-surface-tinted"
-        accessibilityRole="button"
-        accessibilityLabel={accessibilityLabel}
-      >
-        {imageUrl ? (
-          <Image
-            source={{ uri: imageUrl }}
-            className="h-32 w-full bg-surface-tinted"
-            resizeMode="cover"
-            accessible={false}
-          />
-        ) : (
-          <View className="h-32 w-full items-center justify-center bg-surface-soft">
-            <Feather name="map-pin" size={22} color="#52645F" />
-          </View>
-        )}
+      <View className="overflow-hidden rounded-2xl bg-field">
+        <FeedbackPressable
+          haptic="light"
+          onPress={onPress}
+          accessibilityRole="button"
+          accessibilityLabel={accessibilityLabel}
+        >
+          {imageUrl ? (
+            <Image
+              source={{ uri: imageUrl }}
+              className="h-32 w-full bg-surface-soft"
+              resizeMode="cover"
+              accessible={false}
+            />
+          ) : (
+            <View className="h-32 w-full items-center justify-center bg-accent">
+              <Feather name="map-pin" size={22} color={colors.brand} />
+            </View>
+          )}
 
-        <View className="px-3 py-2.5">
-          <Text
-            numberOfLines={1}
-            className="font-outfit-bold text-base text-ink"
-          >
-            {title}
-          </Text>
-          <Text
-            numberOfLines={1}
-            className="mt-0.5 font-outfit-medium text-sm text-muted"
-          >
-            {subtitle}
-          </Text>
-          {typeof meta === 'string' || typeof meta === 'number' ? (
+          <View className="px-3.5 py-3.5">
             <Text
               numberOfLines={1}
-              className="mt-1 font-outfit-medium text-sm text-muted"
+              className="font-outfit-bold text-base text-ink"
             >
-              {meta}
+              {title}
             </Text>
-          ) : meta ? (
-            <View className="mt-1">{meta}</View>
-          ) : null}
-        </View>
-      </FeedbackPressable>
+            <Text
+              numberOfLines={1}
+              className="mt-0.5 font-outfit-medium text-sm text-muted-soft"
+            >
+              {subtitle}
+            </Text>
+            {typeof meta === 'string' || typeof meta === 'number' ? (
+              <Text
+                numberOfLines={1}
+                className="mt-1 font-outfit-medium text-sm text-muted"
+              >
+                {meta}
+              </Text>
+            ) : meta ? (
+              <View className="mt-1">{meta}</View>
+            ) : null}
+          </View>
+        </FeedbackPressable>
+      </View>
 
       {accessory ? (
         <View className="absolute right-2 top-2 z-10" pointerEvents="box-none">
@@ -111,7 +113,7 @@ export function HomeFeedRail({
   const wasNearEndRef = useRef(false);
   return (
     <View>
-      <View className="mb-3">
+      <View className="mb-4">
         <Text className="font-outfit-bold text-base text-ink">{title}</Text>
         {subtitle ? (
           <Text className="mt-0.5 font-outfit-medium text-sm text-muted">
@@ -132,22 +134,22 @@ export function HomeFeedRail({
           {[0, 1, 2].map((placeholder) => (
             <View
               key={placeholder}
-              className="h-52 w-[188px] rounded-3xl bg-surface-tinted"
+              className="h-52 w-[188px] rounded-2xl bg-field"
             />
           ))}
         </ScrollView>
       ) : error ? (
-        <View className="flex-row items-center rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2">
+        <View className="flex-row items-center rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2.5">
           <Text className="flex-1 pr-2 font-outfit-medium text-sm text-errorText">
             {error}
           </Text>
           <FeedbackPressable
             onPress={onRetry}
-            className="rounded-lg bg-brand px-3 py-1.5"
+            className="rounded-xl bg-accent px-3 py-1.5"
             accessibilityRole="button"
             accessibilityLabel={retryAccessibilityLabel}
           >
-            <Text className="font-outfit-bold text-sm text-white">Retry</Text>
+            <Text className="font-outfit-bold text-sm text-brand">Retry</Text>
           </FeedbackPressable>
         </View>
       ) : isEmpty ? (
@@ -180,7 +182,7 @@ export function HomeFeedRail({
           {children}
           {isLoadingMore ? (
             <View className="h-52 w-10 items-center justify-center">
-              <ActivityIndicator color="#21473F" />
+              <ActivityIndicator color={colors.accent} />
             </View>
           ) : null}
         </ScrollView>

@@ -8,7 +8,6 @@ import {
 } from '@expo-google-fonts/outfit';
 import * as Linking from 'expo-linking';
 import { SplashScreen, Stack, useRouter, useSegments } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect } from 'react';
 import { Image, Platform, Pressable, Text, View } from 'react-native';
@@ -19,6 +18,7 @@ import {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import '../../global.css';
+import { colors } from '../constants/colors';
 import images from '../constants/images';
 import { checkAppleCredentialStatus } from '../lib/appleAuthentication';
 import { useAuthStore } from '../store/authStore';
@@ -198,15 +198,13 @@ export default function RootLayout() {
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#21473F' }}>
-      <StatusBar style="light" />
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.surface }}>
       <Stack
         screenOptions={{
           headerShown: false,
           animation: 'slide_from_right',
           gestureEnabled: true,
-          contentStyle: { backgroundColor: '#FFFFFF' },
-          statusBarStyle: 'light',
+          contentStyle: { backgroundColor: colors.surface },
         }}
       >
         <Stack.Screen name="index" options={{ animation: 'none' }} />
@@ -230,34 +228,29 @@ export default function RootLayout() {
         <Stack.Screen name="update-password" />
         <Stack.Screen name="verify-otp" />
         <Stack.Screen name="verify-delete-account" />
-        <Stack.Screen name="map" options={{ contentStyle: { backgroundColor: '#21473F' } }} />
-        <Stack.Screen name="add-spot" options={{ contentStyle: { backgroundColor: '#F7F9F8' } }} />
-        <Stack.Screen name="edit-spot" options={{ contentStyle: { backgroundColor: '#F7F9F8' } }} />
+        <Stack.Screen name="map" options={{ contentStyle: { backgroundColor: colors.brand } }} />
+        <Stack.Screen name="add-spot" options={{ contentStyle: { backgroundColor: colors.surface } }} />
+        <Stack.Screen name="edit-spot" options={{ contentStyle: { backgroundColor: colors.surface } }} />
       </Stack>
 
       {!appReady || !routeSettled ? (
         <View
-          className="absolute inset-0 z-50 items-center justify-center bg-brand"
+          className="absolute inset-0 z-50 items-center justify-center bg-surface"
           accessibilityRole="progressbar"
           accessibilityLabel="Loading SkateU"
         >
           <Image
             source={images.brandLockupCentered}
             accessibilityLabel="SkateU"
-            style={{ width: 220, height: 48 }}
+            style={{ width: 195, height: 36 }}
             resizeMode="contain"
           />
         </View>
       ) : userId && profileError ? (
         <View
-          className="absolute left-4 right-4 z-50 flex-row items-center rounded-2xl bg-white px-4 py-3"
+          className="absolute left-4 right-4 z-50 flex-row items-center rounded-2xl bg-field px-4 py-3"
           style={{
             top: insets.top + 12,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.16,
-            shadowRadius: 8,
-            elevation: 8,
           }}
         >
           <Text
@@ -268,12 +261,12 @@ export default function RootLayout() {
             {profileError}
           </Text>
           <Pressable
-            className="rounded-xl bg-brand px-3 py-2"
+            className="rounded-xl bg-accent px-3 py-2"
             onPress={() => fetchProfile(userId)}
             accessibilityRole="button"
             accessibilityLabel="Retry loading profile"
           >
-            <Text className="font-outfit-bold text-sm text-white">Retry</Text>
+            <Text className="font-outfit-bold text-sm text-brand">Retry</Text>
           </Pressable>
         </View>
       ) : null}

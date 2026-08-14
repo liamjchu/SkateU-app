@@ -29,27 +29,27 @@ export default function HomeSchoolStories({
         keyboardShouldPersistTaps="handled"
         showsHorizontalScrollIndicator={false}
         className="-mx-6"
-        contentContainerClassName="gap-4 px-6"
+        contentContainerClassName="items-start gap-4 px-6 pb-1"
       >
         {schools.map((school) => (
           <FeedbackPressable
             key={school.id}
             haptic="light"
             onPress={() => onPress(school)}
-            className="w-[72px] items-center"
+            className="w-[76px] items-center"
             accessibilityRole="button"
             accessibilityLabel={`Open ${school.name} campus map`}
           >
             {school.spotImageUrl ? (
               <Image
                 source={{ uri: school.spotImageUrl }}
-                className="h-16 w-16 rounded-full bg-surface-soft"
+                className="h-16 w-16 rounded-2xl bg-surface-soft"
                 resizeMode="cover"
                 accessible={false}
               />
             ) : (
-              <View className="h-16 w-16 items-center justify-center rounded-full bg-surface-soft">
-                <Text className="font-outfit-bold text-lg text-brand">
+              <View className="h-16 w-16 items-center justify-center rounded-2xl bg-accent">
+                <Text className="font-outfit-black text-lg text-brand">
                   {school.name.charAt(0).toUpperCase()}
                 </Text>
               </View>

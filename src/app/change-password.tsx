@@ -31,7 +31,7 @@ export default function ChangePasswordScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View className="flex-1 self-center w-full max-w-[640px] px-5 pt-8 pb-8">
+          <View className="flex-1 self-center w-full max-w-[640px] px-6 pt-8 pb-8">
             <ChangePasswordForm email={email} />
           </View>
         </ScrollView>

@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { ScrollView, Text } from 'react-native';
+import { colors } from '../constants/colors';
 import type { SchoolTypeFilter } from '../types/school';
 import FeedbackPressable from './FeedbackPressable';
 
@@ -43,7 +44,7 @@ export default function SchoolTypePills({
       horizontal
       showsHorizontalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
-      contentContainerClassName="gap-2 py-1"
+      contentContainerClassName="items-center gap-2 py-1"
     >
       {FILTER_OPTIONS.map((option) => {
         const isSelected = option.key === selected;
@@ -53,10 +54,8 @@ export default function SchoolTypePills({
             key={option.key}
             haptic="selection"
             onPress={() => onSelect(option.key)}
-            className={`h-10 flex-row items-center rounded-full border px-4 ${
-              isSelected
-                ? 'border-brand bg-brand'
-                : 'border-border-soft bg-surface-soft'
+            className={`h-10 flex-row items-center rounded-xl px-4 ${
+              isSelected ? 'bg-accent' : 'bg-field'
             }`}
             accessibilityRole="button"
             accessibilityLabel={
@@ -73,11 +72,11 @@ export default function SchoolTypePills({
                   : option.icon
               }
               size={15}
-              color={isSelected ? '#FFFFFF' : '#52645F'}
+              color={isSelected ? colors.brand : colors.ink}
             />
             <Text
               className={`ml-1.5 font-outfit-semibold text-sm ${
-                isSelected ? 'text-white' : 'text-muted'
+                isSelected ? 'text-brand' : 'text-ink'
               }`}
             >
               {option.label}

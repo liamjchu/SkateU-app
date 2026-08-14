@@ -32,7 +32,9 @@ import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import FeedbackPressable from '../components/FeedbackPressable';
 import ImageLightbox from '../components/image-lightbox';
 import LoginRequiredModal from '../components/LoginRequiredModal';
+import { StickerStripe } from '../components/sticker';
 import images from '../constants/images';
+import { colors, svgHex } from '../constants/colors';
 import { triggerHaptic } from '../lib/haptics';
 import { formatRelativeTime } from '../lib/relativeTime';
 import { toUserFacingError } from '../lib/userFacingError';
@@ -104,6 +106,7 @@ export default function MapScreen() {
   const sheetHeight = useSharedValue(0);
   const sheetTranslateY = useSharedValue(0);
   const sheetStartY = useSharedValue(0);
+  const [sheetLayoutHeight, setSheetLayoutHeight] = useState(0);
 
   useEffect(() => {
     if (!hasInitializedMapLayerRef.current) {
@@ -229,10 +232,10 @@ export default function MapScreen() {
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
     <style>
       /* FIXED: Changed 100vh/100vw to 100%. WebViews often collapse vh/vw units to 0 */
-      html, body { margin: 0; padding: 0; background: #21473f; width: 100%; height: 100%; }
+      html, body { margin: 0; padding: 0; background: ${colors.brand}; width: 100%; height: 100%; }
       #map { height: 100%; width: 100%; }
-      .leaflet-popup-content-wrapper { background: #21473f; color: white; border-radius: 12px; }
-      .leaflet-popup-tip { background: #21473f; }
+      .leaflet-popup-content-wrapper { background: ${colors.brand}; color: white; border-radius: 12px; }
+      .leaflet-popup-tip { background: ${colors.brand}; }
       .leaflet-control-attribution { display: none; }
 
       /*brightness of the map, darken it so the pin can show*/
@@ -261,7 +264,7 @@ export default function MapScreen() {
       try {
         const center = [${validLat}, ${validLng}];
         const spotIcon = L.icon({
-          iconUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 22s7-6.4 7-12a7 7 0 1 0-14 0c0 5.6 7 12 7 12z" fill="%23FFFFFF" stroke="%23FFFFFF" stroke-width="0"/><circle cx="12" cy="10" r="2.5" fill="%2321473f"/></svg>',
+          iconUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 22s7-6.4 7-12a7 7 0 1 0-14 0c0 5.6 7 12 7 12z" fill="${svgHex(colors.accent)}" stroke="${svgHex(colors.brand)}" stroke-width="1.5" stroke-linejoin="round"/><circle cx="12" cy="10" r="2.5" fill="${svgHex(colors.white)}"/></svg>',
           iconSize: [50, 50],
           iconAnchor: [25, 50],
 
@@ -306,6 +309,19 @@ export default function MapScreen() {
         window.recenterMap = function () {
           if (!window.map) return;
           window.map.setView(campusCenter, window.map.getZoom(), { animate: true });
+        };
+
+        window.focusLatLng = function (lat, lng, bottomPadding, topPadding) {
+          if (!window.map) return;
+          window.map.invalidateSize();
+          const target = L.latLng(lat, lng);
+          const zoom = window.map.getZoom();
+          window.map.setView(target, zoom, { animate: false });
+          const size = window.map.getSize();
+          const top = Number(topPadding) || 0;
+          const bottom = Number(bottomPadding) || 0;
+          const visibleMidY = top + Math.max(size.y - top - bottom, 0) / 2;
+          window.map.panBy([0, size.y / 2 - visibleMidY], { animate: true });
         };
 
         window.setMapLayer = function (layer) {
@@ -386,6 +402,15 @@ export default function MapScreen() {
           });
         };
 
+        if (${initialSpotId ? 'true' : 'false'}) {
+          window.focusLatLng(
+            ${validLat},
+            ${validLng},
+            Math.round((window.innerHeight || 0) * 0.56) + 16,
+            ${insets.top + 81}
+          );
+        }
+
         if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
           window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'WEBVIEW_READY' }));
         }
@@ -402,7 +427,7 @@ export default function MapScreen() {
   </body>
   </html>
   `;
-  }, [mapAttempt, validLat, validLng]);
+  }, [initialSpotId, insets.top, mapAttempt, validLat, validLng]);
 
   const webViewSource = useMemo(
     () => ({ html, baseUrl: 'https://localhost' }),
@@ -514,8 +539,31 @@ export default function MapScreen() {
     if (selectedSpot) {
       sheetTranslateY.value = 0;
       sheetStartY.value = 0;
+    } else {
+      setSheetLayoutHeight(0);
     }
   }, [selectedSpot, sheetStartY, sheetTranslateY]);
+
+  useEffect(() => {
+    if (!selectedSpot || mapStatus !== 'ready') {
+      return;
+    }
+
+    const topPadding = insets.top + 81;
+    const sheetCover =
+      (sheetLayoutHeight > 0 ? sheetLayoutHeight : Math.round(height * 0.56)) + 16;
+    webViewRef.current?.injectJavaScript(
+      `window.focusLatLng(${selectedSpot.latitude},${selectedSpot.longitude},${sheetCover},${topPadding}); true;`
+    );
+  }, [
+    height,
+    insets.top,
+    mapStatus,
+    selectedSpot?.id,
+    selectedSpot?.latitude,
+    selectedSpot?.longitude,
+    sheetLayoutHeight,
+  ]);
 
   const sheetAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: sheetTranslateY.value }],
@@ -750,20 +798,16 @@ export default function MapScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#21473F' }}>
+    <View style={{ flex: 1, backgroundColor: colors.brand }}>
       <View
-        className="absolute left-0 right-0 z-50 flex-row items-center justify-between bg-brand px-5"
+        className="absolute left-0 right-0 z-50 bg-brand"
         style={{
           top: 0,
-          height: insets.top + 80,
+          height: insets.top + 81,
           paddingTop: insets.top,
-          shadowColor: '#000000',
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.12,
-          shadowRadius: 6,
-          elevation: 6,
         }}
       >
+        <View className="flex-1 flex-row items-center justify-between px-5">
         <FeedbackPressable
           haptic="light"
           onPress={handleBackPress}
@@ -777,7 +821,7 @@ export default function MapScreen() {
         <View
           pointerEvents="none"
           className="absolute left-0 right-0 items-center justify-center px-20"
-          style={{ top: insets.top, bottom: 0 }}
+          style={{ top: 0, bottom: 0 }}
         >
           <Text
             className="text-center font-outfit-bold text-2xl text-white"
@@ -787,7 +831,8 @@ export default function MapScreen() {
           </Text>
           {locationSubtitle && (
             <Text
-              className="text-center font-outfit-medium text-sm text-lightGreen"
+              className="text-center font-outfit-medium text-sm"
+              style={{ color: 'rgba(255,255,255,0.72)' }}
               numberOfLines={1}
             >
               {locationSubtitle}
@@ -808,12 +853,14 @@ export default function MapScreen() {
             <Ionicons
               name={isFavoriteSchool ? 'bookmark' : 'bookmark-outline'}
               size={24}
-              color="#FFFFFF"
+              color={isFavoriteSchool ? colors.accent : '#FFFFFF'}
             />
           </FeedbackPressable>
         ) : (
           <View className="h-12 w-12" />
         )}
+        </View>
+        <StickerStripe />
       </View>
       <View
         className="absolute left-4 z-[999] gap-2.5"
@@ -857,20 +904,25 @@ export default function MapScreen() {
           accessibilityHint="Moves the map back to the campus center"
           accessibilityState={{ disabled: mapStatus !== 'ready' }}
         >
-          <Feather name="crosshair" size={26} color="#21473F" />
+          <Feather name="crosshair" size={26} color={colors.brand} />
         </FeedbackPressable>
       </View>
-      <FeedbackPressable
-        haptic="light"
-        className="absolute right-4 z-[999] h-16 w-16 items-center justify-center rounded-full bg-brand"
-        style={[styles.fab, { bottom: Math.max(insets.bottom, 12) + 36 }]}
-        onPress={handleAddSpotPress}
-        accessibilityLabel="Add new spot"
-        accessibilityRole="button"
-        accessibilityHint="Opens the form to add a skate spot"
+      <View
+        className="absolute right-4 z-[999]"
+        style={{ bottom: Math.max(insets.bottom, 12) + 36 }}
       >
-        <Feather name="plus" size={32} color="#FFFFFF" />
-      </FeedbackPressable>
+        <FeedbackPressable
+          haptic="light"
+          className="h-16 w-16 items-center justify-center rounded-full bg-accent"
+          style={styles.fab}
+          onPress={handleAddSpotPress}
+          accessibilityLabel="Add new spot"
+          accessibilityRole="button"
+          accessibilityHint="Opens the form to add a skate spot"
+        >
+          <Feather name="plus" size={32} color={colors.brand} />
+        </FeedbackPressable>
+      </View>
       <FeedbackPressable
         onPress={() => setShowAttribution(true)}
         disabled={mapStatus !== 'ready'}
@@ -920,10 +972,10 @@ export default function MapScreen() {
             accessibilityLabel="Close map attribution"
           />
           <View
-            className="rounded-t-[28px] bg-white px-5 pt-3"
+            className="rounded-t-2xl bg-field px-5 pt-3"
             style={[styles.attributionSheet, { paddingBottom: Math.max(insets.bottom, 16) }]}
           >
-            <View className="mb-4 h-1.5 w-12 self-center rounded-full bg-slate-300" />
+            <View className="mb-4 h-1.5 w-12 self-center rounded-full bg-accent" />
             <View className="min-h-12 flex-row items-center justify-between">
               <Text className="font-outfit-bold text-xl text-ink">
                 Map attribution
@@ -935,7 +987,7 @@ export default function MapScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Close map attribution"
               >
-                <Ionicons name="close" size={18} color="#52645F" />
+                <Ionicons name="close" size={18} color={colors.muted} />
               </FeedbackPressable>
             </View>
             <View className="mt-4 pb-6">
@@ -989,7 +1041,7 @@ export default function MapScreen() {
 
       {mapStatus === 'loading' ? (
         <View
-          className="absolute inset-0 z-40 items-center justify-center bg-[#21473f]/90 px-8"
+          className="absolute inset-0 z-40 items-center justify-center bg-brand/90 px-8"
           style={{ top: insets.top + 80 }}
         >
           <ActivityIndicator color="#FFFFFF" />
@@ -999,7 +1051,7 @@ export default function MapScreen() {
         </View>
       ) : mapStatus === 'error' ? (
         <View
-          className="absolute inset-0 z-40 items-center justify-center bg-[#21473f]/95 px-8"
+          className="absolute inset-0 z-40 items-center justify-center bg-brand/95 px-8"
           accessibilityLabel={`Map unavailable. ${mapError || 'Check your connection and try again.'}`}
         >
           <Text className="text-center font-outfit-bold text-xl text-white">
@@ -1010,18 +1062,18 @@ export default function MapScreen() {
           </Text>
           <FeedbackPressable
             onPress={retryMap}
-            className="mt-5 rounded-2xl bg-white px-6 py-3"
+            className="mt-5 rounded-2xl bg-accent px-6 py-3"
             accessibilityRole="button"
             accessibilityLabel="Retry loading campus map"
           >
-            <Text className="font-outfit-bold text-base text-darkGreen">Retry</Text>
+            <Text className="font-outfit-bold text-base text-brand">Retry</Text>
           </FeedbackPressable>
         </View>
       ) : null}
 
       {mapStatus === 'ready' && error ? (
         <View
-          className="absolute left-4 right-4 z-40 rounded-2xl border border-[#B45F58] bg-white px-4 py-3"
+          className="absolute left-4 right-4 z-40 rounded-2xl border border-errorBorder bg-field px-4 py-3"
           style={{ top: insets.top + 88 }}
         >
           <View className="flex-row items-center justify-between">
@@ -1039,11 +1091,11 @@ export default function MapScreen() {
             </View>
             <FeedbackPressable
               onPress={retrySpots}
-              className="rounded-xl bg-[#21473f] px-4 py-2"
+              className="rounded-xl bg-accent px-4 py-2"
               accessibilityRole="button"
               accessibilityLabel="Retry loading skate spots"
             >
-              <Text className="font-outfit-bold text-xs text-white">Retry</Text>
+              <Text className="font-outfit-bold text-xs text-brand">Retry</Text>
             </FeedbackPressable>
           </View>
         </View>
@@ -1052,12 +1104,9 @@ export default function MapScreen() {
           className="absolute left-0 right-0 z-40 items-center"
           style={{ top: insets.top + 96 }}
         >
-          <View
-            className="flex-row items-center rounded-full bg-white px-3 py-1.5"
-            style={styles.mapControl}
-          >
-            <ActivityIndicator size="small" color="#000000" />
-            <Text className="ml-2 font-outfit-medium text-xs text-black">
+          <View className="flex-row items-center rounded-full bg-white px-3 py-1.5">
+            <ActivityIndicator size="small" color={colors.brand} />
+            <Text className="ml-2 font-outfit-medium text-xs text-brand">
               Loading spots…
             </Text>
           </View>
@@ -1065,22 +1114,22 @@ export default function MapScreen() {
       ) : null}
 
       {mapStatus === 'ready' && !loading && !error && spots.length === 0 ? (
-        <View className="absolute left-6 right-6 top-1/2 z-30 -translate-y-1/2 items-center rounded-3xl bg-white px-6 py-6 shadow-lg">
-          <Feather name="map-pin" size={28} color="#21473f" />
-          <Text className="mt-3 text-center font-outfit-bold text-xl text-ink">
-            No skate spots here yet
-          </Text>
-          <Text className="mt-1.5 text-center font-outfit-medium text-sm leading-5 text-muted-strong">
-            Be the first to drop a spot on this campus.
-          </Text>
-          <FeedbackPressable
-            onPress={handleAddSpotPress}
-            className="mt-5 rounded-2xl bg-[#21473f] px-5 py-3"
-            accessibilityRole="button"
-            accessibilityLabel="Add the first spot"
-          >
-            <Text className="font-outfit-bold text-base text-white">Add the first spot</Text>
-          </FeedbackPressable>
+        <View className="absolute left-6 right-6 top-1/2 z-30 -translate-y-1/2 items-center rounded-2xl bg-field px-6 py-6">
+            <Feather name="map-pin" size={28} color={colors.accent} />
+            <Text className="mt-3 text-center font-outfit-bold text-xl text-ink">
+              No skate spots here yet
+            </Text>
+            <Text className="mt-1.5 text-center font-outfit-medium text-sm leading-5 text-muted-strong">
+              Be the first to drop a spot on this campus.
+            </Text>
+            <FeedbackPressable
+              onPress={handleAddSpotPress}
+              className="mt-5 rounded-2xl bg-accent px-5 py-3"
+              accessibilityRole="button"
+              accessibilityLabel="Add the first spot"
+            >
+              <Text className="font-outfit-bold text-base text-brand">Add the first spot</Text>
+            </FeedbackPressable>
         </View>
       ) : null}
 
@@ -1091,7 +1140,9 @@ export default function MapScreen() {
           entering={SlideInDown.duration(240)}
           exiting={SlideOutDown.duration(220)}
           onLayout={(event) => {
-            sheetHeight.value = event.nativeEvent.layout.height;
+            const nextHeight = event.nativeEvent.layout.height;
+            sheetHeight.value = nextHeight;
+            setSheetLayoutHeight(nextHeight);
           }}
           style={[
             styles.sheet,
@@ -1107,16 +1158,16 @@ export default function MapScreen() {
         >
           <GestureDetector gesture={sheetPanGesture}>
             <View>
-              <View className="mb-3 h-1.5 w-12 self-center rounded-full bg-slate-300" />
+              <View className="mb-3 h-1.5 w-12 self-center rounded-full bg-accent" />
               <View className="flex-row items-start">
                 <View className="min-w-0 flex-1 pr-3">
                   <Text className="font-outfit-bold text-xl text-ink">
                     {selectedSpot.name}
                   </Text>
                   <View className="mt-1 flex-row items-center">
-                    <Octicons name="person" size={13} color="#475569" />
+                    <Feather name="user" size={13} color={colors.muted} />
                     <Text
-                      className="ml-1 font-outfit-medium text-sm text-muted-strong"
+                      className="ml-1.5 font-outfit-medium text-sm text-muted"
                   >
                       {selectedSpot.creatorUsername
                         ? `@${selectedSpot.creatorUsername}`
@@ -1141,7 +1192,9 @@ export default function MapScreen() {
                 <FeedbackPressable
                     onPress={handleLikePress}
                     disabled={likingSpotId === selectedSpot.id}
-                    className="mr-2 flex-row items-center rounded-full bg-[#F4F7F6] px-3 py-2"
+                    className={`mr-2 flex-row items-center rounded-xl px-3 py-2 ${
+                      selectedSpot.likedByUser === true ? 'bg-accent' : 'bg-surface-soft'
+                    }`}
                     accessibilityLabel={
                       selectedSpot.likedByUser === true
                         ? `Unlike ${selectedSpot.name}`
@@ -1150,7 +1203,14 @@ export default function MapScreen() {
                     accessibilityRole="button"
                   >
                     {likingSpotId === selectedSpot.id ? (
-                      <ActivityIndicator size="small" color="#7F302C" />
+                      <ActivityIndicator
+                        size="small"
+                        color={
+                          selectedSpot.likedByUser === true
+                            ? colors.brand
+                            : colors.ink
+                        }
+                      />
                     ) : (
                       <Octicons
                         name={
@@ -1161,12 +1221,18 @@ export default function MapScreen() {
                         size={17}
                         color={
                           selectedSpot.likedByUser === true
-                            ? '#7F302C'
-                            : '#475569'
+                            ? colors.brand
+                            : colors.ink
                         }
                       />
                     )}
-                    <Text className="ml-1.5 font-outfit-semibold text-sm text-slate-600">
+                    <Text
+                      className={`ml-1.5 font-outfit-semibold text-sm ${
+                        selectedSpot.likedByUser === true
+                          ? 'text-brand'
+                          : 'text-ink'
+                      }`}
+                    >
                       {selectedSpot.likeCount ?? 0}
                     </Text>
                   </FeedbackPressable>
@@ -1177,7 +1243,7 @@ export default function MapScreen() {
                     accessibilityRole="button"
                     accessibilityLabel={`Close ${selectedSpot.name} details`}
                   >
-                    <Ionicons name="close" size={18} color="#52645F" />
+                    <Ionicons name="close" size={18} color={colors.muted} />
                   </FeedbackPressable>
               </View>
             </View>
@@ -1200,12 +1266,12 @@ export default function MapScreen() {
                   source={{ uri: selectedSpot.imageUris[0] }}
                   accessibilityLabel={`Photo of ${selectedSpot.name}`}
                   accessible={false}
-                  className="mt-4 h-[280px] w-full rounded-3xl"
+                  className="mt-4 h-[280px] w-full rounded-2xl"
                   resizeMode="cover"
                 />
               </FeedbackPressable>
             ) : (
-              <View className="mt-4 h-80 items-center justify-center rounded-3xl bg-slate-100">
+              <View className="mt-4 h-80 items-center justify-center rounded-2xl bg-surface-soft">
                 <Text
                   className="font-outfit-medium text-muted-strong"
                 >
@@ -1226,32 +1292,28 @@ export default function MapScreen() {
                   haptic="light"
                   onPress={handleEditSelectedSpot}
                   disabled={deletingSpotId !== null}
-                  className="h-12 flex-1 flex-row items-center justify-center rounded-2xl bg-[#21473f]"
+                  className="h-12 flex-1 flex-row items-center justify-center rounded-2xl bg-accent"
                   accessibilityLabel={`Edit ${selectedSpot.name}`}
                   accessibilityRole="button"
                 >
-                  <Feather name="edit-2" size={16} color="#FFFFFF" />
-                  <Text
-                    className="ml-2 font-outfit-semibold text-sm text-white"
-                  >
+                  <Feather name="edit-2" size={16} color={colors.brand} />
+                  <Text className="ml-2 font-outfit-semibold text-sm text-brand">
                     Edit spot
                   </Text>
                 </FeedbackPressable>
                 <FeedbackPressable
                   onPress={handleDeleteSelectedSpot}
                   disabled={deletingSpotId !== null}
-                  className="h-12 flex-1 flex-row items-center justify-center rounded-2xl border border-[#B45F58] bg-[#FBE9E7]"
+                  className="h-12 flex-1 flex-row items-center justify-center rounded-2xl bg-errorSurface"
                   accessibilityLabel={`Delete ${selectedSpot.name}`}
                   accessibilityRole="button"
                 >
                   {deletingSpotId === selectedSpot.id ? (
-                    <ActivityIndicator size="small" color="#7F302C" />
+                    <ActivityIndicator size="small" color={colors.errorText} />
                   ) : (
-                    <Feather name="trash-2" size={16} color="#7F302C" />
+                    <Feather name="trash-2" size={16} color={colors.errorText} />
                   )}
-                  <Text
-                    className="ml-2 font-outfit-semibold text-sm text-errorText"
-                  >
+                  <Text className="ml-2 font-outfit-semibold text-sm text-errorText">
                     Delete spot
                   </Text>
                 </FeedbackPressable>
@@ -1279,9 +1341,9 @@ const styles = StyleSheet.create({
     bottom: 0,
     zIndex: 1000,
     maxHeight: '56%',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    backgroundColor: colors.field,
     paddingHorizontal: 20,
     paddingTop: 12,
     shadowColor: '#000',
@@ -1300,13 +1362,13 @@ const styles = StyleSheet.create({
   mapControlIcon: {
     width: 26,
     height: 26,
-    tintColor: '#21473F',
+    tintColor: colors.brand,
   },
   fab: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.28,
+    shadowOpacity: 0.22,
     shadowRadius: 6,
-    elevation: 10,
+    elevation: 8,
   },
 });

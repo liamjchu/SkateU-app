@@ -27,6 +27,7 @@ import {
     SPOT_NAME_MAX,
 } from '../lib/addSpotForm';
 import { triggerHaptic } from '../lib/haptics';
+import { colors } from '../constants/colors';
 import { toUserFacingError } from '../lib/userFacingError';
 import { useAuthStore } from '../store/authStore';
 import { useMapViewStore } from '../store/mapViewStore';
@@ -216,7 +217,7 @@ export default function AddSpotScreen() {
   return (
     <SafeAreaView
       edges={['left', 'right']}
-      style={{ flex: 1, backgroundColor: '#F7F9F8' }}
+      style={{ flex: 1, backgroundColor: colors.surface }}
     >
       <ScreenHeader
         title="Add spot"
@@ -230,7 +231,7 @@ export default function AddSpotScreen() {
         style={{ flex: 1 }}
       >
         <ScrollView
-          contentContainerClassName="w-full max-w-[720px] self-center px-5 pb-10 pt-5"
+          contentContainerClassName="w-full max-w-[720px] self-center px-6 pb-10 pt-5"
           keyboardShouldPersistTaps="never"
           keyboardDismissMode="interactive"
           onScrollBeginDrag={Keyboard.dismiss}
@@ -239,7 +240,7 @@ export default function AddSpotScreen() {
         >
           <Text className="mb-2 font-outfit-bold text-base text-ink">Name</Text>
           <View
-            className={`min-h-14 justify-center rounded-2xl border bg-white px-3.5 ${
+            className={`min-h-14 justify-center rounded-2xl border bg-field px-5 ${
               showFieldErrors && formErrors.name
                 ? 'border-errorBorder'
                 : 'border-border-soft'
@@ -249,7 +250,7 @@ export default function AddSpotScreen() {
               className="w-full font-outfit-medium text-base text-ink"
               style={{ padding: 0 }}
               placeholder="Library five-stair"
-              placeholderTextColor="#52645F"
+              placeholderTextColor={colors.muted}
               accessibilityLabel="Spot name"
               value={name}
               maxLength={SPOT_NAME_MAX}
@@ -280,7 +281,7 @@ export default function AddSpotScreen() {
             About
           </Text>
           <View
-            className={`rounded-2xl border bg-white px-3.5 py-4 ${
+            className={`rounded-2xl border bg-field px-5 py-4 ${
               showFieldErrors && formErrors.description
                 ? 'border-errorBorder'
                 : 'border-border-soft'
@@ -290,7 +291,7 @@ export default function AddSpotScreen() {
               className="min-h-32 w-full font-outfit-medium text-base text-ink"
               style={{ padding: 0 }}
               placeholder="What’s the spot like?"
-              placeholderTextColor="#52645F"
+              placeholderTextColor={colors.muted}
               accessibilityLabel="Spot description"
               multiline
               maxLength={SPOT_DESCRIPTION_MAX}
@@ -353,7 +354,7 @@ export default function AddSpotScreen() {
             onPress={handleSave}
             disabled={isSaveDisabled}
             className={`mt-6 min-h-14 items-center justify-center rounded-2xl px-5 py-4 ${
-              isSaveDisabled ? 'bg-disabledGreen' : 'bg-brand'
+              isSaveDisabled ? 'bg-actionDisabled' : 'bg-accent'
             }`}
             accessibilityRole="button"
             accessibilityLabel={saving ? 'Saving spot' : 'Save spot'}
@@ -361,13 +362,13 @@ export default function AddSpotScreen() {
           >
             {saving ? (
               <View className="flex-row items-center">
-                <ActivityIndicator color="#FFFFFF" />
-                <Text className="ml-2 font-outfit-bold text-lg text-white">
+                <ActivityIndicator color={colors.muted} />
+                <Text className="ml-2 font-outfit-bold text-lg text-muted">
                   Saving…
                 </Text>
               </View>
             ) : (
-              <Text className="font-outfit-bold text-lg text-white">
+              <Text className="font-outfit-bold text-lg text-brand">
                 Save spot
               </Text>
             )}

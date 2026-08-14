@@ -14,6 +14,7 @@ import {
   getPasswordRequirementStatus,
   validatePassword,
 } from '../lib/password';
+import { colors } from '../constants/colors';
 import { toUserFacingError } from '../lib/userFacingError';
 import { useAuthStore } from '../store/authStore';
 import AppleSignInButton from './AppleSignInButton';
@@ -142,39 +143,42 @@ export default function AuthCredentialsForm({
       <Text className="font-outfit-black text-2xl text-ink">
         {isSignup ? 'Create your account' : 'Welcome back'}
       </Text>
-      <Text className="mt-1 font-outfit-medium text-sm leading-5 text-muted">
+      <Text className="mt-1 font-outfit-medium text-base leading-5 text-muted">
         {isSignup
           ? 'Sign up to like spots, add your own, and use your profile.'
           : 'Sign in to like spots, add your own, and use your profile.'}
       </Text>
 
       <View className="mt-5 gap-3">
-        <TextInput
-          value={email}
-          onChangeText={setEmail}
-          placeholder="Email"
-          placeholderTextColor="#52645F"
-          accessibilityLabel="Email"
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoComplete="email"
-          textContentType="emailAddress"
-          keyboardType="email-address"
-          returnKeyType="next"
-          blurOnSubmit={false}
-          onSubmitEditing={() => passwordInputRef.current?.focus()}
-          editable={!submitting}
-          className="min-h-14 rounded-2xl border border-border-soft bg-field px-7 py-4 font-outfit-medium text-base text-ink"
-        />
+        <View className="min-h-14 justify-center rounded-2xl border border-border-soft bg-field px-5">
+          <TextInput
+            value={email}
+            onChangeText={setEmail}
+            placeholder="Email"
+            placeholderTextColor={colors.muted}
+            accessibilityLabel="Email"
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="email"
+            textContentType="emailAddress"
+            keyboardType="email-address"
+            returnKeyType="next"
+            blurOnSubmit={false}
+            onSubmitEditing={() => passwordInputRef.current?.focus()}
+            editable={!submitting}
+            className="py-4 font-outfit-medium text-base text-ink"
+            style={{ padding: 0 }}
+          />
+        </View>
 
         <View>
-          <View className="min-h-14 flex-row items-center rounded-2xl border border-border-soft bg-field pr-2">
+          <View className="min-h-14 flex-row items-center rounded-2xl border border-border-soft bg-field pl-5 pr-2">
             <TextInput
               ref={passwordInputRef}
               value={password}
               onChangeText={setPassword}
               placeholder="Password"
-              placeholderTextColor="#52645F"
+              placeholderTextColor={colors.muted}
               accessibilityLabel="Password"
               secureTextEntry={!showPassword}
               autoCapitalize="none"
@@ -184,7 +188,8 @@ export default function AuthCredentialsForm({
               returnKeyType="go"
               onSubmitEditing={() => void handleSubmit()}
               editable={!submitting}
-              className="flex-1 pl-7 py-4 font-outfit-medium text-base text-ink"
+              className="flex-1 py-4 font-outfit-medium text-base text-ink"
+              style={{ padding: 0 }}
             />
             <FeedbackPressable
               onPress={() => setShowPassword((prev) => !prev)}
@@ -197,7 +202,7 @@ export default function AuthCredentialsForm({
               <Ionicons
                 name={showPassword ? 'eye-outline' : 'eye-off-outline'}
                 size={22}
-                color="#52645F"
+                color={colors.muted}
               />
             </FeedbackPressable>
           </View>
@@ -210,7 +215,7 @@ export default function AuthCredentialsForm({
               accessibilityRole="button"
               accessibilityLabel="Forgot password"
             >
-              <Text className="font-outfit-semibold text-sm text-muted">
+              <Text className="font-outfit-semibold text-sm text-ink">
                 Forgot password?
               </Text>
             </FeedbackPressable>
@@ -241,11 +246,11 @@ export default function AuthCredentialsForm({
                     requirement.met ? 'checkmark-circle' : 'ellipse-outline'
                   }
                   size={18}
-                  color={requirement.met ? '#21473F' : '#52645F'}
+                  color={requirement.met ? colors.accent : colors.muted}
                 />
                 <Text
                   className={`font-outfit-medium text-sm ${
-                    requirement.met ? 'text-brand' : 'text-muted'
+                    requirement.met ? 'text-accent' : 'text-muted'
                   }`}
                 >
                   {requirement.label}
@@ -269,7 +274,7 @@ export default function AuthCredentialsForm({
           <View
             accessible
             accessibilityLiveRegion="polite"
-            className="rounded-2xl bg-surface-tinted px-4 py-3"
+            className="rounded-2xl bg-field px-4 py-3"
           >
             <Text selectable className="font-outfit-semibold text-sm text-ink">
               {notice}
@@ -282,14 +287,16 @@ export default function AuthCredentialsForm({
           onPress={handleSubmit}
           disabled={submitting}
           className={`min-h-14 items-center justify-center rounded-2xl py-4 ${
-            submitting ? 'bg-disabledGreen' : 'bg-brand'
+            submitting ? 'bg-actionDisabled' : 'bg-accent'
           }`}
           accessibilityLabel={isSignup ? 'Sign up' : 'Sign in'}
           accessibilityRole="button"
           accessibilityState={{ disabled: submitting, busy: submitting }}
         >
-          <Text className="font-outfit-bold text-lg text-white">
-            {submitting ? 'Hang on...' : isSignup ? 'Sign up' : 'Sign in'}
+          <Text
+            className={`font-outfit-bold text-lg ${submitting ? 'text-muted' : 'text-brand'}`}
+          >
+            {submitting ? 'Hang on…' : isSignup ? 'Sign up' : 'Sign in'}
           </Text>
         </FeedbackPressable>
 

@@ -9,6 +9,7 @@ import {
 import Svg, { Circle, Path } from 'react-native-svg';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import IMAGES from '../constants/images';
+import { colors } from '../constants/colors';
 import { useIsTabletLayout } from '../hooks/useIsTabletLayout';
 import { buildLocationPickerHtml } from '../lib/locationPickerMap';
 import type { MapLayer } from '../store/mapViewStore';
@@ -165,7 +166,7 @@ export default function LocationPicker({
   };
 
   return (
-    <View className="overflow-hidden rounded-2xl border border-border-soft bg-surface-soft">
+    <View className="overflow-hidden rounded-2xl bg-field">
       <View
         className="relative bg-black"
         style={{ height: isTabletLayout ? 320 : 224 }}
@@ -195,12 +196,12 @@ export default function LocationPicker({
             setMapError('The location map could not be loaded.');
           }}
           onMessage={handleMessage}
-          style={{ flex: 1, backgroundColor: '#0b0f14' }}
+          style={{ flex: 1, backgroundColor: colors.brand }}
         />
 
         {mapStatus !== 'ready' ? (
           <View
-            className="absolute inset-0 items-center justify-center bg-[#0b0f14]/90 px-6"
+            className="absolute inset-0 items-center justify-center bg-brand/90 px-6"
             accessibilityLabel={`Location map unavailable. ${mapError || 'Check your connection and try again.'}`}
           >
             {mapStatus === 'loading' ? (
@@ -220,11 +221,11 @@ export default function LocationPicker({
                 </Text>
                 <FeedbackPressable
                   onPress={retryMap}
-                  className="mt-4 rounded-xl bg-white px-5 py-2.5"
+                  className="mt-4 rounded-xl bg-accent px-5 py-2.5"
                   accessibilityRole="button"
                   accessibilityLabel="Retry loading location map"
                 >
-                  <Text className="font-outfit-bold text-sm text-darkGreen">Retry</Text>
+                  <Text className="font-outfit-bold text-sm text-brand">Retry</Text>
                 </FeedbackPressable>
               </>
             )}
@@ -262,9 +263,12 @@ export default function LocationPicker({
             <Svg width={50} height={50} viewBox="0 0 24 24">
               <Path
                 d="M12 22s7-6.4 7-12a7 7 0 1 0-14 0c0 5.6 7 12 7 12z"
-                fill="#FFFFFF"
+                fill={colors.accent}
+                stroke={colors.brand}
+                strokeWidth={1.5}
+                strokeLinejoin="round"
               />
-              <Circle cx="12" cy="10" r="2.5" fill="#21473f" />
+              <Circle cx="12" cy="10" r="2.5" fill={colors.white} />
             </Svg>
           </View>
         ) : null}
@@ -284,6 +288,6 @@ const styles = StyleSheet.create({
   mapControlIcon: {
     width: 18,
     height: 18,
-    tintColor: '#21473F',
+    tintColor: colors.brand,
   },
 });

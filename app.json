@@ -6,19 +6,20 @@
     "orientation": "portrait",
     "icon": "./assets/images/app-icon.png",
     "scheme": "skateu",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "ios": {
       "icon": "./assets/images/app-icon.png",
       "bundleIdentifier": "app.skateu.mobile",
       "usesAppleSignIn": true,
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIViewControllerBasedStatusBarAppearance": true
       }
     },
     "android": {
       "package": "app.skateu.mobile",
       "adaptiveIcon": {
-        "backgroundColor": "#21473F",
+        "backgroundColor": "#F7F4F0",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
@@ -33,7 +34,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#21473F",
+          "backgroundColor": "#F7F4F0",
           "image": "./assets/images/splash-centered.png",
           "imageWidth": 260,
           "resizeMode": "contain"

@@ -3,6 +3,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { useAuthStore } from '../store/authStore';
+import { colors } from '../constants/colors';
 import FeedbackPressable from './FeedbackPressable';
 
 // Lets the in-app browser finish any pending auth session when the app is
@@ -63,21 +64,19 @@ export default function GoogleSignInButton({
       haptic="light"
       onPress={handlePress}
       disabled={isDisabled}
-      className={`min-h-12 flex-row items-center justify-center gap-2 border border-border-soft bg-surface ${
-        compact
-          ? 'flex-1 rounded-full py-3'
-          : 'rounded-2xl py-4'
+      className={`min-h-12 flex-row items-center justify-center gap-2 border border-border-soft bg-white ${
+        compact ? 'flex-1 rounded-xl py-3' : 'rounded-2xl py-4'
       } ${isDisabled ? 'opacity-60' : ''}`}
       accessibilityLabel="Sign in with Google"
       accessibilityRole="button"
       accessibilityState={{ disabled: isDisabled, busy: loading }}
     >
       {loading ? (
-        <ActivityIndicator color="#1B3B36" />
+        <ActivityIndicator color={colors.brand} />
       ) : (
         <View className="flex-row items-center gap-2">
-          <Ionicons name="logo-google" size={20} color="#1B3B36" />
-          <Text className="text-base text-ink font-outfit-bold">
+          <Ionicons name="logo-google" size={20} color={colors.brand} />
+          <Text className="text-base text-brand font-outfit-bold">
             {compact ? 'Google' : 'Sign in with Google'}
           </Text>
         </View>

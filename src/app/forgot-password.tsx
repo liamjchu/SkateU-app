@@ -11,6 +11,7 @@ import {
 import FeedbackPressable from '../components/FeedbackPressable';
 import ScreenHeader from '../components/screen-header';
 import { requestPasswordResetEmail } from '../lib/password-reset';
+import { colors } from '../constants/colors';
 
 const SUCCESS_MESSAGE =
   'If an account exists with that email, a password reset link has been sent.';
@@ -89,11 +90,11 @@ export default function ForgotPasswordScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View className="flex-1 self-center w-full max-w-[640px] px-5 pt-8 pb-8">
-            <Text className="font-outfit-black text-3xl text-ink">
+          <View className="flex-1 self-center w-full max-w-[640px] px-6 pt-8 pb-8">
+            <Text className="font-outfit-black text-2xl text-ink">
               Forgot your password?
             </Text>
-            <Text className="mt-2 font-outfit-medium text-base text-slate-500">
+            <Text className="mt-2 font-outfit-medium text-base text-muted">
               Enter your email and we&apos;ll send a link to reset it.
             </Text>
 
@@ -105,22 +106,25 @@ export default function ForgotPasswordScreen() {
                 >
                   Email address
                 </Text>
-                <TextInput
-                  value={email}
-                  onChangeText={setEmail}
-                  placeholder="name@email.com"
-                  placeholderTextColor="#94A3B8"
-                  accessibilityLabelledBy="reset-email-label"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  autoComplete="email"
-                  textContentType="emailAddress"
-                  keyboardType="email-address"
-                  returnKeyType="send"
-                  onSubmitEditing={() => void handleSubmit()}
-                  editable={!submitting}
-                  className="min-h-14 rounded-2xl border border-border-soft bg-field px-7 py-4 font-outfit-medium text-base text-ink"
-                />
+                <View className="min-h-14 justify-center rounded-2xl border border-border-soft bg-field px-5">
+                  <TextInput
+                    value={email}
+                    onChangeText={setEmail}
+                    placeholder="name@email.com"
+                    placeholderTextColor={colors.muted}
+                    accessibilityLabelledBy="reset-email-label"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    autoComplete="email"
+                    textContentType="emailAddress"
+                    keyboardType="email-address"
+                    returnKeyType="send"
+                    onSubmitEditing={() => void handleSubmit()}
+                    editable={!submitting}
+                    className="font-outfit-medium text-base text-ink"
+                    style={{ padding: 0 }}
+                  />
+                </View>
               </View>
 
               {error ? (
@@ -137,7 +141,8 @@ export default function ForgotPasswordScreen() {
                 <View
                   accessible
                   accessibilityLiveRegion="polite"
-                  className="rounded-2xl bg-surface-tinted px-4 py-3">
+                  className="rounded-2xl bg-field px-4 py-3"
+                >
                   <Text
                     selectable
                     className="font-outfit-semibold text-sm text-ink"
@@ -152,25 +157,27 @@ export default function ForgotPasswordScreen() {
                 onPress={handleSubmit}
                 disabled={submitting}
                 className={`mt-2 min-h-14 items-center justify-center rounded-2xl py-4 ${
-                  submitting ? 'bg-disabledGreen' : 'bg-brand'
+                  submitting ? 'bg-actionDisabled' : 'bg-accent'
                 }`}
                 accessibilityRole="button"
                 accessibilityLabel={submitting ? 'Sending password reset link' : 'Send password reset link'}
                 accessibilityState={{ disabled: submitting, busy: submitting }}
               >
-                <Text className="font-outfit-bold text-lg text-white">
-                  {submitting ? 'Sending link...' : 'Send reset link'}
+                <Text
+                  className={`font-outfit-bold text-lg ${submitting ? 'text-muted' : 'text-brand'}`}
+                >
+                  {submitting ? 'Sending link…' : 'Send reset link'}
                 </Text>
               </FeedbackPressable>
 
               {notice === SUCCESS_MESSAGE ? (
                 <FeedbackPressable
                   onPress={goBackToSignIn}
-                  className="min-h-12 items-center justify-center rounded-2xl border border-brand px-4 py-3"
+                  className="min-h-12 items-center justify-center rounded-2xl border border-accent px-4 py-3"
                   accessibilityRole="button"
                   accessibilityLabel="Back to sign in"
                 >
-                  <Text className="font-outfit-bold text-base text-brand">
+                  <Text className="font-outfit-bold text-base text-accent">
                     Back to sign in
                   </Text>
                 </FeedbackPressable>

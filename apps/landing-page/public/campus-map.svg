@@ -18,7 +18,7 @@
   <g stroke="#C9D7D3" stroke-linecap="round" stroke-width="8">
     <path d="M71 61L404 922M239 3L743 958M683 10L1314 945M1125 13L1533 755M-5 303L1515 618M66 939L1567 274"/>
   </g>
-  <g transform="translate(475 486)"><path d="M0-25C-14-25-25-14-25 0C-25 19 0 43 0 43C0 43 25 19 25 0C25-14 14-25 0-25Z" fill="white"/><circle cy="0" r="8" fill="#21473F"/></g>
-  <g transform="translate(1025 390)"><path d="M0-25C-14-25-25-14-25 0C-25 19 0 43 0 43C0 43 25 19 25 0C25-14 14-25 0-25Z" fill="white"/><circle cy="0" r="8" fill="#21473F"/></g>
-  <g transform="translate(1335 706)"><path d="M0-25C-14-25-25-14-25 0C-25 19 0 43 0 43C0 43 25 19 25 0C25-14 14-25 0-25Z" fill="white"/><circle cy="0" r="8" fill="#21473F"/></g>
+  <g transform="translate(475 486)"><path d="M0-25C-14-25-25-14-25 0C-25 19 0 43 0 43C0 43 25 19 25 0C25-14 14-25 0-25Z" fill="#E67A90" stroke="#2A2224" stroke-width="3" stroke-linejoin="round"/><circle cy="-2" r="7" fill="#FFFFFF"/></g>
+  <g transform="translate(1025 390)"><path d="M0-25C-14-25-25-14-25 0C-25 19 0 43 0 43C0 43 25 19 25 0C25-14 14-25 0-25Z" fill="#E67A90" stroke="#2A2224" stroke-width="3" stroke-linejoin="round"/><circle cy="-2" r="7" fill="#FFFFFF"/></g>
+  <g transform="translate(1335 706)"><path d="M0-25C-14-25-25-14-25 0C-25 19 0 43 0 43C0 43 25 19 25 0C25-14 14-25 0-25Z" fill="#E67A90" stroke="#2A2224" stroke-width="3" stroke-linejoin="round"/><circle cy="-2" r="7" fill="#FFFFFF"/></g>
 </svg>

@@ -1,6 +1,7 @@
 import { Feather, Octicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { ActivityIndicator, Image, Text, View } from 'react-native';
+import { colors } from '../constants/colors';
 import { formatCompactRelativeTime } from '../lib/relativeTime';
 import type { Spot } from '../types/spot';
 import ExpandableText from './expandable-text';
@@ -40,40 +41,44 @@ export default function HomeSpotPost({
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
   return (
-    <View className="rounded-3xl bg-surface-tinted">
+    <View className="overflow-hidden rounded-2xl bg-field">
       {imageUrl ? (
         <FeedbackPressable
           haptic="light"
           disablePressScale
           onPress={() => setLightboxOpen(true)}
-          className="overflow-hidden rounded-t-3xl"
           accessibilityRole="button"
           accessibilityLabel={`View full screen photo of ${spot.name}`}
           accessibilityHint="Opens the photo. Pinch or double tap to zoom."
         >
           <Image
             source={{ uri: imageUrl }}
-            className="h-56 w-full bg-surface-tinted"
+            className="h-56 w-full bg-surface-soft"
             resizeMode="cover"
             accessible={false}
           />
         </FeedbackPressable>
       ) : (
         <View
-          className="h-56 w-full items-center justify-center overflow-hidden rounded-t-3xl bg-surface-soft"
+          className="h-56 w-full items-center justify-center bg-surface-soft"
           accessibilityLabel={`No photo for ${spot.name}`}
         >
-          <Feather name="map-pin" size={28} color="#52645F" />
+          <Feather name="map-pin" size={28} color={colors.muted} />
         </View>
       )}
 
-      <View className="px-4 py-3">
-        <ExpandableText
-          collapsedLines={1}
-          className="font-outfit-medium text-sm text-muted"
-        >
-          {spotAttribution(spot)}
-        </ExpandableText>
+      <View className="px-4 py-4">
+        <View className="flex-row items-center">
+          <Feather name="user" size={13} color={colors.muted} />
+          <View className="ml-1.5 min-w-0 flex-1">
+            <ExpandableText
+              collapsedLines={1}
+              className="font-outfit-medium text-sm text-muted"
+            >
+              {spotAttribution(spot)}
+            </ExpandableText>
+          </View>
+        </View>
         <ExpandableText
           collapsedLines={1}
           className="mt-1 font-outfit-bold text-lg text-ink"
@@ -82,7 +87,7 @@ export default function HomeSpotPost({
         </ExpandableText>
         <ExpandableText
           collapsedLines={1}
-          className="mt-0.5 font-outfit-medium text-sm text-muted"
+          className="mt-0.5 font-outfit-medium text-sm text-muted-soft"
         >
           {spotPlace(spot)}
         </ExpandableText>
@@ -100,7 +105,9 @@ export default function HomeSpotPost({
             haptic="light"
             onPress={() => onLike(spot)}
             disabled={isLiking}
-            className="min-h-11 flex-row items-center rounded-full bg-surface-soft px-3.5"
+            className={`min-h-11 flex-row items-center rounded-xl px-3.5 ${
+              liked ? 'bg-accent' : 'bg-surface-soft'
+            }`}
             accessibilityRole="button"
             accessibilityLabel={
               liked ? `Unlike ${spot.name}` : `Like ${spot.name}`
@@ -108,15 +115,22 @@ export default function HomeSpotPost({
             accessibilityState={{ selected: liked, busy: isLiking }}
           >
             {isLiking ? (
-              <ActivityIndicator size="small" color="#7F302C" />
+              <ActivityIndicator
+                size="small"
+                color={liked ? colors.brand : colors.ink}
+              />
             ) : (
               <Octicons
                 name={liked ? 'heart-fill' : 'heart'}
                 size={17}
-                color={liked ? '#7F302C' : '#52645F'}
+                color={liked ? colors.brand : colors.ink}
               />
             )}
-            <Text className="ml-1.5 font-outfit-semibold text-sm text-muted">
+            <Text
+              className={`ml-1.5 font-outfit-semibold text-sm ${
+                liked ? 'text-brand' : 'text-ink'
+              }`}
+            >
               {spot.likeCount ?? 0}
             </Text>
           </FeedbackPressable>
@@ -124,13 +138,13 @@ export default function HomeSpotPost({
           <FeedbackPressable
             haptic="light"
             onPress={() => onViewMap(spot)}
-            className="ml-2 min-h-11 flex-1 flex-row items-center justify-center rounded-full bg-white px-3.5"
+            className="ml-2 min-h-11 flex-1 flex-row items-center justify-center rounded-xl bg-surface-soft px-3.5"
             accessibilityRole="button"
             accessibilityLabel={`View ${spot.name} on the campus map`}
             accessibilityHint="Opens the campus map with this spot selected"
           >
-            <Feather name="map" size={16} color="#21473F" />
-            <Text className="ml-1.5 font-outfit-bold text-sm text-brand">
+            <Feather name="map" size={16} color={colors.ink} />
+            <Text className="ml-1.5 font-outfit-bold text-sm text-ink">
               View map
             </Text>
           </FeedbackPressable>

@@ -5,6 +5,7 @@ import { Alert, ScrollView, Text, View } from 'react-native';
 import FeedbackPressable from '../components/FeedbackPressable';
 import ScreenHeader from '../components/screen-header';
 import { toUserFacingError } from '../lib/userFacingError';
+import { colors } from '../constants/colors';
 import { useAuthStore } from '../store/authStore';
 
 type SettingsRowProps = {
@@ -28,7 +29,7 @@ function SettingsRow({
   busy = false,
   showChevron = false,
 }: SettingsRowProps) {
-  const iconColor = destructive ? '#7F302C' : '#21473F';
+  const iconColor = destructive ? colors.errorText : colors.ink;
   const labelClass = destructive
     ? 'font-outfit-semibold text-base text-errorText'
     : 'font-outfit-semibold text-base text-ink';
@@ -46,14 +47,14 @@ function SettingsRow({
     >
       <View
         className={`h-9 w-9 items-center justify-center rounded-full ${
-          destructive ? 'bg-white' : 'bg-surface-soft'
+          destructive ? 'bg-field' : 'bg-surface-soft'
         }`}
       >
         <Feather name={icon} size={16} color={iconColor} />
       </View>
       <Text className={`ml-3 flex-1 ${labelClass}`}>{label}</Text>
       {showChevron ? (
-        <Feather name="chevron-right" size={18} color="#94A3B8" />
+        <Feather name="chevron-right" size={18} color={colors.muted} />
       ) : null}
     </FeedbackPressable>
   );
@@ -143,13 +144,13 @@ export default function SettingsScreen() {
 
       <ScrollView
         className="flex-1"
-        contentContainerClassName="self-center w-full max-w-[640px] px-5 pb-8 pt-6"
+        contentContainerClassName="self-center w-full max-w-[640px] px-6 pb-8 pt-6"
         showsVerticalScrollIndicator={false}
       >
         <Text className="mb-2 px-1 font-outfit-bold text-xs uppercase tracking-wide text-muted">
           Account
         </Text>
-        <View className="overflow-hidden rounded-3xl bg-surface-tinted">
+        <View className="overflow-hidden rounded-2xl bg-field">
           <SettingsRow
             icon="user"
             label="Change username"
@@ -167,7 +168,7 @@ export default function SettingsScreen() {
           />
         </View>
 
-        <View className="mt-6 overflow-hidden rounded-3xl bg-surface-tinted">
+        <View className="mt-6 overflow-hidden rounded-2xl bg-field">
           <SettingsRow
             icon="log-out"
             label={loggingOut ? 'Logging out...' : 'Log out'}
@@ -177,7 +178,7 @@ export default function SettingsScreen() {
           />
         </View>
 
-        <View className="mt-6 overflow-hidden rounded-3xl bg-errorSurface">
+        <View className="mt-6 overflow-hidden rounded-2xl bg-errorSurface">
           <SettingsRow
             icon="trash-2"
             label={sendingDeleteOtp ? 'Sending code...' : 'Delete account'}

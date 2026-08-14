@@ -4,6 +4,7 @@ import * as Crypto from 'expo-crypto';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { signInWithAppleIdentityToken } from '../lib/appleAuthentication';
+import { colors } from '../constants/colors';
 import FeedbackPressable from './FeedbackPressable';
 
 type AppleSignInButtonProps = {
@@ -101,21 +102,19 @@ export default function AppleSignInButton({
       haptic="light"
       onPress={() => void handlePress()}
       disabled={isDisabled}
-      className={`min-h-12 flex-row items-center justify-center gap-2 border border-border-soft bg-surface ${
-        compact
-          ? 'flex-1 rounded-full py-3'
-          : 'rounded-2xl py-4'
+      className={`min-h-12 flex-row items-center justify-center gap-2 border border-border-soft bg-white ${
+        compact ? 'flex-1 rounded-xl py-3' : 'rounded-2xl py-4'
       } ${isDisabled ? 'opacity-60' : ''}`}
       accessibilityLabel="Sign in with Apple"
       accessibilityRole="button"
       accessibilityState={{ disabled: isDisabled, busy: loading }}
     >
       {loading ? (
-        <ActivityIndicator color="#1B3B36" />
+        <ActivityIndicator color={colors.brand} />
       ) : (
         <View className="flex-row items-center gap-2">
-          <Ionicons name="logo-apple" size={20} color="#1B3B36" />
-          <Text className="text-base text-ink font-outfit-bold">
+          <Ionicons name="logo-apple" size={20} color={colors.brand} />
+          <Text className="text-base text-brand font-outfit-bold">
             {compact ? 'Apple' : 'Sign in with Apple'}
           </Text>
         </View>

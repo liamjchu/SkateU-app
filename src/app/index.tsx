@@ -28,14 +28,15 @@ import PopularSchoolCard, {
 import SchoolTypePills, {
     getSchoolTypesParam,
 } from '../components/SchoolTypePills';
+import { StickerStripe } from '../components/sticker';
 import IMAGES from '../constants/images';
+import { colors } from '../constants/colors';
 import { getApiUrl } from '../lib/api';
 import { triggerHaptic } from '../lib/haptics';
 import { HOME_RAIL_PAGE_SIZE } from '../lib/homeFeed';
 import { toUserFacingError } from '../lib/userFacingError';
 import { useAuthStore } from '../store/authStore';
 import { useFavorites } from '../store/favoritesStore';
-import { useProfileStore } from '../store/profileStore';
 import { useSchools } from '../store/schoolsStore';
 import { useSpotsStore } from '../store/spotsStore';
 import type { School, SchoolTypeFilter } from '../types/school';
@@ -103,7 +104,6 @@ export default function HomeScreen() {
   const { schools, upsertSchool } = useSchools();
   const session = useAuthStore((state) => state.session);
   const authInitializing = useAuthStore((state) => state.initializing);
-  const profile = useProfileStore((state) => state.profile);
   const toggleSpotLike = useSpotsStore((state) => state.toggleSpotLike);
   const {
     favoriteSchoolIds,
@@ -206,11 +206,6 @@ export default function HomeScreen() {
             (school: School) => !favoriteSchoolIds.includes(school.id)
           ),
         ];
-
-  const profileInitial =
-    profile?.username?.charAt(0).toUpperCase() ||
-    session?.user?.email?.charAt(0).toUpperCase() ||
-    'P';
 
   useEffect(() => {
     if (!hasHydratedFavorites) {
@@ -833,21 +828,17 @@ export default function HomeScreen() {
 
   return (
     <View className="flex-1 bg-surface">
-      <View
-        className="bg-brand px-6 pb-5"
-        style={{
-          paddingTop: insets.top + 24,
-          shadowColor: '#000000',
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.12,
-          shadowRadius: 6,
-          elevation: 6,
-        }}
-      >
-        <View className="h-14 flex-row items-center justify-between">
+      <View className="bg-brand">
+        <View
+          className="px-6 pb-5"
+          style={{
+            paddingTop: insets.top + 24,
+          }}
+        >
+        <View className="h-11 flex-row items-center justify-between">
           <Image
             source={IMAGES.brandLockup}
-            className="-ml-[21px] h-14 w-[177px]"
+            style={{ width: 195, height: 36 }}
             resizeMode="contain"
             accessibilityLabel="SkateU"
           />
@@ -855,70 +846,58 @@ export default function HomeScreen() {
           <FeedbackPressable
             haptic="light"
             onPress={handleProfilePress}
-            className="h-11 w-11 items-center justify-center rounded-full bg-white"
+            className="ml-3 h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white"
             accessibilityLabel="Open profile"
             accessibilityRole="button"
           >
-            {session ? (
-              <Text
-                className="font-outfit-black text-lg text-brand"
-                accessibilityLabel={`Profile initial ${profileInitial}`}
-              >
-                {profileInitial}
-              </Text>
-            ) : (
-              <Feather name="user" size={20} color="#21473F" />
-            )}
+            <Feather name="user" size={20} color={colors.brand} />
           </FeedbackPressable>
         </View>
 
         <View className="mt-4 flex-row items-center">
           <View className="relative min-w-0 flex-1 justify-center">
-            <View className="absolute left-5 z-10">
-              <Ionicons name="search" size={20} color="#1B3B36" />
-            </View>
-            <TextInput
-              ref={searchInputRef}
-              value={searchQuery}
-              onChangeText={handleSearchChange}
-              onFocus={() => setIsSearchFocused(true)}
-              onBlur={() => setIsSearchFocused(false)}
-              placeholder={schoolSearchCopy.placeholder}
-              placeholderTextColor="#52645F"
-              accessibilityLabel={schoolSearchCopy.accessibilityLabel}
-              accessibilityHint={
-                activeFilter === 'saved'
-                  ? 'Filters your saved schools by name, city, or state'
-                  : 'Type at least three characters to find a school'
-              }
-              numberOfLines={1}
-              multiline={false}
-              autoCorrect={false}
-              autoCapitalize="words"
-              returnKeyType="search"
-              onSubmitEditing={() => Keyboard.dismiss()}
-              className="h-14 rounded-2xl bg-white pl-14 pr-12 font-outfit-semibold text-base text-ink"
-              style={{
-                shadowColor: '#000000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.12,
-                shadowRadius: 6,
-                elevation: 4,
-              }}
-            />
+            <View className="overflow-hidden rounded-2xl bg-field">
+              <View className="relative justify-center">
+                <View className="absolute left-5 z-10">
+                  <Ionicons name="search" size={20} color={colors.ink} />
+                </View>
+                <TextInput
+                  ref={searchInputRef}
+                  value={searchQuery}
+                  onChangeText={handleSearchChange}
+                  onFocus={() => setIsSearchFocused(true)}
+                  onBlur={() => setIsSearchFocused(false)}
+                  placeholder={schoolSearchCopy.placeholder}
+                  placeholderTextColor={colors.muted}
+                  accessibilityLabel={schoolSearchCopy.accessibilityLabel}
+                  accessibilityHint={
+                    activeFilter === 'saved'
+                      ? 'Filters your saved schools by name, city, or state'
+                      : 'Type at least three characters to find a school'
+                  }
+                  numberOfLines={1}
+                  multiline={false}
+                  autoCorrect={false}
+                  autoCapitalize="words"
+                  returnKeyType="search"
+                  onSubmitEditing={() => Keyboard.dismiss()}
+                  className="h-14 bg-field pl-14 pr-12 font-outfit-semibold text-base text-ink"
+                />
 
-            {searchQuery.length > 0 ? (
-              <View className="absolute right-3 z-10">
-                <FeedbackPressable
-                  onPress={handleClearSearch}
-                  className="h-9 w-9 items-center justify-center rounded-full bg-surface-soft"
-                  accessibilityRole="button"
-                  accessibilityLabel="Clear school search"
-                >
-                  <Feather name="x" size={16} color="#52645F" />
-                </FeedbackPressable>
+                {searchQuery.length > 0 ? (
+                  <View className="absolute right-3 z-10">
+                    <FeedbackPressable
+                      onPress={handleClearSearch}
+                      className="h-9 w-9 items-center justify-center rounded-full bg-surface-soft"
+                      accessibilityRole="button"
+                      accessibilityLabel="Clear school search"
+                    >
+                      <Feather name="x" size={16} color={colors.muted} />
+                    </FeedbackPressable>
+                  </View>
+                ) : null}
               </View>
-            ) : null}
+            </View>
           </View>
 
           {isSearchMode ? (
@@ -934,6 +913,8 @@ export default function HomeScreen() {
             </FeedbackPressable>
           ) : null}
         </View>
+        </View>
+        <StickerStripe />
       </View>
 
       <KeyboardAvoidingView
@@ -942,30 +923,28 @@ export default function HomeScreen() {
         keyboardVerticalOffset={0}
       >
         <View className="w-full max-w-[760px] flex-1 self-center px-6">
-          <View className="pt-4">
-            {!session && !authInitializing ? (
-              <NoticeBanner
-                id="guest-browse"
-                collapsed={isSearchMode}
-                icon="eye-outline"
-                title="Browsing as a guest"
-                message="Browse campuses freely. Sign in to like spots or add your own."
-                actionLabel="Sign in"
-                onAction={() => router.push('/login')}
-              />
-            ) : null}
-          </View>
-
-          <View className="pb-2">
+          <View className="pt-3">
             <SchoolTypePills
               selected={activeFilter}
               onSelect={setActiveFilter}
             />
           </View>
 
+          {!session && !authInitializing ? (
+            <NoticeBanner
+              id="guest-browse"
+              collapsed={isSearchMode}
+              icon="eye-outline"
+              title="Browsing as a guest"
+              message="Browse campuses and spots freely. Sign in to like spots or add your own."
+              actionLabel="Sign in"
+              onAction={() => router.push('/login')}
+            />
+          ) : null}
+
           <ScrollView
             className="min-h-0 flex-1"
-            contentContainerClassName="pt-5"
+            contentContainerClassName="pt-4"
             contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
@@ -976,8 +955,8 @@ export default function HomeScreen() {
                   activeFilter === 'saved' ? false : isRefreshing
                 }
                 onRefresh={handleRefresh}
-                tintColor="#21473F"
-                colors={['#21473F']}
+                tintColor={colors.accent}
+                colors={[colors.accent]}
               />
             }
             scrollEventThrottle={16}
@@ -1000,12 +979,12 @@ export default function HomeScreen() {
           >
             {activeFilter === 'saved' ? (
               <View>
-                <Text className="mb-3 font-outfit-bold text-base text-ink">
+                <Text className="mb-4 font-outfit-bold text-base text-ink">
                   Saved
                 </Text>
 
                 {favoriteRefreshError ? (
-                  <View className="mb-4 flex-row items-center rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2">
+                  <View className="mb-4 flex-row items-center rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2.5">
                     <Text className="flex-1 pr-2 font-outfit-medium text-sm text-errorText">
                       {favoriteRefreshError}
                     </Text>
@@ -1014,32 +993,32 @@ export default function HomeScreen() {
                         setFavoriteRefreshError('');
                         setFavoriteRefreshNonce((nonce) => nonce + 1);
                       }}
-                      className="rounded-lg bg-brand px-3 py-1.5"
+                      className="rounded-xl bg-accent px-3 py-1.5"
                       accessibilityRole="button"
                       accessibilityLabel="Retry refreshing saved schools"
                     >
-                      <Text className="font-outfit-bold text-sm text-white">Retry</Text>
+                      <Text className="font-outfit-bold text-sm text-brand">Retry</Text>
                     </FeedbackPressable>
                   </View>
                 ) : null}
 
                 {isHydratingFavoriteSchools ? (
                   <View
-                    className="items-center rounded-3xl bg-surface-tinted px-6 py-8"
+                    className="items-center rounded-2xl bg-field px-6 py-8"
                     accessibilityLabel="Loading saved schools"
                     accessibilityLiveRegion="polite"
                   >
                     <Text className="text-lg text-ink font-outfit-bold">
-                      Loading saved schools...
+                      Loading saved schools…
                     </Text>
                     <Text className="mt-1 text-center text-base leading-5 text-muted font-outfit-medium">
                       Restoring your saved schools.
                     </Text>
                   </View>
                 ) : favoriteSchools.length === 0 ? (
-                  <View className="items-center rounded-3xl bg-surface-tinted px-6 py-8">
-                    <View className="h-14 w-14 items-center justify-center rounded-2xl bg-white/70">
-                      <Ionicons name="bookmark-outline" size={26} color="#1B3B36" />
+                  <View className="items-center rounded-2xl bg-field px-6 py-8">
+                    <View className="h-14 w-14 items-center justify-center rounded-2xl bg-accent">
+                      <Ionicons name="bookmark-outline" size={26} color={colors.brand} />
                     </View>
                     <Text className="mt-3 text-lg text-ink font-outfit-bold">
                       No saved schools yet
@@ -1049,7 +1028,7 @@ export default function HomeScreen() {
                     </Text>
                   </View>
                 ) : savedSearchResults.length === 0 ? (
-                  <View className="items-center rounded-3xl bg-surface-tinted px-6 py-8">
+                  <View className="items-center rounded-2xl bg-field px-6 py-8">
                     <Text className="text-lg text-ink font-outfit-bold">
                       No matches
                     </Text>
@@ -1073,13 +1052,13 @@ export default function HomeScreen() {
               <View>
                 <Text
                   accessibilityLiveRegion="polite"
-                  className="mb-3 font-outfit-bold text-base text-ink"
+                  className="mb-4 font-outfit-bold text-base text-ink"
                 >
                   {searchStatusText}
                 </Text>
 
                 {searchError ? (
-                  <View className="flex-row items-center rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2">
+                  <View className="flex-row items-center rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2.5">
                     <Text
                       accessibilityRole="alert"
                       accessibilityLiveRegion="polite"
@@ -1089,11 +1068,11 @@ export default function HomeScreen() {
                     </Text>
                     <FeedbackPressable
                       onPress={handleRetrySearch}
-                      className="rounded-lg bg-brand px-3 py-1.5"
+                      className="rounded-xl bg-accent px-3 py-1.5"
                       accessibilityRole="button"
                       accessibilityLabel="Retry school search"
                     >
-                      <Text className="font-outfit-bold text-sm text-white">Retry</Text>
+                      <Text className="font-outfit-bold text-sm text-brand">Retry</Text>
                     </FeedbackPressable>
                   </View>
                 ) : isSearching ? (
@@ -1101,12 +1080,12 @@ export default function HomeScreen() {
                     {[0, 1, 2].map((placeholder) => (
                       <View
                         key={placeholder}
-                        className="mb-4 h-24 rounded-3xl bg-surface-tinted"
+                        className="mb-4 h-24 rounded-2xl bg-field"
                       />
                     ))}
                   </View>
                 ) : sortedSearchResults.length === 0 ? (
-                  <View className="items-center rounded-3xl bg-surface-tinted px-6 py-8">
+                  <View className="items-center rounded-2xl bg-field px-6 py-8">
                     <Text className="text-lg text-ink font-outfit-bold">
                       No schools found
                     </Text>
@@ -1127,7 +1106,7 @@ export default function HomeScreen() {
                 )}
               </View>
             ) : isSearchFocused && trimmedSearch.length > 0 ? (
-              <View className="items-center rounded-3xl bg-surface-tinted px-6 py-8">
+              <View className="items-center rounded-2xl bg-field px-6 py-8">
                 <Text className="text-lg text-ink font-outfit-bold">
                   Keep typing…
                 </Text>
@@ -1137,13 +1116,6 @@ export default function HomeScreen() {
               </View>
             ) : (
               <View className="gap-8">
-                <NoticeBanner
-                  id="home-howto"
-                  icon="compass-outline"
-                  title="Find a campus or browse spots"
-                  message="Search or pick a popular school to open its map. Scroll below to like new spots here — View map only if you want to go there."
-                />
-
                 <HomeSchoolStories
                   schools={favoriteSchools}
                   onPress={handleSchoolPress}
@@ -1164,9 +1136,9 @@ export default function HomeScreen() {
                   onEndReached={loadMorePopularSchools}
                   isLoadingMore={isLoadingMorePopular}
                   empty={
-                    <View className="items-center rounded-3xl bg-surface-tinted px-6 py-8">
-                      <View className="h-14 w-14 items-center justify-center rounded-2xl bg-white/70">
-                        <Feather name="trending-up" size={26} color="#1B3B36" />
+                    <View className="items-center rounded-2xl bg-field px-6 py-8">
+                      <View className="h-14 w-14 items-center justify-center rounded-2xl bg-accent">
+                        <Feather name="trending-up" size={26} color={colors.brand} />
                       </View>
                       <Text className="mt-3 text-lg text-ink font-outfit-bold">
                         No popular schools yet
@@ -1198,7 +1170,9 @@ export default function HomeScreen() {
                           <FeedbackPressable
                             haptic="selection"
                             onPress={() => handleFavoritePress(school)}
-                            className="h-9 w-9 items-center justify-center rounded-full bg-white/90"
+                            className={`h-9 w-9 items-center justify-center rounded-full ${
+                              isSaved ? 'bg-accent' : 'bg-white'
+                            }`}
                             accessibilityRole="button"
                             accessibilityLabel={`${isSaved ? 'Remove' : 'Add'} ${school.name} ${isSaved ? 'from' : 'to'} saved schools`}
                             accessibilityState={{ selected: isSaved }}
@@ -1206,7 +1180,7 @@ export default function HomeScreen() {
                             <Ionicons
                               name={isSaved ? 'bookmark' : 'bookmark-outline'}
                               size={16}
-                              color="#1B3B36"
+                              color={isSaved ? colors.brand : colors.ink}
                             />
                           </FeedbackPressable>
                         }
@@ -1216,7 +1190,7 @@ export default function HomeScreen() {
                 </HomeFeedRail>
 
                 <View>
-                  <View className="mb-3">
+                  <View className="mb-4">
                     <Text className="font-outfit-bold text-base text-ink">
                       Latest spots
                     </Text>
@@ -1233,12 +1207,12 @@ export default function HomeScreen() {
                       {[0, 1].map((placeholder) => (
                         <View
                           key={placeholder}
-                          className="h-80 rounded-3xl bg-surface-tinted"
+                          className="h-80 rounded-2xl bg-field"
                         />
                       ))}
                     </View>
                   ) : recentError && recentSpots.length === 0 ? (
-                    <View className="flex-row items-center rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2">
+                    <View className="flex-row items-center rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2.5">
                       <Text className="flex-1 pr-2 font-outfit-medium text-sm text-errorText">
                         {recentError}
                       </Text>
@@ -1247,19 +1221,19 @@ export default function HomeScreen() {
                           setRecentError('');
                           setRecentRetryNonce((nonce) => nonce + 1);
                         }}
-                        className="rounded-lg bg-brand px-3 py-1.5"
+                        className="rounded-xl bg-accent px-3 py-1.5"
                         accessibilityRole="button"
                         accessibilityLabel="Retry loading latest spots"
                       >
-                        <Text className="font-outfit-bold text-sm text-white">
+                        <Text className="font-outfit-bold text-sm text-brand">
                           Retry
                         </Text>
                       </FeedbackPressable>
                     </View>
                   ) : recentSpots.length === 0 ? (
-                    <View className="items-center rounded-3xl bg-surface-tinted px-6 py-8">
-                      <View className="h-14 w-14 items-center justify-center rounded-2xl bg-white/70">
-                        <Feather name="map-pin" size={26} color="#1B3B36" />
+                    <View className="items-center rounded-2xl bg-field px-6 py-8">
+                      <View className="h-14 w-14 items-center justify-center rounded-2xl bg-accent">
+                        <Feather name="map-pin" size={26} color={colors.brand} />
                       </View>
                       <Text className="mt-3 text-lg text-ink font-outfit-bold">
                         No spots yet
@@ -1282,7 +1256,7 @@ export default function HomeScreen() {
                       ))}
                       {isLoadingMoreRecent ? (
                         <View className="items-center py-4">
-                          <ActivityIndicator color="#21473F" />
+                          <ActivityIndicator color={colors.accent} />
                         </View>
                       ) : null}
                     </View>

@@ -8,6 +8,7 @@ import Animated, {
     withTiming,
 } from 'react-native-reanimated';
 import { getClientStorage } from '../lib/clientStorage';
+import { colors } from '../constants/colors';
 import FeedbackPressable from './FeedbackPressable';
 
 type NoticeBannerProps = {
@@ -108,15 +109,15 @@ export default function NoticeBanner({
         onLayout={({ nativeEvent }) => {
           setContentHeight(nativeEvent.layout.height);
         }}
-        className="pb-3"
+        className="pb-4"
       >
         <View
-          className="flex-row items-start rounded-3xl border border-border-soft bg-surface-tinted p-3.5"
+          className="flex-row items-start rounded-2xl bg-field p-3.5"
           accessibilityRole="summary"
           accessibilityLabel={`${title}. ${message}`}
         >
-          <View className="h-10 w-10 items-center justify-center rounded-2xl bg-white">
-            <Ionicons name={icon} size={18} color="#21473F" />
+          <View className="h-10 w-10 items-center justify-center rounded-xl bg-accent">
+            <Ionicons name={icon} size={18} color={colors.brand} />
           </View>
 
           <View className="ml-3 min-w-0 flex-1">
@@ -129,11 +130,11 @@ export default function NoticeBanner({
               <FeedbackPressable
                 haptic="light"
                 onPress={onAction}
-                className="mt-3 self-start rounded-full bg-brand px-4 py-2"
+                className="mt-3 self-start rounded-xl bg-accent px-4 py-2"
                 accessibilityRole="button"
                 accessibilityLabel={actionLabel}
               >
-                <Text className="font-outfit-bold text-sm text-white">
+                <Text className="font-outfit-bold text-sm text-brand">
                   {actionLabel}
                 </Text>
               </FeedbackPressable>
@@ -147,7 +148,7 @@ export default function NoticeBanner({
             accessibilityRole="button"
             accessibilityLabel="Dismiss notice"
           >
-            <Ionicons name="close" size={16} color="#52645F" />
+            <Ionicons name="close" size={16} color={colors.muted} />
           </FeedbackPressable>
         </View>
       </View>

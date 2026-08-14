@@ -1,7 +1,9 @@
 import { useMemo } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import FeedbackPressable from '../components/FeedbackPressable';
 import { UsernameForm } from '../components/username-form';
+import { StickerStripe } from '../components/sticker';
 import { slugifyUsername } from '../lib/username';
 import { useAuthStore } from '../store/authStore';
 import { useProfileStore } from '../store/profileStore';
@@ -33,21 +35,19 @@ export default function OnboardingScreen() {
   };
 
   return (
-    <View className="flex-1 bg-white">
-      <View
-        className="bg-brand px-6 pb-4"
-        style={{
-          paddingTop: insets.top + 16,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.25,
-          shadowRadius: 8,
-          elevation: 12,
-        }}
-      >
-        <Text className="font-outfit-bold text-2xl text-white">
-          Choose a username
-        </Text>
+    <View className="flex-1 bg-surface">
+      <View className="bg-brand">
+        <View
+          className="px-6 pb-4"
+          style={{
+            paddingTop: insets.top + 16,
+          }}
+        >
+          <Text className="font-outfit-bold text-2xl text-white">
+            Choose a username
+          </Text>
+        </View>
+        <StickerStripe />
       </View>
 
       <KeyboardAvoidingView
@@ -56,11 +56,11 @@ export default function OnboardingScreen() {
       >
         <ScrollView
           className="flex-1"
-          contentContainerClassName="flex-grow self-center w-full max-w-[640px] px-5 pt-8 pb-8"
+          contentContainerClassName="flex-grow self-center w-full max-w-[640px] px-6 pt-8 pb-8"
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <Text className="font-outfit-black text-3xl text-ink">
+          <Text className="font-outfit-black text-2xl text-ink">
             One last step
           </Text>
           <Text className="mt-2 font-outfit-medium text-base text-muted">
@@ -70,11 +70,11 @@ export default function OnboardingScreen() {
           <UsernameForm
             initialUsername={suggestedUsername}
             submitLabel="Continue"
-            submittingLabel="Saving..."
+            submittingLabel="Saving…"
             showWelcomeOnSave
             onSaved={() => undefined}
           />
-          <Pressable
+          <FeedbackPressable
             onPress={handleSignOut}
             className="mt-auto min-h-12 items-center justify-center py-5"
             accessibilityRole="button"
@@ -83,7 +83,7 @@ export default function OnboardingScreen() {
             <Text className="font-outfit-semibold text-base text-muted">
               Sign out
             </Text>
-          </Pressable>
+          </FeedbackPressable>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>

@@ -29,7 +29,7 @@ export default function LoginRequiredModal({
         className="flex-1"
         accessibilityViewIsModal
         accessibilityLabel="Sign in required"
-        style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}
+        style={{ backgroundColor: 'rgba(42, 34, 36, 0.32)' }}
       >
         <Pressable
           onPress={onCancel}
@@ -42,16 +42,7 @@ export default function LoginRequiredModal({
           pointerEvents="box-none"
           className="flex-1 items-center justify-center px-6"
         >
-          <View
-            className="w-full max-w-[480px] rounded-3xl bg-white p-6"
-            style={{
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.25,
-              shadowRadius: 8,
-              elevation: 12,
-            }}
-          >
+          <View className="w-full max-w-[480px] rounded-2xl bg-field p-6">
             <Text className="text-2xl text-ink font-outfit-black">
               Sign in to like and add spots
             </Text>
@@ -63,7 +54,7 @@ export default function LoginRequiredModal({
             <View className="mt-6 flex-row gap-3">
               <FeedbackPressable
                 onPress={onCancel}
-                className="flex-1 items-center justify-center rounded-2xl bg-surface-soft py-4"
+                className="min-h-12 flex-1 items-center justify-center rounded-xl bg-surface-soft py-4"
                 accessibilityLabel="Cancel sign in prompt"
                 accessibilityRole="button"
               >
@@ -74,11 +65,11 @@ export default function LoginRequiredModal({
               <FeedbackPressable
                 haptic="light"
                 onPress={handleLoginPress}
-                className="flex-1 items-center justify-center rounded-2xl bg-brand py-4"
+                className="min-h-12 flex-1 items-center justify-center rounded-xl bg-accent py-4"
                 accessibilityLabel="Go to sign in"
                 accessibilityRole="button"
               >
-                <Text className="text-base text-white font-outfit-bold">
+                <Text className="text-base text-brand font-outfit-bold">
                   Sign in
                 </Text>
               </FeedbackPressable>

@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Text, TextInput, View } from 'react-native';
 import { USERNAME_MAX, validateUsername } from '../lib/username';
+import { colors } from '../constants/colors';
 import { toUserFacingError } from '../lib/userFacingError';
 import { useAuthStore } from '../store/authStore';
 import { useProfileStore } from '../store/profileStore';
+import FeedbackPressable from './FeedbackPressable';
 
 type AvailabilityStatus =
   | 'idle'
@@ -124,12 +126,13 @@ export function UsernameForm({
 
   return (
     <View className="mt-8">
-      <View className="flex-row items-center rounded-2xl bg-field pl-6 pr-3">
+      <View className="flex-row items-center rounded-2xl border border-border-soft bg-field pl-5 pr-3">
         <Text className="font-outfit-bold text-base text-muted">@</Text>
         <TextInput
           value={value}
           onChangeText={handleChange}
           placeholder="username"
+          placeholderTextColor={colors.muted}
           accessibilityLabel="Username"
           accessibilityHint="Enter a username using letters, numbers, and underscores"
           autoCapitalize="none"
@@ -141,11 +144,11 @@ export function UsernameForm({
         />
         <View className="h-6 w-6 items-center justify-center">
           {status === 'checking' ? (
-            <ActivityIndicator size="small" color="#52645F" />
+            <ActivityIndicator size="small" color={colors.muted} />
           ) : status === 'available' ? (
-            <Ionicons name="checkmark-circle" size={22} color="#1B3B36" />
+            <Ionicons name="checkmark-circle" size={22} color={colors.accent} />
           ) : status === 'taken' || status === 'invalid' || status === 'rejected' ? (
-            <Ionicons name="close-circle" size={22} color="#7F302C" />
+            <Ionicons name="close-circle" size={22} color={colors.errorText} />
           ) : null}
         </View>
       </View>
@@ -183,20 +186,23 @@ export function UsernameForm({
         ) : null}
       </View>
 
-      <Pressable
+      <FeedbackPressable
+        haptic="light"
         onPress={handleSubmit}
         disabled={!canSubmit}
-        className={`mt-6 w-full items-center justify-center rounded-2xl py-4 ${
-          canSubmit ? 'bg-brand' : 'bg-disabledGreen'
+        className={`mt-6 min-h-14 w-full items-center justify-center rounded-2xl py-4 ${
+          canSubmit ? 'bg-accent' : 'bg-actionDisabled'
         }`}
         accessibilityLabel={submitting ? submittingLabel : submitLabel}
         accessibilityRole="button"
         accessibilityState={{ disabled: !canSubmit, busy: submitting }}
       >
-        <Text className="font-outfit-bold text-lg text-white">
+        <Text
+          className={`font-outfit-bold text-lg ${canSubmit ? 'text-brand' : 'text-muted'}`}
+        >
           {submitting ? submittingLabel : submitLabel}
         </Text>
-      </Pressable>
+      </FeedbackPressable>
     </View>
   );
 }

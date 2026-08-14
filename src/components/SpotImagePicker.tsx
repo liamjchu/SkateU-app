@@ -9,6 +9,7 @@ import {
     View,
 } from 'react-native';
 import { useIsTabletLayout } from '../hooks/useIsTabletLayout';
+import { colors } from '../constants/colors';
 import type { SpotImageAsset } from '../types/spot';
 import FeedbackPressable from './FeedbackPressable';
 
@@ -126,7 +127,7 @@ export default function SpotImagePicker({
         haptic="light"
         disabled={loading}
         onPress={handlePickImage}
-        className={`items-center justify-center overflow-hidden rounded-2xl border bg-surface ${
+        className={`items-center justify-center overflow-hidden rounded-2xl border bg-field ${
           highlighted ? 'border-errorBorder' : 'border-border-soft'
         }`}
         accessibilityRole="button"
@@ -146,11 +147,11 @@ export default function SpotImagePicker({
 
         <View className="items-center justify-center px-6">
           {loading ? (
-            <ActivityIndicator size="small" color="#355650" />
+            <ActivityIndicator size="small" color={colors.ink} />
           ) : imageUri ? null : (
             <>
-              <View className="mb-2 h-12 w-12 items-center justify-center rounded-2xl bg-surface-tinted">
-                <Feather name="camera" size={22} color="#21473F" />
+              <View className="mb-2 h-12 w-12 items-center justify-center rounded-2xl bg-accent">
+                <Feather name="camera" size={22} color={colors.brand} />
               </View>
               <Text className="font-outfit-semibold text-base text-ink">
                 Add photo
