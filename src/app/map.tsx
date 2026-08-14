@@ -30,6 +30,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import FeedbackPressable from '../components/FeedbackPressable';
+import ImageLightbox from '../components/image-lightbox';
 import LoginRequiredModal from '../components/LoginRequiredModal';
 import images from '../constants/images';
 import { triggerHaptic } from '../lib/haptics';
@@ -97,6 +98,7 @@ export default function MapScreen() {
   );
   const [showAttribution, setShowAttribution] = useState(false);
   const [showLoginRequired, setShowLoginRequired] = useState(false);
+  const [lightboxUri, setLightboxUri] = useState<string | null>(null);
   const [likingSpotId, setLikingSpotId] = useState<string | null>(null);
   const [deletingSpotId, setDeletingSpotId] = useState<string | null>(null);
   const sheetHeight = useSharedValue(0);
@@ -482,9 +484,20 @@ export default function MapScreen() {
   }, [initialSpotId, loading, selectedSpot, selectedSpotId]);
 
   useEffect(() => {
+    if (!selectedSpot) {
+      setLightboxUri(null);
+    }
+  }, [selectedSpot]);
+
+  useEffect(() => {
     const subscription = BackHandler.addEventListener(
       'hardwareBackPress',
       () => {
+        if (lightboxUri) {
+          setLightboxUri(null);
+          return true;
+        }
+
         if (!selectedSpotId) {
           return false;
         }
@@ -495,7 +508,7 @@ export default function MapScreen() {
     );
 
     return () => subscription.remove();
-  }, [selectedSpotId]);
+  }, [lightboxUri, selectedSpotId]);
 
   useEffect(() => {
     if (selectedSpot) {
@@ -879,6 +892,16 @@ export default function MapScreen() {
         visible={showLoginRequired}
         onCancel={() => setShowLoginRequired(false)}
       />
+      <ImageLightbox
+        visible={lightboxUri != null}
+        uri={lightboxUri ?? ''}
+        onClose={() => setLightboxUri(null)}
+        accessibilityLabel={
+          selectedSpot
+            ? `Full screen photo of ${selectedSpot.name}`
+            : 'Full screen photo'
+        }
+      />
       <Modal
         visible={showAttribution}
         transparent
@@ -1165,13 +1188,22 @@ export default function MapScreen() {
             showsVerticalScrollIndicator={false}
           >
             {selectedSpot.imageUris.length > 0 ? (
-              <Image
-                source={{ uri: selectedSpot.imageUris[0] }}
-                accessibilityLabel={`Photo of ${selectedSpot.name}`}
-                accessible
-                className="mt-4 h-[280px] w-full rounded-3xl"
-                resizeMode="cover"
-              />
+              <FeedbackPressable
+                haptic="light"
+                disablePressScale
+                onPress={() => setLightboxUri(selectedSpot.imageUris[0])}
+                accessibilityRole="button"
+                accessibilityLabel={`View full screen photo of ${selectedSpot.name}`}
+                accessibilityHint="Opens the photo. Pinch or double tap to zoom."
+              >
+                <Image
+                  source={{ uri: selectedSpot.imageUris[0] }}
+                  accessibilityLabel={`Photo of ${selectedSpot.name}`}
+                  accessible={false}
+                  className="mt-4 h-[280px] w-full rounded-3xl"
+                  resizeMode="cover"
+                />
+              </FeedbackPressable>
             ) : (
               <View className="mt-4 h-80 items-center justify-center rounded-3xl bg-slate-100">
                 <Text

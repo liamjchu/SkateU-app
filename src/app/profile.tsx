@@ -16,6 +16,7 @@ import Animated, {
     useSharedValue,
     withTiming
 } from 'react-native-reanimated';
+import ExpandableText from '../components/expandable-text';
 import FeedbackPressable from '../components/FeedbackPressable';
 import ScreenHeader from '../components/screen-header';
 import { triggerHaptic } from '../lib/haptics';
@@ -365,7 +366,6 @@ export default function ProfileScreen() {
               >
                 <FeedbackPressable
                   onPress={() => handleSpotPress(spot)}
-                  className="min-w-0 flex-1 flex-row items-center"
                   accessibilityRole="button"
                   accessibilityLabel={`Open ${spot.name} on the ${spot.schoolName || 'campus'} map`}
                   accessibilityHint="Opens the campus map and selects this spot"
@@ -386,31 +386,50 @@ export default function ProfileScreen() {
                       <Feather name="image" size={20} color="#52645F" />
                     </View>
                   )}
+                </FeedbackPressable>
 
-                  <View className="ml-3 min-w-0 flex-1">
-                    <Text
-                      className="font-outfit-bold text-base text-ink"
-                      numberOfLines={1}
-                    >
-                      {spot.name}
-                    </Text>
-                    <View className="mt-0.5 flex-row items-center">
-                      <Feather name="map-pin" size={11} color="#475569" />
-                      <Text className="font-outfit-semibold ml-1 flex-1 text-xs text-muted" numberOfLines={1}>
-                        {spot.schoolName || 'Campus map'}{spot.city || spot.state ? ` · ${spot.city}${spot.city && spot.state ? ', ' : ''}${spot.state}` : ''}
-                      </Text>
-                    </View>
-                    <Text className="font-outfit-medium mt-0.5 text-sm text-muted" numberOfLines={2}>
-                      {spot.description}
-                    </Text>
-                    <View className="mt-1 flex-row items-center">
-                      <Octicons name="heart-fill" size={12} color="#7F302C" />
-                      <Text className="font-outfit-semibold ml-1 text-xs text-muted">
-                        {spot.likeCount ?? 0}
-                      </Text>
+                <View className="ml-3 min-w-0 flex-1">
+                  <ExpandableText
+                    collapsedLines={1}
+                    className="font-outfit-bold text-base text-ink"
+                    onPress={() => handleSpotPress(spot)}
+                    accessibilityLabel={`Open ${spot.name} on the ${spot.schoolName || 'campus'} map`}
+                    accessibilityHint="Opens the campus map and selects this spot"
+                  >
+                    {spot.name}
+                  </ExpandableText>
+                  <View className="mt-0.5 flex-row items-center">
+                    <Feather name="map-pin" size={11} color="#475569" />
+                    <View className="ml-1 min-w-0 flex-1">
+                        <ExpandableText
+                          collapsedLines={1}
+                          className="font-outfit-semibold text-xs text-muted"
+                          onPress={() => handleSpotPress(spot)}
+                          accessibilityLabel={`Open ${spot.name} on the ${spot.schoolName || 'campus'} map`}
+                          accessibilityHint="Opens the campus map and selects this spot"
+                        >
+                          {`${spot.schoolName || 'Campus map'}${spot.city || spot.state ? ` · ${spot.city}${spot.city && spot.state ? ', ' : ''}${spot.state}` : ''}`}
+                        </ExpandableText>
                     </View>
                   </View>
-                </FeedbackPressable>
+                  {spot.description.trim().length > 0 ? (
+                    <ExpandableText
+                      collapsedLines={2}
+                      className="font-outfit-medium mt-0.5 text-sm text-muted"
+                      onPress={() => handleSpotPress(spot)}
+                      accessibilityLabel={`Open ${spot.name} on the ${spot.schoolName || 'campus'} map`}
+                      accessibilityHint="Opens the campus map and selects this spot"
+                    >
+                      {spot.description.trim()}
+                    </ExpandableText>
+                  ) : null}
+                  <View className="mt-1 flex-row items-center">
+                    <Octicons name="heart-fill" size={12} color="#7F302C" />
+                    <Text className="font-outfit-semibold ml-1 text-xs text-muted">
+                      {spot.likeCount ?? 0}
+                    </Text>
+                  </View>
+                </View>
 
                 {showingLikedSpots ? (
                   <FeedbackPressable
