@@ -39,7 +39,7 @@ Reject the username if it contains, references, or clearly hints at any of the f
 
 Allow ordinary names, nicknames, school/skate terms, hobbies, numbers, and neutral words only when they do not resemble sensitive personal information. Never repeat a detected secret or identifier in the reason. When uncertain whether something is a disguised bad word or sensitive personal information, err on the side of rejecting.
 
-Respond ONLY with compact JSON: {"appropriate": boolean, "reason": string}. "reason" is a short, friendly, user-facing explanation (without profanity or sensitive values) when appropriate is false, otherwise an empty string.`;
+Respond ONLY with compact JSON: {"appropriate": boolean, "reason": string}. If appropriate is false, "reason" must be one short, gentle, casual sentence, like a friend giving a nudge. Do not scold or use words like inappropriate, prohibited, not allowed, rejected, or unsafe. Suggest trying another username. If appropriate is true, reason must be an empty string.`;
 
 type ModerationVerdict = {
   appropriate: boolean;
@@ -112,7 +112,7 @@ export async function POST(request: Request) {
   if (containsSensitiveNumericIdentifier(username)) {
     return Response.json({
       allowed: false,
-      reason: 'Usernames cannot contain sensitive personal information.',
+      reason: 'Let’s skip anything that looks like personal info.',
     });
   }
 
@@ -164,12 +164,16 @@ export async function POST(request: Request) {
     const verdict = JSON.parse(content) as ModerationVerdict;
 
     if (verdict.appropriate !== true) {
+      const rawReason =
+        typeof verdict.reason === 'string' ? verdict.reason.trim() : '';
+      const harsh =
+        /\b(inappropriate|prohibited|not allowed|rejected|unsafe|forbidden|violat)\b/i;
       return Response.json({
         allowed: false,
         reason:
-          typeof verdict.reason === 'string' && verdict.reason.length > 0
-            ? verdict.reason
-            : "That username isn't allowed. Please pick another.",
+          rawReason.length > 0 && rawReason.length <= 160 && !harsh.test(rawReason)
+            ? rawReason
+            : 'Let’s try a different username.',
       });
     }
 

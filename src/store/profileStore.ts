@@ -150,7 +150,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
         return {
           ok: false,
           taken: data?.taken === true,
-          message: data?.reason ?? "That username isn't allowed. Try another.",
+          message: data?.reason ?? 'Let’s try a different username.',
         };
       }
 

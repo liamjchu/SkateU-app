@@ -12,6 +12,7 @@ import { useIsTabletLayout } from '../hooks/useIsTabletLayout';
 import { colors } from '../constants/colors';
 import type { SpotImageAsset } from '../types/spot';
 import FeedbackPressable from './FeedbackPressable';
+import ImageLightbox from './image-lightbox';
 
 type SpotImagePickerProps = {
   imageUri?: string;
@@ -62,6 +63,8 @@ export default function SpotImagePicker({
   const isTabletLayout = useIsTabletLayout();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | undefined>();
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const pickerHeight = isTabletLayout ? 260 : 200;
 
   async function handlePickImage() {
     setError(undefined);
@@ -88,9 +91,8 @@ export default function SpotImagePicker({
 
       const imagePickerOptions: ImagePicker.ImagePickerOptions = {
         mediaTypes: ['images'],
-        allowsEditing: true,
+        allowsEditing: false,
         quality: 0.7,
-        aspect: [4, 3],
       };
       const result =
         source === 'camera'
@@ -123,51 +125,83 @@ export default function SpotImagePicker({
 
   return (
     <View>
-      <FeedbackPressable
-        haptic="light"
-        disabled={loading}
-        onPress={handlePickImage}
-        className={`items-center justify-center overflow-hidden rounded-2xl border bg-field ${
+      <View
+        className={`overflow-hidden rounded-2xl border bg-field ${
           highlighted ? 'border-errorBorder' : 'border-border-soft'
         }`}
-        accessibilityRole="button"
-        accessibilityLabel={imageUri ? 'Change spot photo' : 'Add spot photo'}
-        accessibilityHint="Opens camera or photo library"
-        accessibilityState={{ disabled: loading, busy: loading }}
-        style={{ height: isTabletLayout ? 260 : 200 }}
+        style={{ height: pickerHeight }}
       >
         {imageUri ? (
-          <Image
-            source={{ uri: imageUri }}
-            resizeMode="cover"
-            className="absolute inset-0 h-full w-full"
-            accessible={false}
-          />
-        ) : null}
+          <FeedbackPressable
+            haptic="light"
+            disablePressScale
+            disabled={loading}
+            onPress={() => setLightboxOpen(true)}
+            className="absolute inset-0"
+            accessibilityRole="button"
+            accessibilityLabel="View full screen photo"
+            accessibilityHint="Opens the photo. Pinch or double tap to zoom."
+            accessibilityState={{ disabled: loading, busy: loading }}
+          >
+            <Image
+              source={{ uri: imageUri }}
+              resizeMode="cover"
+              className="h-full w-full"
+              accessible={false}
+            />
+          </FeedbackPressable>
+        ) : (
+          <FeedbackPressable
+            haptic="light"
+            disabled={loading}
+            onPress={handlePickImage}
+            className="h-full w-full items-center justify-center"
+            accessibilityRole="button"
+            accessibilityLabel="Add spot photo"
+            accessibilityHint="Opens camera or photo library"
+            accessibilityState={{ disabled: loading, busy: loading }}
+          >
+            <View className="items-center justify-center px-6">
+              {loading ? (
+                <ActivityIndicator size="small" color={colors.ink} />
+              ) : (
+                <>
+                  <View className="mb-2 h-12 w-12 items-center justify-center rounded-2xl bg-accent">
+                    <Feather name="camera" size={22} color={colors.brand} />
+                  </View>
+                  <Text className="font-outfit-semibold text-base text-ink">
+                    Add photo
+                  </Text>
+                </>
+              )}
+            </View>
+          </FeedbackPressable>
+        )}
 
-        <View className="items-center justify-center px-6">
-          {loading ? (
-            <ActivityIndicator size="small" color={colors.ink} />
-          ) : imageUri ? null : (
-            <>
-              <View className="mb-2 h-12 w-12 items-center justify-center rounded-2xl bg-accent">
-                <Feather name="camera" size={22} color={colors.brand} />
-              </View>
-              <Text className="font-outfit-semibold text-base text-ink">
-                Add photo
-              </Text>
-            </>
-          )}
-        </View>
         {imageUri && !loading ? (
-          <View className="absolute bottom-4 flex-row items-center rounded-full bg-black/60 px-4 py-2">
-            <Feather name="camera" size={16} color="#FFFFFF" />
-            <Text className="ml-2 font-outfit-bold text-sm text-white">
-              Change photo
-            </Text>
+          <View className="absolute bottom-4 left-0 right-0 items-center">
+            <FeedbackPressable
+              haptic="light"
+              onPress={handlePickImage}
+              className="flex-row items-center rounded-full bg-black/60 px-4 py-2"
+              accessibilityRole="button"
+              accessibilityLabel="Change spot photo"
+              accessibilityHint="Opens camera or photo library"
+            >
+              <Feather name="camera" size={16} color="#FFFFFF" />
+              <Text className="ml-2 font-outfit-bold text-sm text-white">
+                Change photo
+              </Text>
+            </FeedbackPressable>
           </View>
         ) : null}
-      </FeedbackPressable>
+
+        {imageUri && loading ? (
+          <View className="absolute inset-0 items-center justify-center bg-black/20">
+            <ActivityIndicator size="small" color={colors.white} />
+          </View>
+        ) : null}
+      </View>
 
       {error ? (
         <Text
@@ -177,6 +211,15 @@ export default function SpotImagePicker({
         >
           {error}
         </Text>
+      ) : null}
+
+      {imageUri ? (
+        <ImageLightbox
+          visible={lightboxOpen}
+          uri={imageUri}
+          onClose={() => setLightboxOpen(false)}
+          accessibilityLabel="Full screen spot photo"
+        />
       ) : null}
     </View>
   );

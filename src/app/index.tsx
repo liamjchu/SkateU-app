@@ -56,6 +56,10 @@ function recentSpotsAuthHeaders(accessToken?: string): HeadersInit | undefined {
     : undefined;
 }
 
+const PROFILE_BUTTON_SIZE = 44;
+const HEADER_LOGO_HEIGHT = (PROFILE_BUTTON_SIZE * 2) / 3;
+const HEADER_LOGO_WIDTH = (195 / 36) * HEADER_LOGO_HEIGHT;
+
 function getSchoolSearchCopy(filter: SchoolTypeFilter): {
   placeholder: string;
   accessibilityLabel: string;
@@ -838,7 +842,10 @@ export default function HomeScreen() {
         <View className="h-11 flex-row items-center justify-between">
           <Image
             source={IMAGES.brandLockup}
-            style={{ width: 195, height: 36 }}
+            style={{
+              width: HEADER_LOGO_WIDTH,
+              height: HEADER_LOGO_HEIGHT,
+            }}
             resizeMode="contain"
             accessibilityLabel="SkateU"
           />
@@ -923,7 +930,7 @@ export default function HomeScreen() {
         keyboardVerticalOffset={0}
       >
         <View className="w-full max-w-[760px] flex-1 self-center px-6">
-          <View className="pt-3">
+          <View className="pt-3 pb-5">
             <SchoolTypePills
               selected={activeFilter}
               onSelect={setActiveFilter}
@@ -944,7 +951,6 @@ export default function HomeScreen() {
 
           <ScrollView
             className="min-h-0 flex-1"
-            contentContainerClassName="pt-4"
             contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"

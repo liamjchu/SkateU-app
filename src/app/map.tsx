@@ -91,6 +91,11 @@ export default function MapScreen() {
   const [mapStatus, setMapStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [mapError, setMapError] = useState('');
   const [selectedSpotId, setSelectedSpotId] = useState<string | undefined>(initialSpotId);
+  // Recenter only when arriving from another screen with a spot selected.
+  // Tapping a pin on the map should leave the camera alone.
+  const selectionSourceRef = useRef<'navigation' | 'map'>(
+    initialSpotId ? 'navigation' : 'map'
+  );
   const initialMapLayer: 'default' | 'satellite' =
     searchParams.layer === 'satellite' || searchParams.layer === 'default'
       ? searchParams.layer
@@ -103,6 +108,8 @@ export default function MapScreen() {
   const [lightboxUri, setLightboxUri] = useState<string | null>(null);
   const [likingSpotId, setLikingSpotId] = useState<string | null>(null);
   const [deletingSpotId, setDeletingSpotId] = useState<string | null>(null);
+  const [emptySpotsNoticeDismissed, setEmptySpotsNoticeDismissed] =
+    useState(false);
   const sheetHeight = useSharedValue(0);
   const sheetTranslateY = useSharedValue(0);
   const sheetStartY = useSharedValue(0);
@@ -454,6 +461,12 @@ export default function MapScreen() {
   // add-spot screen shows up on return.
   useFocusEffect(
     useCallback(() => {
+      setEmptySpotsNoticeDismissed(false);
+    }, [schoolId])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
       if (schoolId) {
         fetchSpots(schoolId, session?.access_token);
       }
@@ -480,6 +493,7 @@ export default function MapScreen() {
 
   useEffect(() => {
     if (initialSpotId && spots.some((spot) => spot.id === initialSpotId)) {
+      selectionSourceRef.current = 'navigation';
       setSelectedSpotId(initialSpotId);
     }
   }, [initialSpotId, spots]);
@@ -546,6 +560,10 @@ export default function MapScreen() {
 
   useEffect(() => {
     if (!selectedSpot || mapStatus !== 'ready') {
+      return;
+    }
+
+    if (selectionSourceRef.current !== 'navigation') {
       return;
     }
 
@@ -776,6 +794,7 @@ export default function MapScreen() {
 
       if (data.type === 'MARKER_PRESS' && typeof data.id === 'string') {
         triggerHaptic('selection');
+        selectionSourceRef.current = 'map';
         if (data.id === selectedSpotId) {
           const collapsedOffset = Math.max(
             sheetHeight.value - COLLAPSED_SHEET_HEIGHT,
@@ -1007,6 +1026,7 @@ export default function MapScreen() {
         onAccessibilityAction={(event) => {
           const spotId = event.nativeEvent.actionName.replace('select-', '');
           if (spots.some((spot) => spot.id === spotId)) {
+            selectionSourceRef.current = 'map';
             setSelectedSpotId(spotId);
           }
         }}
@@ -1113,8 +1133,22 @@ export default function MapScreen() {
         </View>
       ) : null}
 
-      {mapStatus === 'ready' && !loading && !error && spots.length === 0 ? (
+      {mapStatus === 'ready' &&
+      !loading &&
+      !error &&
+      spots.length === 0 &&
+      !emptySpotsNoticeDismissed ? (
         <View className="absolute left-6 right-6 top-1/2 z-30 -translate-y-1/2 items-center rounded-2xl bg-field px-6 py-6">
+            <FeedbackPressable
+              haptic="selection"
+              onPress={() => setEmptySpotsNoticeDismissed(true)}
+              className="absolute right-3 top-3 h-10 w-10 items-center justify-center rounded-full bg-surface-soft"
+              accessibilityRole="button"
+              accessibilityLabel="Dismiss empty campus message"
+              accessibilityHint="Hides this message so you can move around the map"
+            >
+              <Ionicons name="close" size={18} color={colors.muted} />
+            </FeedbackPressable>
             <Feather name="map-pin" size={28} color={colors.accent} />
             <Text className="mt-3 text-center font-outfit-bold text-xl text-ink">
               No skate spots here yet

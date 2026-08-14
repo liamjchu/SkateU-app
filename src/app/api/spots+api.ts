@@ -1,7 +1,11 @@
 import { randomUUID } from 'crypto';
 
 import { HOME_RAIL_PAGE_SIZE, parseOffset } from '../../lib/homeFeed';
-import { imageFileToDataUrl, moderateSpotSubmission } from '../../lib/spotModeration';
+import {
+    imageFileToDataUrl,
+    moderateSpotSubmission,
+    softenModerationReason,
+} from '../../lib/spotModeration';
 import type { Spot } from '../../types/spot';
 
 // --- Configuration & constants (mirrors schools+api.ts) ---------------------
@@ -159,20 +163,20 @@ export function validatePostBody(
 
   const name = (fields.name ?? '').trim();
   if (name.length === 0) {
-    return { ok: false, message: 'The name field is required.' };
+    return { ok: false, message: 'Still needs a name.' };
   }
   if (name.length > NAME_MAX) {
-    return { ok: false, message: `The name field must be ${NAME_MAX} characters or fewer.` };
+    return { ok: false, message: `That name’s a bit long. Keep it to ${NAME_MAX} characters.` };
   }
 
   const description = (fields.description ?? '').trim();
   if (description.length === 0) {
-    return { ok: false, message: 'The description field is required.' };
+    return { ok: false, message: 'Still needs a description.' };
   }
   if (description.length > DESCRIPTION_MAX) {
     return {
       ok: false,
-      message: `The description field must be ${DESCRIPTION_MAX} characters or fewer.`,
+      message: `That description’s a bit long. Keep it to ${DESCRIPTION_MAX} characters.`,
     };
   }
 
@@ -238,20 +242,20 @@ export function validatePatchBody(
 ): ValidationResult<ValidatedPatchBody> {
   const name = (fields.name ?? '').trim();
   if (name.length === 0) {
-    return { ok: false, message: 'The name field is required.' };
+    return { ok: false, message: 'Still needs a name.' };
   }
   if (name.length > NAME_MAX) {
-    return { ok: false, message: `The name field must be ${NAME_MAX} characters or fewer.` };
+    return { ok: false, message: `That name’s a bit long. Keep it to ${NAME_MAX} characters.` };
   }
 
   const description = (fields.description ?? '').trim();
   if (description.length === 0) {
-    return { ok: false, message: 'The description field is required.' };
+    return { ok: false, message: 'Still needs a description.' };
   }
   if (description.length > DESCRIPTION_MAX) {
     return {
       ok: false,
-      message: `The description field must be ${DESCRIPTION_MAX} characters or fewer.`,
+      message: `That description’s a bit long. Keep it to ${DESCRIPTION_MAX} characters.`,
     };
   }
 
@@ -840,7 +844,18 @@ export async function POST(request: Request): Promise<Response> {
     });
 
     if (!moderation.approved) {
-      return Response.json(moderation, { status: 422 });
+      const flag =
+        moderation.flag === 'INAPPROPRIATE' || moderation.flag === 'IRRELEVANT'
+          ? moderation.flag
+          : 'IRRELEVANT';
+      return Response.json(
+        {
+          ...moderation,
+          flag,
+          reason: softenModerationReason(flag, moderation.reason),
+        },
+        { status: 422 }
+      );
     }
   } catch (error) {
     console.error('Spot moderation failed before create:', error);
@@ -998,7 +1013,18 @@ export async function PATCH(request: Request): Promise<Response> {
     });
 
     if (!moderation.approved) {
-      return Response.json(moderation, { status: 422 });
+      const flag =
+        moderation.flag === 'INAPPROPRIATE' || moderation.flag === 'IRRELEVANT'
+          ? moderation.flag
+          : 'IRRELEVANT';
+      return Response.json(
+        {
+          ...moderation,
+          flag,
+          reason: softenModerationReason(flag, moderation.reason),
+        },
+        { status: 422 }
+      );
     }
   } catch (error) {
     console.error('Spot moderation failed before update:', error);
