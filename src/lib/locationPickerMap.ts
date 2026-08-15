@@ -1,3 +1,5 @@
+import { colors } from '../constants/colors';
+
 export type LocationMapLayer = 'default' | 'satellite';
 
 type LocationMapHtmlOptions = {
@@ -25,34 +27,15 @@ export function buildLocationPickerHtml({
       margin: 0;
       padding: 0;
       overflow: hidden;
-      background: #0b0f14;
+      background: ${colors.brand};
     }
     #map { height: 100%; width: 100%; }
     .leaflet-control-attribution { display: none; }
     #map:not(.satellite) .leaflet-tile { filter: brightness(.9); }
     #map.satellite .leaflet-tile { filter: brightness(.8); }
     #layer-toggle {
-      position: absolute;
-      top: 12px;
-      right: 12px;
-      z-index: 1000;
-      display: flex;
-      width: 40px;
-      height: 40px;
-      padding: 0;
-      align-items: center;
-      justify-content: center;
-      border: 0;
-      border-radius: 9999px;
-      background: #21473f;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, .3);
-      color: #fff;
-      cursor: pointer;
-      touch-action: manipulation;
-      -webkit-tap-highlight-color: transparent;
+      display: none;
     }
-    #layer-toggle:active { opacity: .88; transform: scale(.98); }
-    #layer-toggle svg { width: 25px; height: 25px; pointer-events: none; }
   </style>
 </head>
 <body>

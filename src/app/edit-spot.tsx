@@ -1,10 +1,10 @@
-import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    Keyboard,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -21,11 +21,14 @@ import ScreenHeader from '../components/screen-header';
 import SpotImagePicker from '../components/SpotImagePicker';
 import {
     getSpotFormErrors,
+    getSpotFormMissingSummary,
     isAddSpotFormValid,
     SPOT_DESCRIPTION_MAX,
     SPOT_NAME_MAX,
 } from '../lib/addSpotForm';
 import { triggerHaptic } from '../lib/haptics';
+import { colors } from '../constants/colors';
+import { toUserFacingError } from '../lib/userFacingError';
 import { useAuthStore } from '../store/authStore';
 import { useMapViewStore } from '../store/mapViewStore';
 import { useSpotsStore } from '../store/spotsStore';
@@ -37,9 +40,9 @@ type Coordinates = {
   longitude: number;
 };
 
-const AUTH_REQUIRED_ERROR = 'You must be signed in to edit a spot.';
+const AUTH_REQUIRED_ERROR = 'Sign in to edit a spot.';
 const MISSING_SPOT_ERROR =
-  'This spot could not be found. Return to your profile and try again.';
+  'Couldn’t find this spot. Head back and try again.';
 
 export default function EditSpotScreen() {
   const router = useRouter();
@@ -86,11 +89,6 @@ export default function EditSpotScreen() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [hasSubmitted, setHasSubmitted] = useState(false);
-  const [touched, setTouched] = useState({
-    image: false,
-    name: false,
-    description: false,
-  });
 
   const interactionTimeoutRef = useRef<number | null>(null);
   const allowRemovalRef = useRef(false);
@@ -120,13 +118,12 @@ export default function EditSpotScreen() {
 
   const isFormValid = isAddSpotFormValid(imageUri, name, description);
   const formErrors = getSpotFormErrors(imageUri, name, description);
-  const showImageError = hasSubmitted || touched.image;
-  const showNameError = hasSubmitted || touched.name;
-  const showDescriptionError = hasSubmitted || touched.description;
+  const missingSummary = getSpotFormMissingSummary(imageUri, name, description);
+  const showFieldErrors = hasSubmitted;
   const locationError =
     locationPickerStatus === 'error'
-      ? 'Location map is unavailable. Retry it before saving.'
-      : 'Wait for the location map to finish loading.';
+      ? 'Map didn’t load. Retry it, then save.'
+      : 'Hang on, the map’s still loading.';
   const hasUnsavedChanges = Boolean(
     spot &&
       (name !== spot.name ||
@@ -137,7 +134,6 @@ export default function EditSpotScreen() {
   );
 
   const handleImageSelected = (asset: SpotImageAsset) => {
-    setTouched((current) => ({ ...current, image: true }));
     setImageUri(asset.uri);
     setImageAsset(asset);
     setImageChanged(true);
@@ -168,12 +164,12 @@ export default function EditSpotScreen() {
 
       event.preventDefault();
       Alert.alert(
-        'Discard unsaved changes?',
-        'Your changes to this spot will be lost if you leave now.',
+        'Leave without saving?',
+        'You’ll lose these edits.',
         [
-          { text: 'Keep editing', style: 'cancel' },
+          { text: 'Stay', style: 'cancel' },
           {
-            text: 'Discard changes',
+            text: 'Leave',
             style: 'destructive',
             onPress: () => {
               allowRemovalRef.current = true;
@@ -199,11 +195,13 @@ export default function EditSpotScreen() {
 
   const handleSave = async () => {
     setHasSubmitted(true);
-    setTouched({ image: true, name: true, description: true });
     setSaveError(null);
 
     if (!isFormValid || locationPickerStatus !== 'ready' || saving || !spotId) {
       triggerHaptic('warning');
+      if (isFormValid && locationPickerStatus !== 'ready') {
+        setSaveError(locationError);
+      }
       return;
     }
 
@@ -233,9 +231,7 @@ export default function EditSpotScreen() {
       router.back();
     } catch (error) {
       setSaveError(
-        error instanceof Error && error.message.length > 0
-          ? error.message
-          : 'Unable to save your changes right now. Please try again.'
+        toUserFacingError(error, 'Couldn’t save that. Try again in a sec.')
       );
     } finally {
       setSaving(false);
@@ -245,7 +241,7 @@ export default function EditSpotScreen() {
   return (
     <SafeAreaView
       edges={['left', 'right']}
-      style={{ flex: 1, backgroundColor: '#FFFFFF' }}
+      style={{ flex: 1, backgroundColor: colors.surface }}
     >
       <ScreenHeader
         title="Edit spot"
@@ -260,7 +256,7 @@ export default function EditSpotScreen() {
           accessibilityLabel={myLoading ? 'Loading spot' : MISSING_SPOT_ERROR}
           className="flex-1 items-center justify-center px-8"
         >
-          {myLoading ? <ActivityIndicator size="small" color="#21473F" /> : null}
+          {myLoading ? <ActivityIndicator size="small" color={colors.accent} /> : null}
           <Text className="mt-3 text-center font-outfit-medium text-base text-muted">
             {myLoading ? 'Loading spot…' : MISSING_SPOT_ERROR}
           </Text>
@@ -272,171 +268,121 @@ export default function EditSpotScreen() {
           style={{ flex: 1 }}
         >
           <ScrollView
-            contentContainerClassName="w-full max-w-[720px] self-center px-5 pb-10 pt-4"
+            contentContainerClassName="w-full max-w-[720px] self-center px-6 pb-10 pt-5"
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
+            onScrollBeginDrag={Keyboard.dismiss}
             scrollEnabled={scrollEnabled}
             showsVerticalScrollIndicator={false}
           >
-          <View className="mb-2 flex-row items-baseline">
-            <Text
-              nativeID="edit-spot-name-label"
-              className="font-outfit-bold text-base text-ink"
-            >
-              Spot name
-            </Text>
-            <Text className="ml-2 font-outfit-medium text-xs text-muted">Required</Text>
-          </View>
-          <TextInput
-            className={`min-h-14 rounded-2xl border bg-surface px-[18px] py-4 font-outfit-medium text-base text-ink ${
-              showNameError && formErrors.name
+          <Text className="mb-2 font-outfit-bold text-base text-ink">Name</Text>
+          <View
+            className={`min-h-14 justify-center rounded-2xl border bg-field px-5 ${
+              showFieldErrors && formErrors.name
                 ? 'border-errorBorder'
                 : 'border-border-soft'
             }`}
-            placeholder="e.g. Library five-stair"
-            placeholderTextColor="#52645F"
-            accessibilityLabelledBy="edit-spot-name-label"
-            accessibilityHint="Enter a short name for this skate spot"
-            value={name}
-            maxLength={SPOT_NAME_MAX}
-            onBlur={() => setTouched((current) => ({ ...current, name: true }))}
-            onChangeText={setName}
-          />
-          <View className="mt-1 min-h-5 flex-row items-start justify-between">
+          >
+            <TextInput
+              className="w-full font-outfit-medium text-base text-ink"
+              style={{ padding: 0 }}
+              placeholder="Library five-stair"
+              placeholderTextColor={colors.muted}
+              accessibilityLabel="Spot name"
+              value={name}
+              maxLength={SPOT_NAME_MAX}
+              returnKeyType="next"
+              blurOnSubmit
+              onChangeText={setName}
+            />
+          </View>
+          {name.length > SPOT_NAME_MAX * 0.8 ? (
             <Text
-              accessibilityLiveRegion="polite"
-              className="flex-1 pr-3 font-outfit-medium text-sm text-errorText"
-            >
-              {showNameError && formErrors.name ? formErrors.name : ' '}
-            </Text>
-            <Text
-              className="font-outfit-medium text-xs text-muted"
+              className="mt-1 self-end font-outfit-medium text-sm text-muted"
               style={{ fontVariant: ['tabular-nums'] }}
             >
-              {name.length} / {SPOT_NAME_MAX}
-            </Text>
-          </View>
-
-          <View className="mb-2 mt-5 flex-row items-baseline">
-            <Text className="font-outfit-bold text-base text-ink">Spot photo</Text>
-            <Text className="ml-2 font-outfit-medium text-xs text-muted">Required</Text>
-          </View>
-          <SpotImagePicker
-            imageUri={imageUri}
-            onImageSelected={handleImageSelected}
-          />
-          {showImageError && formErrors.image ? (
-            <Text
-              accessibilityRole="alert"
-              accessibilityLiveRegion="polite"
-              className="mt-2 font-outfit-medium text-sm text-errorText"
-            >
-              {formErrors.image}
+              {name.length}/{SPOT_NAME_MAX}
             </Text>
           ) : null}
 
-          <View className="mb-2 mt-5 flex-row items-baseline">
-            <Text
-              nativeID="edit-spot-description-label"
-              className="font-outfit-bold text-base text-ink"
-            >
-              Description
-            </Text>
-            <Text className="ml-2 font-outfit-medium text-xs text-muted">Required</Text>
-          </View>
-          <TextInput
-            className={`min-h-32 rounded-2xl border bg-surface px-[18px] py-4 font-outfit-medium text-base text-ink ${
-              showDescriptionError && formErrors.description
+          <Text className="mb-2 mt-6 font-outfit-bold text-base text-ink">
+            Photo
+          </Text>
+          <SpotImagePicker
+            imageUri={imageUri}
+            onImageSelected={handleImageSelected}
+            highlighted={Boolean(showFieldErrors && formErrors.image)}
+          />
+
+          <Text className="mb-2 mt-6 font-outfit-bold text-base text-ink">
+            About
+          </Text>
+          <View
+            className={`rounded-2xl border bg-field px-5 py-4 ${
+              showFieldErrors && formErrors.description
                 ? 'border-errorBorder'
                 : 'border-border-soft'
             }`}
-            placeholder="Describe the obstacle, condition, and security…"
-            placeholderTextColor="#52645F"
-            accessibilityLabelledBy="edit-spot-description-label"
-            accessibilityHint="Describe the obstacle, condition, and security details"
-            multiline
-            maxLength={SPOT_DESCRIPTION_MAX}
-            textAlignVertical="top"
-            value={description}
-            onBlur={() => setTouched((current) => ({ ...current, description: true }))}
-            onChangeText={setDescription}
-          />
-          <View className="mt-1 min-h-5 flex-row items-start justify-between">
+          >
+            <TextInput
+              className="min-h-32 w-full font-outfit-medium text-base text-ink"
+              style={{ padding: 0 }}
+              placeholder="What’s the spot like?"
+              placeholderTextColor={colors.muted}
+              accessibilityLabel="Spot description"
+              multiline
+              maxLength={SPOT_DESCRIPTION_MAX}
+              textAlignVertical="top"
+              value={description}
+              onChangeText={setDescription}
+            />
+          </View>
+          {description.length > SPOT_DESCRIPTION_MAX * 0.8 ? (
             <Text
-              accessibilityLiveRegion="polite"
-              className="flex-1 pr-3 font-outfit-medium text-sm text-errorText"
-            >
-              {showDescriptionError && formErrors.description ? formErrors.description : ' '}
-            </Text>
-            <Text
-              className="font-outfit-medium text-xs text-muted"
+              className="mt-1 self-end font-outfit-medium text-sm text-muted"
               style={{ fontVariant: ['tabular-nums'] }}
             >
-              {description.length} / {SPOT_DESCRIPTION_MAX}
+              {description.length}/{SPOT_DESCRIPTION_MAX}
             </Text>
-          </View>
+          ) : null}
 
-          <Text className="mb-2 mt-5 font-outfit-bold text-base text-ink">
+          <Text className="mb-2 mt-6 font-outfit-bold text-base text-ink">
             Location
           </Text>
+          <LocationPicker
+            initialLatitude={selectedLocation.latitude}
+            initialLongitude={selectedLocation.longitude}
+            initialLayer={layer}
+            onLocationChange={handleLocationChange}
+            onStatusChange={(status) => setLocationPickerStatus(status)}
+            onInteractionChange={(isInteracting: boolean) => {
+              if (interactionTimeoutRef.current) {
+                clearTimeout(
+                  interactionTimeoutRef.current as unknown as number
+                );
+                interactionTimeoutRef.current = null;
+              }
 
-          <Text className="mb-3 font-outfit-medium text-sm leading-5 text-muted">
-            Move the map until the pin is directly over the skate spot.
-          </Text>
+              if (isInteracting) {
+                setScrollEnabled(false);
 
-          <View className="overflow-hidden">
-            <LocationPicker
-              initialLatitude={selectedLocation.latitude}
-              initialLongitude={selectedLocation.longitude}
-              initialLayer={layer}
-              onLocationChange={handleLocationChange}
-              onStatusChange={(status) => setLocationPickerStatus(status)}
-              onInteractionChange={(isInteracting: boolean) => {
-                if (interactionTimeoutRef.current) {
-                  clearTimeout(
-                    interactionTimeoutRef.current as unknown as number
-                  );
-                  interactionTimeoutRef.current = null;
-                }
-
-                if (isInteracting) {
-                  setScrollEnabled(false);
-
-                  interactionTimeoutRef.current = setTimeout(() => {
-                    setScrollEnabled(true);
-                    interactionTimeoutRef.current = null;
-                  }, 6000) as unknown as number;
-                } else {
+                interactionTimeoutRef.current = setTimeout(() => {
                   setScrollEnabled(true);
-                }
-              }}
-            />
-            {locationPickerStatus === 'ready' ? (
-              <View
-                accessible
-                accessibilityLiveRegion="polite"
-                className="-mt-4 mb-3 flex-row items-center rounded-xl bg-surface-tinted px-3 py-2.5"
-              >
-                <Text className="font-outfit-bold text-sm text-brand">
-                  ✓ Location selected
-                </Text>
-              </View>
-            ) : hasSubmitted ? (
-              <Text
-                accessibilityRole="alert"
-                accessibilityLiveRegion="polite"
-                className="-mt-4 mb-3 text-sm text-errorText"
-              >
-                {locationError}
-              </Text>
-            ) : null}
-          </View>
+                  interactionTimeoutRef.current = null;
+                }, 6000) as unknown as number;
+              } else {
+                setScrollEnabled(true);
+              }
+            }}
+          />
 
-          {saveError ? (
+          {hasSubmitted && (missingSummary || saveError) ? (
             <Text
               accessibilityRole="alert"
               accessibilityLiveRegion="polite"
-              className="mb-3 mt-4 text-center text-sm text-errorText">
-              {saveError}
+              className="mt-4 text-center font-outfit-medium text-base text-errorText"
+            >
+              {saveError ?? missingSummary}
             </Text>
           ) : null}
 
@@ -445,34 +391,24 @@ export default function EditSpotScreen() {
             onPress={handleSave}
             disabled={saving}
             className={`mt-6 min-h-14 items-center justify-center rounded-2xl px-5 py-4 ${
-              saving ? 'bg-disabledGreen' : 'bg-brand'
+              saving ? 'bg-actionDisabled' : 'bg-accent'
             }`}
             accessibilityRole="button"
             accessibilityLabel={saving ? 'Saving changes' : 'Save changes'}
-            accessibilityHint={
-              !isFormValid || locationPickerStatus !== 'ready'
-                ? 'Checks the form and highlights anything that needs attention'
-                : undefined
-            }
             accessibilityState={{ disabled: saving, busy: saving }}
           >
-            <View className="flex-row items-center">
-              {saving ? (
-                <>
-                  <ActivityIndicator color="#FFFFFF" />
-                  <Text className="ml-2 font-outfit-bold text-lg text-white">
-                    Saving…
-                  </Text>
-                </>
-              ) : (
-                <>
-                  <Text className="font-outfit-bold text-lg text-white">
-                    Save changes
-                  </Text>
-                  <Feather name="chevron-right" size={20} color="#FFFFFF" />
-                </>
-              )}
-            </View>
+            {saving ? (
+              <View className="flex-row items-center">
+                <ActivityIndicator color={colors.muted} />
+                <Text className="ml-2 font-outfit-bold text-lg text-muted">
+                  Saving…
+                </Text>
+              </View>
+            ) : (
+              <Text className="font-outfit-bold text-lg text-brand">
+                Save changes
+              </Text>
+            )}
           </FeedbackPressable>
           </ScrollView>
         </KeyboardAvoidingView>

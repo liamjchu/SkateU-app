@@ -1,131 +1,104 @@
-﻿import { Feather, Ionicons, Octicons } from '@expo/vector-icons';
-import Constants from 'expo-constants';
+﻿import { Feather, Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+    ActivityIndicator,
+    Alert,
     BackHandler,
     Image,
     Keyboard,
+    KeyboardAvoidingView,
     Platform,
-    Pressable,
+    RefreshControl,
     ScrollView,
     Text,
     TextInput,
-    useWindowDimensions,
     View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import FavoriteSchoolRow from '../components/FavoriteSchoolRow';
 import FeedbackPressable from '../components/FeedbackPressable';
+import HomeRailCard, { HomeFeedRail } from '../components/home-rail-card';
+import HomeSchoolStories from '../components/home-school-stories';
+import HomeSpotPost from '../components/home-spot-post';
+import LoginRequiredModal from '../components/LoginRequiredModal';
+import NoticeBanner from '../components/NoticeBanner';
+import PopularSchoolCard, {
+    SchoolSpotCount,
+} from '../components/PopularSchoolCard';
+import SchoolTypePills, {
+    getSchoolTypesParam,
+} from '../components/SchoolTypePills';
+import { StickerStripe } from '../components/sticker';
 import IMAGES from '../constants/images';
-import { formatSpotCount } from '../lib/formatSpotCount';
+import { colors } from '../constants/colors';
+import { getApiUrl } from '../lib/api';
 import { triggerHaptic } from '../lib/haptics';
+import { HOME_RAIL_PAGE_SIZE } from '../lib/homeFeed';
+import { toUserFacingError } from '../lib/userFacingError';
 import { useAuthStore } from '../store/authStore';
 import { useFavorites } from '../store/favoritesStore';
-import { useProfileStore } from '../store/profileStore';
 import { useSchools } from '../store/schoolsStore';
-import type { School } from '../types/school';
-
-type SchoolRowProps = {
-  school: School;
-  displayNumSpots: number;
-  isFavorite: boolean;
-  isSelected: boolean;
-  onSelect: (school: School) => void;
-  onFavoritePress: (school: School) => void;
-};
+import { useSpotsStore } from '../store/spotsStore';
+import type { School, SchoolTypeFilter } from '../types/school';
+import type { Spot } from '../types/spot';
 
 type SchoolsSearchResponse = {
   schools: School[];
 };
 
-function isAbsoluteUrl(url: string) {
-  return /^https?:\/\//i.test(url);
+type RecentSpotsResponse = {
+  spots: Spot[];
+};
+
+function recentSpotsAuthHeaders(accessToken?: string): HeadersInit | undefined {
+  return accessToken
+    ? { Authorization: `Bearer ${accessToken}` }
+    : undefined;
 }
 
-function getApiUrl(path: string) {
-  const configuredUrl = process.env.EXPO_PUBLIC_API_URL;
+const PROFILE_BUTTON_SIZE = 44;
+const HEADER_LOGO_HEIGHT = (PROFILE_BUTTON_SIZE * 2) / 3;
+const HEADER_LOGO_WIDTH = (195 / 36) * HEADER_LOGO_HEIGHT;
 
-  if (configuredUrl) {
-    if (Platform.OS !== 'web' && !isAbsoluteUrl(configuredUrl)) {
-      throw new Error(
-        'EXPO_PUBLIC_API_URL must be an absolute URL on native platforms.'
-      );
-    }
-
-    return `${configuredUrl.replace(/\/$/, '')}${path}`;
+function getSchoolSearchCopy(filter: SchoolTypeFilter): {
+  placeholder: string;
+  accessibilityLabel: string;
+} {
+  switch (filter) {
+    case 'saved':
+      return {
+        placeholder: 'Search saved schools...',
+        accessibilityLabel: 'Search saved schools',
+      };
+    case 'k12':
+      return {
+        placeholder: 'Search K-12 schools...',
+        accessibilityLabel: 'Search K-12 schools',
+      };
+    case 'college':
+      return {
+        placeholder: 'Search colleges...',
+        accessibilityLabel: 'Search colleges',
+      };
+    default:
+      return {
+        placeholder: 'Search all schools...',
+        accessibilityLabel: 'Search all schools',
+      };
   }
-
-  if (Platform.OS === 'web') {
-    return path;
-  }
-
-  const hostUri = Constants.expoConfig?.hostUri;
-
-  if (hostUri) {
-    return `http://${hostUri}${path}`;
-  }
-
-  throw new Error(
-    'Missing API URL for native platforms. Set EXPO_PUBLIC_API_URL to an absolute URL or run through Expo with a host URI.'
-  );
 }
 
-function SchoolRow({
-  school,
-  displayNumSpots,
-  isFavorite,
-  isSelected,
-  onSelect,
-  onFavoritePress,
-}: SchoolRowProps) {
+function schoolMatchesQuery(school: School, query: string) {
+  const trimmedQuery = query.trim().toLowerCase();
+
+  if (trimmedQuery.length === 0) {
+    return true;
+  }
+
   return (
-    <View
-      className={`flex-row items-center border-b bg-surface px-3 py-2 ${
-        isSelected ? 'border-brand bg-surface-tinted' : 'border-border-soft'
-      }`}
-    >
-      <FeedbackPressable
-        haptic="selection"
-        onPress={() => onFavoritePress(school)}
-        className="h-12 w-12 items-center justify-center rounded-2xl bg-surface-soft"
-        accessibilityRole="button"
-        accessibilityLabel={`${isFavorite ? 'Remove' : 'Add'} ${school.name} ${isFavorite ? 'from' : 'to'} favorites`}
-        accessibilityState={{ selected: isFavorite }}
-      >
-        <Octicons
-          name={isFavorite ? 'star-fill' : 'star'}
-          size={20}
-          color={isFavorite ? '#1B3B36' : '#52645F'}
-        />
-      </FeedbackPressable>
-
-      <FeedbackPressable
-        haptic="selection"
-        onPress={() => onSelect(school)}
-        className="ml-2 min-h-12 min-w-0 flex-1 flex-row items-center justify-between rounded-xl px-1"
-        accessibilityRole="button"
-        accessibilityLabel={`Select ${school.name}`}
-        accessibilityHint="Selects this school for the campus map button"
-        accessibilityState={{ selected: isSelected }}
-      >
-        <View className="min-w-0 flex-1 pr-2">
-          <Text className="font-outfit-bold text-base text-ink">
-            {school.name}
-          </Text>
-          <Text className="mt-0.5 font-outfit-medium text-sm text-muted">
-            {school.city}, {school.state}
-          </Text>
-        </View>
-
-        <View className="w-20 shrink-0 flex-row items-center justify-end">
-          <Feather name="map-pin" size={12} color="#475569" />
-          <Text className="ml-1.5 font-outfit-bold text-base text-ink">
-            {formatSpotCount(displayNumSpots)}
-          </Text>
-        </View>
-      </FeedbackPressable>
-    </View>
+    school.name.toLowerCase().includes(trimmedQuery) ||
+    school.city.toLowerCase().includes(trimmedQuery) ||
+    school.state.toLowerCase().includes(trimmedQuery)
   );
 }
 
@@ -134,10 +107,8 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { schools, upsertSchool } = useSchools();
   const session = useAuthStore((state) => state.session);
-  const profile = useProfileStore((state) => state.profile);
-  const welcomeAboardUserId = useProfileStore(
-    (state) => state.welcomeAboardUserId
-  );
+  const authInitializing = useAuthStore((state) => state.initializing);
+  const toggleSpotLike = useSpotsStore((state) => state.toggleSpotLike);
   const {
     favoriteSchoolIds,
     favoriteSchools: storedFavoriteSchools,
@@ -146,24 +117,65 @@ export default function HomeScreen() {
     upsertFavoriteSchool,
   } = useFavorites();
 
-  const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
-  const [isOpen, setIsOpen] = useState(false);
+  const searchInputRef = useRef<TextInput>(null);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<SchoolTypeFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<School[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
   const [searchRetryNonce, setSearchRetryNonce] = useState(0);
+  const [popularSchools, setPopularSchools] = useState<School[]>([]);
+  const [isLoadingPopular, setIsLoadingPopular] = useState(true);
+  const [popularError, setPopularError] = useState('');
+  const [popularRetryNonce, setPopularRetryNonce] = useState(0);
+  const [isLoadingMorePopular, setIsLoadingMorePopular] = useState(false);
+  const [popularHasMore, setPopularHasMore] = useState(true);
+  const [recentSpots, setRecentSpots] = useState<Spot[]>([]);
+  const [isLoadingRecent, setIsLoadingRecent] = useState(true);
+  const [recentError, setRecentError] = useState('');
+  const [recentRetryNonce, setRecentRetryNonce] = useState(0);
+  const [isLoadingMoreRecent, setIsLoadingMoreRecent] = useState(false);
+  const [recentHasMore, setRecentHasMore] = useState(true);
   const [favoriteRefreshError, setFavoriteRefreshError] = useState('');
   const [favoriteRefreshNonce, setFavoriteRefreshNonce] = useState(0);
   const [isHydratingFavoriteSchools, setIsHydratingFavoriteSchools] =
     useState(true);
-  const [searchBarBottom, setSearchBarBottom] = useState(0);
-  const { height, width } = useWindowDimensions();
-  const isTabletLayout = width >= 768 && height >= 600;
+  const [showLoginRequired, setShowLoginRequired] = useState(false);
+  const [likingSpotId, setLikingSpotId] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const wasNearBottomRef = useRef(false);
+  const popularFilterRef = useRef(activeFilter);
+  const recentFilterRef = useRef(activeFilter);
 
-  const getDisplaySpotCount = (school: School) => {
-    return school.numSpots;
-  };
+  const popularAbortRef = useRef<AbortController | null>(null);
+  const recentAbortRef = useRef<AbortController | null>(null);
+  const popularLockRef = useRef(false);
+  const recentLockRef = useRef(false);
+  const popularHasMoreRef = useRef(true);
+  const recentHasMoreRef = useRef(true);
+  const isLoadingPopularRef = useRef(true);
+  const isLoadingRecentRef = useRef(true);
+  const popularSchoolsRef = useRef<School[]>([]);
+  const recentSpotsRef = useRef<Spot[]>([]);
+
+  popularHasMoreRef.current = popularHasMore;
+  recentHasMoreRef.current = recentHasMore;
+  isLoadingPopularRef.current = isLoadingPopular || isLoadingMorePopular;
+  isLoadingRecentRef.current = isLoadingRecent || isLoadingMoreRecent;
+  popularSchoolsRef.current = popularSchools;
+  recentSpotsRef.current = recentSpots;
+
+  const isSearchMode = isSearchFocused || searchQuery.trim().length > 0;
+
+  const exitSearchMode = useCallback(() => {
+    searchInputRef.current?.blur();
+    Keyboard.dismiss();
+    setIsSearchFocused(false);
+    setSearchQuery('');
+    setSearchResults([]);
+    setSearchError('');
+  }, []);
 
   const favoriteSchools = favoriteSchoolIds
     .map((schoolId) => {
@@ -183,31 +195,21 @@ export default function HomeScreen() {
     return school;
   });
 
-  const sortedSearchResults = [
-    ...displayedSearchResults.filter((school: School) =>
-      favoriteSchoolIds.includes(school.id)
-    ),
-    ...displayedSearchResults.filter(
-      (school: School) => !favoriteSchoolIds.includes(school.id)
-    ),
-  ];
+  const savedSearchResults = favoriteSchools.filter((school) =>
+    schoolMatchesQuery(school, searchQuery)
+  );
 
-  const hour = new Date().getHours();
-  const greeting =
-    hour < 12
-      ? 'Good morning 👋'
-      : hour < 18
-        ? 'Good afternoon 👋'
-      : 'Good evening 👋';
-  const welcomeMessage = !session?.user || !profile?.username
-    ? "Glad you're here!"
-    : welcomeAboardUserId === session.user.id
-      ? `Welcome aboard, ${profile.username}!`
-      : `Welcome back, ${profile.username}!`;
-  const profileInitial =
-    profile?.username?.charAt(0).toUpperCase() ||
-    session?.user?.email?.charAt(0).toUpperCase() ||
-    'P';
+  const sortedSearchResults =
+    activeFilter === 'saved'
+      ? savedSearchResults
+      : [
+          ...displayedSearchResults.filter((school: School) =>
+            favoriteSchoolIds.includes(school.id)
+          ),
+          ...displayedSearchResults.filter(
+            (school: School) => !favoriteSchoolIds.includes(school.id)
+          ),
+        ];
 
   useEffect(() => {
     if (!hasHydratedFavorites) {
@@ -240,7 +242,7 @@ export default function HomeScreen() {
             | { error?: string }
             | null;
           throw new Error(
-            errorData?.error ?? `Favorite schools lookup failed with status ${response.status}`
+            errorData?.error ?? `Saved schools lookup failed with status ${response.status}`
           );
         }
 
@@ -256,7 +258,7 @@ export default function HomeScreen() {
 
         if (!cancelled) {
           setFavoriteRefreshError(
-            error instanceof Error ? error.message : 'Unable to load favorite schools right now.'
+            toUserFacingError(error, 'Couldn’t load saved schools right now.')
           );
         }
       } finally {
@@ -280,7 +282,7 @@ export default function HomeScreen() {
     upsertFavoriteSchool,
   ]);
 
-  // Re-pull favorite schools' spot counts from the backend whenever the home
+  // Re-pull saved schools' spot counts from the backend whenever the home
   // screen regains focus (e.g. after adding a spot on the map), so the counter
   // reflects the current schools.numspots column.
   useFocusEffect(
@@ -303,7 +305,7 @@ export default function HomeScreen() {
           );
 
           if (!response.ok) {
-            throw new Error('Unable to refresh favorite schools right now.');
+            throw new Error('Couldn’t refresh saved schools right now.');
           }
 
           const data = (await response.json()) as SchoolsSearchResponse;
@@ -321,7 +323,7 @@ export default function HomeScreen() {
 
           if (!cancelled) {
             setFavoriteRefreshError(
-              error instanceof Error ? error.message : 'Unable to refresh favorite schools right now.'
+              toUserFacingError(error, 'Couldn’t refresh saved schools right now.')
             );
           }
         }
@@ -342,27 +344,311 @@ export default function HomeScreen() {
     ])
   );
 
+  // Load the most-spotted schools for the popular feed. Re-runs when the
+  // type filter changes so the pills narrow down the feed too. Pages in as
+  // the rail is scrolled so there is no total cap.
   useEffect(() => {
-    if (!isOpen) {
+    popularAbortRef.current?.abort();
+
+    if (activeFilter === 'saved') {
+      setIsLoadingPopular(false);
+      setIsLoadingMorePopular(false);
+      setPopularHasMore(false);
+      popularLockRef.current = false;
+      return;
+    }
+
+    const controller = new AbortController();
+    popularAbortRef.current = controller;
+    popularLockRef.current = false;
+    const filterChanged = popularFilterRef.current !== activeFilter;
+    popularFilterRef.current = activeFilter;
+    if (filterChanged || popularSchoolsRef.current.length === 0) {
+      setPopularSchools([]);
+    }
+    setPopularHasMore(true);
+    setIsLoadingPopular(true);
+    setIsLoadingMorePopular(false);
+
+    const loadPopularSchools = async () => {
+      try {
+        const typeParam = getSchoolTypesParam(activeFilter);
+        const typeQuery = typeParam
+          ? `&type=${encodeURIComponent(typeParam)}`
+          : '';
+        const response = await fetch(
+          getApiUrl(`/api/schools?popular=1${typeQuery}`),
+          { signal: controller.signal }
+        );
+
+        if (!response.ok) {
+          const errorData = (await response.json().catch(() => null)) as
+            | { error?: string }
+            | null;
+          throw new Error(
+            errorData?.error ?? `Popular schools failed with status ${response.status}`
+          );
+        }
+
+        const data = (await response.json()) as SchoolsSearchResponse;
+        const page = data.schools ?? [];
+        page.forEach(upsertSchool);
+
+        if (!controller.signal.aborted) {
+          setPopularSchools(page);
+          setPopularHasMore(page.length === HOME_RAIL_PAGE_SIZE);
+          setPopularError('');
+        }
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') {
+          return;
+        }
+
+        if (!controller.signal.aborted) {
+          setPopularError(
+            toUserFacingError(error, 'Couldn’t load popular schools right now.')
+          );
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsLoadingPopular(false);
+        }
+      }
+    };
+
+    loadPopularSchools();
+
+    return () => controller.abort();
+  }, [activeFilter, popularRetryNonce, upsertSchool]);
+
+  useEffect(() => {
+    recentAbortRef.current?.abort();
+
+    if (activeFilter === 'saved') {
+      setIsLoadingRecent(false);
+      setIsLoadingMoreRecent(false);
+      setRecentHasMore(false);
+      recentLockRef.current = false;
+      return;
+    }
+
+    const controller = new AbortController();
+    recentAbortRef.current = controller;
+    recentLockRef.current = false;
+    const filterChanged = recentFilterRef.current !== activeFilter;
+    recentFilterRef.current = activeFilter;
+    if (filterChanged || recentSpotsRef.current.length === 0) {
+      setRecentSpots([]);
+    }
+    setRecentHasMore(true);
+    setIsLoadingRecent(true);
+    setIsLoadingMoreRecent(false);
+
+    const loadRecentSpots = async () => {
+      try {
+        const typeParam = getSchoolTypesParam(activeFilter);
+        const typeQuery = typeParam
+          ? `&type=${encodeURIComponent(typeParam)}`
+          : '';
+        const response = await fetch(
+          getApiUrl(`/api/spots?recent=1${typeQuery}`),
+          {
+            signal: controller.signal,
+            headers: recentSpotsAuthHeaders(session?.access_token),
+          }
+        );
+
+        if (!response.ok) {
+          const errorData = (await response.json().catch(() => null)) as
+            | { error?: string }
+            | null;
+          throw new Error(
+            errorData?.error ?? `Recent spots failed with status ${response.status}`
+          );
+        }
+
+        const data = (await response.json()) as RecentSpotsResponse;
+        const page = data.spots ?? [];
+
+        if (!controller.signal.aborted) {
+          setRecentSpots(page);
+          setRecentHasMore(page.length === HOME_RAIL_PAGE_SIZE);
+          setRecentError('');
+        }
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') {
+          return;
+        }
+
+        if (!controller.signal.aborted) {
+          setRecentError(
+            toUserFacingError(error, 'Couldn’t load recent spots right now.')
+          );
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsLoadingRecent(false);
+        }
+      }
+    };
+
+    loadRecentSpots();
+
+    return () => controller.abort();
+  }, [activeFilter, recentRetryNonce, session?.access_token]);
+
+  const loadMorePopularSchools = useCallback(async () => {
+    if (
+      popularLockRef.current ||
+      isLoadingPopularRef.current ||
+      !popularHasMoreRef.current
+    ) {
+      return;
+    }
+
+    const controller = popularAbortRef.current;
+    if (!controller || controller.signal.aborted) {
+      return;
+    }
+
+    popularLockRef.current = true;
+    setIsLoadingMorePopular(true);
+
+    try {
+      const typeParam = getSchoolTypesParam(activeFilter);
+      const typeQuery = typeParam
+        ? `&type=${encodeURIComponent(typeParam)}`
+        : '';
+      const offset = popularSchoolsRef.current.length;
+      const response = await fetch(
+        getApiUrl(`/api/schools?popular=1${typeQuery}&offset=${offset}`),
+        { signal: controller.signal }
+      );
+
+      if (!response.ok) {
+        throw new Error('Couldn’t load more popular schools right now.');
+      }
+
+      const data = (await response.json()) as SchoolsSearchResponse;
+      const page = data.schools ?? [];
+      page.forEach(upsertSchool);
+
+      if (!controller.signal.aborted) {
+        setPopularSchools((current) => {
+          const seen = new Set(current.map((school) => school.id));
+          return [
+            ...current,
+            ...page.filter((school) => !seen.has(school.id)),
+          ];
+        });
+        setPopularHasMore(page.length === HOME_RAIL_PAGE_SIZE);
+        setPopularError('');
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return;
+      }
+
+      if (!controller.signal.aborted) {
+        setPopularError(
+          toUserFacingError(
+            error,
+            'Couldn’t load more popular schools right now.'
+          )
+        );
+      }
+    } finally {
+      popularLockRef.current = false;
+      if (!controller.signal.aborted) {
+        setIsLoadingMorePopular(false);
+      }
+    }
+  }, [activeFilter, upsertSchool]);
+
+  const loadMoreRecentSpots = useCallback(async () => {
+    if (
+      recentLockRef.current ||
+      isLoadingRecentRef.current ||
+      !recentHasMoreRef.current
+    ) {
+      return;
+    }
+
+    const controller = recentAbortRef.current;
+    if (!controller || controller.signal.aborted) {
+      return;
+    }
+
+    recentLockRef.current = true;
+    setIsLoadingMoreRecent(true);
+
+    try {
+      const typeParam = getSchoolTypesParam(activeFilter);
+      const typeQuery = typeParam
+        ? `&type=${encodeURIComponent(typeParam)}`
+        : '';
+      const offset = recentSpotsRef.current.length;
+      const response = await fetch(
+        getApiUrl(`/api/spots?recent=1${typeQuery}&offset=${offset}`),
+        {
+          signal: controller.signal,
+          headers: recentSpotsAuthHeaders(session?.access_token),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Couldn’t load more recent spots right now.');
+      }
+
+      const data = (await response.json()) as RecentSpotsResponse;
+      const page = data.spots ?? [];
+
+      if (!controller.signal.aborted) {
+        setRecentSpots((current) => {
+          const seen = new Set(current.map((spot) => spot.id));
+          return [...current, ...page.filter((spot) => !seen.has(spot.id))];
+        });
+        setRecentHasMore(page.length === HOME_RAIL_PAGE_SIZE);
+        setRecentError('');
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return;
+      }
+
+      if (!controller.signal.aborted) {
+        setRecentError(
+          toUserFacingError(error, 'Couldn’t load more recent spots right now.')
+        );
+      }
+    } finally {
+      recentLockRef.current = false;
+      if (!controller.signal.aborted) {
+        setIsLoadingMoreRecent(false);
+      }
+    }
+  }, [activeFilter, session?.access_token]);
+
+  useEffect(() => {
+    if (!isSearchMode) {
       return;
     }
 
     const subscription = BackHandler.addEventListener(
       'hardwareBackPress',
       () => {
-        setIsOpen(false);
-        Keyboard.dismiss();
+        exitSearchMode();
         return true;
       }
     );
 
     return () => subscription.remove();
-  }, [isOpen]);
+  }, [isSearchMode, exitSearchMode]);
 
   useEffect(() => {
     const trimmedQuery = searchQuery.trim();
 
-    if (trimmedQuery.length < 3 || selectedSchool?.name === searchQuery) {
+    if (activeFilter === 'saved' || trimmedQuery.length < 3) {
       setSearchResults([]);
       setIsSearching(false);
       setSearchError('');
@@ -375,8 +661,12 @@ export default function HomeScreen() {
       setSearchError('');
 
       try {
+        const typeParam = getSchoolTypesParam(activeFilter);
+        const typeQuery = typeParam
+          ? `&type=${encodeURIComponent(typeParam)}`
+          : '';
         const response = await fetch(
-          getApiUrl(`/api/schools?search=${encodeURIComponent(trimmedQuery)}`),
+          getApiUrl(`/api/schools?search=${encodeURIComponent(trimmedQuery)}${typeQuery}`),
           { signal: controller.signal }
         );
 
@@ -402,7 +692,7 @@ export default function HomeScreen() {
         }
 
         setSearchResults([]);
-        setSearchError(error instanceof Error ? error.message : 'Unable to search schools right now.');
+        setSearchError(toUserFacingError(error, 'Couldn’t search schools right now.'));
       } finally {
         setIsSearching(false);
       }
@@ -412,38 +702,23 @@ export default function HomeScreen() {
       controller.abort();
       clearTimeout(timeoutId);
     };
-  }, [searchQuery, searchRetryNonce, selectedSchool?.name, upsertFavoriteSchool, upsertSchool]);
+  }, [searchQuery, searchRetryNonce, activeFilter, upsertFavoriteSchool, upsertSchool]);
 
   const handleSearchChange = (text: string) => {
     setSearchQuery(text);
-    setIsOpen(true);
-
-    if (selectedSchool && text !== selectedSchool.name) {
-      setSelectedSchool(null);
-    }
   };
 
   const handleClearSearch = () => {
     setSearchQuery('');
-    setSelectedSchool(null);
     setSearchResults([]);
     setSearchError('');
-    setIsOpen(false);
-    Keyboard.dismiss();
+    // Clearing keeps the user in search mode, ready to type a new query.
+    searchInputRef.current?.focus();
   };
 
   const handleRetrySearch = () => {
     setSearchError('');
     setSearchRetryNonce((nonce) => nonce + 1);
-  };
-
-  const handleSchoolSelect = (school: School) => {
-    upsertSchool(school);
-    setSelectedSchool(school);
-    setSearchQuery(school.name);
-    setSearchResults([]);
-    setSearchError('');
-    setIsOpen(false);
   };
 
   const navigateToSchoolMap = (school: School) => {
@@ -456,31 +731,84 @@ export default function HomeScreen() {
         schoolId: school.id,
         schoolCity: school.city,
         schoolState: school.state,
-        schoolNumSpots: getDisplaySpotCount(school).toString(),
+        schoolNumSpots: school.numSpots.toString(),
       },
     });
   };
 
-  const handleFavoriteSelect = (school: School) => {
-    handleSchoolSelect(school);
+  const handleSchoolPress = (school: School) => {
+    upsertSchool(school);
+    Keyboard.dismiss();
+    navigateToSchoolMap(school);
+  };
+
+  const handleRecentSpotPress = (spot: Spot) => {
+    if (!spot.schoolId) {
+      Alert.alert(
+        'Campus map unavailable',
+        'This spot isn’t tied to a campus, so there’s no map to open.'
+      );
+      return;
+    }
+
+    Keyboard.dismiss();
+    router.push({
+      pathname: '/map',
+      params: {
+        lat: spot.latitude.toString(),
+        lng: spot.longitude.toString(),
+        schoolId: spot.schoolId,
+        schoolName: spot.schoolName || 'Campus map',
+        schoolCity: spot.city,
+        schoolState: spot.state,
+        spotId: spot.id,
+      },
+    });
+  };
+
+  const handleLikeSpot = async (spot: Spot) => {
+    const accessToken = session?.access_token;
+    if (!accessToken) {
+      setShowLoginRequired(true);
+      return;
+    }
+
+    if (likingSpotId) {
+      return;
+    }
+
+    setLikingSpotId(spot.id);
+    try {
+      const result = await toggleSpotLike(
+        spot.id,
+        spot.likedByUser === true,
+        accessToken
+      );
+      triggerHaptic('light');
+      setRecentSpots((current) =>
+        current.map((item) =>
+          item.id === spot.id
+            ? {
+                ...item,
+                likedByUser: result.likedByUser,
+                likeCount: result.likeCount,
+              }
+            : item
+        )
+      );
+    } catch (error) {
+      Alert.alert(
+        'Couldn’t update that like',
+        toUserFacingError(error, 'Try again in a sec.')
+      );
+    } finally {
+      setLikingSpotId(null);
+    }
   };
 
   const handleFavoritePress = (school: School) => {
     upsertSchool(school);
     toggleFavoriteSchool(school);
-  };
-
-  const handleRemoveFavoriteSchool = (school: School) => {
-    triggerHaptic('warning');
-    toggleFavoriteSchool(school);
-  };
-
-  const handleGoPress = () => {
-    if (!selectedSchool) {
-      return;
-    }
-
-    navigateToSchoolMap(selectedSchool);
   };
 
   const handleProfilePress = () => {
@@ -492,23 +820,56 @@ export default function HomeScreen() {
     router.push('/login');
   };
 
+  const handleRefresh = () => {
+    if (activeFilter === 'saved') {
+      setFavoriteRefreshError('');
+      setFavoriteRefreshNonce((nonce) => nonce + 1);
+      return;
+    }
+
+    setIsRefreshing(true);
+    setIsLoadingPopular(true);
+    setIsLoadingRecent(true);
+    setPopularRetryNonce((nonce) => nonce + 1);
+    setRecentRetryNonce((nonce) => nonce + 1);
+  };
+
+  useEffect(() => {
+    if (!isRefreshing) {
+      return;
+    }
+
+    if (!isLoadingPopular && !isLoadingRecent) {
+      setIsRefreshing(false);
+    }
+  }, [isLoadingPopular, isLoadingRecent, isRefreshing]);
+
+  const trimmedSearch = searchQuery.trim();
+  const showRemoteSearchResults =
+    activeFilter !== 'saved' && trimmedSearch.length >= 3;
+  const searchStatusText = isSearching
+    ? 'Searching…'
+    : `${sortedSearchResults.length} ${
+        sortedSearchResults.length === 1 ? 'school' : 'schools'
+      }`;
+  const schoolSearchCopy = getSchoolSearchCopy(activeFilter);
+
   return (
     <View className="flex-1 bg-surface">
-      <View
-        className="bg-brand px-6 pb-6"
-        style={{
-          paddingTop: insets.top + 32,
-          shadowColor: '#000000',
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.12,
-          shadowRadius: 6,
-          elevation: 6,
-        }}
-      >
-        <View className="h-14 flex-row items-center justify-between">
+      <View className="bg-brand">
+        <View
+          className="px-6 pb-5"
+          style={{
+            paddingTop: insets.top + 24,
+          }}
+        >
+        <View className="h-11 flex-row items-center justify-between">
           <Image
             source={IMAGES.brandLockup}
-            className="-ml-[21px] h-14 w-[177px]"
+            style={{
+              width: HEADER_LOGO_WIDTH,
+              height: HEADER_LOGO_HEIGHT,
+            }}
             resizeMode="contain"
             accessibilityLabel="SkateU"
           />
@@ -516,321 +877,450 @@ export default function HomeScreen() {
           <FeedbackPressable
             haptic="light"
             onPress={handleProfilePress}
-            className="h-12 w-12 items-center justify-center rounded-full border border-white/25 bg-white/15"
+            className="ml-3 h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white"
             accessibilityLabel="Open profile"
             accessibilityRole="button"
           >
-            {session ? (
-              <Text
-                className="font-outfit-black text-xl text-white"
-                accessibilityLabel={`Profile initial ${profileInitial}`}
-              >
-                {profileInitial}
-              </Text>
-            ) : (
-              <Octicons name="person" size={22} color="#FFFFFF" />
-            )}
+            <Feather name="user" size={20} color={colors.brand} />
           </FeedbackPressable>
         </View>
+
+        <View className="mt-4 flex-row items-center">
+          <View className="relative min-w-0 flex-1 justify-center">
+            <View className="overflow-hidden rounded-2xl bg-field">
+              <View className="relative justify-center">
+                <View className="absolute left-5 z-10">
+                  <Ionicons name="search" size={20} color={colors.ink} />
+                </View>
+                <TextInput
+                  ref={searchInputRef}
+                  value={searchQuery}
+                  onChangeText={handleSearchChange}
+                  onFocus={() => setIsSearchFocused(true)}
+                  onBlur={() => setIsSearchFocused(false)}
+                  placeholder={schoolSearchCopy.placeholder}
+                  placeholderTextColor={colors.muted}
+                  accessibilityLabel={schoolSearchCopy.accessibilityLabel}
+                  accessibilityHint={
+                    activeFilter === 'saved'
+                      ? 'Filters your saved schools by name, city, or state'
+                      : 'Type at least three characters to find a school'
+                  }
+                  numberOfLines={1}
+                  multiline={false}
+                  autoCorrect={false}
+                  autoCapitalize="words"
+                  returnKeyType="search"
+                  onSubmitEditing={() => Keyboard.dismiss()}
+                  className="h-14 bg-field pl-14 pr-12 font-outfit-semibold text-base text-ink"
+                />
+
+                {searchQuery.length > 0 ? (
+                  <View className="absolute right-3 z-10">
+                    <FeedbackPressable
+                      onPress={handleClearSearch}
+                      className="h-9 w-9 items-center justify-center rounded-full bg-surface-soft"
+                      accessibilityRole="button"
+                      accessibilityLabel="Clear school search"
+                    >
+                      <Feather name="x" size={16} color={colors.muted} />
+                    </FeedbackPressable>
+                  </View>
+                ) : null}
+              </View>
+            </View>
+          </View>
+
+          {isSearchMode ? (
+            <FeedbackPressable
+              onPress={exitSearchMode}
+              className="ml-3 h-14 shrink-0 justify-center"
+              accessibilityRole="button"
+              accessibilityLabel="Cancel search"
+            >
+              <Text className="font-outfit-semibold text-base text-white">
+                Cancel
+              </Text>
+            </FeedbackPressable>
+          ) : null}
+        </View>
+        </View>
+        <StickerStripe />
       </View>
 
-      <View className="relative w-full max-w-[760px] flex-1 self-center px-5 pt-6">
-        {/* Welcome Message Card */}
-        <View className="mb-5 rounded-3xl bg-surface-tinted p-5">
-          <Text 
-            className="text-base text-slate-500 mb-1 font-outfit-medium"
-          >
-            {greeting}
-          </Text>
-          <Text 
-            className="text-3xl text-ink mb-1.5 font-outfit-black"
-          >
-            {welcomeMessage}
-          </Text>
-          <Text 
-            className="text-base text-slate-500 font-outfit-medium"
-          >
-            Find a new campus skate spot.
-          </Text>
-        </View>
-
-        {/* Input Bar Area */}
-        <View
-          className="relative z-50 mb-6"
-          onLayout={({ nativeEvent }) => {
-            setSearchBarBottom(
-              nativeEvent.layout.y + nativeEvent.layout.height
-            );
-          }}
-        >
-          <View className="absolute left-4 inset-y-0 justify-center z-10">
-            <Ionicons name="search-outline" size={22} color="#1B3B36" />
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' && isSearchMode ? 'padding' : undefined}
+        keyboardVerticalOffset={0}
+      >
+        <View className="w-full max-w-[760px] flex-1 self-center px-6">
+          <View className="pt-3 pb-5">
+            <SchoolTypePills
+              selected={activeFilter}
+              onSelect={setActiveFilter}
+            />
           </View>
-          <TextInput
-            value={searchQuery}
-            onChangeText={handleSearchChange}
-            onFocus={() => setIsOpen(true)}
-            onPressIn={() => setIsOpen(true)}
-            placeholder="Search schools..."
-            placeholderTextColor="#52645F"
-            accessibilityLabel="Search schools"
-            accessibilityHint="Type at least three characters to find a school"
-            accessibilityState={{ expanded: isOpen }}
-            numberOfLines={1}
-            multiline={false}
-            className="h-16 rounded-2xl border border-border-soft bg-field py-5 pl-14 pr-14 font-outfit-semibold text-lg text-ink"
-          />
 
-          {searchQuery.length > 0 ? (
-            <View className="absolute right-4 inset-y-0 justify-center z-10">
-              <FeedbackPressable
-                onPress={handleClearSearch}
-                className="h-12 w-12 items-center justify-center rounded-full bg-[#F0F3F5]"
-                accessibilityRole="button"
-                accessibilityLabel="Clear school search"
-              >
-                <Text className="text-sm font-outfit-bold text-slate-400">✕</Text>
-              </FeedbackPressable>
-            </View>
+          {!session && !authInitializing ? (
+            <NoticeBanner
+              id="guest-browse"
+              collapsed={isSearchMode}
+              icon="eye-outline"
+              title="Browsing as a guest"
+              message="Browse campuses and spots freely. Sign in to like spots or add your own."
+              actionLabel="Sign in"
+              onAction={() => router.push('/login')}
+            />
           ) : null}
 
-        </View>
+          <ScrollView
+            className="min-h-0 flex-1"
+            contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={
+                  activeFilter === 'saved' ? false : isRefreshing
+                }
+                onRefresh={handleRefresh}
+                tintColor={colors.accent}
+                colors={[colors.accent]}
+              />
+            }
+            scrollEventThrottle={16}
+            onScroll={(event) => {
+              if (activeFilter === 'saved' || isSearchMode) {
+                return;
+              }
 
-        {/* BACKGROUND SECTION: Stays visible but blocks touch interactions when dropdown is open */}
-        <View
-          className="min-h-0 flex-1"
-          pointerEvents={isOpen ? 'none' : 'auto'}
-        >
-          {/* Favorites Card */}
-          <View className="min-h-0 flex-1">
-            <View className="min-h-0 flex-1 rounded-3xl bg-surface-tinted p-3">
-              <View className="mb-3 flex-row items-center justify-between px-1">
-                <Text
-                  className="text-lg text-ink font-outfit-black"
-                >
-                  Favorites
+              const { contentOffset, layoutMeasurement, contentSize } =
+                event.nativeEvent;
+              const remaining =
+                contentSize.height -
+                (contentOffset.y + layoutMeasurement.height);
+              const isNearBottom = remaining < 240;
+              if (isNearBottom && !wasNearBottomRef.current) {
+                void loadMoreRecentSpots();
+              }
+              wasNearBottomRef.current = isNearBottom;
+            }}
+          >
+            {activeFilter === 'saved' ? (
+              <View>
+                <Text className="mb-4 font-outfit-bold text-base text-ink">
+                  Saved
                 </Text>
-                <Text
-                  className="text-sm text-slate-400 font-outfit-bold"
-                >
-                  {isHydratingFavoriteSchools
-                    ? '...'
-                    : `${favoriteSchools.length} ${favoriteSchools.length === 1 ? 'school' : 'schools'}`}
-                </Text>
-              </View>
 
-              {favoriteRefreshError ? (
-                <View className="mb-3 flex-row items-center rounded-2xl border border-[#B45F58] bg-[#FBE9E7] px-3 py-2">
-                  <Text className="flex-1 pr-2 font-outfit-medium text-xs text-errorText">
-                    {favoriteRefreshError}
-                  </Text>
-                  <FeedbackPressable
-                    onPress={() => {
-                      setFavoriteRefreshError('');
-                      setFavoriteRefreshNonce((nonce) => nonce + 1);
-                    }}
-                    className="rounded-lg bg-[#21473f] px-3 py-1.5"
-                    accessibilityRole="button"
-                    accessibilityLabel="Retry refreshing favorite schools"
-                  >
-                    <Text className="font-outfit-bold text-xs text-white">Retry</Text>
-                  </FeedbackPressable>
-                </View>
-              ) : null}
+                {favoriteRefreshError ? (
+                  <View className="mb-4 flex-row items-center rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2.5">
+                    <Text className="flex-1 pr-2 font-outfit-medium text-sm text-errorText">
+                      {favoriteRefreshError}
+                    </Text>
+                    <FeedbackPressable
+                      onPress={() => {
+                        setFavoriteRefreshError('');
+                        setFavoriteRefreshNonce((nonce) => nonce + 1);
+                      }}
+                      className="rounded-xl bg-accent px-3 py-1.5"
+                      accessibilityRole="button"
+                      accessibilityLabel="Retry refreshing saved schools"
+                    >
+                      <Text className="font-outfit-bold text-sm text-brand">Retry</Text>
+                    </FeedbackPressable>
+                  </View>
+                ) : null}
 
-              <View className="min-h-0 flex-1">
                 {isHydratingFavoriteSchools ? (
                   <View
-                    className="flex-1 items-center justify-center rounded-2xl bg-white/60 px-6 py-6"
-                    accessibilityLabel="Loading favorite schools"
+                    className="items-center rounded-2xl bg-field px-6 py-8"
+                    accessibilityLabel="Loading saved schools"
                     accessibilityLiveRegion="polite"
                   >
-                    <Text
-                      className="text-xl text-ink font-outfit-bold"
-                    >
-                      Loading favorites...
+                    <Text className="text-lg text-ink font-outfit-bold">
+                      Loading saved schools…
                     </Text>
-                    <Text
-                      className="mt-1.5 text-center text-sm leading-5 text-slate-400 font-outfit-medium"
-                    >
+                    <Text className="mt-1 text-center text-base leading-5 text-muted font-outfit-medium">
                       Restoring your saved schools.
                     </Text>
                   </View>
                 ) : favoriteSchools.length === 0 ? (
-                  <View className="flex-1 items-center justify-center rounded-2xl bg-white/60 px-6 py-6">
-                    <View className="h-16 w-16 items-center justify-center rounded-2xl bg-[#E3ECEA]">
-                      <Octicons name="star" size={30} color="#1B3B36" />
+                  <View className="items-center rounded-2xl bg-field px-6 py-8">
+                    <View className="h-14 w-14 items-center justify-center rounded-2xl bg-accent">
+                      <Ionicons name="bookmark-outline" size={26} color={colors.brand} />
                     </View>
-                    <Text
-                      className="mt-4 text-xl text-ink font-outfit-bold"
-                    >
-                      No favorites yet
+                    <Text className="mt-3 text-lg text-ink font-outfit-bold">
+                      No saved schools yet
                     </Text>
-                    <Text
-                      className="mt-1.5 text-center text-sm leading-5 text-slate-400 font-outfit-medium"
-                    >
-                      Tap the{' '}
-                      <Octicons name="star-fill" size={13} color="#1B3B36" />
-                      {' '}star on a school in the search dropdown or on the
-                      school&apos;s map screen to save it here.
+                    <Text className="mt-1 text-center text-base leading-5 text-muted font-outfit-medium">
+                      Tap the bookmark on a school to keep it here.
+                    </Text>
+                  </View>
+                ) : savedSearchResults.length === 0 ? (
+                  <View className="items-center rounded-2xl bg-field px-6 py-8">
+                    <Text className="text-lg text-ink font-outfit-bold">
+                      No matches
+                    </Text>
+                    <Text className="mt-1 text-center text-base leading-5 text-muted font-outfit-medium">
+                      Nothing in Saved matches that search.
                     </Text>
                   </View>
                 ) : (
-                  <ScrollView
-                    className="flex-1"
-                    contentContainerClassName="pb-1"
-                    keyboardShouldPersistTaps="handled"
-                    nestedScrollEnabled
-                    showsVerticalScrollIndicator={false}
-                  >
-                    {favoriteSchools.map((school: School) => (
-                      <FavoriteSchoolRow
-                        key={school.id}
-                        school={school}
-                        isSelected={selectedSchool?.id === school.id}
-                        onRemove={handleRemoveFavoriteSchool}
-                        onSelect={handleFavoriteSelect}
-                      />
-                    ))}
-                  </ScrollView>
+                  savedSearchResults.map((school: School) => (
+                    <PopularSchoolCard
+                      key={school.id}
+                      school={school}
+                      isSaved
+                      onPress={handleSchoolPress}
+                      onToggleSave={handleFavoritePress}
+                    />
+                  ))
                 )}
               </View>
-            </View>
-          </View>
+            ) : showRemoteSearchResults ? (
+              <View>
+                <Text
+                  accessibilityLiveRegion="polite"
+                  className="mb-4 font-outfit-bold text-base text-ink"
+                >
+                  {searchStatusText}
+                </Text>
 
-          <View className="-mx-5 mt-4 h-36">
-            <Image
-              source={IMAGES.landscape}
-              className="h-full w-full"
-              resizeMode="cover"
-              accessible={false}
-            />
-          </View>
-        </View>
+                {searchError ? (
+                  <View className="flex-row items-center rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2.5">
+                    <Text
+                      accessibilityRole="alert"
+                      accessibilityLiveRegion="polite"
+                      className="flex-1 pr-2 font-outfit-medium text-sm text-errorText"
+                    >
+                      {searchError}
+                    </Text>
+                    <FeedbackPressable
+                      onPress={handleRetrySearch}
+                      className="rounded-xl bg-accent px-3 py-1.5"
+                      accessibilityRole="button"
+                      accessibilityLabel="Retry school search"
+                    >
+                      <Text className="font-outfit-bold text-sm text-brand">Retry</Text>
+                    </FeedbackPressable>
+                  </View>
+                ) : isSearching ? (
+                  <View accessibilityLabel="Searching schools">
+                    {[0, 1, 2].map((placeholder) => (
+                      <View
+                        key={placeholder}
+                        className="mb-4 h-24 rounded-2xl bg-field"
+                      />
+                    ))}
+                  </View>
+                ) : sortedSearchResults.length === 0 ? (
+                  <View className="items-center rounded-2xl bg-field px-6 py-8">
+                    <Text className="text-lg text-ink font-outfit-bold">
+                      No schools found
+                    </Text>
+                    <Text className="mt-1 text-center text-base leading-5 text-muted font-outfit-medium">
+                      Try a school name, city, or state.
+                    </Text>
+                  </View>
+                ) : (
+                  sortedSearchResults.map((school: School) => (
+                    <PopularSchoolCard
+                      key={school.id}
+                      school={school}
+                      isSaved={favoriteSchoolIds.includes(school.id)}
+                      onPress={handleSchoolPress}
+                      onToggleSave={handleFavoritePress}
+                    />
+                  ))
+                )}
+              </View>
+            ) : isSearchFocused && trimmedSearch.length > 0 ? (
+              <View className="items-center rounded-2xl bg-field px-6 py-8">
+                <Text className="text-lg text-ink font-outfit-bold">
+                  Keep typing…
+                </Text>
+                <Text className="mt-1 text-center text-base leading-5 text-muted font-outfit-medium">
+                  Type at least three characters to find a school.
+                </Text>
+              </View>
+            ) : (
+              <View className="gap-8">
+                <HomeSchoolStories
+                  schools={favoriteSchools}
+                  onPress={handleSchoolPress}
+                />
 
-        {/* Tap outside the dropdown to close search mode. The dropdown itself is rendered above this backdrop. */}
-        {isOpen ? (
-          <Pressable
-            onPress={() => {
-              setIsOpen(false);
-              Keyboard.dismiss();
-            }}
-            className="absolute inset-0 z-40"
-            accessibilityLabel="Close school search"
-            accessibilityRole="button"
-          />
-        ) : null}
+                <HomeFeedRail
+                  title="Popular schools"
+                  subtitle="Tap a campus to open its map"
+                  isLoading={isLoadingPopular && popularSchools.length === 0}
+                  loadingAccessibilityLabel="Loading popular schools"
+                  error={popularError}
+                  onRetry={() => {
+                    setPopularError('');
+                    setPopularRetryNonce((nonce) => nonce + 1);
+                  }}
+                  retryAccessibilityLabel="Retry loading popular schools"
+                  isEmpty={popularSchools.length === 0}
+                  onEndReached={loadMorePopularSchools}
+                  isLoadingMore={isLoadingMorePopular}
+                  empty={
+                    <View className="items-center rounded-2xl bg-field px-6 py-8">
+                      <View className="h-14 w-14 items-center justify-center rounded-2xl bg-accent">
+                        <Feather name="trending-up" size={26} color={colors.brand} />
+                      </View>
+                      <Text className="mt-3 text-lg text-ink font-outfit-bold">
+                        No popular schools yet
+                      </Text>
+                      <Text className="mt-1 text-center text-base leading-5 text-muted font-outfit-medium">
+                        Schools with the most skate spots will show up here.
+                      </Text>
+                    </View>
+                  }
+                >
+                  {popularSchools.map((school: School) => {
+                    const isSaved = favoriteSchoolIds.includes(school.id);
 
-        {/* Dropdown Overlay Menu Results Container */}
-        {isOpen && (
-          <View
-            nativeID="school-search-results"
-            className="absolute left-5 right-5 z-50 overflow-hidden rounded-2xl border border-border-soft bg-surface"
-            style={{
-              maxHeight: isTabletLayout ? 440 : 320,
-              top: searchBarBottom + 8,
-              shadowColor: '#000000',
-              shadowOffset: { width: 0, height: 8 },
-              shadowOpacity: 0.12,
-              shadowRadius: 20,
-              elevation: 12,
-            }}
-          >
-            <View className="px-4 py-2 bg-slate-50 border-b border-slate-100">
-              <Text
-                accessibilityLiveRegion="polite"
-                className="font-outfit-bold text-xs text-muted"
-              >
-                {searchQuery.trim().length < 3
-                  ? 'Type 3 or more characters'
-                  : sortedSearchResults.length === 20
-                    ? '20+ schools, only first 20 listed'
-                    : `${sortedSearchResults.length} schools found`}
-              </Text>
-            </View>
-            <ScrollView
-              keyboardShouldPersistTaps="handled"
-              nestedScrollEnabled
-              showsVerticalScrollIndicator
-            >
-              {searchError ? (
-                <View className="flex-row items-center bg-white px-4 py-3">
-                  <Text
-                    accessibilityRole="alert"
-                    accessibilityLiveRegion="polite"
-                    className="flex-1 pr-3 text-base text-errorText font-outfit-medium"
-                  >
-                    Something went wrong. {searchError}
-                  </Text>
-                  <FeedbackPressable
-                    onPress={handleRetrySearch}
-                    className="rounded-xl bg-[#21473f] px-3 py-2"
-                    accessibilityRole="button"
-                    accessibilityLabel="Retry school search"
-                  >
-                    <Text className="font-outfit-bold text-xs text-white">Retry</Text>
-                  </FeedbackPressable>
+                    return (
+                      <HomeRailCard
+                        key={school.id}
+                        imageUrl={school.spotImageUrl}
+                        title={school.name}
+                        subtitle={`${school.city}, ${school.state}`}
+                        meta={
+                          <SchoolSpotCount
+                            count={school.numSpots}
+                            type={school.type}
+                          />
+                        }
+                        onPress={() => handleSchoolPress(school)}
+                        accessibilityLabel={`Open ${school.name} campus map`}
+                        accessory={
+                          <FeedbackPressable
+                            haptic="selection"
+                            onPress={() => handleFavoritePress(school)}
+                            className={`h-9 w-9 items-center justify-center rounded-full ${
+                              isSaved ? 'bg-accent' : 'bg-white'
+                            }`}
+                            accessibilityRole="button"
+                            accessibilityLabel={`${isSaved ? 'Remove' : 'Add'} ${school.name} ${isSaved ? 'from' : 'to'} saved schools`}
+                            accessibilityState={{ selected: isSaved }}
+                          >
+                            <Ionicons
+                              name={isSaved ? 'bookmark' : 'bookmark-outline'}
+                              size={16}
+                              color={isSaved ? colors.brand : colors.ink}
+                            />
+                          </FeedbackPressable>
+                        }
+                      />
+                    );
+                  })}
+                </HomeFeedRail>
+
+                <View>
+                  <View className="mb-4">
+                    <Text className="font-outfit-bold text-base text-ink">
+                      Latest spots
+                    </Text>
+                    <Text className="mt-0.5 font-outfit-medium text-sm text-muted">
+                      Like a spot here, or open it on the map
+                    </Text>
+                  </View>
+
+                  {isLoadingRecent && recentSpots.length === 0 ? (
+                    <View
+                      accessibilityLabel="Loading latest spots"
+                      className="gap-4"
+                    >
+                      {[0, 1].map((placeholder) => (
+                        <View
+                          key={placeholder}
+                          className="h-80 rounded-2xl bg-field"
+                        />
+                      ))}
+                    </View>
+                  ) : recentError && recentSpots.length === 0 ? (
+                    <View className="flex-row items-center rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2.5">
+                      <Text className="flex-1 pr-2 font-outfit-medium text-sm text-errorText">
+                        {recentError}
+                      </Text>
+                      <FeedbackPressable
+                        onPress={() => {
+                          setRecentError('');
+                          setRecentRetryNonce((nonce) => nonce + 1);
+                        }}
+                        className="rounded-xl bg-accent px-3 py-1.5"
+                        accessibilityRole="button"
+                        accessibilityLabel="Retry loading latest spots"
+                      >
+                        <Text className="font-outfit-bold text-sm text-brand">
+                          Retry
+                        </Text>
+                      </FeedbackPressable>
+                    </View>
+                  ) : recentSpots.length === 0 ? (
+                    <View className="items-center rounded-2xl bg-field px-6 py-8">
+                      <View className="h-14 w-14 items-center justify-center rounded-2xl bg-accent">
+                        <Feather name="map-pin" size={26} color={colors.brand} />
+                      </View>
+                      <Text className="mt-3 text-lg text-ink font-outfit-bold">
+                        No spots yet
+                      </Text>
+                      <Text className="mt-1 text-center text-base leading-5 text-muted font-outfit-medium">
+                        When someone adds a spot, it’ll show up here to like or
+                        open on the map.
+                      </Text>
+                    </View>
+                  ) : (
+                    <View className="gap-4">
+                      {recentSpots.map((spot) => (
+                        <HomeSpotPost
+                          key={spot.id}
+                          spot={spot}
+                          isLiking={likingSpotId === spot.id}
+                          onLike={handleLikeSpot}
+                          onViewMap={handleRecentSpotPress}
+                        />
+                      ))}
+                      {recentError ? (
+                        <View className="flex-row items-center rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2.5">
+                          <Text className="flex-1 pr-2 font-outfit-medium text-sm text-errorText">
+                            {recentError}
+                          </Text>
+                          <FeedbackPressable
+                            onPress={() => {
+                              setRecentError('');
+                              setRecentRetryNonce((nonce) => nonce + 1);
+                            }}
+                            className="rounded-xl bg-accent px-3 py-1.5"
+                            accessibilityRole="button"
+                            accessibilityLabel="Retry loading latest spots"
+                          >
+                            <Text className="font-outfit-bold text-sm text-brand">
+                              Retry
+                            </Text>
+                          </FeedbackPressable>
+                        </View>
+                      ) : isLoadingMoreRecent ? (
+                        <View className="items-center py-4">
+                          <ActivityIndicator color={colors.accent} />
+                        </View>
+                      ) : null}
+                    </View>
+                  )}
                 </View>
-              ) : isSearching ? (
-                <Text
-                  className="px-4 py-4 text-base text-slate-400 bg-white font-outfit-medium"
-                >
-                  Searching schools...
-                </Text>
-              ) : searchQuery.trim().length < 3 ? (
-                <Text
-                  className="px-4 py-4 text-base text-slate-400 bg-white font-outfit-medium"
-                >
-                  Keep typing to search by school&apos;s full name or city
-                </Text>
-              ) : sortedSearchResults.length > 0 ? (
-                sortedSearchResults.map((school: School) => (
-                  <SchoolRow
-                    key={school.id}
-                    school={school}
-                    displayNumSpots={getDisplaySpotCount(school)}
-                    isFavorite={favoriteSchoolIds.includes(school.id)}
-                    isSelected={selectedSchool?.id === school.id}
-                    onSelect={handleSchoolSelect}
-                    onFavoritePress={handleFavoritePress}
-                  />
-                ))
-              ) : (
-                <Text 
-                  className="px-4 py-4 text-base text-slate-400 bg-white font-outfit-medium"
-                >
-                  No schools found
-                </Text>
-              )}
-            </ScrollView>
-          </View>
-        )}
-      </View>
+              </View>
+            )}
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
 
-      <View
-        className="border-t border-border-soft bg-surface px-5 pt-3"
-        style={{ paddingBottom: Math.max(insets.bottom, 12) }}
-        pointerEvents={isOpen ? 'none' : 'auto'}
-      >
-        <FeedbackPressable
-          haptic="light"
-          onPress={handleGoPress}
-          disabled={!selectedSchool}
-          accessibilityRole="button"
-          accessibilityLabel={selectedSchool ? `Open ${selectedSchool.name} map` : 'Choose a school to continue'}
-          accessibilityState={{ disabled: !selectedSchool }}
-          className={`min-h-14 w-full max-w-[720px] self-center flex-row items-center justify-center rounded-2xl px-5 py-4 ${
-            selectedSchool ? 'bg-brand' : 'bg-disabledGreen'
-          }`}
-        >
-          <Text className="font-outfit-bold text-center text-lg text-white">
-            {selectedSchool ? 'View campus map' : 'Select a school to continue'}
-          </Text>
-          {selectedSchool ? (
-            <Feather name="chevron-right" size={20} color="#FFFFFF" />
-          ) : null}
-        </FeedbackPressable>
-      </View>
+      <LoginRequiredModal
+        visible={showLoginRequired}
+        onCancel={() => setShowLoginRequired(false)}
+      />
     </View>
   );
 }

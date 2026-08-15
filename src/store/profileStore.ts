@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { getApiUrl } from '../lib/api';
 import { supabase } from '../lib/supabase';
+import { sanitizeErrorMessage } from '../lib/userFacingError';
 import type { Profile } from '../types/profile';
 import { useSpotsStore } from './spotsStore';
 
@@ -72,7 +73,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
         profile: null,
         loading: false,
         loaded: false,
-        error: 'Unable to load your profile right now. Please try again.',
+        error: 'Couldn’t load your profile right now. Try again in a sec.',
       });
       return;
     }
@@ -138,7 +139,10 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
 
       if (!response.ok) {
         throw new Error(
-          data?.error ?? 'Could not save the username right now. Try again.'
+          sanitizeErrorMessage(
+            data?.error ?? '',
+            'Could not save the username right now. Try again.'
+          )
         );
       }
 
@@ -146,7 +150,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
         return {
           ok: false,
           taken: data?.taken === true,
-          message: data?.reason ?? "That username isn't allowed. Please pick another.",
+          message: data?.reason ?? 'Let’s try a different username.',
         };
       }
 
@@ -175,7 +179,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
       return { ok: true };
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
-        throw new Error('Saving the username timed out. Please try again.');
+        throw new Error('Saving the username timed out. Try again in a sec.');
       }
       throw error;
     } finally {

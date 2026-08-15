@@ -4,6 +4,7 @@ import {
     AUTH_REQUEST_TIMEOUT_MS,
     getSupabaseConfig,
     resolveUserId,
+    authUserMessage,
 } from './spots+api';
 
 
@@ -66,7 +67,7 @@ export async function POST(request: Request): Promise<Response> {
   const accessToken = readBearerToken(request);
   if (!accessToken) {
     return Response.json(
-      { error: 'Authentication is required to verify account deletion.' },
+      { error: authUserMessage('missing') },
       { status: 401 }
     );
   }
@@ -81,16 +82,9 @@ export async function POST(request: Request): Promise<Response> {
 
   const auth = await resolveUserId(config, accessToken);
   if (!auth.ok) {
-    if (auth.reason === 'timeout') {
-      return Response.json(
-        { error: 'Account verification timed out. Please try again.' },
-        { status: 503 }
-      );
-    }
-
     return Response.json(
-      { error: 'A valid session is required to verify account deletion.' },
-      { status: 401 }
+      { error: authUserMessage(auth.reason) },
+      { status: auth.reason === 'timeout' ? 503 : 401 }
     );
   }
 
@@ -128,7 +122,7 @@ export async function POST(request: Request): Promise<Response> {
     if (!response.ok) {
       console.error('Creating account-deletion proof failed:', response.status);
       return Response.json(
-        { error: 'Could not verify account deletion right now. Please try again.' },
+        { error: 'Couldn’t verify that. Try again in a sec.' },
         { status: 502 }
       );
     }
@@ -138,7 +132,7 @@ export async function POST(request: Request): Promise<Response> {
     const status = error instanceof Error && error.name === 'AbortError' ? 504 : 502;
     console.error('Creating account-deletion proof failed:', error);
     return Response.json(
-      { error: 'Could not verify account deletion right now. Please try again.' },
+      { error: 'Couldn’t verify that. Try again in a sec.' },
       { status }
     );
   } finally {

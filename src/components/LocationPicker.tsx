@@ -2,12 +2,14 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Image,
+    StyleSheet,
     Text,
     View
 } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import IMAGES from '../constants/images';
+import { colors } from '../constants/colors';
 import { useIsTabletLayout } from '../hooks/useIsTabletLayout';
 import { buildLocationPickerHtml } from '../lib/locationPickerMap';
 import type { MapLayer } from '../store/mapViewStore';
@@ -55,6 +57,7 @@ export default function LocationPicker({
   const isTabletLayout = useIsTabletLayout();
   const webViewRef = useRef<WebView>(null);
   const mapLayerRef = useRef<LayerType>(initialLayer);
+  const [mapLayer, setMapLayer] = useState<LayerType>(initialLayer);
   const [webViewAttempt, setWebViewAttempt] = useState(0);
   const [mapStatus, setMapStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [mapError, setMapError] = useState('');
@@ -132,6 +135,7 @@ export default function LocationPicker({
         const layer: LayerType =
           data.layer === 'satellite' ? 'satellite' : 'default';
         mapLayerRef.current = layer;
+        setMapLayer(layer);
       }
 
       if (
@@ -162,7 +166,7 @@ export default function LocationPicker({
   };
 
   return (
-    <View className="mb-6 overflow-hidden rounded-2xl border border-border-soft bg-surface-soft">
+    <View className="overflow-hidden rounded-2xl bg-field">
       <View
         className="relative bg-black"
         style={{ height: isTabletLayout ? 320 : 224 }}
@@ -192,12 +196,12 @@ export default function LocationPicker({
             setMapError('The location map could not be loaded.');
           }}
           onMessage={handleMessage}
-          style={{ flex: 1, backgroundColor: '#0b0f14' }}
+          style={{ flex: 1, backgroundColor: colors.brand }}
         />
 
         {mapStatus !== 'ready' ? (
           <View
-            className="absolute inset-0 items-center justify-center bg-[#0b0f14]/90 px-6"
+            className="absolute inset-0 items-center justify-center bg-brand/90 px-6"
             accessibilityLabel={`Location map unavailable. ${mapError || 'Check your connection and try again.'}`}
           >
             {mapStatus === 'loading' ? (
@@ -217,15 +221,36 @@ export default function LocationPicker({
                 </Text>
                 <FeedbackPressable
                   onPress={retryMap}
-                  className="mt-4 rounded-xl bg-white px-5 py-2.5"
+                  className="mt-4 rounded-xl bg-accent px-5 py-2.5"
                   accessibilityRole="button"
                   accessibilityLabel="Retry loading location map"
                 >
-                  <Text className="font-outfit-bold text-sm text-darkGreen">Retry</Text>
+                  <Text className="font-outfit-bold text-sm text-brand">Retry</Text>
                 </FeedbackPressable>
               </>
             )}
           </View>
+        ) : null}
+        {mapStatus === 'ready' ? (
+          <FeedbackPressable
+            haptic="selection"
+            onPress={() => {
+              webViewRef.current?.injectJavaScript(
+                `window.toggleLayer(); true;`
+              );
+            }}
+            className="absolute right-3 top-3 z-10 h-11 w-11 items-center justify-center rounded-full bg-white"
+            style={styles.mapControl}
+            accessibilityRole="button"
+            accessibilityLabel={
+              mapLayer === 'satellite'
+                ? 'Switch to standard map'
+                : 'Switch to satellite map'
+            }
+            accessibilityState={{ selected: mapLayer === 'satellite' }}
+          >
+            <Image source={IMAGES.layers} className="h-[18px] w-[18px] tint-brand" />
+          </FeedbackPressable>
         ) : null}
         {mapStatus === 'ready' ? (
           <View className="absolute left-1/2 top-1/2 h-[60px] w-[50px] -ml-[25px] -mt-[50px] items-center justify-start pointer-events-none">
@@ -238,9 +263,12 @@ export default function LocationPicker({
             <Svg width={50} height={50} viewBox="0 0 24 24">
               <Path
                 d="M12 22s7-6.4 7-12a7 7 0 1 0-14 0c0 5.6 7 12 7 12z"
-                fill="#FFFFFF"
+                fill={colors.accent}
+                stroke={colors.brand}
+                strokeWidth={1.5}
+                strokeLinejoin="round"
               />
-              <Circle cx="12" cy="10" r="2.5" fill="#21473f" />
+              <Circle cx="12" cy="10" r="2.5" fill={colors.white} />
             </Svg>
           </View>
         ) : null}
@@ -248,3 +276,13 @@ export default function LocationPicker({
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  mapControl: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
+    elevation: 6,
+  },
+});

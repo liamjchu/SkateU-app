@@ -1,8 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
+import { colors } from '../constants/colors';
 import { PASSWORD_REQUIREMENTS, validatePassword } from '../lib/password';
 import { changePassword } from '../lib/password-change';
+import FeedbackPressable from './FeedbackPressable';
 
 type ChangePasswordFormProps = {
   email: string;
@@ -29,7 +31,7 @@ const getChangePasswordErrorMessage = (changeError: unknown): string => {
     return 'Check your internet connection and try again.';
   }
 
-  return 'We could not update your password right now. Please try again.';
+  return 'Couldn’t update your password right now. Try again in a sec.';
 };
 
 function PasswordField({
@@ -43,20 +45,21 @@ function PasswordField({
   editable,
 }: PasswordFieldProps) {
   return (
-    <View className="flex-row items-center rounded-2xl bg-[#F0F3F5] pr-3">
+    <View className="flex-row items-center rounded-2xl border border-border-soft bg-field pl-5 pr-2">
       <TextInput
         value={value}
         onChangeText={onChangeText}
         accessibilityLabel={label}
         accessibilityHint="Enter your password"
         placeholder={placeholder}
-        placeholderTextColor="#52645F"
+        placeholderTextColor={colors.muted}
         secureTextEntry={!visible}
         autoCapitalize="none"
         autoCorrect={false}
         autoComplete={autoComplete}
         editable={editable}
-        className="flex-1 pl-4 pr-5 py-4 font-outfit-semibold text-base text-ink"
+        className="flex-1 py-4 font-outfit-semibold text-base text-ink"
+        style={{ padding: 0 }}
       />
       <Pressable
         onPress={onToggleVisibility}
@@ -69,7 +72,7 @@ function PasswordField({
         <Ionicons
           name={visible ? 'eye-outline' : 'eye-off-outline'}
           size={22}
-          color="#52645F"
+          color={colors.muted}
         />
       </Pressable>
     </View>
@@ -93,7 +96,7 @@ export default function ChangePasswordForm({ email }: ChangePasswordFormProps) {
     }
 
     if (!email) {
-      setError('You must be signed in to change your password.');
+      setError('Sign in to change your password.');
       return;
     }
     if (!currentPassword) {
@@ -190,7 +193,7 @@ export default function ChangePasswordForm({ email }: ChangePasswordFormProps) {
           accessible
           accessibilityRole="alert"
           accessibilityLiveRegion="polite"
-          className="rounded-2xl bg-surface-tinted px-4 py-3"
+          className="rounded-2xl bg-field px-4 py-3"
         >
           <Text selectable className="font-outfit-semibold text-sm text-ink">
             {success}
@@ -198,20 +201,23 @@ export default function ChangePasswordForm({ email }: ChangePasswordFormProps) {
         </View>
       ) : null}
 
-      <Pressable
+      <FeedbackPressable
+        haptic="light"
         onPress={handleSubmit}
         disabled={submitting}
-        className={`items-center justify-center rounded-2xl py-4 ${
-          submitting ? 'bg-disabledGreen' : 'bg-brand'
+        className={`min-h-14 items-center justify-center rounded-2xl py-4 ${
+          submitting ? 'bg-actionDisabled' : 'bg-accent'
         }`}
         accessibilityRole="button"
         accessibilityLabel={submitting ? 'Updating password' : 'Update password'}
         accessibilityState={{ disabled: submitting, busy: submitting }}
       >
-        <Text className="font-outfit-bold text-lg text-white">
-          {submitting ? 'Updating password...' : 'Update password'}
+        <Text
+          className={`font-outfit-bold text-lg ${submitting ? 'text-muted' : 'text-brand'}`}
+        >
+          {submitting ? 'Updating password…' : 'Update password'}
         </Text>
-      </Pressable>
+      </FeedbackPressable>
     </View>
   );
 }

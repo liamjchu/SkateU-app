@@ -18,6 +18,7 @@ describe("Home", () => {
     const skipLink = container.querySelector('a[href="#main-content"]');
 
     expect(skipLink?.textContent).toBe("Skip to content");
+    expect(container.querySelector('a[aria-label="SkateU home"]')?.getAttribute("href")).toBe("/");
     expect(container.textContent).toContain("Locals know the spots,");
     expect(container.textContent).toContain("Now you do too");
     expect(container.querySelector('form[aria-label="Join the SkateU waitlist"]')).not.toBeNull();

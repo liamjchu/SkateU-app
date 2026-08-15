@@ -1,5 +1,6 @@
 import fc from 'fast-check';
 import {
+    getSpotFormMissingSummary,
     isAddSpotFormValid,
     SPOT_DESCRIPTION_MAX,
     SPOT_DESCRIPTION_MIN,
@@ -94,5 +95,34 @@ describe('add-spot save enablement', () => {
     expect(isAddSpotFormValid('', 'Ledge', 'Nice ledge')).toBe(false);
     expect(isAddSpotFormValid('file:///x.jpg', '   ', 'Nice ledge')).toBe(false);
     expect(isAddSpotFormValid('file:///x.jpg', 'Ledge', '   ')).toBe(false);
+  });
+});
+
+describe('add-spot missing summary', () => {
+  it('names only the fields that are actually wrong', () => {
+    expect(getSpotFormMissingSummary('file:///x.jpg', '', 'Nice ledge')).toBe(
+      'Still needs a name.'
+    );
+    expect(getSpotFormMissingSummary('file:///x.jpg', 'Ledge', '')).toBe(
+      'Still needs a description.'
+    );
+    expect(getSpotFormMissingSummary(undefined, 'Ledge', 'Nice ledge')).toBe(
+      'Still needs a photo.'
+    );
+    expect(getSpotFormMissingSummary(undefined, '', 'Nice ledge')).toBe(
+      'Still needs a name and a photo.'
+    );
+    expect(getSpotFormMissingSummary(undefined, '', '')).toBe(
+      'Still needs a name, a photo, and a description.'
+    );
+    expect(getSpotFormMissingSummary('file:///x.jpg', '', '')).toBe(
+      'Still needs a name and a description.'
+    );
+    expect(
+      getSpotFormMissingSummary('file:///x.jpg', 'a'.repeat(SPOT_NAME_MAX + 1), 'Nice ledge')
+    ).toBe('That name’s a bit long.');
+    expect(getSpotFormMissingSummary('file:///x.jpg', 'Ledge', 'Nice ledge')).toBe(
+      null
+    );
   });
 });

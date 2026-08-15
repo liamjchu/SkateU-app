@@ -1,4 +1,8 @@
-import { imageFileToDataUrl, moderateSpotSubmission } from '../spotModeration';
+import {
+    imageFileToDataUrl,
+    moderateSpotSubmission,
+    softenModerationReason,
+} from '../spotModeration';
 
 const originalEnv = { ...process.env };
 const originalFetch = global.fetch;
@@ -55,5 +59,21 @@ describe('moderateSpotSubmission', () => {
     await expect(moderateSpotSubmission(submission)).rejects.toThrow('Spot moderation is unavailable.');
     await expect(moderateSpotSubmission(submission)).rejects.toThrow('Spot moderation is unavailable.');
     expect(errorSpy).toHaveBeenCalled();
+  });
+});
+
+describe('softenModerationReason', () => {
+  it('always returns deterministic field-specific copy', () => {
+    expect(
+      softenModerationReason('IRRELEVANT', 'That name doesn’t really say what the spot is.')
+    ).toBe('That name doesn’t really say what the spot is — try the obstacle or where it is.');
+    expect(
+      softenModerationReason('INAPPROPRIATE', 'This title is inappropriate and not allowed.')
+    ).toBe('Let’s keep the name school-friendly — tweak it and try again.');
+    expect(
+      softenModerationReason('IRRELEVANT', 'The description is prohibited spam.')
+    ).toBe(
+      'The description’s a little thin — a line about the ledge, rail, or run-up would help.'
+    );
   });
 });

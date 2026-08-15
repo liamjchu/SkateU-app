@@ -10,9 +10,11 @@ import {
     TextInput,
     View,
 } from 'react-native';
+import FeedbackPressable from '../components/FeedbackPressable';
 import ScreenHeader from '../components/screen-header';
 import { PASSWORD_REQUIREMENTS, validatePassword } from '../lib/password';
 import { updatePassword } from '../lib/password-reset';
+import { colors } from '../constants/colors';
 import { useAuthStore } from '../store/authStore';
 
 const getUpdateErrorMessage = (updateError: unknown): string => {
@@ -25,7 +27,7 @@ const getUpdateErrorMessage = (updateError: unknown): string => {
     return 'Check your internet connection and try again.';
   }
 
-  return 'We could not update your password right now. Please try again.';
+  return 'Couldn’t update your password right now. Try again in a sec.';
 };
 
 export default function UpdatePasswordScreen() {
@@ -91,7 +93,7 @@ export default function UpdatePasswordScreen() {
       <ScreenHeader
         title="New password"
         onBack={() => router.replace('/login')}
-        backAccessibilityLabel="Back to login"
+        backAccessibilityLabel="Back to sign in"
         backDisabled={submitting || success}
       />
 
@@ -105,8 +107,8 @@ export default function UpdatePasswordScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View className="flex-1 self-center w-full max-w-[640px] px-5 pt-8 pb-8">
-            <Text className="font-outfit-black text-3xl text-ink">
+          <View className="flex-1 self-center w-full max-w-[640px] px-6 pt-8 pb-8">
+            <Text className="font-outfit-black text-2xl text-ink">
               Create a new password
             </Text>
             <Text className="mt-2 font-outfit-medium text-base text-muted">
@@ -117,19 +119,20 @@ export default function UpdatePasswordScreen() {
             </Text>
 
             <View className="mt-8 gap-4">
-              <View className="flex-row items-center rounded-2xl bg-field pr-3">
+              <View className="flex-row items-center rounded-2xl border border-border-soft bg-field pl-5 pr-2">
                 <TextInput
                   value={password}
                   onChangeText={setPassword}
                   placeholder="New password"
-                  placeholderTextColor="#52645F"
+                  placeholderTextColor={colors.muted}
                   accessibilityLabel="New password"
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
                   autoCorrect={false}
                   autoComplete="new-password"
                   editable={!submitting && !success}
-                  className="flex-1 pl-4 pr-5 py-4 font-outfit-semibold text-base text-ink"
+                  className="flex-1 py-4 font-outfit-semibold text-base text-ink"
+                  style={{ padding: 0 }}
                 />
                 <Pressable
                   onPress={() => setShowPassword((visible) => !visible)}
@@ -143,24 +146,25 @@ export default function UpdatePasswordScreen() {
                   <Ionicons
                     name={showPassword ? 'eye-outline' : 'eye-off-outline'}
                     size={22}
-                    color="#52645F"
+                    color={colors.muted}
                   />
                 </Pressable>
               </View>
 
-              <View className="flex-row items-center rounded-2xl bg-field pr-3">
+              <View className="flex-row items-center rounded-2xl border border-border-soft bg-field pl-5 pr-2">
                 <TextInput
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   placeholder="Confirm new password"
-                  placeholderTextColor="#52645F"
+                  placeholderTextColor={colors.muted}
                   accessibilityLabel="Confirm new password"
                   secureTextEntry={!showConfirmation}
                   autoCapitalize="none"
                   autoCorrect={false}
                   autoComplete="new-password"
                   editable={!submitting && !success}
-                  className="flex-1 pl-4 pr-5 py-4 font-outfit-semibold text-base text-ink"
+                  className="flex-1 py-4 font-outfit-semibold text-base text-ink"
+                  style={{ padding: 0 }}
                 />
                 <Pressable
                   onPress={() => setShowConfirmation((visible) => !visible)}
@@ -176,7 +180,7 @@ export default function UpdatePasswordScreen() {
                   <Ionicons
                     name={showConfirmation ? 'eye-outline' : 'eye-off-outline'}
                     size={22}
-                    color="#52645F"
+                    color={colors.muted}
                   />
                 </Pressable>
               </View>
@@ -196,7 +200,8 @@ export default function UpdatePasswordScreen() {
                   accessible
                   accessibilityRole="alert"
                   accessibilityLiveRegion="polite"
-                  className="rounded-2xl bg-surface-tinted px-4 py-3">
+                  className="rounded-2xl bg-field px-4 py-3"
+                >
                   <Text
                     selectable
                     className="font-outfit-semibold text-sm text-ink"
@@ -205,20 +210,23 @@ export default function UpdatePasswordScreen() {
                   </Text>
                 </View>
               ) : (
-                <Pressable
+                <FeedbackPressable
+                  haptic="light"
                   onPress={handleSubmit}
                   disabled={submitting}
-                  className={`mt-2 items-center justify-center rounded-2xl py-4 ${
-                    submitting ? 'bg-disabledGreen' : 'bg-brand'
+                  className={`mt-2 min-h-14 items-center justify-center rounded-2xl py-4 ${
+                    submitting ? 'bg-actionDisabled' : 'bg-accent'
                   }`}
                   accessibilityRole="button"
                   accessibilityLabel={submitting ? 'Saving new password' : 'Save new password'}
                   accessibilityState={{ disabled: submitting, busy: submitting }}
                 >
-                  <Text className="font-outfit-bold text-lg text-white">
-                    {submitting ? 'Saving password...' : 'Save new password'}
+                  <Text
+                    className={`font-outfit-bold text-lg ${submitting ? 'text-muted' : 'text-brand'}`}
+                  >
+                    {submitting ? 'Saving…' : 'Save new password'}
                   </Text>
-                </Pressable>
+                </FeedbackPressable>
               )}
 
               {error.includes('expired') ? (
@@ -228,7 +236,7 @@ export default function UpdatePasswordScreen() {
                   className="items-center justify-center py-1"
                   accessibilityRole="button"
                 >
-                  <Text className="font-outfit-semibold text-sm text-slate-500">
+                  <Text className="font-outfit-semibold text-sm text-muted">
                     Request a new reset link
                   </Text>
                 </Pressable>

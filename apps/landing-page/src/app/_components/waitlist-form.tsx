@@ -94,7 +94,7 @@ export function WaitlistForm() {
   return (
     <>
       <form
-        className="mx-auto mt-8 flex w-full max-w-md flex-col gap-3 rounded-3xl border border-border-soft bg-surface p-2 sm:mt-10 sm:flex-row"
+        className="mx-auto mt-8 flex w-full max-w-md flex-col gap-3 rounded-2xl bg-surface p-2 sm:mt-10 sm:flex-row"
         aria-label="Join the SkateU waitlist"
         aria-busy={isSubmitting}
         onSubmit={handleSubmit}
@@ -109,7 +109,7 @@ export function WaitlistForm() {
           autoComplete="email"
           inputMode="email"
           placeholder="Your email address"
-          className="min-h-14 min-w-0 flex-1 rounded-2xl bg-field px-4 text-sm font-medium text-ink outline-none placeholder:text-muted focus:ring-2 focus:ring-brand focus:ring-offset-2 focus:ring-offset-surface"
+          className="min-h-14 min-w-0 flex-1 rounded-2xl bg-field px-4 text-sm font-medium text-ink outline-none placeholder:text-muted focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-surface"
           value={email}
           onChange={(event) => {
             setEmail(event.target.value);
@@ -121,7 +121,7 @@ export function WaitlistForm() {
         />
         <button
           type="submit"
-          className="min-h-14 rounded-2xl bg-darkGreen px-6 text-sm font-bold text-white transition-colors hover:bg-logoGreen focus:outline-none focus-visible:ring-2 focus-visible:ring-darkGreen focus:ring-offset-2 focus:ring-offset-white motion-reduce:transition-none"
+          className="min-h-14 rounded-xl bg-accent px-6 text-sm font-bold text-brand transition-colors hover:bg-accent-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus:ring-offset-2 focus:ring-offset-surface disabled:bg-actionDisabled disabled:text-muted motion-reduce:transition-none"
           disabled={isSubmitting}
         >
           Get early access
@@ -130,7 +130,7 @@ export function WaitlistForm() {
       <p
         className={
           isError
-            ? "mt-4 text-xs font-medium text-red-600"
+            ? "mt-4 text-xs font-medium text-errorText"
             : "mt-4 text-xs font-medium text-muted"
         }
         role={isError ? "alert" : "status"}

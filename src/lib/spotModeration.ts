@@ -12,7 +12,7 @@ RELEVANCE: Use a forgiving, best-effort interpretation. The title and descriptio
 
 Reject as IRRELEVANT only when the image and text together provide no plausible spot or session context, such as pure random letters or characters, obvious spam, meme-only or nonsensical text, or a clearly unrelated image paired with no meaningful context. Imperfect but meaningful words are enough; do not confuse misspellings or unusual skate slang with gibberish. When uncertain between a genuine-looking spot claim and irrelevance, approve. Only the strict APPROPRIATENESS and privacy rules override this leniency.
 
-Always apply the strict APPROPRIATENESS filter even when relevance is uncertain. If both rules are violated, use INAPPROPRIATE. Return ONLY compact JSON in exactly this shape: {"approved": boolean, "flag": "NONE" | "INAPPROPRIATE" | "IRRELEVANT", "reason": string}. If approved, flag must be NONE and reason must be empty. If rejected, reason must be a polite, user-facing explanation in 1-2 sentences that references the specific issue without repeating offensive content.`;
+Always apply the strict APPROPRIATENESS filter even when relevance is uncertain. If both rules are violated, use INAPPROPRIATE. Return ONLY compact JSON in exactly this shape: {"approved": boolean, "flag": "NONE" | "INAPPROPRIATE" | "IRRELEVANT", "reason": string}. If approved, flag must be NONE and reason must be empty. If rejected, reason must be one short, gentle, casual sentence, like a friend giving a nudge. Name only the part that is actually wrong: the title, the description, or the photo. Do not mention a field that is fine. Do not mention more than one field unless more than one field is actually the problem. Do not scold, accuse, or use words like inappropriate, prohibited, violates, not allowed, rejected, unsafe, or forbidden. Do not repeat offensive content.`;
 
 type TextPart = { type: 'text'; text: string };
 type ImagePart = {
@@ -73,6 +73,61 @@ function parseVerdict(content: string): SpotModerationVerdict {
   }
 
   return { approved: false, flag, reason };
+}
+
+function mentionedFields(reason: string): {
+  title: boolean;
+  description: boolean;
+  photo: boolean;
+} {
+  const lower = reason.toLowerCase();
+  return {
+    title: /\b(title|name)\b/.test(lower),
+    description: /\bdescription\b/.test(lower),
+    photo: /\b(photo|image|picture)\b/.test(lower),
+  };
+}
+
+function gentleFieldReason(
+  flag: 'INAPPROPRIATE' | 'IRRELEVANT',
+  reason: string
+): string {
+  const fields = mentionedFields(reason);
+  const onlyTitle = fields.title && !fields.description && !fields.photo;
+  const onlyDescription = fields.description && !fields.title && !fields.photo;
+  const onlyPhoto = fields.photo && !fields.title && !fields.description;
+
+  if (flag === 'INAPPROPRIATE') {
+    if (onlyTitle) {
+      return 'Let’s keep the name school-friendly — tweak it and try again.';
+    }
+    if (onlyDescription) {
+      return 'Let’s keep the description school-friendly — tweak it and try again.';
+    }
+    if (onlyPhoto) {
+      return 'Let’s try a different photo for this one.';
+    }
+    return 'Let’s keep this one school-friendly and try again.';
+  }
+
+  if (onlyTitle) {
+    return 'That name doesn’t really say what the spot is — try the obstacle or where it is.';
+  }
+  if (onlyDescription) {
+    return 'The description’s a little thin — a line about the ledge, rail, or run-up would help.';
+  }
+  if (onlyPhoto) {
+    return 'That photo’s a little hard to read as a skate spot — a clearer shot of the obstacle would help.';
+  }
+  return 'This one doesn’t quite read as a skate spot yet — add a little more about what you’re skating.';
+}
+
+/** Rewrites a model rejection into short, gentle copy the user can act on. */
+export function softenModerationReason(
+  flag: 'INAPPROPRIATE' | 'IRRELEVANT',
+  reason: string
+): string {
+  return gentleFieldReason(flag, reason.trim());
 }
 
 /** Convert an uploaded image into a data URL without exposing it to the client. */

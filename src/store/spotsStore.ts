@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { getApiUrl } from '../lib/api';
+import { sanitizeErrorMessage } from '../lib/userFacingError';
 import type { NewSpotInput, Spot, UpdateSpotInput } from '../types/spot';
 
 
@@ -24,7 +25,7 @@ type SpotsState = {
     id: string,
     likedByUser: boolean,
     accessToken: string
-  ) => Promise<void>;
+  ) => Promise<{ likedByUser: boolean; likeCount: number }>;
   updateSpot: (
     id: string,
     input: UpdateSpotInput,
@@ -40,14 +41,14 @@ type SpotsState = {
 // Reads stay short, while mutations get enough time for moderation and image upload.
 const REQUEST_TIMEOUT_MS = 10_000;
 const MUTATION_TIMEOUT_MS = 60_000;
-const SAVE_TIMEOUT_ERROR = 'Saving this spot timed out. Please try again.';
+const SAVE_TIMEOUT_ERROR = 'Saving this spot timed out. Try again in a sec.';
 
 const INVALID_SCHOOL_ID_ERROR =
   'A valid school identifier is required to load spots.';
-const LOAD_FAILED_ERROR = 'Unable to load spots right now.';
-const LOAD_TIMEOUT_ERROR = 'Loading spots timed out. Please try again.';
-const MY_SPOTS_LOAD_FAILED_ERROR = 'Unable to load your spots right now.';
-const LIKED_SPOTS_LOAD_FAILED_ERROR = 'Unable to load liked spots right now.';
+const LOAD_FAILED_ERROR = 'Couldn’t load spots right now.';
+const LOAD_TIMEOUT_ERROR = 'Loading spots timed out. Try again in a sec.';
+const MY_SPOTS_LOAD_FAILED_ERROR = 'Couldn’t load your spots right now.';
+const LIKED_SPOTS_LOAD_FAILED_ERROR = 'Couldn’t load liked spots right now.';
 
 let spotsRequestVersion = 0;
 let mySpotsRequestVersion = 0;
@@ -115,10 +116,10 @@ async function readErrorMessage(response: Response): Promise<string> {
       reason?: string;
     };
     if (typeof data.error === 'string' && data.error.length > 0) {
-      return data.error;
+      return sanitizeErrorMessage(data.error, LOAD_FAILED_ERROR);
     }
     if (typeof data.reason === 'string' && data.reason.length > 0) {
-      return data.reason;
+      return sanitizeErrorMessage(data.reason, LOAD_FAILED_ERROR);
     }
   } catch {
     // Body was not JSON; fall through to the status-based message.
@@ -128,7 +129,11 @@ async function readErrorMessage(response: Response): Promise<string> {
   // paused backend, a flaky tunnel), not our API — which always returns a JSON
   // `{ error }`. Show a friendlier, retryable message instead of a raw status.
   if (response.status >= 500) {
-    return 'The server is temporarily unavailable. Please try again.';
+    return 'The server is temporarily unavailable. Try again in a sec.';
+  }
+
+  if (response.status === 401) {
+    return 'Sign in again to keep going.';
   }
 
   return `Request failed with status ${response.status}.`;
@@ -450,7 +455,7 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
       return {
         spots: updatedSpots,
         mySpots: updatedMySpots,
-        likedSpots: likedSpot
+        likedSpots:         likedSpot
           ? [
               likedSpot,
               ...updatedLikedSpots.filter((spot) => spot.id !== id),
@@ -458,6 +463,8 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
           : updatedLikedSpots,
       };
     });
+
+    return { likedByUser: nextLiked, likeCount: nextCount };
   },
 
   updateSpot: async (id: string, input: UpdateSpotInput, accessToken: string) => {

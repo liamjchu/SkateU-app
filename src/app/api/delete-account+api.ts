@@ -4,6 +4,7 @@ import {
     AUTH_REQUEST_TIMEOUT_MS,
     getSupabaseConfig,
     resolveUserId,
+    authUserMessage,
 } from './spots+api';
 
 // Permanently deletes the signed-in user's account only after a newly verified
@@ -71,7 +72,7 @@ export async function DELETE(request: Request): Promise<Response> {
   const accessToken = readBearerToken(request);
   if (!accessToken) {
     return Response.json(
-      { error: 'Authentication is required to delete your account.' },
+      { error: authUserMessage('missing') },
       { status: 401 }
     );
   }
@@ -86,18 +87,10 @@ export async function DELETE(request: Request): Promise<Response> {
 
   const auth = await resolveUserId(config, accessToken);
   if (!auth.ok) {
-    if (auth.reason === 'timeout') {
-      return Response.json(
-        { error: 'Account verification timed out. Please try again.' },
-        { status: 503 }
-      );
-    }
-
-    const message =
-      auth.reason === 'expired'
-        ? 'The access token is expired.'
-        : 'The access token is invalid.';
-    return Response.json({ error: message }, { status: 401 });
+    return Response.json(
+      { error: authUserMessage(auth.reason) },
+      { status: auth.reason === 'timeout' ? 503 : 401 }
+    );
   }
 
   const proof = readDeletionProof(request);
@@ -111,7 +104,7 @@ export async function DELETE(request: Request): Promise<Response> {
   const proofConsumption = await consumeDeletionProof(config, auth.userId, proof);
   if (proofConsumption === 'unavailable') {
     return Response.json(
-      { error: 'Could not verify account deletion right now. Please try again.' },
+      { error: 'Couldn’t finish deleting your account. Try again in a sec.' },
       { status: 503 }
     );
   }

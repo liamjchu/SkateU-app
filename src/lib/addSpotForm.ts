@@ -23,19 +23,19 @@ export function getSpotFormErrors(
   const descriptionLength = description.trim().length;
 
   if (!imageUri) {
-    errors.image = 'Add a photo to continue.';
+    errors.image = 'Still needs a photo.';
   }
 
   if (nameLength < SPOT_NAME_MIN) {
-    errors.name = 'Enter a spot name.';
+    errors.name = 'Still needs a name.';
   } else if (nameLength > SPOT_NAME_MAX) {
-    errors.name = `Keep the spot name to ${SPOT_NAME_MAX} characters or fewer.`;
+    errors.name = 'That name’s a bit long.';
   }
 
   if (descriptionLength < SPOT_DESCRIPTION_MIN) {
-    errors.description = 'Enter a description.';
+    errors.description = 'Still needs a description.';
   } else if (descriptionLength > SPOT_DESCRIPTION_MAX) {
-    errors.description = `Keep the description to ${SPOT_DESCRIPTION_MAX} characters or fewer.`;
+    errors.description = 'That description’s a bit long.';
   }
 
   return errors;
@@ -47,4 +47,72 @@ export function isAddSpotFormValid(
   description: string
 ): boolean {
   return Object.keys(getSpotFormErrors(imageUri, name, description)).length === 0;
+}
+
+function joinCasualList(items: string[]): string {
+  if (items.length === 1) {
+    return items[0];
+  }
+  if (items.length === 2) {
+    return `${items[0]} and ${items[1]}`;
+  }
+
+  return `${items.slice(0, -1).join(', ')}, and ${items[items.length - 1]}`;
+}
+
+function joinWithArticles(items: string[]): string {
+  const withArticles = items.map((item) => `a ${item}`);
+  return joinCasualList(withArticles);
+}
+
+export function getSpotFormMissingSummary(
+  imageUri: string | undefined,
+  name: string,
+  description: string
+): string | null {
+  const errors = getSpotFormErrors(imageUri, name, description);
+  const messages = [errors.name, errors.image, errors.description].filter(
+    (message): message is string => Boolean(message)
+  );
+
+  if (messages.length === 0) {
+    return null;
+  }
+  if (messages.length === 1) {
+    return messages[0];
+  }
+
+  const missing: string[] = [];
+  if (errors.name && name.trim().length < SPOT_NAME_MIN) {
+    missing.push('name');
+  }
+  if (errors.image) {
+    missing.push('photo');
+  }
+  if (errors.description && description.trim().length < SPOT_DESCRIPTION_MIN) {
+    missing.push('description');
+  }
+
+  const tooLong: string[] = [];
+  if (errors.name && name.trim().length > SPOT_NAME_MAX) {
+    tooLong.push('name');
+  }
+  if (
+    errors.description &&
+    description.trim().length > SPOT_DESCRIPTION_MAX
+  ) {
+    tooLong.push('description');
+  }
+
+  if (tooLong.length === 0 && missing.length > 0) {
+    return `Still needs ${joinWithArticles(missing)}.`;
+  }
+  if (missing.length === 0 && tooLong.length === 1) {
+    return `That ${tooLong[0]}’s a bit long.`;
+  }
+  if (missing.length === 0 && tooLong.length > 1) {
+    return `That ${joinCasualList(tooLong)} are a bit long.`;
+  }
+
+  return messages.join(' ');
 }

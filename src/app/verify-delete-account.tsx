@@ -3,12 +3,13 @@ import { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
-    Pressable,
     Text,
     TextInput,
     View,
 } from 'react-native';
+import FeedbackPressable from '../components/FeedbackPressable';
 import ScreenHeader from '../components/screen-header';
+import { colors } from '../constants/colors';
 import { useAuthStore } from '../store/authStore';
 
 const CODE_LENGTH = 6;
@@ -54,7 +55,7 @@ export default function VerifyDeleteAccountScreen() {
       return;
     }
 
-    router.replace('/profile');
+    router.replace('/settings');
   };
 
   const handleChangeCode = (value: string) => {
@@ -134,24 +135,24 @@ export default function VerifyDeleteAccountScreen() {
     <View className="flex-1 bg-surface">
       <ScreenHeader title="Delete account" onBack={goBack} />
 
-      <View className="flex-1 self-center w-full max-w-[640px] px-5 pt-8 pb-8">
-        <Text className="font-outfit-black text-3xl text-ink">
+      <View className="flex-1 self-center w-full max-w-[640px] px-6 pt-8 pb-8">
+        <Text className="font-outfit-black text-2xl text-ink">
           Enter your code
         </Text>
-        <Text className="mt-2 font-outfit-medium text-base text-slate-500">
+        <Text className="mt-2 font-outfit-medium text-base text-muted">
           {email
             ? `We sent a 6-digit verification code to ${email}. Enter it to permanently delete your account.`
             : 'Enter the 6-digit verification code we emailed you to permanently delete your account.'}
         </Text>
 
         <View className="mt-8 gap-4">
-          <Pressable
+          <FeedbackPressable
             onPress={() => inputRef.current?.focus()}
             accessibilityRole="button"
             accessibilityLabel={`Verification code, ${code.length} of ${CODE_LENGTH} digits entered`}
             accessibilityHint="Opens the 6-digit verification code input"
           >
-            <View className="flex-row justify-between">
+            <View className="flex-row gap-2">
               {cells.map((_, index) => {
                 const char = code[index] ?? '';
                 const isActive = index === code.length;
@@ -159,8 +160,8 @@ export default function VerifyDeleteAccountScreen() {
                 return (
                   <View
                     key={index}
-                    className={`h-14 flex-1 mx-1 items-center justify-center rounded-2xl bg-[#F0F3F5] ${
-                      isActive ? 'border-2 border-[#21473f]' : ''
+                    className={`h-14 flex-1 items-center justify-center rounded-2xl bg-field ${
+                      isActive ? 'border-2 border-accent' : 'border border-border-soft'
                     }`}
                   >
                     <Text className="font-outfit-bold text-2xl text-ink">
@@ -170,7 +171,7 @@ export default function VerifyDeleteAccountScreen() {
                 );
               })}
             </View>
-          </Pressable>
+          </FeedbackPressable>
 
           <TextInput
             ref={inputRef}
@@ -199,36 +200,38 @@ export default function VerifyDeleteAccountScreen() {
 
           {notice ? (
             <View
-            accessible
-            accessibilityRole="alert"
-            accessibilityLiveRegion="polite"
-            className="rounded-2xl bg-surface-tinted px-4 py-3">
+              accessible
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
+              className="rounded-2xl bg-field px-4 py-3"
+            >
               <Text className="font-outfit-semibold text-sm text-ink">
                 {notice}
               </Text>
             </View>
           ) : null}
 
-          <Pressable
+          <FeedbackPressable
+            haptic="warning"
             onPress={() => submitCode(code)}
             disabled={submitting}
             className={`mt-2 h-14 flex-row items-center justify-center rounded-2xl ${
-              submitting ? 'bg-disabledGreen' : 'bg-errorText'
+              submitting ? 'bg-actionDisabled' : 'bg-errorText'
             }`}
             accessibilityLabel={submitting ? 'Verifying and deleting account' : 'Confirm account deletion'}
             accessibilityRole="button"
             accessibilityState={{ disabled: submitting, busy: submitting }}
           >
             {submitting ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color={colors.muted} />
             ) : (
               <Text className="font-outfit-bold text-lg text-white">
                 Verify and delete
               </Text>
             )}
-          </Pressable>
+          </FeedbackPressable>
 
-          <Pressable
+          <FeedbackPressable
             onPress={handleResend}
             disabled={resending || cooldown > 0}
             className="min-h-12 items-center justify-center px-2 py-1"
@@ -244,16 +247,16 @@ export default function VerifyDeleteAccountScreen() {
           >
             <Text
               className={`font-outfit-semibold text-base ${
-                cooldown > 0 || resending ? 'text-muted' : 'text-brand'
+                cooldown > 0 || resending ? 'text-muted' : 'text-accent'
               }`}
             >
               {resending
-                ? 'Sending...'
+                ? 'Sending…'
                 : cooldown > 0
                   ? `Resend code in ${cooldown}s`
                   : 'Resend code'}
             </Text>
-          </Pressable>
+          </FeedbackPressable>
         </View>
       </View>
     </View>

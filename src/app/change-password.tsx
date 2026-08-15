@@ -14,12 +14,12 @@ export default function ChangePasswordScreen() {
       return;
     }
 
-    router.replace('/profile');
+    router.replace('/settings');
   };
 
   return (
     <View className="flex-1 bg-surface">
-      <ScreenHeader title="Account settings" onBack={goBack} />
+      <ScreenHeader title="Change password" onBack={goBack} />
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -31,7 +31,7 @@ export default function ChangePasswordScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View className="flex-1 self-center w-full max-w-[640px] px-5 pt-8 pb-8">
+          <View className="flex-1 self-center w-full max-w-[640px] px-6 pt-8 pb-8">
             <ChangePasswordForm email={email} />
           </View>
         </ScrollView>

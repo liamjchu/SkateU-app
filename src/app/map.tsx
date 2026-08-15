@@ -1,4 +1,4 @@
-﻿import { Feather, Octicons } from '@expo/vector-icons';
+﻿import { Feather, Ionicons, Octicons } from '@expo/vector-icons';
 import {
     useFocusEffect,
     useLocalSearchParams,
@@ -30,10 +30,14 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import FeedbackPressable from '../components/FeedbackPressable';
+import ImageLightbox from '../components/image-lightbox';
 import LoginRequiredModal from '../components/LoginRequiredModal';
+import { StickerStripe } from '../components/sticker';
 import images from '../constants/images';
+import { colors, svgHex } from '../constants/colors';
 import { triggerHaptic } from '../lib/haptics';
 import { formatRelativeTime } from '../lib/relativeTime';
+import { toUserFacingError } from '../lib/userFacingError';
 import { useAuthStore } from '../store/authStore';
 import { useFavorites } from '../store/favoritesStore';
 import { useMapViewStore } from '../store/mapViewStore';
@@ -48,6 +52,11 @@ const MAP_ATTRIBUTIONS = {
   default: '© OpenStreetMap contributors © CARTO',
   satellite:
     'Tiles © Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+} as const;
+
+const MAP_ATTRIBUTION_SHORT = {
+  default: '© OpenStreetMap · CARTO',
+  satellite: 'Tiles © Esri',
 } as const;
 
 export default function MapScreen() {
@@ -82,6 +91,11 @@ export default function MapScreen() {
   const [mapStatus, setMapStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [mapError, setMapError] = useState('');
   const [selectedSpotId, setSelectedSpotId] = useState<string | undefined>(initialSpotId);
+  // Recenter only when arriving from another screen with a spot selected.
+  // Tapping a pin on the map should leave the camera alone.
+  const selectionSourceRef = useRef<'navigation' | 'map'>(
+    initialSpotId ? 'navigation' : 'map'
+  );
   const initialMapLayer: 'default' | 'satellite' =
     searchParams.layer === 'satellite' || searchParams.layer === 'default'
       ? searchParams.layer
@@ -91,11 +105,15 @@ export default function MapScreen() {
   );
   const [showAttribution, setShowAttribution] = useState(false);
   const [showLoginRequired, setShowLoginRequired] = useState(false);
+  const [lightboxUri, setLightboxUri] = useState<string | null>(null);
   const [likingSpotId, setLikingSpotId] = useState<string | null>(null);
   const [deletingSpotId, setDeletingSpotId] = useState<string | null>(null);
+  const [emptySpotsNoticeDismissed, setEmptySpotsNoticeDismissed] =
+    useState(false);
   const sheetHeight = useSharedValue(0);
   const sheetTranslateY = useSharedValue(0);
   const sheetStartY = useSharedValue(0);
+  const [sheetLayoutHeight, setSheetLayoutHeight] = useState(0);
 
   useEffect(() => {
     if (!hasInitializedMapLayerRef.current) {
@@ -207,7 +225,12 @@ export default function MapScreen() {
     return { label: wasEdited ? 'edited' : 'added', relative };
   }, [selectedSpot]);
 
-  const html = `
+  const htmlMapLayerRef = useRef<'default' | 'satellite'>(initialMapLayer);
+
+  const html = useMemo(() => {
+    const htmlMapLayer = htmlMapLayerRef.current;
+
+    return `
   <!DOCTYPE html>
   <html>
   <head>
@@ -216,10 +239,10 @@ export default function MapScreen() {
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
     <style>
       /* FIXED: Changed 100vh/100vw to 100%. WebViews often collapse vh/vw units to 0 */
-      html, body { margin: 0; padding: 0; background: #21473f; width: 100%; height: 100%; }
+      html, body { margin: 0; padding: 0; background: ${colors.brand}; width: 100%; height: 100%; }
       #map { height: 100%; width: 100%; }
-      .leaflet-popup-content-wrapper { background: #21473f; color: white; border-radius: 12px; }
-      .leaflet-popup-tip { background: #21473f; }
+      .leaflet-popup-content-wrapper { background: ${colors.brand}; color: white; border-radius: 12px; }
+      .leaflet-popup-tip { background: ${colors.brand}; }
       .leaflet-control-attribution { display: none; }
 
       /*brightness of the map, darken it so the pin can show*/
@@ -248,7 +271,7 @@ export default function MapScreen() {
       try {
         const center = [${validLat}, ${validLng}];
         const spotIcon = L.icon({
-          iconUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 22s7-6.4 7-12a7 7 0 1 0-14 0c0 5.6 7 12 7 12z" fill="%23FFFFFF" stroke="%23FFFFFF" stroke-width="0"/><circle cx="12" cy="10" r="2.5" fill="%2321473f"/></svg>',
+          iconUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 22s7-6.4 7-12a7 7 0 1 0-14 0c0 5.6 7 12 7 12z" fill="${svgHex(colors.accent)}" stroke="${svgHex(colors.brand)}" stroke-width="1.5" stroke-linejoin="round"/><circle cx="12" cy="10" r="2.5" fill="${svgHex(colors.white)}"/></svg>',
           iconSize: [50, 50],
           iconAnchor: [25, 50],
 
@@ -280,13 +303,13 @@ export default function MapScreen() {
         defaultLayer.on('tileerror', reportTileError);
         satelliteLayer.on('tileerror', reportTileError);
 
-        const selectedLayer = '${initialMapLayer}' === 'satellite'
+        const selectedLayer = '${htmlMapLayer}' === 'satellite'
           ? satelliteLayer
           : defaultLayer;
         window.currentLayer = selectedLayer.addTo(window.map);
         document.getElementById('map').classList.toggle(
           'satellite',
-          '${initialMapLayer}' === 'satellite'
+          '${htmlMapLayer}' === 'satellite'
         );
 
         const campusCenter = L.latLng(${validLat}, ${validLng});
@@ -295,8 +318,24 @@ export default function MapScreen() {
           window.map.setView(campusCenter, window.map.getZoom(), { animate: true });
         };
 
+        window.focusLatLng = function (lat, lng, bottomPadding, topPadding) {
+          if (!window.map) return;
+          window.map.invalidateSize();
+          const target = L.latLng(lat, lng);
+          const zoom = window.map.getZoom();
+          window.map.setView(target, zoom, { animate: false });
+          const size = window.map.getSize();
+          const top = Number(topPadding) || 0;
+          const bottom = Number(bottomPadding) || 0;
+          const visibleMidY = top + Math.max(size.y - top - bottom, 0) / 2;
+          window.map.panBy([0, size.y / 2 - visibleMidY], { animate: true });
+        };
+
         window.setMapLayer = function (layer) {
           if (!window.map || (layer !== 'default' && layer !== 'satellite')) return;
+
+          const center = window.map.getCenter();
+          const zoom = window.map.getZoom();
 
           if (layer === 'satellite' && window.currentLayer === defaultLayer) {
             window.map.removeLayer(defaultLayer);
@@ -309,6 +348,8 @@ export default function MapScreen() {
             window.currentLayer = defaultLayer;
             document.getElementById('map').classList.remove('satellite');
           }
+
+          window.map.setView(center, zoom, { animate: false });
 
           if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
             window.ReactNativeWebView.postMessage(JSON.stringify({
@@ -368,6 +409,15 @@ export default function MapScreen() {
           });
         };
 
+        if (${initialSpotId ? 'true' : 'false'}) {
+          window.focusLatLng(
+            ${validLat},
+            ${validLng},
+            Math.round((window.innerHeight || 0) * 0.56) + 16,
+            ${insets.top + 81}
+          );
+        }
+
         if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
           window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'WEBVIEW_READY' }));
         }
@@ -384,6 +434,12 @@ export default function MapScreen() {
   </body>
   </html>
   `;
+  }, [initialSpotId, insets.top, mapAttempt, validLat, validLng]);
+
+  const webViewSource = useMemo(
+    () => ({ html, baseUrl: 'https://localhost' }),
+    [html]
+  );
 
   const sendMarkers = useCallback(() => {
     if (!webViewRef.current) return;
@@ -403,6 +459,12 @@ export default function MapScreen() {
 
   // Refetch when the screen regains focus so a spot just created on the
   // add-spot screen shows up on return.
+  useFocusEffect(
+    useCallback(() => {
+      setEmptySpotsNoticeDismissed(false);
+    }, [schoolId])
+  );
+
   useFocusEffect(
     useCallback(() => {
       if (schoolId) {
@@ -431,17 +493,19 @@ export default function MapScreen() {
 
   useEffect(() => {
     if (initialSpotId && spots.some((spot) => spot.id === initialSpotId)) {
+      selectionSourceRef.current = 'navigation';
       setSelectedSpotId(initialSpotId);
     }
   }, [initialSpotId, spots]);
 
   const retryMap = useCallback(() => {
+    htmlMapLayerRef.current = mapLayer;
     webViewReadyRef.current = false;
     tileErrorCountRef.current = 0;
     setMapError('');
     setMapStatus('loading');
     setMapAttempt((attempt) => attempt + 1);
-  }, []);
+  }, [mapLayer]);
 
   const retrySpots = useCallback(() => {
     if (schoolId) {
@@ -451,14 +515,28 @@ export default function MapScreen() {
 
   useEffect(() => {
     if (selectedSpotId && !selectedSpot) {
+      if (loading || selectedSpotId === initialSpotId) {
+        return;
+      }
       setSelectedSpotId(undefined);
     }
-  }, [selectedSpot, selectedSpotId]);
+  }, [initialSpotId, loading, selectedSpot, selectedSpotId]);
+
+  useEffect(() => {
+    if (!selectedSpot) {
+      setLightboxUri(null);
+    }
+  }, [selectedSpot]);
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener(
       'hardwareBackPress',
       () => {
+        if (lightboxUri) {
+          setLightboxUri(null);
+          return true;
+        }
+
         if (!selectedSpotId) {
           return false;
         }
@@ -469,14 +547,41 @@ export default function MapScreen() {
     );
 
     return () => subscription.remove();
-  }, [selectedSpotId]);
+  }, [lightboxUri, selectedSpotId]);
 
   useEffect(() => {
     if (selectedSpot) {
       sheetTranslateY.value = 0;
       sheetStartY.value = 0;
+    } else {
+      setSheetLayoutHeight(0);
     }
   }, [selectedSpot, sheetStartY, sheetTranslateY]);
+
+  useEffect(() => {
+    if (!selectedSpot || mapStatus !== 'ready') {
+      return;
+    }
+
+    if (selectionSourceRef.current !== 'navigation') {
+      return;
+    }
+
+    const topPadding = insets.top + 81;
+    const sheetCover =
+      (sheetLayoutHeight > 0 ? sheetLayoutHeight : Math.round(height * 0.56)) + 16;
+    webViewRef.current?.injectJavaScript(
+      `window.focusLatLng(${selectedSpot.latitude},${selectedSpot.longitude},${sheetCover},${topPadding}); true;`
+    );
+  }, [
+    height,
+    insets.top,
+    mapStatus,
+    selectedSpot?.id,
+    selectedSpot?.latitude,
+    selectedSpot?.longitude,
+    sheetLayoutHeight,
+  ]);
 
   const sheetAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: sheetTranslateY.value }],
@@ -566,10 +671,8 @@ export default function MapScreen() {
       triggerHaptic('light');
     } catch (error) {
       Alert.alert(
-        'Could not update like',
-        error instanceof Error && error.message.length > 0
-          ? error.message
-          : 'Please try again.'
+        'Couldn’t update that like',
+        toUserFacingError(error, 'Try again in a sec.')
       );
     } finally {
       setLikingSpotId(null);
@@ -594,8 +697,8 @@ export default function MapScreen() {
     triggerHaptic('warning');
     const spotToDelete = selectedSpot;
     Alert.alert(
-      'Delete spot?',
-      `"${spotToDelete.name}" will be permanently removed for everyone. This cannot be undone.`,
+      'Delete this spot?',
+      `"${spotToDelete.name}" will be gone for everyone.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -604,7 +707,7 @@ export default function MapScreen() {
           onPress: async () => {
             const accessToken = session?.access_token;
             if (!accessToken) {
-              Alert.alert('You must be signed in to delete a spot.');
+              Alert.alert('Sign in to delete a spot.');
               return;
             }
 
@@ -615,10 +718,8 @@ export default function MapScreen() {
               setSelectedSpotId(undefined);
             } catch (error) {
               Alert.alert(
-                'Could not delete spot',
-                error instanceof Error && error.message.length > 0
-                  ? error.message
-                  : 'Please try again.'
+                'Couldn’t delete that spot',
+                toUserFacingError(error, 'Try again in a sec.')
               );
             } finally {
               setDeletingSpotId(null);
@@ -658,7 +759,7 @@ export default function MapScreen() {
 
         webViewReadyRef.current = false;
         setMapStatus('error');
-        setMapError('Map tiles could not be loaded.');
+        setMapError('Couldn’t load map tiles.');
         return;
       }
 
@@ -668,7 +769,7 @@ export default function MapScreen() {
         setMapError(
           data.message && data.message.length > 0
             ? data.message
-            : 'The campus map could not be initialized.'
+            : 'Couldn’t start the campus map.'
         );
         return;
       }
@@ -693,6 +794,7 @@ export default function MapScreen() {
 
       if (data.type === 'MARKER_PRESS' && typeof data.id === 'string') {
         triggerHaptic('selection');
+        selectionSourceRef.current = 'map';
         if (data.id === selectedSpotId) {
           const collapsedOffset = Math.max(
             sheetHeight.value - COLLAPSED_SHEET_HEIGHT,
@@ -715,20 +817,16 @@ export default function MapScreen() {
   };
 
   return (
-    <View style={{ flex: 1 }}>
+    <View className="flex-1 bg-brand">
       <View
-        className="absolute left-0 right-0 z-50 flex-row items-center justify-between border-b border-white/10 bg-brand px-5"
+        className="absolute left-0 right-0 z-50 bg-brand"
         style={{
           top: 0,
-          height: insets.top + 80,
+          height: insets.top + 81,
           paddingTop: insets.top,
-          shadowColor: '#000000',
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.12,
-          shadowRadius: 6,
-          elevation: 6,
         }}
       >
+        <View className="flex-1 flex-row items-center justify-between px-5">
         <FeedbackPressable
           haptic="light"
           onPress={handleBackPress}
@@ -741,8 +839,7 @@ export default function MapScreen() {
 
         <View
           pointerEvents="none"
-          className="absolute left-0 right-0 items-center justify-center px-20"
-          style={{ top: insets.top, bottom: 0 }}
+          className="absolute inset-y-0 left-0 right-0 items-center justify-center px-20"
         >
           <Text
             className="text-center font-outfit-bold text-2xl text-white"
@@ -752,7 +849,8 @@ export default function MapScreen() {
           </Text>
           {locationSubtitle && (
             <Text
-              className="text-center font-outfit-medium text-sm text-lightGreen"
+              className="text-center font-outfit-medium text-sm"
+              style={{ color: 'rgba(255,255,255,0.72)' }}
               numberOfLines={1}
             >
               {locationSubtitle}
@@ -766,23 +864,27 @@ export default function MapScreen() {
             onPress={handleFavoritePress}
             className="h-12 w-12 items-center justify-center rounded-full"
             accessibilityLabel={
-              isFavoriteSchool ? 'Remove school from favorites' : 'Add school to favorites'
+              isFavoriteSchool ? 'Remove school from saved schools' : 'Save this school'
             }
             accessibilityRole="button"
           >
-            <Octicons
-              name={isFavoriteSchool ? 'star-fill' : 'star'}
-              size={26}
-              color="#FFFFFF"
+            <Ionicons
+              name={isFavoriteSchool ? 'bookmark' : 'bookmark-outline'}
+              size={24}
+              color={isFavoriteSchool ? colors.accent : '#FFFFFF'}
             />
           </FeedbackPressable>
         ) : (
-          <View className="h-11 w-11" />
+          <View className="h-12 w-12" />
         )}
+        </View>
+        <StickerStripe />
       </View>
       <View
-        className="absolute right-4 z-[999] overflow-hidden rounded-full bg-black"
-        style={[styles.toggleButton, { top: insets.top + 88 }]}
+        className="absolute left-4 z-[999] gap-2.5"
+        style={{ bottom: Math.max(insets.bottom, 12) + 36 }}
+        accessibilityRole="toolbar"
+        accessibilityLabel="Map navigation"
       >
         <FeedbackPressable
           haptic="selection"
@@ -790,7 +892,8 @@ export default function MapScreen() {
             webViewRef.current?.injectJavaScript(`window.toggleLayer(); true;`);
           }}
           disabled={mapStatus !== 'ready'}
-          className="h-12 w-12 items-center justify-center"
+          className="h-14 w-14 items-center justify-center rounded-full bg-white"
+          style={styles.mapControl}
           accessibilityLabel={
             mapLayer === 'satellite'
               ? 'Switch to standard map'
@@ -802,9 +905,8 @@ export default function MapScreen() {
             selected: mapLayer === 'satellite',
           }}
         >
-          <Image source={images.layers} style={styles.icon} />
+          <Image source={images.layers} style={styles.mapControlIcon} />
         </FeedbackPressable>
-        <View className="mx-3 h-px bg-white/35" />
         <FeedbackPressable
           haptic="light"
           onPress={() => {
@@ -813,42 +915,62 @@ export default function MapScreen() {
             );
           }}
           disabled={mapStatus !== 'ready'}
-          className="h-12 w-12 items-center justify-center"
+          className="h-14 w-14 items-center justify-center rounded-full bg-white"
+          style={styles.mapControl}
           accessibilityRole="button"
           accessibilityLabel="Recenter on campus"
           accessibilityHint="Moves the map back to the campus center"
           accessibilityState={{ disabled: mapStatus !== 'ready' }}
         >
-          <Feather name="crosshair" size={22} color="#FFFFFF" />
+          <Feather name="crosshair" size={26} color={colors.brand} />
         </FeedbackPressable>
-        <View className="mx-3 h-px bg-white/35" />
+      </View>
+      <View
+        className="absolute right-4 z-[999]"
+        style={{ bottom: Math.max(insets.bottom, 12) + 36 }}
+      >
         <FeedbackPressable
           haptic="light"
-          onPress={() => setShowAttribution(true)}
-          disabled={mapStatus !== 'ready'}
-          className="h-12 w-12 items-center justify-center"
+          className="h-16 w-16 items-center justify-center rounded-full bg-accent"
+          style={styles.fab}
+          onPress={handleAddSpotPress}
+          accessibilityLabel="Add new spot"
           accessibilityRole="button"
-          accessibilityLabel="Show map attribution"
-          accessibilityHint="Shows attribution for the active map layer"
-          accessibilityState={{ disabled: mapStatus !== 'ready' }}
+          accessibilityHint="Opens the form to add a skate spot"
         >
-          <Feather name="info" size={22} color="#FFFFFF" />
+          <Feather name="plus" size={32} color={colors.brand} />
         </FeedbackPressable>
       </View>
       <FeedbackPressable
-        haptic="light"
-        className="absolute right-4 bg-[#21473f] w-18 h-18 rounded-full items-center justify-center shadow-lg z-50"
-        style={{ bottom: Math.max(insets.bottom, 16) }}
-        onPress={handleAddSpotPress}
-        accessibilityLabel="Add new spot"
+        onPress={() => setShowAttribution(true)}
+        disabled={mapStatus !== 'ready'}
+        className="absolute left-4 z-[998] max-w-[70%] self-start rounded-full bg-black/40 px-2.5 py-1"
+        style={{ bottom: Math.max(insets.bottom, 10) }}
         accessibilityRole="button"
-        accessibilityHint="Opens the form to add a skate spot"
+        accessibilityLabel="Map attribution"
+        accessibilityHint="Shows full credit for the active map layer"
+        accessibilityState={{ disabled: mapStatus !== 'ready' }}
       >
-        <Text className="text-white text-4xl">+</Text>
+        <Text
+          className="font-outfit-medium text-sm leading-4 text-white"
+          numberOfLines={1}
+        >
+          {MAP_ATTRIBUTION_SHORT[mapLayer]}
+        </Text>
       </FeedbackPressable>
       <LoginRequiredModal
         visible={showLoginRequired}
         onCancel={() => setShowLoginRequired(false)}
+      />
+      <ImageLightbox
+        visible={lightboxUri != null}
+        uri={lightboxUri ?? ''}
+        onClose={() => setLightboxUri(null)}
+        accessibilityLabel={
+          selectedSpot
+            ? `Full screen photo of ${selectedSpot.name}`
+            : 'Full screen photo'
+        }
       />
       <Modal
         visible={showAttribution}
@@ -868,10 +990,10 @@ export default function MapScreen() {
             accessibilityLabel="Close map attribution"
           />
           <View
-            className="rounded-t-[28px] bg-white px-5 pt-3"
+            className="rounded-t-2xl bg-field px-5 pt-3"
             style={[styles.attributionSheet, { paddingBottom: Math.max(insets.bottom, 16) }]}
           >
-            <View className="mb-4 h-1.5 w-12 self-center rounded-full bg-slate-300" />
+            <View className="mb-4 h-1.5 w-12 self-center rounded-full bg-accent" />
             <View className="min-h-12 flex-row items-center justify-between">
               <Text className="font-outfit-bold text-xl text-ink">
                 Map attribution
@@ -879,13 +1001,11 @@ export default function MapScreen() {
               <FeedbackPressable
                 haptic="selection"
                 onPress={() => setShowAttribution(false)}
-                className="min-h-12 min-w-12 items-center justify-center rounded-full px-2 py-1"
+                className="h-10 w-10 items-center justify-center rounded-full bg-surface-soft"
                 accessibilityRole="button"
                 accessibilityLabel="Close map attribution"
               >
-                <Text className="font-outfit-semibold text-sm text-slate-600">
-                  Close
-                </Text>
+                <Ionicons name="close" size={18} color={colors.muted} />
               </FeedbackPressable>
             </View>
             <View className="mt-4 pb-6">
@@ -905,6 +1025,7 @@ export default function MapScreen() {
         onAccessibilityAction={(event) => {
           const spotId = event.nativeEvent.actionName.replace('select-', '');
           if (spots.some((spot) => spot.id === spotId)) {
+            selectionSourceRef.current = 'map';
             setSelectedSpotId(spotId);
           }
         }}
@@ -912,12 +1033,7 @@ export default function MapScreen() {
         ref={webViewRef}
         style={{ flex: 1, backgroundColor: 'transparent' }}
         originWhitelist={['*']}
-        source={{ 
-          html: html,
-          // The baseUrl is the magic fix. It gives the HTML an HTTP origin, 
-          // allowing it to successfully bypass CORS/security blocks to fetch Leaflet.
-          baseUrl: 'https://localhost' 
-        }}
+        source={webViewSource}
         // Explicitly enable JS and DOM Storage (critical for map libraries)
         javaScriptEnabled={true}
         domStorageEnabled={true}
@@ -932,19 +1048,19 @@ export default function MapScreen() {
         onError={() => {
           webViewReadyRef.current = false;
           setMapStatus('error');
-          setMapError('The campus map could not be loaded.');
+          setMapError('Couldn’t load the campus map.');
         }}
         onHttpError={() => {
           webViewReadyRef.current = false;
           setMapStatus('error');
-          setMapError('The campus map could not be loaded.');
+          setMapError('Couldn’t load the campus map.');
         }}
         onMessage={handleWebViewMessage}
       />
 
       {mapStatus === 'loading' ? (
         <View
-          className="absolute inset-0 z-40 items-center justify-center bg-[#21473f]/90 px-8"
+          className="absolute inset-0 z-40 items-center justify-center bg-brand/90 px-8"
           style={{ top: insets.top + 80 }}
         >
           <ActivityIndicator color="#FFFFFF" />
@@ -954,7 +1070,7 @@ export default function MapScreen() {
         </View>
       ) : mapStatus === 'error' ? (
         <View
-          className="absolute inset-0 z-40 items-center justify-center bg-[#21473f]/95 px-8"
+          className="absolute inset-0 z-40 items-center justify-center bg-brand/95 px-8"
           accessibilityLabel={`Map unavailable. ${mapError || 'Check your connection and try again.'}`}
         >
           <Text className="text-center font-outfit-bold text-xl text-white">
@@ -965,19 +1081,19 @@ export default function MapScreen() {
           </Text>
           <FeedbackPressable
             onPress={retryMap}
-            className="mt-5 rounded-2xl bg-white px-6 py-3"
+            className="mt-5 rounded-2xl bg-accent px-6 py-3"
             accessibilityRole="button"
             accessibilityLabel="Retry loading campus map"
           >
-            <Text className="font-outfit-bold text-base text-darkGreen">Retry</Text>
+            <Text className="font-outfit-bold text-base text-brand">Retry</Text>
           </FeedbackPressable>
         </View>
       ) : null}
 
       {mapStatus === 'ready' && error ? (
         <View
-          className="absolute left-4 right-4 z-40 rounded-2xl border border-[#B45F58] bg-white px-4 py-3"
-          style={{ top: insets.top + 142 }}
+          className="absolute left-4 right-4 z-40 rounded-2xl border border-errorBorder bg-field px-4 py-3"
+          style={{ top: insets.top + 88 }}
         >
           <View className="flex-row items-center justify-between">
             <View className="flex-1 pr-3">
@@ -989,61 +1105,64 @@ export default function MapScreen() {
                 Spots unavailable
               </Text>
               <Text className="mt-0.5 font-outfit-medium text-xs text-muted-strong">
-                The map loaded, but spots could not be refreshed.
+                Map’s up, but spots didn’t load.
               </Text>
             </View>
             <FeedbackPressable
               onPress={retrySpots}
-              className="rounded-xl bg-[#21473f] px-4 py-2"
+              className="rounded-xl bg-accent px-4 py-2"
               accessibilityRole="button"
               accessibilityLabel="Retry loading skate spots"
             >
-              <Text className="font-outfit-bold text-xs text-white">Retry</Text>
+              <Text className="font-outfit-bold text-xs text-brand">Retry</Text>
             </FeedbackPressable>
           </View>
         </View>
       ) : mapStatus === 'ready' && loading ? (
         <View
           className="absolute left-0 right-0 z-40 items-center"
-          style={{ top: 154 }}
+          style={{ top: insets.top + 96 }}
         >
-          <View
-            className={`flex-row items-center rounded-full px-3 py-1.5 ${
-              mapLayer === 'satellite' ? 'bg-[#21473f]' : 'bg-white'
-            }`}
-          >
-            <ActivityIndicator
-              size="small"
-              color={mapLayer === 'satellite' ? '#FFFFFF' : '#000000'}
-            />
-            <Text
-              className={`ml-2 font-outfit-medium text-xs ${
-                mapLayer === 'satellite' ? 'text-white' : 'text-black'
-              }`}
-            >
+          <View className="flex-row items-center rounded-full bg-white px-3 py-1.5">
+            <ActivityIndicator size="small" color={colors.brand} />
+            <Text className="ml-2 font-outfit-medium text-xs text-brand">
               Loading spots…
             </Text>
           </View>
         </View>
       ) : null}
 
-      {mapStatus === 'ready' && !loading && !error && spots.length === 0 ? (
-        <View className="absolute left-6 right-6 top-1/2 z-30 -translate-y-1/2 items-center rounded-3xl bg-white px-6 py-6 shadow-lg">
-          <Feather name="map-pin" size={28} color="#21473f" />
-          <Text className="mt-3 text-center font-outfit-bold text-xl text-ink">
-            No skate spots here yet
-          </Text>
-          <Text className="mt-1.5 text-center font-outfit-medium text-sm leading-5 text-muted-strong">
-            Be the first to add a spot to this campus.
-          </Text>
-          <FeedbackPressable
-            onPress={handleAddSpotPress}
-            className="mt-5 rounded-2xl bg-[#21473f] px-5 py-3"
-            accessibilityRole="button"
-            accessibilityLabel="Add the first spot"
-          >
-            <Text className="font-outfit-bold text-base text-white">Add the first spot</Text>
-          </FeedbackPressable>
+      {mapStatus === 'ready' &&
+      !loading &&
+      !error &&
+      spots.length === 0 &&
+      !emptySpotsNoticeDismissed ? (
+        <View className="absolute left-6 right-6 top-1/2 z-30 -translate-y-1/2 items-center rounded-2xl bg-field px-6 py-6">
+            <FeedbackPressable
+              haptic="selection"
+              onPress={() => setEmptySpotsNoticeDismissed(true)}
+              className="absolute right-3 top-3 h-10 w-10 items-center justify-center rounded-full bg-surface-soft"
+              accessibilityRole="button"
+              accessibilityLabel="Dismiss empty campus message"
+              accessibilityHint="Hides this message so you can move around the map"
+            >
+              <Ionicons name="close" size={18} color={colors.muted} />
+            </FeedbackPressable>
+            <Feather name="map-pin" size={28} color={colors.accent} />
+            <Text className="mt-3 text-center font-outfit-bold text-xl text-ink">
+              No skate spots here yet
+            </Text>
+            <Text className="mt-1.5 text-center font-outfit-medium text-sm leading-5 text-muted-strong">
+              Be the first to drop a spot on this campus.
+            </Text>
+            <FeedbackPressable
+              onPress={handleAddSpotPress}
+              className="mt-5 rounded-2xl bg-accent px-5 py-3"
+              accessibilityRole="button"
+              accessibilityLabel="Add the first spot"
+            >
+              <Text className="font-outfit-bold text-base text-brand">Add the first spot</Text>
+            </FeedbackPressable>
         </View>
       ) : null}
 
@@ -1054,7 +1173,9 @@ export default function MapScreen() {
           entering={SlideInDown.duration(240)}
           exiting={SlideOutDown.duration(220)}
           onLayout={(event) => {
-            sheetHeight.value = event.nativeEvent.layout.height;
+            const nextHeight = event.nativeEvent.layout.height;
+            sheetHeight.value = nextHeight;
+            setSheetLayoutHeight(nextHeight);
           }}
           style={[
             styles.sheet,
@@ -1070,16 +1191,16 @@ export default function MapScreen() {
         >
           <GestureDetector gesture={sheetPanGesture}>
             <View>
-              <View className="mb-4 h-1.5 w-12 self-center rounded-full bg-slate-300" />
-              <View className="min-h-12 flex-row items-start justify-between">
-                <View className="flex-1 pr-3">
+              <View className="mb-3 h-1.5 w-12 self-center rounded-full bg-accent" />
+              <View className="flex-row items-start">
+                <View className="min-w-0 flex-1 pr-3">
                   <Text className="font-outfit-bold text-xl text-ink">
                     {selectedSpot.name}
                   </Text>
                   <View className="mt-1 flex-row items-center">
-                    <Octicons name="person" size={13} color="#475569" />
+                    <Feather name="user" size={13} color={colors.muted} />
                     <Text
-                      className="ml-1 font-outfit-medium text-xs text-muted-strong"
+                      className="ml-1.5 font-outfit-medium text-sm text-muted"
                   >
                       {selectedSpot.creatorUsername
                         ? `@${selectedSpot.creatorUsername}`
@@ -1088,12 +1209,12 @@ export default function MapScreen() {
                     {spotTimeInfo ? (
                       <>
                         <Text
-                          className="mx-1.5 font-outfit-medium text-xs text-muted"
+                          className="mx-1.5 font-outfit-medium text-sm text-muted"
                         >
                           ·
                         </Text>
                         <Text
-                          className="font-outfit-medium text-xs text-muted-strong"
+                          className="font-outfit-medium text-sm text-muted-strong"
                         >
                           {`${spotTimeInfo.label} ${spotTimeInfo.relative}`}
                         </Text>
@@ -1101,11 +1222,12 @@ export default function MapScreen() {
                     ) : null}
                   </View>
                 </View>
-                <View className="flex-row items-center">
-                  <FeedbackPressable
+                <FeedbackPressable
                     onPress={handleLikePress}
                     disabled={likingSpotId === selectedSpot.id}
-                    className="mr-2 flex-row items-center rounded-full bg-[#F4F7F6] px-3 py-2"
+                    className={`mr-2 flex-row items-center rounded-xl px-3 py-2 ${
+                      selectedSpot.likedByUser === true ? 'bg-accent' : 'bg-surface-soft'
+                    }`}
                     accessibilityLabel={
                       selectedSpot.likedByUser === true
                         ? `Unlike ${selectedSpot.name}`
@@ -1114,7 +1236,14 @@ export default function MapScreen() {
                     accessibilityRole="button"
                   >
                     {likingSpotId === selectedSpot.id ? (
-                      <ActivityIndicator size="small" color="#7F302C" />
+                      <ActivityIndicator
+                        size="small"
+                        color={
+                          selectedSpot.likedByUser === true
+                            ? colors.brand
+                            : colors.ink
+                        }
+                      />
                     ) : (
                       <Octicons
                         name={
@@ -1125,29 +1254,30 @@ export default function MapScreen() {
                         size={17}
                         color={
                           selectedSpot.likedByUser === true
-                            ? '#7F302C'
-                            : '#475569'
+                            ? colors.brand
+                            : colors.ink
                         }
                       />
                     )}
-                    <Text className="ml-1.5 font-outfit-semibold text-sm text-slate-600">
+                    <Text
+                      className={`ml-1.5 font-outfit-semibold text-sm ${
+                        selectedSpot.likedByUser === true
+                          ? 'text-brand'
+                          : 'text-ink'
+                      }`}
+                    >
                       {selectedSpot.likeCount ?? 0}
                     </Text>
                   </FeedbackPressable>
                   <FeedbackPressable
                     haptic="selection"
                     onPress={() => setSelectedSpotId(undefined)}
-                    className="min-h-12 min-w-12 items-center justify-center rounded-full px-2 py-1"
+                    className="h-10 w-10 items-center justify-center rounded-full bg-surface-soft"
                     accessibilityRole="button"
                     accessibilityLabel={`Close ${selectedSpot.name} details`}
                   >
-                    <Text
-                      className="font-outfit-semibold text-sm text-slate-600"
-                    >
-                      Close
-                    </Text>
+                    <Ionicons name="close" size={18} color={colors.muted} />
                   </FeedbackPressable>
-                </View>
               </View>
             </View>
           </GestureDetector>
@@ -1157,15 +1287,24 @@ export default function MapScreen() {
             showsVerticalScrollIndicator={false}
           >
             {selectedSpot.imageUris.length > 0 ? (
-              <Image
-                source={{ uri: selectedSpot.imageUris[0] }}
-                accessibilityLabel={`Photo of ${selectedSpot.name}`}
-                accessible
-                className="mt-4 h-[280px] w-full rounded-3xl"
-                resizeMode="cover"
-              />
+              <FeedbackPressable
+                haptic="light"
+                disablePressScale
+                onPress={() => setLightboxUri(selectedSpot.imageUris[0])}
+                accessibilityRole="button"
+                accessibilityLabel={`View full screen photo of ${selectedSpot.name}`}
+                accessibilityHint="Opens the photo. Pinch or double tap to zoom."
+              >
+                <Image
+                  source={{ uri: selectedSpot.imageUris[0] }}
+                  accessibilityLabel={`Photo of ${selectedSpot.name}`}
+                  accessible={false}
+                  className="mt-4 h-[280px] w-full rounded-2xl"
+                  resizeMode="cover"
+                />
+              </FeedbackPressable>
             ) : (
-              <View className="mt-4 h-80 items-center justify-center rounded-3xl bg-slate-100">
+              <View className="mt-4 h-80 items-center justify-center rounded-2xl bg-surface-soft">
                 <Text
                   className="font-outfit-medium text-muted-strong"
                 >
@@ -1175,7 +1314,7 @@ export default function MapScreen() {
             )}
 
             <Text
-              className="font-outfit-medium mt-4 text-sm text-muted-strong"
+              className="font-outfit-medium mt-4 text-base text-muted-strong"
             >
               {selectedSpot.description}
             </Text>
@@ -1186,32 +1325,28 @@ export default function MapScreen() {
                   haptic="light"
                   onPress={handleEditSelectedSpot}
                   disabled={deletingSpotId !== null}
-                  className="h-12 flex-1 flex-row items-center justify-center rounded-2xl bg-[#21473f]"
+                  className="h-12 flex-1 flex-row items-center justify-center rounded-2xl bg-accent"
                   accessibilityLabel={`Edit ${selectedSpot.name}`}
                   accessibilityRole="button"
                 >
-                  <Feather name="edit-2" size={16} color="#FFFFFF" />
-                  <Text
-                    className="ml-2 font-outfit-semibold text-sm text-white"
-                  >
+                  <Feather name="edit-2" size={16} color={colors.brand} />
+                  <Text className="ml-2 font-outfit-semibold text-sm text-brand">
                     Edit spot
                   </Text>
                 </FeedbackPressable>
                 <FeedbackPressable
                   onPress={handleDeleteSelectedSpot}
                   disabled={deletingSpotId !== null}
-                  className="h-12 flex-1 flex-row items-center justify-center rounded-2xl border border-[#B45F58] bg-[#FBE9E7]"
+                  className="h-12 flex-1 flex-row items-center justify-center rounded-2xl bg-errorSurface"
                   accessibilityLabel={`Delete ${selectedSpot.name}`}
                   accessibilityRole="button"
                 >
                   {deletingSpotId === selectedSpot.id ? (
-                    <ActivityIndicator size="small" color="#7F302C" />
+                    <ActivityIndicator size="small" color={colors.errorText} />
                   ) : (
-                    <Feather name="trash-2" size={16} color="#7F302C" />
+                    <Feather name="trash-2" size={16} color={colors.errorText} />
                   )}
-                  <Text
-                    className="ml-2 font-outfit-semibold text-sm text-errorText"
-                  >
+                  <Text className="ml-2 font-outfit-semibold text-sm text-errorText">
                     Delete spot
                   </Text>
                 </FeedbackPressable>
@@ -1239,9 +1374,9 @@ const styles = StyleSheet.create({
     bottom: 0,
     zIndex: 1000,
     maxHeight: '56%',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    backgroundColor: colors.field,
     paddingHorizontal: 20,
     paddingTop: 12,
     shadowColor: '#000',
@@ -1250,17 +1385,23 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 16,
   },
-  toggleButton: {
+  mapControl: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
+    elevation: 6,
+  },
+  mapControlIcon: {
+    width: 26,
+    height: 26,
+    tintColor: colors.brand,
+  },
+  fab: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.22,
     shadowRadius: 6,
-
-    elevation: 10,
-  },
-  icon: {
-    width: 30,
-    height: 30,
-    tintColor: 'white',
+    elevation: 8,
   },
 });

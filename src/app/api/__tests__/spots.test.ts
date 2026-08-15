@@ -404,6 +404,83 @@ describe('GET /api/spots', () => {
     expect(response.status).toBe(400);
   });
 
+  it('returns recent spots without a schoolId', async () => {
+    setConfigured();
+    const row: DatabaseSpot = {
+      id: 'spot-recent',
+      school_id: 'school1',
+      name: 'Ledge',
+      description: 'A ledge',
+      latitude: 10,
+      longitude: 20,
+      image_urls: ['https://img/2.jpg'],
+      created_at: '2024-06-01T00:00:00.000Z',
+      updated_at: '2024-06-01T00:00:00.000Z',
+      likes_count: 1,
+      schools: { name: 'UT Austin', city: 'Austin', state: 'TX' },
+      creator: { username: 'skater_jane' },
+    };
+    const fetchMock: FetchMock = jest.fn(async (_input: string | URL | Request) =>
+      jsonResponse([row])
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await GET(
+      new Request('https://app.test/api/spots?recent=1')
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { spots: Array<{ id: string }> };
+    expect(body.spots).toEqual([
+      expect.objectContaining({
+        id: 'spot-recent',
+        name: 'Ledge',
+        schoolId: 'school1',
+        schoolName: 'UT Austin',
+      }),
+    ]);
+    expect(fetchMock).toHaveBeenCalled();
+    const recentUrl = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(recentUrl.searchParams.get('order')).toBe('created_at.desc,id.desc');
+  });
+
+  it('filters recent spots by school type and includes offset', async () => {
+    setConfigured();
+    const fetchMock: FetchMock = jest.fn(async (_input: string | URL | Request) =>
+      jsonResponse([])
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await GET(
+      new Request(
+        'https://app.test/api/spots?recent=1&type=k12_public&offset=24'
+      )
+    );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ spots: [] });
+
+    const recentUrl = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(recentUrl.searchParams.get('schools.type')).toBe('in.(k12_public)');
+    expect(recentUrl.searchParams.get('offset')).toBe('24');
+    expect(recentUrl.searchParams.get('order')).toBe('created_at.desc,id.desc');
+  });
+
+  it('omits an invalid recent-spots type from the request URL', async () => {
+    setConfigured();
+    const fetchMock: FetchMock = jest.fn(async (_input: string | URL | Request) =>
+      jsonResponse([])
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await GET(
+      new Request('https://app.test/api/spots?recent=1&type=not_a_school_type')
+    );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ spots: [] });
+
+    const recentUrl = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(recentUrl.searchParams.get('schools.type')).toBeNull();
+  });
+
   it('returns 400 when schoolId is invalid', async () => {
     setConfigured();
     const response = await GET(
@@ -465,7 +542,7 @@ describe('POST /api/spots', () => {
     const response = await POST(makePostRequest(validForm()));
     expect(response.status).toBe(401);
     const body = (await response.json()) as { error: string };
-    expect(body.error.toLowerCase()).toContain('authentication');
+    expect(body.error.toLowerCase()).toContain('sign in');
   });
 
   it('returns 401 when the token is invalid', async () => {
@@ -479,7 +556,7 @@ describe('POST /api/spots', () => {
     );
     expect(response.status).toBe(401);
     const body = (await response.json()) as { error: string };
-    expect(body.error.toLowerCase()).toContain('invalid');
+    expect(body.error.toLowerCase()).toContain('sign in');
   });
 
   it('returns 401 when the token is expired', async () => {

@@ -10,13 +10,16 @@ import * as Linking from 'expo-linking';
 import { SplashScreen, Stack, useRouter, useSegments } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect } from 'react';
-import { Platform, Pressable, Text, View } from 'react-native';
+import { Image, Platform, Pressable, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import {
     configureReanimatedLogger,
     ReanimatedLogLevel,
 } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import '../../global.css';
+import { colors } from '../constants/colors';
+import images from '../constants/images';
 import { checkAppleCredentialStatus } from '../lib/appleAuthentication';
 import { useAuthStore } from '../store/authStore';
 import { useFavorites } from '../store/favoritesStore';
@@ -49,6 +52,7 @@ export default function RootLayout() {
   const authInitializing = useAuthStore((state) => state.initializing);
   const profile = useProfileStore((state) => state.profile);
   const profileLoaded = useProfileStore((state) => state.loaded);
+  const profileLoading = useProfileStore((state) => state.loading);
   const profileError = useProfileStore((state) => state.error);
   const fetchProfile = useProfileStore((state) => state.fetchProfile);
   const clearProfile = useProfileStore((state) => state.clearProfile);
@@ -57,6 +61,7 @@ export default function RootLayout() {
 
   const router = useRouter();
   const segments = useSegments();
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     // Restore any persisted Supabase session and subscribe to auth changes.
@@ -64,7 +69,7 @@ export default function RootLayout() {
   }, [initAuth]);
 
   useEffect(() => {
-    // Persistent favorites are browser/device state, so restore them only
+    // Persistent saved schools are browser/device state, so restore them only
     // after client mounting instead of during the web server render.
     void useFavorites.persist.rehydrate();
   }, []);
@@ -174,12 +179,13 @@ export default function RootLayout() {
   }, [appReady, needsOnboarding, onOnboarding, router]);
 
   useEffect(() => {
-    // Keep the native splash up until routing has settled, avoiding a flash
-    // of the wrong screen during session and profile restoration.
-    if (Platform.OS !== 'web' && appReady && routeSettled) {
+    // Keep the native splash up until fonts are ready, then hand off to a
+    // centered in-app lockup so auth/profile restoration never flashes a
+    // misaligned splash image.
+    if (Platform.OS !== 'web' && fontsReady) {
       void SplashScreen.hideAsync();
     }
-  }, [appReady, routeSettled]);
+  }, [fontsReady]);
 
   // 1. PLACE THE ERROR CHECK HERE FIRST:
   if (fontError) {
@@ -192,81 +198,82 @@ export default function RootLayout() {
     return null;
   }
 
-  if (userId && profileError) {
-    return (
-      <View className="flex-1 items-center justify-center bg-white px-6">
-        <Text
-          accessibilityRole="alert"
-          accessibilityLiveRegion="polite"
-          className="text-center font-outfit-medium text-base text-slate-600">
-          {profileError}
-        </Text>
-        <Pressable
-          className="mt-4 rounded-2xl bg-[#21473f] px-5 py-3"
-          onPress={() => fetchProfile(userId)}
-          accessibilityRole="button"
-          accessibilityLabel="Retry loading profile"
-        >
-          <Text className="font-outfit-bold text-base text-white">Retry</Text>
-        </Pressable>
-      </View>
-    );
-  }
-
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.surface }}>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          animation: 'slide_from_right',
+          gestureEnabled: true,
+          contentStyle: { backgroundColor: colors.surface },
+        }}
+      >
+        <Stack.Screen name="index" options={{ animation: 'none' }} />
         <Stack.Screen name="onboarding" />
-        <Stack.Screen
-          name="profile"
-          options={{
-            animation: 'slide_from_right',
-          }}
-        />
-        <Stack.Screen
-          name="change-username"
-          options={{
-            animation: 'slide_from_right',
-          }}
-        />
+        <Stack.Screen name="profile" />
+        <Stack.Screen name="settings" />
+        <Stack.Screen name="change-username" />
+        <Stack.Screen name="change-password" />
         <Stack.Screen
           name="login"
-          options={{
-            animation: 'slide_from_right',
-          }}
+          options={{ animationTypeForReplace: 'pop' }}
         />
         <Stack.Screen
-          name="verify-otp"
-          options={{
-            animation: 'slide_from_right',
-          }}
+          name="signup"
+          options={{ animationTypeForReplace: 'pop' }}
         />
         <Stack.Screen
-          name="verify-delete-account"
-          options={{
-            animation: 'slide_from_right',
-          }}
+          name="forgot-password"
+          options={{ animationTypeForReplace: 'pop' }}
         />
-        <Stack.Screen
-          name="map"
-          options={{
-            animation: 'slide_from_right',
-          }}
-        />
-        <Stack.Screen
-          name="add-spot"
-          options={{
-            animation: 'slide_from_right',
-          }}
-        />
-        <Stack.Screen
-          name="edit-spot"
-          options={{
-            animation: 'slide_from_right',
-          }}
-        />
+        <Stack.Screen name="update-password" />
+        <Stack.Screen name="verify-otp" />
+        <Stack.Screen name="verify-delete-account" />
+        <Stack.Screen name="map" options={{ contentStyle: { backgroundColor: colors.brand } }} />
+        <Stack.Screen name="add-spot" options={{ contentStyle: { backgroundColor: colors.surface } }} />
+        <Stack.Screen name="edit-spot" options={{ contentStyle: { backgroundColor: colors.surface } }} />
       </Stack>
+
+      {!appReady || !routeSettled ? (
+        <View
+          className="absolute inset-0 z-50 items-center justify-center bg-surface"
+          accessibilityRole="progressbar"
+          accessibilityLabel="Loading SkateU"
+        >
+          <Image
+            source={images.brandLockupCentered}
+            accessibilityLabel="SkateU"
+            style={{ width: 195, height: 36 }}
+            resizeMode="contain"
+          />
+          {userId && profileError ? (
+            <View
+              className="absolute left-4 right-4 flex-row items-center rounded-2xl bg-field px-4 py-3"
+              style={{
+                top: insets.top + 12,
+              }}
+            >
+              <Text
+                accessibilityRole="alert"
+                accessibilityLiveRegion="polite"
+                className="flex-1 pr-3 font-outfit-medium text-base text-ink"
+              >
+                {profileError}
+              </Text>
+              <Pressable
+                className="rounded-xl bg-accent px-3 py-2"
+                onPress={() => fetchProfile(userId)}
+                disabled={profileLoading}
+                accessibilityRole="button"
+                accessibilityLabel="Retry loading profile"
+                accessibilityState={{ busy: profileLoading }}
+              >
+                <Text className="font-outfit-bold text-sm text-brand">Retry</Text>
+              </Pressable>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
     </GestureHandlerRootView>
   );
 }

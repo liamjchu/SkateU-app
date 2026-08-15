@@ -5,7 +5,11 @@ module.exports = {
   testMatch: ['**/__tests__/**/*.test.ts?(x)', '**/?(*.)+(spec|test).ts?(x)'],
   // Skill folders contain duplicate package.json files that trigger Haste
   // naming collisions; they are not part of the app and should be ignored.
-  modulePathIgnorePatterns: ['<rootDir>/.agents/', '<rootDir>/.claude/'],
+  modulePathIgnorePatterns: [
+    '<rootDir>/.agents/',
+    '<rootDir>/.claude/',
+    '<rootDir>/apps/',
+  ],
   // Expo/React Native ship untranspiled ESM in node_modules; allow the RN/Expo
   // toolchain packages through Babel so tests can import them.
   transformIgnorePatterns: [
