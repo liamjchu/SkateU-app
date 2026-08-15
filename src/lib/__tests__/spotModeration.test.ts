@@ -63,10 +63,10 @@ describe('moderateSpotSubmission', () => {
 });
 
 describe('softenModerationReason', () => {
-  it('keeps a short casual reason and rewrites a harsh one', () => {
+  it('always returns deterministic field-specific copy', () => {
     expect(
       softenModerationReason('IRRELEVANT', 'That name doesn’t really say what the spot is.')
-    ).toBe('That name doesn’t really say what the spot is.');
+    ).toBe('That name doesn’t really say what the spot is — try the obstacle or where it is.');
     expect(
       softenModerationReason('INAPPROPRIATE', 'This title is inappropriate and not allowed.')
     ).toBe('Let’s keep the name school-friendly — tweak it and try again.');

@@ -5,6 +5,7 @@ import {
     imageFileToDataUrl,
     moderateSpotSubmission,
     softenModerationReason,
+    type SpotModerationVerdict,
 } from '../../lib/spotModeration';
 import type { Spot } from '../../types/spot';
 
@@ -684,7 +685,7 @@ async function getRecentSpots(
     } else {
       query.searchParams.set('select', SPOT_SELECT_COLUMNS);
     }
-    query.searchParams.set('order', 'created_at.desc');
+    query.searchParams.set('order', 'created_at.desc,id.desc');
     query.searchParams.set('limit', String(HOME_RAIL_PAGE_SIZE));
     const offset = parseOffset(url.searchParams.get('offset'));
     if (offset > 0) {
@@ -772,6 +773,21 @@ async function getMySpots(
   }
 }
 
+function moderationRejectionResponse(moderation: SpotModerationVerdict): Response {
+  const flag =
+    moderation.flag === 'INAPPROPRIATE' || moderation.flag === 'IRRELEVANT'
+      ? moderation.flag
+      : 'IRRELEVANT';
+  return Response.json(
+    {
+      ...moderation,
+      flag,
+      reason: softenModerationReason(flag, moderation.reason),
+    },
+    { status: 422 }
+  );
+}
+
 // --- POST /api/spots --------------------------------------------------------
 
 export async function POST(request: Request): Promise<Response> {
@@ -844,18 +860,7 @@ export async function POST(request: Request): Promise<Response> {
     });
 
     if (!moderation.approved) {
-      const flag =
-        moderation.flag === 'INAPPROPRIATE' || moderation.flag === 'IRRELEVANT'
-          ? moderation.flag
-          : 'IRRELEVANT';
-      return Response.json(
-        {
-          ...moderation,
-          flag,
-          reason: softenModerationReason(flag, moderation.reason),
-        },
-        { status: 422 }
-      );
+      return moderationRejectionResponse(moderation);
     }
   } catch (error) {
     console.error('Spot moderation failed before create:', error);
@@ -1013,18 +1018,7 @@ export async function PATCH(request: Request): Promise<Response> {
     });
 
     if (!moderation.approved) {
-      const flag =
-        moderation.flag === 'INAPPROPRIATE' || moderation.flag === 'IRRELEVANT'
-          ? moderation.flag
-          : 'IRRELEVANT';
-      return Response.json(
-        {
-          ...moderation,
-          flag,
-          reason: softenModerationReason(flag, moderation.reason),
-        },
-        { status: 422 }
-      );
+      return moderationRejectionResponse(moderation);
     }
   } catch (error) {
     console.error('Spot moderation failed before update:', error);

@@ -100,7 +100,9 @@ export default function AddSpotScreen() {
   const hasUnsavedChanges =
     imageUri !== undefined ||
     name.trim().length > 0 ||
-    description.trim().length > 0;
+    description.trim().length > 0 ||
+    selectedLocation.latitude !== initialLocationRef.current.latitude ||
+    selectedLocation.longitude !== initialLocationRef.current.longitude;
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (event) => {
@@ -247,8 +249,7 @@ export default function AddSpotScreen() {
             }`}
           >
             <TextInput
-              className="w-full font-outfit-medium text-base text-ink"
-              style={{ padding: 0 }}
+              className="w-full p-0 font-outfit-medium text-base text-ink"
               placeholder="Library five-stair"
               placeholderTextColor={colors.muted}
               accessibilityLabel="Spot name"
@@ -260,10 +261,7 @@ export default function AddSpotScreen() {
             />
           </View>
           {name.length > SPOT_NAME_MAX * 0.8 ? (
-            <Text
-              className="mt-1 self-end font-outfit-medium text-sm text-muted"
-              style={{ fontVariant: ['tabular-nums'] }}
-            >
+            <Text className="mt-1 self-end font-outfit-medium text-sm tabular-nums text-muted">
               {name.length}/{SPOT_NAME_MAX}
             </Text>
           ) : null}
@@ -288,8 +286,7 @@ export default function AddSpotScreen() {
             }`}
           >
             <TextInput
-              className="min-h-32 w-full font-outfit-medium text-base text-ink"
-              style={{ padding: 0 }}
+              className="min-h-32 w-full p-0 font-outfit-medium text-base text-ink"
               placeholder="What’s the spot like?"
               placeholderTextColor={colors.muted}
               accessibilityLabel="Spot description"
@@ -301,10 +298,7 @@ export default function AddSpotScreen() {
             />
           </View>
           {description.length > SPOT_DESCRIPTION_MAX * 0.8 ? (
-            <Text
-              className="mt-1 self-end font-outfit-medium text-sm text-muted"
-              style={{ fontVariant: ['tabular-nums'] }}
-            >
+            <Text className="mt-1 self-end font-outfit-medium text-sm tabular-nums text-muted">
               {description.length}/{SPOT_DESCRIPTION_MAX}
             </Text>
           ) : null}

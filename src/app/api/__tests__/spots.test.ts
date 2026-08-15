@@ -420,7 +420,9 @@ describe('GET /api/spots', () => {
       schools: { name: 'UT Austin', city: 'Austin', state: 'TX' },
       creator: { username: 'skater_jane' },
     };
-    const fetchMock = jest.fn(async () => jsonResponse([row]));
+    const fetchMock: FetchMock = jest.fn(async (_input: string | URL | Request) =>
+      jsonResponse([row])
+    );
     global.fetch = fetchMock as unknown as typeof fetch;
 
     const response = await GET(
@@ -437,6 +439,46 @@ describe('GET /api/spots', () => {
       }),
     ]);
     expect(fetchMock).toHaveBeenCalled();
+    const recentUrl = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(recentUrl.searchParams.get('order')).toBe('created_at.desc,id.desc');
+  });
+
+  it('filters recent spots by school type and includes offset', async () => {
+    setConfigured();
+    const fetchMock: FetchMock = jest.fn(async (_input: string | URL | Request) =>
+      jsonResponse([])
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await GET(
+      new Request(
+        'https://app.test/api/spots?recent=1&type=k12_public&offset=24'
+      )
+    );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ spots: [] });
+
+    const recentUrl = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(recentUrl.searchParams.get('schools.type')).toBe('in.(k12_public)');
+    expect(recentUrl.searchParams.get('offset')).toBe('24');
+    expect(recentUrl.searchParams.get('order')).toBe('created_at.desc,id.desc');
+  });
+
+  it('omits an invalid recent-spots type from the request URL', async () => {
+    setConfigured();
+    const fetchMock: FetchMock = jest.fn(async (_input: string | URL | Request) =>
+      jsonResponse([])
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await GET(
+      new Request('https://app.test/api/spots?recent=1&type=not_a_school_type')
+    );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ spots: [] });
+
+    const recentUrl = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(recentUrl.searchParams.get('schools.type')).toBeNull();
   });
 
   it('returns 400 when schoolId is invalid', async () => {

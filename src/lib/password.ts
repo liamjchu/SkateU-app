@@ -17,16 +17,16 @@ export const validatePassword = (password: string): string | null => {
   const requirements = getPasswordRequirementStatus(password);
 
   if (!requirements.minLength) {
-    return 'Need at least 8 characters.';
+    return 'Password needs at least 8 characters.';
   }
   if (!requirements.upperAndLowerCase) {
-    return 'Mix in uppercase and lowercase letters.';
+    return 'Password needs uppercase and lowercase letters.';
   }
   if (!requirements.number) {
-    return 'Add a number.';
+    return 'Password needs a number.';
   }
   if (!requirements.specialCharacter) {
-    return 'Add a special character.';
+    return 'Password needs a special character.';
   }
 
   return null;

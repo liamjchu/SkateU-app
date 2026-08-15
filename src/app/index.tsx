@@ -534,12 +534,28 @@ export default function HomeScreen() {
       page.forEach(upsertSchool);
 
       if (!controller.signal.aborted) {
-        setPopularSchools((current) => [...current, ...page]);
+        setPopularSchools((current) => {
+          const seen = new Set(current.map((school) => school.id));
+          return [
+            ...current,
+            ...page.filter((school) => !seen.has(school.id)),
+          ];
+        });
         setPopularHasMore(page.length === HOME_RAIL_PAGE_SIZE);
+        setPopularError('');
       }
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
         return;
+      }
+
+      if (!controller.signal.aborted) {
+        setPopularError(
+          toUserFacingError(
+            error,
+            'Couldn’t load more popular schools right now.'
+          )
+        );
       }
     } finally {
       popularLockRef.current = false;
@@ -588,12 +604,22 @@ export default function HomeScreen() {
       const page = data.spots ?? [];
 
       if (!controller.signal.aborted) {
-        setRecentSpots((current) => [...current, ...page]);
+        setRecentSpots((current) => {
+          const seen = new Set(current.map((spot) => spot.id));
+          return [...current, ...page.filter((spot) => !seen.has(spot.id))];
+        });
         setRecentHasMore(page.length === HOME_RAIL_PAGE_SIZE);
+        setRecentError('');
       }
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
         return;
+      }
+
+      if (!controller.signal.aborted) {
+        setRecentError(
+          toUserFacingError(error, 'Couldn’t load more recent spots right now.')
+        );
       }
     } finally {
       recentLockRef.current = false;
@@ -823,11 +849,9 @@ export default function HomeScreen() {
     activeFilter !== 'saved' && trimmedSearch.length >= 3;
   const searchStatusText = isSearching
     ? 'Searching…'
-    : sortedSearchResults.length === 20
-      ? 'Showing the first 20'
-      : `${sortedSearchResults.length} ${
-          sortedSearchResults.length === 1 ? 'school' : 'schools'
-        }`;
+    : `${sortedSearchResults.length} ${
+        sortedSearchResults.length === 1 ? 'school' : 'schools'
+      }`;
   const schoolSearchCopy = getSchoolSearchCopy(activeFilter);
 
   return (
@@ -1260,7 +1284,26 @@ export default function HomeScreen() {
                           onViewMap={handleRecentSpotPress}
                         />
                       ))}
-                      {isLoadingMoreRecent ? (
+                      {recentError ? (
+                        <View className="flex-row items-center rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2.5">
+                          <Text className="flex-1 pr-2 font-outfit-medium text-sm text-errorText">
+                            {recentError}
+                          </Text>
+                          <FeedbackPressable
+                            onPress={() => {
+                              setRecentError('');
+                              setRecentRetryNonce((nonce) => nonce + 1);
+                            }}
+                            className="rounded-xl bg-accent px-3 py-1.5"
+                            accessibilityRole="button"
+                            accessibilityLabel="Retry loading latest spots"
+                          >
+                            <Text className="font-outfit-bold text-sm text-brand">
+                              Retry
+                            </Text>
+                          </FeedbackPressable>
+                        </View>
+                      ) : isLoadingMoreRecent ? (
                         <View className="items-center py-4">
                           <ActivityIndicator color={colors.accent} />
                         </View>

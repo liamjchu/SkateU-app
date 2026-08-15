@@ -65,7 +65,7 @@ export default function PopularSchoolCard({
                 source={{ uri: school.spotImageUrl }}
                 className="h-[72px] w-[72px] rounded-xl bg-surface-soft"
                 resizeMode="cover"
-                accessibilityLabel={`Spot photo at ${school.name}`}
+                accessible={false}
               />
             ) : (
               <View className="h-[72px] w-[72px] items-center justify-center rounded-xl bg-accent">

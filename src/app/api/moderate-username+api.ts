@@ -80,7 +80,10 @@ export async function POST(request: Request) {
 
   const auth = await resolveUserId(config, accessToken);
   if (!auth.ok) {
-    return Response.json({ error: authUserMessage(auth.reason) }, { status: 401 });
+    return Response.json(
+      { error: authUserMessage(auth.reason) },
+      { status: auth.reason === 'timeout' ? 503 : 401 }
+    );
   }
 
   const apiKey = process.env.OPENAI_API_KEY;

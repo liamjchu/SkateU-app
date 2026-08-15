@@ -92,6 +92,10 @@ export default function SettingsScreen() {
       router.replace('/');
     } catch (error) {
       console.warn('Failed to log out', error);
+      Alert.alert(
+        'Couldn’t log out',
+        toUserFacingError(error, 'Try again in a sec.')
+      );
       setLoggingOut(false);
     }
   };
@@ -104,7 +108,15 @@ export default function SettingsScreen() {
   };
 
   const performDeleteAccount = async () => {
-    if (sendingDeleteOtp || !email) {
+    if (sendingDeleteOtp) {
+      return;
+    }
+
+    if (!email) {
+      Alert.alert(
+        'Couldn’t delete account',
+        'This account doesn’t have an email we can verify.'
+      );
       return;
     }
 
@@ -112,7 +124,10 @@ export default function SettingsScreen() {
 
     try {
       await sendDeleteAccountOtp(email);
-      router.push(`/verify-delete-account?email=${encodeURIComponent(email)}`);
+      router.push({
+        pathname: '/verify-delete-account',
+        params: { email },
+      });
     } catch (error) {
       Alert.alert(
         'Couldn’t send that code',

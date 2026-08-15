@@ -38,12 +38,11 @@ export default function AuthCredentialsForm({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   const isSignup = mode === 'signup';
-  const isIOS = process.env.EXPO_OS === 'ios';
+  const isIOS = Platform.OS === 'ios';
   const passwordRequirementStatus = getPasswordRequirementStatus(password);
   const passwordRequirements = [
     {
@@ -112,7 +111,6 @@ export default function AuthCredentialsForm({
     }
 
     setError('');
-    setNotice('');
     setSubmitting(true);
 
     try {
@@ -166,8 +164,7 @@ export default function AuthCredentialsForm({
             blurOnSubmit={false}
             onSubmitEditing={() => passwordInputRef.current?.focus()}
             editable={!submitting}
-            className="py-4 font-outfit-medium text-base text-ink"
-            style={{ padding: 0 }}
+            className="p-0 py-4 font-outfit-medium text-base text-ink"
           />
         </View>
 
@@ -188,8 +185,7 @@ export default function AuthCredentialsForm({
               returnKeyType="go"
               onSubmitEditing={() => void handleSubmit()}
               editable={!submitting}
-              className="flex-1 py-4 font-outfit-medium text-base text-ink"
-              style={{ padding: 0 }}
+              className="flex-1 p-0 py-4 font-outfit-medium text-base text-ink"
             />
             <FeedbackPressable
               onPress={() => setShowPassword((prev) => !prev)}
@@ -268,18 +264,6 @@ export default function AuthCredentialsForm({
           >
             {error}
           </Text>
-        ) : null}
-
-        {notice ? (
-          <View
-            accessible
-            accessibilityLiveRegion="polite"
-            className="rounded-2xl bg-field px-4 py-3"
-          >
-            <Text selectable className="font-outfit-semibold text-sm text-ink">
-              {notice}
-            </Text>
-          </View>
         ) : null}
 
         <FeedbackPressable

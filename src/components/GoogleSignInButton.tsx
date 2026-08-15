@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { useAuthStore } from '../store/authStore';
 import { colors } from '../constants/colors';
+import { toUserFacingError } from '../lib/userFacingError';
 import FeedbackPressable from './FeedbackPressable';
 
 // Lets the in-app browser finish any pending auth session when the app is
@@ -50,9 +51,7 @@ export default function GoogleSignInButton({
       }
     } catch (error) {
       onError?.(
-        error instanceof Error
-          ? error.message
-          : 'Could not sign in with Google. Try again.'
+        toUserFacingError(error, 'Could not sign in with Google. Try again.')
       );
     } finally {
       setLoading(false);

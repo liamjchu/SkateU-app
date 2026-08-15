@@ -52,6 +52,7 @@ export default function RootLayout() {
   const authInitializing = useAuthStore((state) => state.initializing);
   const profile = useProfileStore((state) => state.profile);
   const profileLoaded = useProfileStore((state) => state.loaded);
+  const profileLoading = useProfileStore((state) => state.loading);
   const profileError = useProfileStore((state) => state.error);
   const fetchProfile = useProfileStore((state) => state.fetchProfile);
   const clearProfile = useProfileStore((state) => state.clearProfile);
@@ -156,7 +157,7 @@ export default function RootLayout() {
   // The app is ready to decide on routing once fonts are loaded, the persisted
   // session has been restored, and (if signed in) the profile has resolved.
   const fontsReady = fontsLoaded || !!fontError;
-  const profileReady = !userId || profileLoaded || Boolean(profileError);
+  const profileReady = !userId || profileLoaded;
   const appReady = fontsReady && !authInitializing && profileReady;
 
   // The gate: a signed-in user with no username is locked onto onboarding.
@@ -245,29 +246,32 @@ export default function RootLayout() {
             style={{ width: 195, height: 36 }}
             resizeMode="contain"
           />
-        </View>
-      ) : userId && profileError ? (
-        <View
-          className="absolute left-4 right-4 z-50 flex-row items-center rounded-2xl bg-field px-4 py-3"
-          style={{
-            top: insets.top + 12,
-          }}
-        >
-          <Text
-            accessibilityRole="alert"
-            accessibilityLiveRegion="polite"
-            className="flex-1 pr-3 font-outfit-medium text-base text-ink"
-          >
-            {profileError}
-          </Text>
-          <Pressable
-            className="rounded-xl bg-accent px-3 py-2"
-            onPress={() => fetchProfile(userId)}
-            accessibilityRole="button"
-            accessibilityLabel="Retry loading profile"
-          >
-            <Text className="font-outfit-bold text-sm text-brand">Retry</Text>
-          </Pressable>
+          {userId && profileError ? (
+            <View
+              className="absolute left-4 right-4 flex-row items-center rounded-2xl bg-field px-4 py-3"
+              style={{
+                top: insets.top + 12,
+              }}
+            >
+              <Text
+                accessibilityRole="alert"
+                accessibilityLiveRegion="polite"
+                className="flex-1 pr-3 font-outfit-medium text-base text-ink"
+              >
+                {profileError}
+              </Text>
+              <Pressable
+                className="rounded-xl bg-accent px-3 py-2"
+                onPress={() => fetchProfile(userId)}
+                disabled={profileLoading}
+                accessibilityRole="button"
+                accessibilityLabel="Retry loading profile"
+                accessibilityState={{ busy: profileLoading }}
+              >
+                <Text className="font-outfit-bold text-sm text-brand">Retry</Text>
+              </Pressable>
+            </View>
+          ) : null}
         </View>
       ) : null}
     </GestureHandlerRootView>

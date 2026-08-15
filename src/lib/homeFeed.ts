@@ -1,4 +1,5 @@
 export const HOME_RAIL_PAGE_SIZE = 24;
+export const MAX_HOME_FEED_OFFSET = HOME_RAIL_PAGE_SIZE * 50;
 
 export function parseOffset(raw: string | null): number {
   if (raw == null || raw.trim() === '') {
@@ -10,5 +11,5 @@ export function parseOffset(raw: string | null): number {
     return 0;
   }
 
-  return value;
+  return Math.min(value, MAX_HOME_FEED_OFFSET);
 }

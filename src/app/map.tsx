@@ -817,7 +817,7 @@ export default function MapScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.brand }}>
+    <View className="flex-1 bg-brand">
       <View
         className="absolute left-0 right-0 z-50 bg-brand"
         style={{
@@ -839,8 +839,7 @@ export default function MapScreen() {
 
         <View
           pointerEvents="none"
-          className="absolute left-0 right-0 items-center justify-center px-20"
-          style={{ top: 0, bottom: 0 }}
+          className="absolute inset-y-0 left-0 right-0 items-center justify-center px-20"
         >
           <Text
             className="text-center font-outfit-bold text-2xl text-white"

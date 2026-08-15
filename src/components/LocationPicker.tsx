@@ -249,7 +249,7 @@ export default function LocationPicker({
             }
             accessibilityState={{ selected: mapLayer === 'satellite' }}
           >
-            <Image source={IMAGES.layers} style={styles.mapControlIcon} />
+            <Image source={IMAGES.layers} className="h-[18px] w-[18px] tint-brand" />
           </FeedbackPressable>
         ) : null}
         {mapStatus === 'ready' ? (
@@ -284,10 +284,5 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.18,
     shadowRadius: 4,
     elevation: 6,
-  },
-  mapControlIcon: {
-    width: 18,
-    height: 18,
-    tintColor: colors.brand,
   },
 });

@@ -56,7 +56,10 @@ export default function OnboardingScreen() {
       >
         <ScrollView
           className="flex-1"
-          contentContainerClassName="flex-grow self-center w-full max-w-[640px] px-6 pt-8 pb-8"
+          contentContainerClassName="flex-grow self-center w-full max-w-[640px] px-6 pt-8"
+          contentContainerStyle={{
+            paddingBottom: insets.bottom > 32 ? insets.bottom + 32 : 32,
+          }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >

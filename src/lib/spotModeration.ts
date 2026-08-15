@@ -75,9 +75,6 @@ function parseVerdict(content: string): SpotModerationVerdict {
   return { approved: false, flag, reason };
 }
 
-const HARSH_REASON =
-  /\b(inappropriate|prohibited|violat|not allowed|rejected|unsafe|forbidden|cannot be posted|against (our|the) (rules|guidelines)|offensive|explicit|nsfw)\b/i;
-
 function mentionedFields(reason: string): {
   title: boolean;
   description: boolean;
@@ -130,12 +127,7 @@ export function softenModerationReason(
   flag: 'INAPPROPRIATE' | 'IRRELEVANT',
   reason: string
 ): string {
-  const text = reason.trim();
-  if (text.length > 0 && text.length <= 160 && !HARSH_REASON.test(text)) {
-    return text;
-  }
-
-  return gentleFieldReason(flag, text);
+  return gentleFieldReason(flag, reason.trim());
 }
 
 /** Convert an uploaded image into a data URL without exposing it to the client. */

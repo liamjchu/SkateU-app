@@ -138,7 +138,7 @@ export function HomeFeedRail({
             />
           ))}
         </ScrollView>
-      ) : error ? (
+      ) : error && isEmpty ? (
         <View className="flex-row items-center rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2.5">
           <Text className="flex-1 pr-2 font-outfit-medium text-sm text-errorText">
             {error}
@@ -180,7 +180,21 @@ export function HomeFeedRail({
           }}
         >
           {children}
-          {isLoadingMore ? (
+          {error ? (
+            <View className="w-[188px] justify-center rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2.5">
+              <Text className="font-outfit-medium text-sm text-errorText">
+                {error}
+              </Text>
+              <FeedbackPressable
+                onPress={onRetry}
+                className="mt-2 self-start rounded-xl bg-accent px-3 py-1.5"
+                accessibilityRole="button"
+                accessibilityLabel={retryAccessibilityLabel}
+              >
+                <Text className="font-outfit-bold text-sm text-brand">Retry</Text>
+              </FeedbackPressable>
+            </View>
+          ) : isLoadingMore ? (
             <View className="h-52 w-10 items-center justify-center">
               <ActivityIndicator color={colors.accent} />
             </View>

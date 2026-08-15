@@ -103,6 +103,8 @@ export default function NoticeBanner({
   return (
     <Animated.View
       pointerEvents={shouldShow ? 'auto' : 'none'}
+      accessibilityElementsHidden={!shouldShow}
+      importantForAccessibility={shouldShow ? 'auto' : 'no-hide-descendants'}
       style={[{ overflow: 'hidden' }, animatedStyle]}
     >
       <View

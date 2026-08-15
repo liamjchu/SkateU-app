@@ -121,8 +121,7 @@ export default function ForgotPasswordScreen() {
                     returnKeyType="send"
                     onSubmitEditing={() => void handleSubmit()}
                     editable={!submitting}
-                    className="font-outfit-medium text-base text-ink"
-                    style={{ padding: 0 }}
+                    className="p-0 font-outfit-medium text-base text-ink"
                   />
                 </View>
               </View>

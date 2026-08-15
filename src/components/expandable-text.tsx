@@ -46,11 +46,13 @@ export default function ExpandableText({
     setIsTruncated(false);
   }, [children, collapsedLines]);
 
-  const canToggle = onPress == null || isTruncated || expanded;
+  const canToggle = isTruncated || expanded;
+  const isInteractive = canToggle || onPress != null;
 
   return (
     <View className="w-full min-w-0">
       <Pressable
+        disabled={!isInteractive}
         onPress={() => {
           if (canToggle) {
             triggerHaptic('selection');
@@ -60,16 +62,18 @@ export default function ExpandableText({
 
           onPress?.();
         }}
-        accessibilityRole="button"
+        accessibilityRole={isInteractive ? 'button' : undefined}
         accessibilityLabel={accessibilityLabel ?? children}
         accessibilityHint={
-          expanded
-            ? 'Shows less text'
-            : isTruncated
-              ? 'Shows the full text'
-              : accessibilityHint
+          !isInteractive
+            ? undefined
+            : expanded
+              ? 'Shows less text'
+              : isTruncated
+                ? 'Shows the full text'
+                : accessibilityHint
         }
-        accessibilityState={{ expanded }}
+        accessibilityState={isInteractive ? { expanded } : undefined}
       >
         <Text
           className={className}

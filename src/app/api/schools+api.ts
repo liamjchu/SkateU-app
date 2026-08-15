@@ -26,7 +26,7 @@ type SchoolSearchResult = {
   spotImageUrl?: string | null;
 };
 
-const SEARCH_LIMIT = 20;
+export const SEARCH_LIMIT = 20;
 const MIN_SEARCH_LENGTH = 2;
 const IDS_LIMIT = 50;
 const SPOT_IMAGE_LOOKUP_LIMIT = 200;
@@ -215,7 +215,7 @@ export async function GET(request: Request) {
         config,
         { numspots: 'gt.0', ...typeParams },
         HOME_RAIL_PAGE_SIZE,
-        'numspots.desc',
+        'numspots.desc,id.asc',
         offset
       );
       const imageBySchoolId = await fetchLatestSpotImageBySchool(

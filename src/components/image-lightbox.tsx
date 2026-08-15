@@ -139,6 +139,14 @@ export default function ImageLightbox({
 
       savedTranslateX.value = translateX.value;
       savedTranslateY.value = translateY.value;
+    })
+    .onFinalize((_event, success) => {
+      if (success) {
+        return;
+      }
+
+      translateX.value = withTiming(0);
+      translateY.value = withTiming(0);
     });
 
   const doubleTap = Gesture.Tap()

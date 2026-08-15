@@ -269,7 +269,7 @@ export default function EditSpotScreen() {
         >
           <ScrollView
             contentContainerClassName="w-full max-w-[720px] self-center px-6 pb-10 pt-5"
-            keyboardShouldPersistTaps="never"
+            keyboardShouldPersistTaps="handled"
             keyboardDismissMode="interactive"
             onScrollBeginDrag={Keyboard.dismiss}
             scrollEnabled={scrollEnabled}
