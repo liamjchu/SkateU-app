@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 
+import { WAITLIST_MAX_BODY_BYTES } from "../../../constants/site";
 import { getSupabaseAdmin } from "../../../lib/supabase-server";
+import {
+  isWaitlistEmail,
+  normalizeWaitlistEmail,
+} from "../../../lib/waitlistEmail";
 
-const emailPattern = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const dispatchTimeoutMs = 15_000;
 const defaultRateLimitMaxRequests = 5;
 const defaultRateLimitWindowMs = 60_000;
@@ -71,49 +75,22 @@ function rateLimitResponse(retryAfterSeconds: number): NextResponse {
   );
 }
 
-async function handleSubscription(request: Request) {
-  let payload: unknown;
-
-  try {
-    payload = await request.json();
-  } catch {
-    return invalidRequestResponse();
-  }
-
-  if (
-    typeof payload !== "object" ||
-    payload === null ||
-    !("email" in payload) ||
-    typeof payload.email !== "string"
-  ) {
-    return invalidRequestResponse();
-  }
-
-  const email = payload.email.trim().toLowerCase();
-
-  if (
-    email.length === 0 ||
-    email.length > 254 ||
-    !emailPattern.test(email)
-  ) {
-    return invalidRequestResponse();
-  }
-
-  const { error: subscribeError } = await getSupabaseAdmin().rpc(
-    "subscribe_email",
-    { p_email: email }
+function requestBodyTooLarge(request: Request): boolean {
+  const contentLength = Number.parseInt(
+    request.headers.get("content-length") ?? "",
+    10
   );
 
-  if (subscribeError) {
-    return failureResponse();
-  }
+  return Number.isSafeInteger(contentLength) && contentLength > WAITLIST_MAX_BODY_BYTES;
+}
 
+async function dispatchConfirmationEmail(email: string): Promise<boolean> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const dispatchSecret = process.env.SUBSCRIPTION_DISPATCH_SECRET;
 
   if (!supabaseUrl || !anonKey || !dispatchSecret) {
-    return failureResponse();
+    return false;
   }
 
   try {
@@ -132,17 +109,74 @@ async function handleSubscription(request: Request) {
       }
     );
 
-    if (!dispatchResponse.ok) {
-      return failureResponse();
-    }
+    return dispatchResponse.ok;
   } catch {
+    return false;
+  }
+}
+
+async function handleSubscription(request: Request): Promise<NextResponse> {
+  if (requestBodyTooLarge(request)) {
+    return invalidRequestResponse();
+  }
+
+  const contentType = request.headers.get("content-type") ?? "";
+  if (!contentType.toLowerCase().includes("application/json")) {
+    return invalidRequestResponse();
+  }
+
+  let payload: unknown;
+
+  try {
+    payload = await request.json();
+  } catch {
+    return invalidRequestResponse();
+  }
+
+  if (
+    typeof payload !== "object" ||
+    payload === null ||
+    !("email" in payload) ||
+    typeof payload.email !== "string"
+  ) {
+    return invalidRequestResponse();
+  }
+
+  if (!("confirmedAge13Plus" in payload) || payload.confirmedAge13Plus !== true) {
+    return NextResponse.json(
+      { error: "You must be at least 13 years old to join the waitlist." },
+      { status: 400 }
+    );
+  }
+
+  const email = normalizeWaitlistEmail(payload.email);
+
+  if (!isWaitlistEmail(email)) {
+    return invalidRequestResponse();
+  }
+
+  const { error: subscribeError } = await getSupabaseAdmin().rpc(
+    "subscribe_email",
+    { p_email: email }
+  );
+
+  if (subscribeError) {
     return failureResponse();
   }
 
-  return NextResponse.json({ success: true });
+  const emailSent = await dispatchConfirmationEmail(email);
+
+  return NextResponse.json({ success: true, emailSent });
 }
 
-export async function POST(request: Request) {
+export async function GET(): Promise<NextResponse> {
+  return NextResponse.json(
+    { error: "Method not allowed." },
+    { status: 405, headers: { Allow: "POST" } }
+  );
+}
+
+export async function POST(request: Request): Promise<NextResponse> {
   const retryAfterSeconds = rateLimitRetryAfterSeconds(clientIp(request));
 
   if (retryAfterSeconds !== null) {

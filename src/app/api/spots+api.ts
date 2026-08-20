@@ -1,4 +1,8 @@
 import { HOME_RAIL_PAGE_SIZE, parseOffset } from '../../lib/homeFeed';
+import {
+    IMAGE_SANITIZE_ERROR,
+    sanitizeSpotImage,
+} from '../../lib/sanitizeImage';
 import { createRandomId } from '../../lib/webCrypto';
 import type { ImageOrderEntry } from '../../lib/spotMedia';
 import {
@@ -332,6 +336,41 @@ export function validateImageFile(file: { type: string; size: number }):
   return { ok: true };
 }
 
+function bytesToArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy.buffer;
+}
+
+/**
+ * Strips GPS, camera, timestamp, and similar metadata before moderation
+ * and storage. The original bytes never leave this request.
+ */
+export async function sanitizeUploadedImages(
+  files: SpotImageFile[]
+): Promise<ValidationResult<SpotImageFile[]>> {
+  const sanitized: SpotImageFile[] = [];
+
+  for (const file of files) {
+    const result = sanitizeSpotImage({
+      type: file.type,
+      bytes: new Uint8Array(await file.arrayBuffer()),
+    });
+    if (!result.ok) {
+      return { ok: false, message: IMAGE_SANITIZE_ERROR };
+    }
+
+    const copy = result.bytes.slice();
+    sanitized.push({
+      type: result.type,
+      size: copy.byteLength,
+      arrayBuffer: async () => bytesToArrayBuffer(copy),
+    });
+  }
+
+  return { ok: true, value: sanitized };
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -482,7 +521,7 @@ export async function uploadImages(
 // --- Auth -------------------------------------------------------------------
 
 export type AuthResult =
-  | { ok: true; userId: string }
+  | { ok: true; userId: string; email: string | null }
   | { ok: false; reason: 'invalid' | 'expired' | 'timeout' };
 
 export function authUserMessage(
@@ -521,9 +560,13 @@ export async function resolveUserId(
     });
 
     if (response.ok) {
-      const user = (await response.json()) as { id?: string };
+      const user = (await response.json()) as { id?: string; email?: string | null };
       if (typeof user.id === 'string' && user.id.length > 0) {
-        return { ok: true, userId: user.id };
+        const email =
+          typeof user.email === 'string' && user.email.trim().length > 0
+            ? user.email.trim()
+            : null;
+        return { ok: true, userId: user.id, email };
       }
       return { ok: false, reason: 'invalid' };
     }
@@ -984,8 +1027,15 @@ export async function POST(request: Request): Promise<Response> {
     }
   }
 
+  const sanitizedImages = await sanitizeUploadedImages(files);
+  if (!sanitizedImages.ok) {
+    return Response.json({ error: sanitizedImages.message }, { status: 400 });
+  }
+
   try {
-    const imageUrls = await Promise.all(files.map(imageFileToDataUrl));
+    const imageUrls = await Promise.all(
+      sanitizedImages.value.map(imageFileToDataUrl)
+    );
     const moderation = await moderateSpotSubmission({
       title: bodyValidation.value.name,
       description: bodyValidation.value.description,
@@ -1005,7 +1055,11 @@ export async function POST(request: Request): Promise<Response> {
 
   let imageUrls: string[];
   try {
-    imageUrls = await uploadImages(config, bodyValidation.value.schoolId, files);
+    imageUrls = await uploadImages(
+      config,
+      bodyValidation.value.schoolId,
+      sanitizedImages.value
+    );
   } catch (error) {
     console.error('Uploading spot images failed:', error);
     return Response.json(
@@ -1137,6 +1191,11 @@ export async function PATCH(request: Request): Promise<Response> {
     }
   }
 
+  const sanitizedImages = await sanitizeUploadedImages(files);
+  if (!sanitizedImages.ok) {
+    return Response.json({ error: sanitizedImages.message }, { status: 400 });
+  }
+
   const imageOrderRaw = readTextField(form, 'imageOrder');
   let imageOrder: ImageOrderEntry[] | undefined;
   if (imageOrderRaw.length > 0) {
@@ -1158,12 +1217,16 @@ export async function PATCH(request: Request): Promise<Response> {
   try {
     let moderationImageUrls: string[];
     if (imageOrder) {
-      const newDataUrls = await Promise.all(files.map(imageFileToDataUrl));
+      const newDataUrls = await Promise.all(
+        sanitizedImages.value.map(imageFileToDataUrl)
+      );
       moderationImageUrls = imageOrder.map((entry) =>
         entry.kind === 'existing' ? entry.url : newDataUrls[entry.index]
       );
-    } else if (files.length > 0) {
-      moderationImageUrls = await Promise.all(files.map(imageFileToDataUrl));
+    } else if (sanitizedImages.value.length > 0) {
+      moderationImageUrls = await Promise.all(
+        sanitizedImages.value.map(imageFileToDataUrl)
+      );
     } else {
       moderationImageUrls = ownership.imageUrls;
     }
@@ -1197,11 +1260,11 @@ export async function PATCH(request: Request): Promise<Response> {
     longitude: bodyValidation.value.longitude,
   };
 
-  if (imageOrder || files.length > 0) {
+  if (imageOrder || sanitizedImages.value.length > 0) {
     try {
       const uploadedUrls =
-        files.length > 0
-          ? await uploadImages(config, ownership.schoolId, files)
+        sanitizedImages.value.length > 0
+          ? await uploadImages(config, ownership.schoolId, sanitizedImages.value)
           : [];
       updates.image_urls = imageOrder
         ? imageOrder.map((entry) =>

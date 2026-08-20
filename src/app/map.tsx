@@ -119,7 +119,7 @@ export default function MapScreen() {
   const [showAttribution, setShowAttribution] = useState(false);
   const [showLoginRequired, setShowLoginRequired] = useState(false);
   const [loginRequiredReason, setLoginRequiredReason] = useState<
-    'default' | 'removal'
+    'default' | 'removal' | 'spot_problem'
   >('default');
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [likingSpotId, setLikingSpotId] = useState<string | null>(null);
@@ -760,6 +760,23 @@ export default function MapScreen() {
     });
   };
 
+  const handleReportProblemPress = () => {
+    if (!selectedSpot || selectedSpotIsOwned) {
+      return;
+    }
+
+    if (!session?.access_token) {
+      setLoginRequiredReason('spot_problem');
+      setShowLoginRequired(true);
+      return;
+    }
+
+    router.push({
+      pathname: '/help/spot-problem',
+      params: { spotId: selectedSpot.id, spotName: selectedSpot.name },
+    });
+  };
+
   const handleRequestRemovalPress = () => {
     if (!selectedSpot || selectedSpotIsOwned) {
       return;
@@ -1061,12 +1078,16 @@ export default function MapScreen() {
         title={
           loginRequiredReason === 'removal'
             ? 'Sign in to request removal'
-            : undefined
+            : loginRequiredReason === 'spot_problem'
+              ? 'Sign in to report a problem'
+              : undefined
         }
         message={
           loginRequiredReason === 'removal'
             ? 'You can still browse campuses. Sign in if you want to request that a spot be removed.'
-            : undefined
+            : loginRequiredReason === 'spot_problem'
+              ? 'You can still browse campuses. Sign in if you want to report a problem with this spot.'
+              : undefined
         }
       />
       <ImageLightbox
@@ -1468,31 +1489,45 @@ export default function MapScreen() {
                 </FeedbackPressable>
               </View>
             ) : canShowRemovalAction ? (
-              selectedSpotWasReported ? (
-                <View
-                  className="mt-4 min-h-12 flex-row items-center justify-center rounded-2xl bg-surface-soft px-4"
-                  accessibilityRole="text"
-                  accessibilityLabel="Removal request submitted"
-                >
-                  <Feather name="flag" size={16} color={colors.muted} />
-                  <Text className="ml-2 font-outfit-semibold text-sm text-muted">
-                    Removal request submitted
-                  </Text>
-                </View>
-              ) : (
+              <View className="mt-4 gap-3">
                 <FeedbackPressable
                   haptic="selection"
-                  onPress={handleRequestRemovalPress}
-                  className="mt-4 h-12 flex-row items-center justify-center rounded-2xl bg-surface-soft px-4"
+                  onPress={handleReportProblemPress}
+                  className="h-12 flex-row items-center justify-center rounded-2xl bg-surface-soft px-4"
                   accessibilityRole="button"
-                  accessibilityLabel={`Request removal of ${selectedSpot.name}`}
+                  accessibilityLabel={`Report a problem with ${selectedSpot.name}`}
                 >
-                  <Feather name="flag" size={16} color={colors.ink} />
+                  <Feather name="alert-circle" size={16} color={colors.ink} />
                   <Text className="ml-2 font-outfit-semibold text-sm text-ink">
-                    Request Removal
+                    Report a Problem
                   </Text>
                 </FeedbackPressable>
-              )
+                {selectedSpotWasReported ? (
+                  <View
+                    className="min-h-12 flex-row items-center justify-center rounded-2xl bg-surface-soft px-4"
+                    accessibilityRole="text"
+                    accessibilityLabel="Removal request submitted"
+                  >
+                    <Feather name="flag" size={16} color={colors.muted} />
+                    <Text className="ml-2 font-outfit-semibold text-sm text-muted">
+                      Removal request submitted
+                    </Text>
+                  </View>
+                ) : (
+                  <FeedbackPressable
+                    haptic="selection"
+                    onPress={handleRequestRemovalPress}
+                    className="h-12 flex-row items-center justify-center rounded-2xl bg-surface-soft px-4"
+                    accessibilityRole="button"
+                    accessibilityLabel={`Request removal of ${selectedSpot.name}`}
+                  >
+                    <Feather name="flag" size={16} color={colors.ink} />
+                    <Text className="ml-2 font-outfit-semibold text-sm text-ink">
+                      Request Removal
+                    </Text>
+                  </FeedbackPressable>
+                )}
+              </View>
             ) : null}
           </ScrollView>
         </Animated.View>

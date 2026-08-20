@@ -34,6 +34,12 @@ export function change(input: HTMLInputElement, value: string): void {
   });
 }
 
+export function click(element: HTMLElement): void {
+  act(() => {
+    element.click();
+  });
+}
+
 export function submit(form: HTMLFormElement): void {
   act(() => form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
 }

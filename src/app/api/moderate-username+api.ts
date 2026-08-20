@@ -1,5 +1,6 @@
 import { validateUsername } from '../../lib/username';
 import type { Profile } from '../../types/profile';
+import { fetchMergedProfile } from './profile-record';
 import { getSupabaseConfig, resolveUserId, authUserMessage } from './spots+api';
 
 // Server-side username moderation. The OpenAI key lives only here (never
@@ -25,7 +26,7 @@ function readBearerToken(request: Request): string | null {
   return match ? match[1].trim() : null;
 }
 
-const SYSTEM_PROMPT = `You are a strict username moderation filter for SkateU, a school skate-spot app used by all ages. Decide if a username is safe to display publicly, like Instagram or Roblox would allow.
+const SYSTEM_PROMPT = `You are a strict username moderation filter for SkateU, a 13+ campus skate-spot app. Decide if a username is safe to display publicly, like a general-audience social app would allow.
 
 Reject the username if it contains, references, or clearly hints at any of the following, INCLUDING obfuscated, misspelled, leetspeak (e.g. 4=a, 3=e, 1=i, 0=o, $=s), or concatenated forms without spaces:
 - Profanity, vulgar language, or crude slang
@@ -211,9 +212,22 @@ export async function POST(request: Request) {
     }
 
     const profiles = (await profileResponse.json()) as Profile[];
-    const profile = profiles[0];
-    if (!profile || profile.id !== auth.userId || profile.username !== username) {
+    const patched = profiles[0];
+    if (!patched || patched.id !== auth.userId || patched.username !== username) {
       console.error('Moderated username profile update returned an invalid profile.');
+      return Response.json(
+        { error: 'Could not save the username right now. Try again.' },
+        { status: 502 }
+      );
+    }
+
+    const profile = await fetchMergedProfile(
+      config,
+      auth.userId,
+      controller.signal
+    );
+    if (!profile || profile.id !== auth.userId || profile.username !== username) {
+      console.error('Moderated username profile merge returned an invalid profile.');
       return Response.json(
         { error: 'Could not save the username right now. Try again.' },
         { status: 502 }

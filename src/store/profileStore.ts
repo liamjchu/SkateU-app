@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { getApiUrl } from '../lib/api';
+import { PROFILE_PUBLIC_SELECT_COLUMNS } from '../lib/legalAcceptance';
 import { supabase } from '../lib/supabase';
 import { sanitizeErrorMessage } from '../lib/userFacingError';
-import type { Profile } from '../types/profile';
+import { mapProfile, type Profile } from '../types/profile';
 import { useSpotsStore } from './spotsStore';
 
 export type UsernameClaimResult =
@@ -29,7 +30,7 @@ type ProfileState = {
   // A transient fetch failure is distinct from a valid missing profile.
   error: string | null;
 
-  fetchProfile: (userId: string) => Promise<void>;
+  fetchProfile: (userId: string, accessToken?: string | null) => Promise<void>;
   clearProfile: () => void;
   isUsernameAvailable: (
     username: string,
@@ -40,6 +41,7 @@ type ProfileState = {
     username: string,
     showWelcomeOnSave?: boolean
   ) => Promise<UsernameClaimResult>;
+  acceptLegal: (accessToken: string) => Promise<void>;
 };
 
 const USERNAME_MODERATION_TIMEOUT_MS = 10_000;
@@ -53,13 +55,13 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
   loaded: false,
   error: null,
 
-  fetchProfile: async (userId) => {
+  fetchProfile: async (userId, accessToken) => {
     const requestVersion = ++profileRequestVersion;
     set({ profile: null, loading: true, loaded: false, error: null });
 
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, username, avatar_url, updated_at')
+      .select(PROFILE_PUBLIC_SELECT_COLUMNS)
       .eq('id', userId)
       .maybeSingle();
 
@@ -78,12 +80,63 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
       return;
     }
 
-    set({
-      profile: data as Profile | null,
-      loading: false,
-      loaded: true,
-      error: null,
-    });
+    const publicProfile = data
+      ? mapProfile({
+          ...data,
+          legal_version: null,
+          legal_accepted_at: null,
+          age_attested_at: null,
+        })
+      : null;
+
+    if (!publicProfile || !accessToken) {
+      set({
+        profile: publicProfile,
+        loading: false,
+        loaded: true,
+        error: null,
+      });
+      return;
+    }
+
+    try {
+      const legalResponse = await fetch(getApiUrl('/api/accept-legal'), {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (requestVersion !== profileRequestVersion) {
+        return;
+      }
+
+      const legalData = (await legalResponse.json().catch(() => null)) as
+        | { profile?: Profile; error?: string }
+        | null;
+
+      if (!legalResponse.ok || !legalData?.profile?.id) {
+        throw new Error(legalData?.error ?? 'Could not load legal acceptance.');
+      }
+
+      set({
+        profile: mapProfile(legalData.profile),
+        loading: false,
+        loaded: true,
+        error: null,
+      });
+    } catch (legalError) {
+      if (requestVersion !== profileRequestVersion) {
+        return;
+      }
+
+      console.warn('Failed to load legal acceptance', legalError);
+      set({
+        profile: null,
+        loading: false,
+        loaded: false,
+        error: 'Couldn’t load your profile right now. Try again in a sec.',
+      });
+    }
   },
 
   clearProfile: () => {
@@ -154,16 +207,24 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
         };
       }
 
-      const profile = data.profile;
-      if (!profile?.id || profile.username !== username) {
+      if (!data.profile?.id || data.profile.username !== username) {
         throw new Error('Could not save the username right now. Try again.');
       }
 
-      const previousUsername = get().profile?.username;
+      const profile = mapProfile(data.profile);
+      const current = get().profile;
+      const previousUsername = current?.username;
       const welcomeAboardUserId = get().welcomeAboardUserId;
       profileRequestVersion += 1;
       set({
-        profile,
+        profile: {
+          ...profile,
+          legal_version: profile.legal_version ?? current?.legal_version ?? null,
+          legal_accepted_at:
+            profile.legal_accepted_at ?? current?.legal_accepted_at ?? null,
+          age_attested_at:
+            profile.age_attested_at ?? current?.age_attested_at ?? null,
+        },
         welcomeAboardUserId: showWelcomeOnSave ? profile.id : welcomeAboardUserId,
         loading: false,
         loaded: true,
@@ -180,6 +241,57 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
         throw new Error('Saving the username timed out. Try again in a sec.');
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  },
+
+  acceptLegal: async (accessToken) => {
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () => controller.abort(),
+      USERNAME_MODERATION_TIMEOUT_MS
+    );
+
+    try {
+      const response = await fetch(getApiUrl('/api/accept-legal'), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        signal: controller.signal,
+      });
+
+      const data = (await response.json().catch(() => null)) as
+        | { profile?: Profile; error?: string }
+        | null;
+
+      if (!response.ok) {
+        throw new Error(
+          sanitizeErrorMessage(
+            data?.error ?? '',
+            'Could not save your agreement right now. Try again.'
+          )
+        );
+      }
+
+      if (!data?.profile?.id) {
+        throw new Error('Could not save your agreement right now. Try again.');
+      }
+
+      profileRequestVersion += 1;
+      set({
+        profile: mapProfile(data.profile),
+        loading: false,
+        loaded: true,
+        error: null,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('Saving your agreement timed out. Try again in a sec.');
       }
       throw error;
     } finally {

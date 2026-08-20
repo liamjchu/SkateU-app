@@ -20,6 +20,13 @@ import '../../global.css';
 import { colors } from '../constants/colors';
 import images from '../constants/images';
 import { checkAppleCredentialStatus } from '../lib/appleAuthentication';
+import {
+    getLegalGate,
+    isAllowedDuringLegalGate,
+    isSettledLegalRoute,
+    legalGateRedirectPath,
+} from '../lib/legalAcceptance';
+import { useAgeEligibilityStore } from '../store/ageEligibilityStore';
 import { useAuthStore } from '../store/authStore';
 import { useFavorites } from '../store/favoritesStore';
 import { useProfileStore } from '../store/profileStore';
@@ -48,7 +55,11 @@ export default function RootLayout() {
 
   // --- Auth + profile state that drives the username gate ---
   const userId = useAuthStore((state) => state.user?.id ?? null);
+  const accessToken = useAuthStore((state) => state.session?.access_token ?? null);
   const authInitializing = useAuthStore((state) => state.initializing);
+  const confirmedAgeEligibleThisSession = useAgeEligibilityStore(
+    (state) => state.confirmedThisSession
+  );
   const profile = useProfileStore((state) => state.profile);
   const profileLoaded = useProfileStore((state) => state.loaded);
   const profileLoading = useProfileStore((state) => state.loading);
@@ -92,11 +103,11 @@ export default function RootLayout() {
     clearReportedSpotIds();
 
     if (userId) {
-      fetchProfile(userId);
+      fetchProfile(userId, accessToken);
     } else {
       clearProfile();
     }
-  }, [clearLikedSpots, clearMySpots, clearReportedSpotIds, userId, fetchProfile, clearProfile]);
+  }, [clearLikedSpots, clearMySpots, clearReportedSpotIds, userId, accessToken, fetchProfile, clearProfile]);
 
   useEffect(() => {
     // Supabase redirects OAuth and recovery emails to distinct native paths.
@@ -157,23 +168,38 @@ export default function RootLayout() {
   const profileReady = !userId || profileLoaded;
   const appReady = fontsReady && !authInitializing && profileReady;
 
-  // The gate: a signed-in user with no username is locked onto onboarding.
-  // Anonymous users are unaffected (they keep browsing as before).
-  const needsOnboarding = !!userId && profileLoaded && !profile?.username;
-  const onOnboarding = segments[0] === 'onboarding';
-  const routeSettled = needsOnboarding ? onOnboarding : !onOnboarding;
+  // Signed-in users without a username and without a 13+ answer stay on
+  // age-gate. After that they stay on onboarding until they pick a username.
+  // Users who already have a username but have not accepted the current Terms
+  // stay on accept-legal. Anonymous browsing is unchanged. Legal documents stay
+  // reachable. Delete-account OTP stays reachable during accept-legal.
+  const legalGate = getLegalGate({
+    userId,
+    profileLoaded,
+    profile,
+    confirmedAgeEligibleThisSession,
+  });
+  const routeRoot = segments[0];
+  const routeSettled = isSettledLegalRoute(legalGate, routeRoot);
 
   useEffect(() => {
     if (!appReady) {
       return;
     }
 
-    if (needsOnboarding && !onOnboarding) {
-      router.replace('/onboarding');
-    } else if (!needsOnboarding && onOnboarding) {
+    const redirect = legalGateRedirectPath(legalGate);
+    if (redirect && !isAllowedDuringLegalGate(legalGate, routeRoot)) {
+      router.replace(redirect);
+      return;
+    }
+
+    if (
+      legalGate === 'none' &&
+      (routeRoot === 'onboarding' || routeRoot === 'accept-legal')
+    ) {
       router.replace('/');
     }
-  }, [appReady, needsOnboarding, onOnboarding, router]);
+  }, [appReady, legalGate, routeRoot, router]);
 
   useEffect(() => {
     // Keep the native splash up until fonts are ready, then hand off to a
@@ -207,8 +233,13 @@ export default function RootLayout() {
       >
         <Stack.Screen name="index" options={{ animation: 'none' }} />
         <Stack.Screen name="onboarding" />
+        <Stack.Screen name="age-gate" />
+        <Stack.Screen name="age-restricted" />
+        <Stack.Screen name="accept-legal" />
+        <Stack.Screen name="legal" />
         <Stack.Screen name="profile" />
         <Stack.Screen name="settings" />
+        <Stack.Screen name="help" />
         <Stack.Screen name="change-username" />
         <Stack.Screen name="change-password" />
         <Stack.Screen
@@ -261,7 +292,7 @@ export default function RootLayout() {
               </Text>
               <Pressable
                 className="rounded-xl bg-accent px-3 py-2"
-                onPress={() => fetchProfile(userId)}
+                onPress={() => fetchProfile(userId, accessToken)}
                 disabled={profileLoading}
                 accessibilityRole="button"
                 accessibilityLabel="Retry loading profile"

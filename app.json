@@ -18,6 +18,10 @@
     },
     "android": {
       "package": "app.skateu.mobile",
+      "blockedPermissions": [
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#F7F4F0",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -41,7 +45,14 @@
         }
       ],
       "expo-font",
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "SkateU uses your photo library so you can add pictures of skate spots.",
+          "cameraPermission": "SkateU uses the camera so you can take pictures of skate spots."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

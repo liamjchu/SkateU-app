@@ -91,11 +91,15 @@ Follow the complete [Backend setup](docs/backend-setup.md). Before this app can 
 
    ```text
    supabase/profiles_setup.sql
+   supabase/profile_legal_acceptance_setup.sql
+   supabase/profile_legal_private_setup.sql
    supabase/spots_setup.sql
    supabase/spots_creator_link.sql
    supabase/spot_likes_setup.sql
+   supabase/spot_comments_setup.sql
    supabase/spots_count_trigger.sql
    supabase/account_deletion_proofs_setup.sql
+   supabase/spot_removal_requests_setup.sql
    ```
 
 5. Create a `spot-images` Storage bucket with public read enabled.

@@ -20,8 +20,9 @@ const RESEND_COOLDOWN = 60;
 // deletion instead of confirming a new signup.
 export default function VerifyDeleteAccountScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ email?: string }>();
+  const params = useLocalSearchParams<{ email?: string; from?: string }>();
   const email = typeof params.email === 'string' ? params.email : '';
+  const fromAcceptLegal = params.from === 'accept-legal';
 
   const verifyDeleteAccountOtp = useAuthStore(
     (state) => state.verifyDeleteAccountOtp
@@ -50,6 +51,11 @@ export default function VerifyDeleteAccountScreen() {
   }, [cooldown]);
 
   const goBack = () => {
+    if (fromAcceptLegal) {
+      router.replace('/accept-legal');
+      return;
+    }
+
     if (router.canGoBack()) {
       router.back();
       return;

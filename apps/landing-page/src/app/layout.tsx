@@ -1,6 +1,7 @@
 import { Analytics } from "@vercel/analytics/next";
 import type { Metadata, Viewport } from "next";
 import { Outfit } from "next/font/google";
+import { SITE_DESCRIPTION, SITE_TITLE } from "../constants/site";
 import "./globals.css";
 
 const outfit = Outfit({
@@ -9,12 +10,12 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: "SkateU — Track spots. Land tricks.",
-  description: "The all-in-one skate spot map for your campus.",
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
   applicationName: "SkateU",
   openGraph: {
-    title: "SkateU — Track spots. Land tricks.",
-    description: "The all-in-one skate spot map for your campus.",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
     type: "website",
   },
 };

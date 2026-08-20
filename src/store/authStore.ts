@@ -4,6 +4,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { create } from 'zustand';
 import { getApiUrl } from '../lib/api';
 import { supabase } from '../lib/supabase';
+import { useAgeEligibilityStore } from './ageEligibilityStore';
 
 type AuthState = {
   session: Session | null;
@@ -184,6 +185,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   signUp: async (email, password) => {
+    if (!useAgeEligibilityStore.getState().confirmedThisSession) {
+      throw new Error('Confirm you are 13 or older before creating an account.');
+    }
+
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
@@ -325,6 +330,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
 
     deleteAccountProof = null;
+    useAgeEligibilityStore.getState().clear();
     set({ passwordRecovery: false });
   },
 

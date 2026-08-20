@@ -1,5 +1,12 @@
 import fc from 'fast-check';
 
+import { IMAGE_SANITIZE_ERROR } from '../../../lib/sanitizeImage';
+import {
+    CAMERA_MAKE,
+    CAPTURE_TIME,
+    containsAscii,
+    jpegWithPrivateMetadata,
+} from '../../../lib/__tests__/imageFixtures';
 import {
     ALLOWED_IMAGE_TYPES,
     buildInsertRecord,
@@ -16,6 +23,7 @@ import {
     POST,
     parseImageOrder,
     resolveImageOrder,
+    sanitizeUploadedImages,
     SpotImageFile,
     uploadImages,
     ValidatedPostBody,
@@ -65,6 +73,22 @@ function makeImageFile(type: string, size: number, bytes = 4): SpotImageFile {
     size,
     arrayBuffer: async () => new ArrayBuffer(bytes),
   };
+}
+
+function jpegFile(bytes: Uint8Array, name = 'spot.jpg'): File {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return new File([copy.buffer], name, { type: 'image/jpeg' });
+}
+
+function requestBodyBytes(body: BodyInit | null | undefined): Uint8Array {
+  if (body instanceof ArrayBuffer) {
+    return new Uint8Array(body);
+  }
+  if (ArrayBuffer.isView(body)) {
+    return new Uint8Array(body.buffer, body.byteOffset, body.byteLength);
+  }
+  throw new Error('Expected an ArrayBuffer upload body.');
 }
 
 afterEach(() => {
@@ -339,6 +363,35 @@ describe('uploadImages', () => {
     await expect(
       uploadImages(config, 'school1', [makeImageFile('image/png', 1024)])
     ).rejects.toThrow();
+  });
+});
+
+describe('sanitizeUploadedImages', () => {
+  it('returns sanitized bytes and rejects corrupt files', async () => {
+    const original = jpegWithPrivateMetadata();
+    const originalCopy = new Uint8Array(original.byteLength);
+    originalCopy.set(original);
+    const result = await sanitizeUploadedImages([
+      {
+        type: 'image/jpeg',
+        size: originalCopy.byteLength,
+        arrayBuffer: async () => originalCopy.buffer,
+      },
+    ]);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+
+    const sanitized = new Uint8Array(await result.value[0].arrayBuffer());
+    expect(containsAscii(sanitized, CAMERA_MAKE)).toBe(false);
+    expect(containsAscii(sanitized, CAPTURE_TIME)).toBe(false);
+    expect(containsAscii(original, CAMERA_MAKE)).toBe(true);
+
+    await expect(
+      sanitizeUploadedImages([makeImageFile('image/jpeg', 4)])
+    ).resolves.toEqual({ ok: false, message: IMAGE_SANITIZE_ERROR });
   });
 });
 
@@ -697,6 +750,97 @@ describe('POST /api/spots', () => {
     expect(response.status).toBe(201);
     const body = (await response.json()) as { spot: { id: string } };
     expect(body.spot.id).toBe('spot1');
+  });
+
+  it('returns 400 and does not upload when an image cannot be sanitized', async () => {
+    setConfigured();
+    const fetchMock: FetchMock = jest.fn(async (_input) =>
+      jsonResponse({ id: 'user-1' })
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const form = validForm();
+    form.append(
+      'image',
+      jpegFile(Uint8Array.from([1, 2, 3, 4]))
+    );
+
+    const response = await POST(
+      makePostRequest(form, { Authorization: 'Bearer good-token' })
+    );
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: string };
+    expect(body.error).toBe(IMAGE_SANITIZE_ERROR);
+    expect(
+      fetchMock.mock.calls.some((call) =>
+        call[0].toString().includes('/storage/v1/object/spot-images/')
+      )
+    ).toBe(false);
+  });
+
+  it('uploads and moderates sanitized bytes instead of the original JPEG', async () => {
+    setConfigured();
+    const original = jpegWithPrivateMetadata();
+    const createdRow: DatabaseSpot = {
+      id: 'spot1',
+      school_id: 'school1',
+      name: 'Rail',
+      description: 'A nice rail',
+      latitude: 10,
+      longitude: 20,
+      image_urls: [
+        'https://project.supabase.co/storage/v1/object/public/spot-images/school1/new.jpg',
+      ],
+      created_at: '2024-01-01T00:00:00.000Z',
+      updated_at: '2024-01-01T00:00:00.000Z',
+      schools: { name: 'UT Austin', city: 'Austin', state: 'TX' },
+      creator: { username: 'skater_jane' },
+    };
+    const fetchMock: FetchMock = jest.fn(async (input, init) => {
+      const requestUrl = input.toString();
+      if (requestUrl.includes('/auth/v1/user')) {
+        return jsonResponse({ id: 'user-1' });
+      }
+      if (requestUrl.includes('api.openai.com')) {
+        return openAIApprovalResponse();
+      }
+      if (requestUrl.includes('/storage/v1/object/spot-images/')) {
+        return new Response('', { status: 200 });
+      }
+      return jsonResponse([createdRow], 201);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const form = validForm();
+    form.append('image', jpegFile(original));
+    const response = await POST(
+      makePostRequest(form, { Authorization: 'Bearer good-token' })
+    );
+    expect(response.status).toBe(201);
+
+    const storageCall = fetchMock.mock.calls.find((call) =>
+      call[0].toString().includes('/storage/v1/object/spot-images/')
+    );
+    expect(storageCall).toBeDefined();
+    const uploaded = requestBodyBytes(storageCall?.[1]?.body ?? null);
+    expect(containsAscii(uploaded, CAMERA_MAKE)).toBe(false);
+    expect(containsAscii(uploaded, CAPTURE_TIME)).toBe(false);
+    expect(containsAscii(original, CAMERA_MAKE)).toBe(true);
+
+    const openaiCall = fetchMock.mock.calls.find((call) =>
+      call[0].toString().includes('api.openai.com')
+    );
+    const openaiBody = JSON.parse(String(openaiCall?.[1]?.body)) as {
+      messages: { content: { type: string; image_url?: { url: string } }[] }[];
+    };
+    const dataUrl = openaiBody.messages[1].content.find(
+      (part) => part.type === 'image_url'
+    )?.image_url?.url;
+    expect(dataUrl).toEqual(expect.stringContaining('data:image/jpeg;base64,'));
+    const encoded = dataUrl?.slice('data:image/jpeg;base64,'.length) ?? '';
+    const moderated = Uint8Array.from(Buffer.from(encoded, 'base64'));
+    expect(containsAscii(moderated, CAMERA_MAKE)).toBe(false);
+    expect(containsAscii(moderated, CAPTURE_TIME)).toBe(false);
   });
 
   it('never includes the service-role key in any response body', async () => {
@@ -1260,12 +1404,7 @@ describe('PATCH /api/spots', () => {
         { kind: 'new', index: 0 },
       ])
     );
-    form.append(
-      'image',
-      new File([Uint8Array.from([1, 2, 3, 4])], 'spot.jpg', {
-        type: 'image/jpeg',
-      })
-    );
+    form.append('image', jpegFile(jpegWithPrivateMetadata()));
 
     const response = await PATCH(
       new Request('https://app.test/api/spots?id=spot1', {
@@ -1279,6 +1418,14 @@ describe('PATCH /api/spots', () => {
     expect(body.spot.imageUris).toHaveLength(2);
     expect(body.spot.imageUris[0]).toBe(existingUrl);
     expect(body.spot.imageUris[1]).toContain('/storage/v1/object/public/spot-images/');
+
+    const storageCall = fetchMock.mock.calls.find((call) =>
+      call[0].toString().includes('/storage/v1/object/spot-images/')
+    );
+    expect(storageCall).toBeDefined();
+    const uploaded = requestBodyBytes(storageCall?.[1]?.body ?? null);
+    expect(containsAscii(uploaded, CAMERA_MAKE)).toBe(false);
+    expect(containsAscii(uploaded, CAPTURE_TIME)).toBe(false);
 
     const removeCall = fetchMock.mock.calls.find((call) =>
       call[0].toString().includes('/storage/v1/object/remove')

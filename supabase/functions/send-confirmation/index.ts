@@ -167,7 +167,7 @@ Deno.serve(async (request) => {
       headers: {
         Authorization: `Bearer ${requiredEnvironmentValue("RESEND_API_KEY")}`,
         "Content-Type": "application/json",
-        "Idempotency-Key": `subscription-confirmation:${subscriber.confirmation_token}`,
+        "Idempotency-Key": `subscription-confirmation:${subscriber.confirmation_token}:${subscriber.confirmation_sent_at ?? "initial"}`,
       },
       body: JSON.stringify({
         from: requiredEnvironmentValue("RESEND_FROM_EMAIL"),

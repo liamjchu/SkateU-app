@@ -31,15 +31,41 @@ Deploy the Expo Router server output to a runtime that supports Expo Router API 
 SUPABASE_URL
 SUPABASE_SERVICE_ROLE_KEY
 OPENAI_API_KEY
+RESEND_API_KEY
+RESEND_FROM_EMAIL
+MODERATION_NOTIFY_EMAIL
 ```
 
-Set `EXPO_PUBLIC_API_URL` in the native app build environment to that HTTPS origin, without a trailing path. The mobile client requires an absolute URL outside local Expo development. Do not include service-role or OpenAI keys in a native build, `.env.example`, source control, or any `EXPO_PUBLIC_*` variable.
+Set `EXPO_PUBLIC_API_URL` in the native app build environment to that HTTPS origin, without a trailing path. The mobile client requires an absolute URL outside local Expo development. Do not include service-role, OpenAI, or Resend keys in a native build, `.env.example`, source control, or any `EXPO_PUBLIC_*` variable.
 
 ## Release checklist
 
 1. Apply and verify the Supabase setup in [backend setup](backend-setup.md).
 2. Confirm production API routes can reach Supabase and OpenAI without exposing credentials.
-3. Build a preview artifact and validate authentication, password recovery deep links, map browsing, spot creation, image uploads, edits, likes, and account deletion.
+3. Build a preview artifact and validate authentication, password recovery deep links, map browsing, spot creation, image uploads, edits, likes, Help & Support submissions, and account deletion.
 4. Create the production build, then submit it through EAS after store metadata and signing credentials are complete.
+5. Confirm `https://skateu.app/privacy` resolves for store forms. Terms and Community Guidelines stay in the app.
+6. Inspect the production IPA/AAB permission list before App Privacy and Data Safety. The app does not collect device GPS. Camera and photo library are used to add skate-spot pictures. Unused native map SDKs must not add location permission.
 
 No CI or automated release workflow is configured yet; build and release commands are currently run manually.
+
+## App Store Connect (complete manually)
+
+These answers are product inputs, not a claim of store approval:
+
+- Not Made for Kids.
+- Age: accounts are 13+. UGC/social apps often rate 12+ on Apple’s matrix; keep the in-app rule at 13+ and complete the questionnaire honestly.
+- User-generated content: yes (spots, photos, comments, usernames).
+- Social: public usernames and comments; no DMs or in-app user blocking.
+- Photos: camera and photo library.
+- Location: no device GPS. Spot pins are user-placed place data.
+- Privacy policy URL: `https://skateu.app/privacy`.
+- App Privacy labels: account email; user content (photos, text); identifiers (account); not advertising tracking.
+
+## Google Play Console (complete manually)
+
+- Target audience: 13–15, 16–17, and 18+ as appropriate. Do not select under-13. Do not enroll in Designed for Families as a children’s app.
+- “Is this app primarily for children?” → No, for this 13+ general-audience product.
+- Data safety: email, user-generated photos/text, account identifiers; no advertising SDK; no crash SDK; no collected device GPS. The website waitlist is not the Play app.
+- Privacy policy URL required.
+- IARC: UGC, social-ish features, skateboarding.

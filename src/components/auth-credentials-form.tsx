@@ -10,16 +10,16 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  getPasswordRequirementStatus,
-  validatePassword,
-} from '../lib/password';
+import { canCreateAccountAtAge } from '../lib/ageEligibility';
+import { getPasswordRequirementStatus, validatePassword } from '../lib/password';
 import { colors } from '../constants/colors';
 import { toUserFacingError } from '../lib/userFacingError';
+import { useAgeEligibilityStore } from '../store/ageEligibilityStore';
 import { useAuthStore } from '../store/authStore';
 import AppleSignInButton from './AppleSignInButton';
 import FeedbackPressable from './FeedbackPressable';
 import GoogleSignInButton from './GoogleSignInButton';
+import LegalAuthNotice from './LegalAuthNotice';
 import ScreenHeader from './screen-header';
 
 type AuthCredentialsFormProps = {
@@ -34,6 +34,9 @@ export default function AuthCredentialsForm({
   const passwordInputRef = useRef<TextInput>(null);
   const signIn = useAuthStore((state) => state.signIn);
   const signUp = useAuthStore((state) => state.signUp);
+  const confirmedAgeEligibleThisSession = useAgeEligibilityStore(
+    (state) => state.confirmedThisSession
+  );
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -78,13 +81,13 @@ export default function AuthCredentialsForm({
   };
 
   const goBack = () => {
-    if (router.canGoBack()) {
-      router.back();
+    if (isSignup) {
+      router.replace('/age-gate');
       return;
     }
 
-    if (isSignup) {
-      router.replace('/login');
+    if (router.canGoBack()) {
+      router.back();
       return;
     }
 
@@ -102,6 +105,14 @@ export default function AuthCredentialsForm({
     }
 
     if (isSignup) {
+      if (
+        !confirmedAgeEligibleThisSession ||
+        !canCreateAccountAtAge(true)
+      ) {
+        router.replace('/age-gate');
+        return;
+      }
+
       const passwordError = validatePassword(password);
 
       if (passwordError) {
@@ -287,11 +298,11 @@ export default function AuthCredentialsForm({
         <FeedbackPressable
           onPress={() => {
             if (isSignup) {
-              goBack();
+              router.replace('/login');
               return;
             }
 
-            router.push('/signup');
+            router.push('/age-gate');
           }}
           disabled={submitting}
           className="min-h-11 items-center justify-center"
@@ -334,6 +345,8 @@ export default function AuthCredentialsForm({
           </>
         ) : null}
       </View>
+
+      <LegalAuthNotice />
     </View>
   );
 

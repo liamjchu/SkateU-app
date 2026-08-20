@@ -10,6 +10,11 @@ module.exports = {
     '<rootDir>/.claude/',
     '<rootDir>/apps/',
   ],
+  // Deno Edge Functions are typechecked and tested with Deno, not jest-expo.
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '<rootDir>/supabase/functions/',
+  ],
   // Expo/React Native ship untranspiled ESM in node_modules; allow the RN/Expo
   // toolchain packages through Babel so tests can import them.
   transformIgnorePatterns: [

@@ -20,6 +20,9 @@ export default defineConfig({
         "src/app/api/subscribe/route.ts",
         "src/app/confirm/page.tsx",
         "src/lib/confirm-subscription.ts",
+        "src/lib/waitlistEmail.ts",
+        "src/lib/legal-markdown.ts",
+        "src/constants/site.ts",
       ],
       exclude: ["**/*.test.ts", "**/*.test.tsx"],
       thresholds: {

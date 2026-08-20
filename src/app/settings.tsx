@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Alert, ScrollView, Text, View } from 'react-native';
 import FeedbackPressable from '../components/FeedbackPressable';
 import ScreenHeader from '../components/screen-header';
+import { LEGAL_APP_ROUTES } from '../lib/legalAcceptance';
 import { toUserFacingError } from '../lib/userFacingError';
 import { colors } from '../constants/colors';
 import { useAuthStore } from '../store/authStore';
@@ -180,6 +181,48 @@ export default function SettingsScreen() {
             showChevron
             onPress={() => router.push('/change-password')}
             accessibilityHint="Opens the password editor"
+          />
+        </View>
+
+        <Text className="mb-2 mt-8 px-1 font-outfit-bold text-xs uppercase tracking-wide text-muted">
+          Support
+        </Text>
+        <View className="overflow-hidden rounded-2xl bg-field">
+          <SettingsRow
+            icon="help-circle"
+            label="Help & Support"
+            showChevron
+            onPress={() => router.push('/help')}
+            accessibilityHint="Opens Help and Support"
+          />
+        </View>
+
+        <Text className="mb-2 mt-8 px-1 font-outfit-bold text-xs uppercase tracking-wide text-muted">
+          Legal
+        </Text>
+        <View className="overflow-hidden rounded-2xl bg-field">
+          <SettingsRow
+            icon="file-text"
+            label="Terms of Use"
+            showChevron
+            onPress={() => router.push(LEGAL_APP_ROUTES.terms)}
+            accessibilityHint="Opens the Terms of Use"
+          />
+          <View className="ml-16 h-px bg-border-soft" />
+          <SettingsRow
+            icon="shield"
+            label="Privacy Policy"
+            showChevron
+            onPress={() => router.push(LEGAL_APP_ROUTES.privacy)}
+            accessibilityHint="Opens the Privacy Policy"
+          />
+          <View className="ml-16 h-px bg-border-soft" />
+          <SettingsRow
+            icon="users"
+            label="Community Guidelines"
+            showChevron
+            onPress={() => router.push(LEGAL_APP_ROUTES.communityGuidelines)}
+            accessibilityHint="Opens the Community Guidelines"
           />
         </View>
 
