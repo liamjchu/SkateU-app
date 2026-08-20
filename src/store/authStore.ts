@@ -248,15 +248,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     // Open the Google login in an in-app browser sheet. It resolves once the
     // browser navigates to our redirectTo URL (which carries the auth code).
+    // Do not call dismissBrowser() afterward: that API only closes
+    // openBrowserAsync (SFSafariViewController). Google sign-in uses
+    // openAuthSessionAsync (ASWebAuthenticationSession), which already
+    // closes itself. Calling dismissBrowser throws
+    // "There is no web browser to dismiss" on iOS.
     const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-
-    // Make sure the sheet is gone. In Expo Go the deep link can reopen the app
-    // without auto-dismissing the browser, which looks like an endless spinner.
-    try {
-      WebBrowser.dismissBrowser();
-    } catch {
-      // No browser open to dismiss; ignore.
-    }
 
     if (result.type !== 'success' || !result.url) {
       // User dismissed the sheet or cancelled; nothing to do.

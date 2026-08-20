@@ -214,6 +214,7 @@ describe('spotsStore', () => {
       description: 'Round rail',
       latitude: 1,
       longitude: 2,
+      images: [],
     };
     const result = await useSpotsStore.getState().addSpot(input, 'token-123');
 
@@ -240,6 +241,23 @@ function makeSpot(overrides: Partial<Spot> = {}): Spot {
     ...overrides,
   };
 }
+
+describe('spotsStore.setSpotCommentCount', () => {
+  it('updates the comment count on every collection that contains the spot', () => {
+    const spot = makeSpot({ id: 'a', commentCount: 1 });
+    useSpotsStore.setState({
+      spots: [spot],
+      mySpots: [spot],
+      likedSpots: [spot],
+    });
+
+    useSpotsStore.getState().setSpotCommentCount('a', 4);
+
+    expect(useSpotsStore.getState().spots[0].commentCount).toBe(4);
+    expect(useSpotsStore.getState().mySpots[0].commentCount).toBe(4);
+    expect(useSpotsStore.getState().likedSpots[0].commentCount).toBe(4);
+  });
+});
 
 describe('spotsStore.fetchMySpots', () => {
   it('loads the user spots and sends the bearer token to the mine endpoint', async () => {
@@ -482,6 +500,43 @@ describe('spotsStore liked spots', () => {
     expect(useSpotsStore.getState()).toMatchObject({ likedSpots: [], likedLoading: false, likedError: null });
     expect(useSpotsStore.getState().spots[0]?.likedByUser).toBe(false);
     expect(useSpotsStore.getState().mySpots[0]?.likedByUser).toBe(false);
+  });
+});
+
+describe('spotsStore removal requests', () => {
+  it('records a submitted removal request', async () => {
+    fetchMock.mockResolvedValue(
+      mockResponse({ request: { id: 'req-1', spotId: 'spot-1' } }, { status: 201 })
+    );
+
+    await useSpotsStore
+      .getState()
+      .submitSpotRemovalRequest('spot-1', 'dangerous', '', 'token-abc');
+
+    expect(useSpotsStore.getState().reportedSpotIds).toEqual(['spot-1']);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/api/spot-removal-requests'),
+      expect.objectContaining({ method: 'POST' })
+    );
+  });
+
+  it('marks a spot as already reported when a request exists', async () => {
+    fetchMock.mockResolvedValue(
+      mockResponse({
+        request: {
+          id: 'req-1',
+          spotId: 'spot-1',
+          reason: 'dangerous',
+          details: '',
+          createdAt: '2026-08-19T12:00:00.000Z',
+        },
+      })
+    );
+
+    await expect(
+      useSpotsStore.getState().fetchMySpotRemovalRequest('spot-1', 'token-abc')
+    ).resolves.toBe(true);
+    expect(useSpotsStore.getState().reportedSpotIds).toEqual(['spot-1']);
   });
 });
 

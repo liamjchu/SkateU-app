@@ -5,11 +5,15 @@ import FeedbackPressable from './FeedbackPressable';
 type LoginRequiredModalProps = {
   visible: boolean;
   onCancel: () => void;
+  title?: string;
+  message?: string;
 };
 
 export default function LoginRequiredModal({
   visible,
   onCancel,
+  title = 'Sign in to like and add spots',
+  message = 'You can still browse campuses. Sign in if you want to like spots or drop your own.',
 }: LoginRequiredModalProps) {
   const router = useRouter();
 
@@ -44,11 +48,10 @@ export default function LoginRequiredModal({
         >
           <View className="w-full max-w-[480px] rounded-2xl bg-field p-6">
             <Text className="text-2xl text-ink font-outfit-black">
-              Sign in to like and add spots
+              {title}
             </Text>
             <Text className="mt-3 text-base text-muted font-outfit-medium">
-              You can still browse campuses. Sign in if you want to like spots
-              or drop your own.
+              {message}
             </Text>
 
             <View className="mt-6 flex-row gap-3">

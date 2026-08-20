@@ -32,7 +32,7 @@ import { toUserFacingError } from '../lib/userFacingError';
 import { useAuthStore } from '../store/authStore';
 import { useMapViewStore } from '../store/mapViewStore';
 import { useSpotsStore } from '../store/spotsStore';
-import type { SpotImageAsset } from '../types/spot';
+import type { SpotMediaItem } from '../types/spot';
 
 type Coordinates = {
   latitude: number;
@@ -48,8 +48,7 @@ export default function AddSpotScreen() {
   const navigation = useNavigation();
   const searchParams = useLocalSearchParams();
 
-  const [imageUri, setImageUri] = useState<string | undefined>();
-  const [imageAsset, setImageAsset] = useState<SpotImageAsset | undefined>();
+  const [media, setMedia] = useState<SpotMediaItem[]>([]);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
 
@@ -88,17 +87,17 @@ export default function AddSpotScreen() {
   const addSpot = useSpotsStore((s) => s.addSpot);
   const session = useAuthStore((s) => s.session);
 
-  const isFormValid = isAddSpotFormValid(imageUri, name, description);
+  const isFormValid = isAddSpotFormValid(media.length, name, description);
   const isSaveDisabled = saving;
-  const formErrors = getSpotFormErrors(imageUri, name, description);
-  const missingSummary = getSpotFormMissingSummary(imageUri, name, description);
+  const formErrors = getSpotFormErrors(media.length, name, description);
+  const missingSummary = getSpotFormMissingSummary(media.length, name, description);
   const showFieldErrors = hasSubmitted;
   const locationError =
     locationPickerStatus === 'error'
       ? 'Map didn’t load. Retry it, then save.'
       : 'Hang on, the map’s still loading.';
   const hasUnsavedChanges =
-    imageUri !== undefined ||
+    media.length > 0 ||
     name.trim().length > 0 ||
     description.trim().length > 0 ||
     selectedLocation.latitude !== initialLocationRef.current.latitude ||
@@ -145,11 +144,6 @@ export default function AddSpotScreen() {
     return unsubscribe;
   }, [hasUnsavedChanges, navigation, saving]);
 
-  const handleImageSelected = (asset: SpotImageAsset) => {
-    setImageUri(asset.uri);
-    setImageAsset(asset);
-  };
-
   const handleLocationChange = useCallback(
     (latitude: number, longitude: number) => {
       setSelectedLocation({ latitude, longitude });
@@ -191,7 +185,9 @@ export default function AddSpotScreen() {
           description: description.trim(),
           latitude: selectedLocation.latitude,
           longitude: selectedLocation.longitude,
-          image: imageAsset,
+          images: media
+            .filter((item) => item.kind === 'new')
+            .map((item) => item.asset),
         },
         accessToken
       );
@@ -267,11 +263,11 @@ export default function AddSpotScreen() {
           ) : null}
 
           <Text className="mb-2 mt-6 font-outfit-bold text-base text-ink">
-            Photo
+            Photos
           </Text>
           <SpotImagePicker
-            imageUri={imageUri}
-            onImageSelected={handleImageSelected}
+            items={media}
+            onChange={setMedia}
             highlighted={Boolean(showFieldErrors && formErrors.image)}
           />
 

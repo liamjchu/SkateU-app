@@ -36,6 +36,7 @@ import { triggerHaptic } from '../lib/haptics';
 import { HOME_RAIL_PAGE_SIZE } from '../lib/homeFeed';
 import { toUserFacingError } from '../lib/userFacingError';
 import { useAuthStore } from '../store/authStore';
+import { useCommentsStore } from '../store/commentsStore';
 import { useFavorites } from '../store/favoritesStore';
 import { useSchools } from '../store/schoolsStore';
 import { useSpotsStore } from '../store/spotsStore';
@@ -109,6 +110,7 @@ export default function HomeScreen() {
   const session = useAuthStore((state) => state.session);
   const authInitializing = useAuthStore((state) => state.initializing);
   const toggleSpotLike = useSpotsStore((state) => state.toggleSpotLike);
+  const commentCounts = useCommentsStore((state) => state.commentCounts);
   const {
     favoriteSchoolIds,
     favoriteSchools: storedFavoriteSchools,
@@ -806,6 +808,13 @@ export default function HomeScreen() {
     }
   };
 
+  const handleOpenComments = (spot: Spot) => {
+    router.push({
+      pathname: '/spot-comments',
+      params: { spotId: spot.id, spotName: spot.name },
+    });
+  };
+
   const handleFavoritePress = (school: School) => {
     upsertSchool(school);
     toggleFavoriteSchool(school);
@@ -1149,6 +1158,7 @@ export default function HomeScreen() {
                 <HomeSchoolStories
                   schools={favoriteSchools}
                   onPress={handleSchoolPress}
+                  onToggleSave={handleFavoritePress}
                 />
 
                 <HomeFeedRail
@@ -1278,10 +1288,15 @@ export default function HomeScreen() {
                       {recentSpots.map((spot) => (
                         <HomeSpotPost
                           key={spot.id}
-                          spot={spot}
+                          spot={{
+                            ...spot,
+                            commentCount:
+                              commentCounts[spot.id] ?? spot.commentCount,
+                          }}
                           isLiking={likingSpotId === spot.id}
                           onLike={handleLikeSpot}
                           onViewMap={handleRecentSpotPress}
+                          onOpenComments={handleOpenComments}
                         />
                       ))}
                       {recentError ? (

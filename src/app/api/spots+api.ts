@@ -1,6 +1,6 @@
-import { randomUUID } from 'crypto';
-
 import { HOME_RAIL_PAGE_SIZE, parseOffset } from '../../lib/homeFeed';
+import { createRandomId } from '../../lib/webCrypto';
+import type { ImageOrderEntry } from '../../lib/spotMedia';
 import {
     imageFileToDataUrl,
     moderateSpotSubmission,
@@ -17,7 +17,7 @@ export const SPOT_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 export const MAX_SCHOOL_ID_LENGTH = 64;
 export const NAME_MAX = 100;
 export const DESCRIPTION_MAX = 1000;
-export const MAX_IMAGES = 10;
+export const MAX_IMAGES = 3;
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
 export const UPLOAD_TIMEOUT_MS = 30_000;
 export const AUTH_REQUEST_TIMEOUT_MS = 10_000;
@@ -32,10 +32,30 @@ const IMAGE_EXTENSIONS: Record<string, string> = {
 };
 
 export const SPOT_SELECT_COLUMNS =
-  'id,school_id,name,description,latitude,longitude,image_urls,created_at,updated_at,likes_count,schools(name,city,state),creator:profiles(username)';
+  'id,school_id,name,description,latitude,longitude,image_urls,created_at,updated_at,likes_count,comments_count,schools(name,city,state),creator:profiles(username)';
 const RECENT_SPOT_SELECT_COLUMNS =
-  'id,school_id,name,description,latitude,longitude,image_urls,created_at,updated_at,likes_count,schools!inner(name,city,state,type),creator:profiles(username)';
+  'id,school_id,name,description,latitude,longitude,image_urls,created_at,updated_at,likes_count,comments_count,schools!inner(name,city,state,type),creator:profiles(username)';
 const VALID_SCHOOL_TYPES = ['k12_public', 'k12_private', 'higher_ed'] as const;
+
+export const HIDDEN_SPOT_STATUS = 'removed';
+export const VISIBLE_SPOT_STATUS_FILTER = `neq.${HIDDEN_SPOT_STATUS}`;
+
+export type SpotModerationStatus = 'active' | 'under_review' | 'removed';
+
+export function parseSpotStatus(value: unknown): SpotModerationStatus {
+  if (value === 'under_review' || value === 'removed') {
+    return value;
+  }
+  return 'active';
+}
+
+export function isRemovedSpotStatus(status: unknown): boolean {
+  return parseSpotStatus(status) === 'removed';
+}
+
+export function applyVisibleSpotFilter(query: URL): void {
+  query.searchParams.set('status', VISIBLE_SPOT_STATUS_FILTER);
+}
 
 /**
  * Reads Supabase configuration from server-side environment variables only.
@@ -99,6 +119,7 @@ export type DatabaseSpot = {
   created_at: string;
   updated_at: string;
   likes_count?: number;
+  comments_count?: number;
   schools: { name: string; city: string; state: string } | null;
   creator: { username: string | null } | null;
 };
@@ -133,6 +154,7 @@ export function mapSpot(row: DatabaseSpot, likedByUser = false): Spot {
     createdAt: row.created_at ?? '',
     updatedAt: row.updated_at ?? '',
     likeCount: row.likes_count ?? 0,
+    commentCount: row.comments_count ?? 0,
     likedByUser,
   };
 }
@@ -310,6 +332,106 @@ export function validateImageFile(file: { type: string; size: number }):
   return { ok: true };
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Parses the client-supplied imageOrder JSON used on PATCH. An omitted field
+ * is handled by the caller; this only accepts a well-formed 1–3 entry list.
+ */
+export function parseImageOrder(
+  raw: string
+): ValidationResult<ImageOrderEntry[]> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { ok: false, message: 'The imageOrder field is invalid.' };
+  }
+
+  if (!Array.isArray(parsed)) {
+    return { ok: false, message: 'The imageOrder field is invalid.' };
+  }
+
+  if (parsed.length < 1) {
+    return { ok: false, message: 'Still needs a photo.' };
+  }
+
+  if (parsed.length > MAX_IMAGES) {
+    return {
+      ok: false,
+      message: `A spot can have at most ${MAX_IMAGES} images.`,
+    };
+  }
+
+  const entries: ImageOrderEntry[] = [];
+  for (const item of parsed) {
+    if (!isRecord(item) || typeof item.kind !== 'string') {
+      return { ok: false, message: 'The imageOrder field is invalid.' };
+    }
+
+    if (item.kind === 'existing') {
+      if (typeof item.url !== 'string' || item.url.length === 0) {
+        return { ok: false, message: 'The imageOrder field is invalid.' };
+      }
+      entries.push({ kind: 'existing', url: item.url });
+      continue;
+    }
+
+    if (item.kind === 'new') {
+      if (typeof item.index !== 'number' || !Number.isInteger(item.index)) {
+        return { ok: false, message: 'The imageOrder field is invalid.' };
+      }
+      entries.push({ kind: 'new', index: item.index });
+      continue;
+    }
+
+    return { ok: false, message: 'The imageOrder field is invalid.' };
+  }
+
+  return { ok: true, value: entries };
+}
+
+/**
+ * Checks that existing URLs belong to the spot and that new indexes cover the
+ * uploaded files exactly once.
+ */
+export function resolveImageOrder(
+  order: ImageOrderEntry[],
+  existingUrls: string[],
+  newFileCount: number
+): ValidationResult<true> {
+  const existingSet = new Set(existingUrls);
+  const seenExisting = new Set<string>();
+  const seenNew = new Set<number>();
+
+  for (const entry of order) {
+    if (entry.kind === 'existing') {
+      if (!existingSet.has(entry.url) || seenExisting.has(entry.url)) {
+        return { ok: false, message: 'The imageOrder field is invalid.' };
+      }
+      seenExisting.add(entry.url);
+      continue;
+    }
+
+    if (
+      entry.index < 0 ||
+      entry.index >= newFileCount ||
+      seenNew.has(entry.index)
+    ) {
+      return { ok: false, message: 'The imageOrder field is invalid.' };
+    }
+    seenNew.add(entry.index);
+  }
+
+  if (seenNew.size !== newFileCount) {
+    return { ok: false, message: 'The imageOrder field is invalid.' };
+  }
+
+  return { ok: true, value: true };
+}
+
 /**
  * Uploads each file in selection order to the spot-images bucket using the
  * service-role key, guarded by a per-upload 30s timeout. Returns the public
@@ -324,7 +446,7 @@ export async function uploadImages(
   return Promise.all(
     files.map(async (file) => {
       const extension = IMAGE_EXTENSIONS[file.type] ?? 'bin';
-      const objectKey = `${schoolId}/${randomUUID()}.${extension}`;
+      const objectKey = `${schoolId}/${createRandomId()}.${extension}`;
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
 
@@ -425,7 +547,13 @@ export async function resolveUserId(
 
 export type SpotOwnership =
   | { found: false }
-  | { found: true; ownerId: string | null; schoolId: string; imageUrls: string[] };
+  | {
+      found: true;
+      ownerId: string | null;
+      schoolId: string;
+      imageUrls: string[];
+      status: SpotModerationStatus;
+    };
 
 /**
  * Looks up a spot's owner and school so a write can be authorized before it is
@@ -438,7 +566,7 @@ export async function fetchSpotOwnership(
 ): Promise<SpotOwnership> {
   const query = new URL(`${config.url}/rest/v1/spots`);
   query.searchParams.set('id', `eq.${spotId}`);
-  query.searchParams.set('select', 'created_by_user_id,school_id,image_urls');
+  query.searchParams.set('select', 'created_by_user_id,school_id,image_urls,status');
 
   const response = await fetch(query.toString(), {
     headers: {
@@ -455,6 +583,7 @@ export async function fetchSpotOwnership(
     created_by_user_id: string | null;
     school_id: string;
     image_urls?: string[];
+    status?: string;
   }[];
 
   if (rows.length === 0) {
@@ -466,6 +595,7 @@ export async function fetchSpotOwnership(
     ownerId: rows[0].created_by_user_id,
     schoolId: rows[0].school_id,
     imageUrls: Array.isArray(rows[0].image_urls) ? rows[0].image_urls : [],
+    status: parseSpotStatus(rows[0].status),
   };
 }
 
@@ -632,6 +762,7 @@ export async function GET(request: Request): Promise<Response> {
     query.searchParams.set('school_id', `eq.${validation.value}`);
     query.searchParams.set('select', SPOT_SELECT_COLUMNS);
     query.searchParams.set('order', 'created_at.asc');
+    applyVisibleSpotFilter(query);
 
     const response = await fetch(query.toString(), {
       headers: {
@@ -687,6 +818,7 @@ async function getRecentSpots(
     }
     query.searchParams.set('order', 'created_at.desc,id.desc');
     query.searchParams.set('limit', String(HOME_RAIL_PAGE_SIZE));
+    applyVisibleSpotFilter(query);
     const offset = parseOffset(url.searchParams.get('offset'));
     if (offset > 0) {
       query.searchParams.set('offset', String(offset));
@@ -750,6 +882,7 @@ async function getMySpots(
     query.searchParams.set('created_by_user_id', `eq.${auth.userId}`);
     query.searchParams.set('select', SPOT_SELECT_COLUMNS);
     query.searchParams.set('order', 'created_at.desc');
+    applyVisibleSpotFilter(query);
 
     const response = await fetch(query.toString(), {
       headers: {
@@ -980,7 +1113,7 @@ export async function PATCH(request: Request): Promise<Response> {
     );
   }
 
-  if (!ownership.found) {
+  if (!ownership.found || ownership.status === 'removed') {
     return Response.json({ error: 'That spot no longer exists.' }, { status: 404 });
   }
   if (ownership.ownerId !== auth.userId) {
@@ -990,8 +1123,6 @@ export async function PATCH(request: Request): Promise<Response> {
     );
   }
 
-  // A new image is optional. When present, upload it and replace image_urls;
-  // otherwise the existing image is left untouched.
   const files = form.getAll('image').filter(isFilePart);
   if (files.length > MAX_IMAGES) {
     return Response.json(
@@ -1006,11 +1137,36 @@ export async function PATCH(request: Request): Promise<Response> {
     }
   }
 
+  const imageOrderRaw = readTextField(form, 'imageOrder');
+  let imageOrder: ImageOrderEntry[] | undefined;
+  if (imageOrderRaw.length > 0) {
+    const parsedOrder = parseImageOrder(imageOrderRaw);
+    if (!parsedOrder.ok) {
+      return Response.json({ error: parsedOrder.message }, { status: 400 });
+    }
+    const resolved = resolveImageOrder(
+      parsedOrder.value,
+      ownership.imageUrls,
+      files.length
+    );
+    if (!resolved.ok) {
+      return Response.json({ error: resolved.message }, { status: 400 });
+    }
+    imageOrder = parsedOrder.value;
+  }
+
   try {
-    const moderationImageUrls =
-      files.length > 0
-        ? await Promise.all(files.map(imageFileToDataUrl))
-        : ownership.imageUrls;
+    let moderationImageUrls: string[];
+    if (imageOrder) {
+      const newDataUrls = await Promise.all(files.map(imageFileToDataUrl));
+      moderationImageUrls = imageOrder.map((entry) =>
+        entry.kind === 'existing' ? entry.url : newDataUrls[entry.index]
+      );
+    } else if (files.length > 0) {
+      moderationImageUrls = await Promise.all(files.map(imageFileToDataUrl));
+    } else {
+      moderationImageUrls = ownership.imageUrls;
+    }
     const moderation = await moderateSpotSubmission({
       title: bodyValidation.value.name,
       description: bodyValidation.value.description,
@@ -1041,9 +1197,17 @@ export async function PATCH(request: Request): Promise<Response> {
     longitude: bodyValidation.value.longitude,
   };
 
-  if (files.length > 0) {
+  if (imageOrder || files.length > 0) {
     try {
-      updates.image_urls = await uploadImages(config, ownership.schoolId, files);
+      const uploadedUrls =
+        files.length > 0
+          ? await uploadImages(config, ownership.schoolId, files)
+          : [];
+      updates.image_urls = imageOrder
+        ? imageOrder.map((entry) =>
+            entry.kind === 'existing' ? entry.url : uploadedUrls[entry.index]
+          )
+        : uploadedUrls;
     } catch (error) {
       console.error('Uploading spot images failed:', error);
       return Response.json(
@@ -1080,10 +1244,14 @@ export async function PATCH(request: Request): Promise<Response> {
     }
 
     if (updates.image_urls) {
-      try {
-        await deleteStorageObjects(config, ownership.imageUrls);
-      } catch (error) {
-        console.error('Deleting replaced spot images failed:', error);
+      const kept = new Set(updates.image_urls);
+      const removed = ownership.imageUrls.filter((url) => !kept.has(url));
+      if (removed.length > 0) {
+        try {
+          await deleteStorageObjects(config, removed);
+        } catch (error) {
+          console.error('Deleting replaced spot images failed:', error);
+        }
       }
     }
 
@@ -1142,6 +1310,9 @@ export async function DELETE(request: Request): Promise<Response> {
   if (!ownership.found) {
     // Already gone — treat as success so the client can drop it locally.
     return Response.json({ success: true });
+  }
+  if (ownership.status === 'removed') {
+    return Response.json({ error: 'That spot no longer exists.' }, { status: 404 });
   }
   if (ownership.ownerId !== auth.userId) {
     return Response.json(

@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
     BackHandler,
     Image,
     Modal,
+    ScrollView,
     StyleSheet,
+    Text,
     View,
     useWindowDimensions,
 } from 'react-native';
@@ -20,7 +22,8 @@ import FeedbackPressable from './FeedbackPressable';
 
 type ImageLightboxProps = {
   visible: boolean;
-  uri: string;
+  uris: string[];
+  initialIndex?: number;
   onClose: () => void;
   accessibilityLabel: string;
 };
@@ -36,18 +39,34 @@ function clamp(value: number, min: number, max: number) {
 
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 
-export default function ImageLightbox({
-  visible,
+type ZoomablePhotoProps = {
+  uri: string;
+  width: number;
+  height: number;
+  paging: boolean;
+  onClose: () => void;
+  onZoomChange: (zoomed: boolean) => void;
+  accessibilityLabel: string;
+};
+
+function ZoomablePhoto({
   uri,
+  width,
+  height,
+  paging,
   onClose,
+  onZoomChange,
   accessibilityLabel,
-}: ImageLightboxProps) {
-  const insets = useSafeAreaInsets();
-  const { width, height } = useWindowDimensions();
+}: ZoomablePhotoProps) {
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  const onZoomChangeRef = useRef(onZoomChange);
+  onZoomChangeRef.current = onZoomChange;
   const close = useCallback(() => {
     onCloseRef.current();
+  }, []);
+  const reportZoom = useCallback((zoomed: boolean) => {
+    onZoomChangeRef.current(zoomed);
   }, []);
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
@@ -57,39 +76,31 @@ export default function ImageLightbox({
   const savedTranslateY = useSharedValue(0);
 
   useEffect(() => {
-    if (!visible) {
-      return;
-    }
-
     scale.value = 1;
     savedScale.value = 1;
     translateX.value = 0;
     translateY.value = 0;
     savedTranslateX.value = 0;
     savedTranslateY.value = 0;
-  }, [scale, savedScale, savedTranslateX, savedTranslateY, translateX, translateY, uri, visible]);
-
-  useEffect(() => {
-    if (!visible) {
-      return;
-    }
-
-    const subscription = BackHandler.addEventListener(
-      'hardwareBackPress',
-      () => {
-        close();
-        return true;
-      }
-    );
-
-    return () => subscription.remove();
-  }, [close, visible]);
+    reportZoom(false);
+  }, [
+    reportZoom,
+    savedScale,
+    savedTranslateX,
+    savedTranslateY,
+    scale,
+    translateX,
+    translateY,
+    uri,
+  ]);
 
   const pinch = Gesture.Pinch()
     .onUpdate((event) => {
+      'worklet';
       scale.value = clamp(savedScale.value * event.scale, 0.85, MAX_SCALE);
     })
     .onEnd(() => {
+      'worklet';
       if (scale.value < MIN_SCALE) {
         savedScale.value = MIN_SCALE;
         savedTranslateX.value = 0;
@@ -97,15 +108,21 @@ export default function ImageLightbox({
         scale.value = withTiming(MIN_SCALE);
         translateX.value = withTiming(0);
         translateY.value = withTiming(0);
+        runOnJS(reportZoom)(false);
         return;
       }
 
       savedScale.value = scale.value;
+      runOnJS(reportZoom)(scale.value > 1.02);
     });
 
-  const pan = Gesture.Pan()
-    .minDistance(8)
+  const panBase = Gesture.Pan().minDistance(8);
+  const pan = (paging
+    ? panBase.activeOffsetY([-24, 24]).failOffsetX([-20, 20])
+    : panBase
+  )
     .onUpdate((event) => {
+      'worklet';
       if (scale.value > 1.02) {
         const maxX = ((scale.value - 1) * width) / 2;
         const maxY = ((scale.value - 1) * height) / 2;
@@ -126,6 +143,7 @@ export default function ImageLightbox({
       translateY.value = event.translationY;
     })
     .onEnd((event) => {
+      'worklet';
       if (scale.value <= 1.02) {
         if (event.translationY > DISMISS_DISTANCE || event.velocityY > 900) {
           runOnJS(close)();
@@ -141,6 +159,7 @@ export default function ImageLightbox({
       savedTranslateY.value = translateY.value;
     })
     .onFinalize((_event, success) => {
+      'worklet';
       if (success) {
         return;
       }
@@ -152,6 +171,7 @@ export default function ImageLightbox({
   const doubleTap = Gesture.Tap()
     .numberOfTaps(2)
     .onEnd(() => {
+      'worklet';
       if (scale.value > 1.1) {
         savedScale.value = MIN_SCALE;
         savedTranslateX.value = 0;
@@ -159,11 +179,13 @@ export default function ImageLightbox({
         scale.value = withTiming(MIN_SCALE);
         translateX.value = withTiming(0);
         translateY.value = withTiming(0);
+        runOnJS(reportZoom)(false);
         return;
       }
 
       scale.value = withTiming(2.5);
       savedScale.value = 2.5;
+      runOnJS(reportZoom)(true);
     });
 
   const gesture = Gesture.Simultaneous(pinch, pan, doubleTap);
@@ -185,42 +207,141 @@ export default function ImageLightbox({
   });
 
   return (
+    <View style={{ width, height }}>
+      {paging ? null : (
+        <Animated.View
+          style={[styles.backdrop, backdropStyle]}
+          accessibilityElementsHidden
+        />
+      )}
+      <GestureDetector gesture={gesture}>
+        <Animated.View
+          style={styles.stage}
+          accessibilityLabel={accessibilityLabel}
+          accessibilityRole="image"
+        >
+          {uri.length > 0 ? (
+            <AnimatedImage
+              source={{ uri }}
+              resizeMode="contain"
+              style={[{ width, height }, imageStyle]}
+              accessible={false}
+            />
+          ) : null}
+        </Animated.View>
+      </GestureDetector>
+    </View>
+  );
+}
+
+export default function ImageLightbox({
+  visible,
+  uris,
+  initialIndex = 0,
+  onClose,
+  accessibilityLabel,
+}: ImageLightboxProps) {
+  const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
+  const pagerRef = useRef<ScrollView>(null);
+  const [index, setIndex] = useState(initialIndex);
+  const [zoomed, setZoomed] = useState(false);
+  const paging = uris.length > 1;
+  const safeIndex = Math.min(Math.max(initialIndex, 0), Math.max(uris.length - 1, 0));
+
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+
+    setIndex(safeIndex);
+    setZoomed(false);
+    pagerRef.current?.scrollTo({ x: safeIndex * width, animated: false });
+  }, [safeIndex, visible, width]);
+
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        onClose();
+        return true;
+      }
+    );
+
+    return () => subscription.remove();
+  }, [onClose, visible]);
+
+  if (!visible || uris.length === 0) {
+    return null;
+  }
+
+  return (
     <Modal
       visible={visible}
       transparent
       animationType="fade"
       statusBarTranslucent
       presentationStyle="overFullScreen"
-      onRequestClose={close}
+      onRequestClose={onClose}
     >
       <GestureHandlerRootView style={styles.root}>
-        <Animated.View
-          style={[styles.backdrop, backdropStyle]}
-          accessibilityElementsHidden
-        />
-        <GestureDetector gesture={gesture}>
-          <Animated.View
-            style={styles.stage}
-            accessibilityLabel={accessibilityLabel}
-            accessibilityRole="image"
+        {paging ? <View style={styles.backdrop} /> : null}
+        {paging ? (
+          <ScrollView
+            ref={pagerRef}
+            horizontal
+            pagingEnabled
+            scrollEnabled={!zoomed}
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={(event) => {
+              const next = Math.round(event.nativeEvent.contentOffset.x / width);
+              if (next >= 0 && next < uris.length) {
+                setIndex(next);
+              }
+            }}
           >
-            {uri.length > 0 ? (
-              <AnimatedImage
-                source={{ uri }}
-                resizeMode="contain"
-                style={[{ width, height }, imageStyle]}
-                accessible={false}
+            {uris.map((uri, photoIndex) => (
+              <ZoomablePhoto
+                key={`${uri}-${photoIndex}`}
+                uri={uri}
+                width={width}
+                height={height}
+                paging
+                onClose={onClose}
+                onZoomChange={setZoomed}
+                accessibilityLabel={accessibilityLabel}
               />
-            ) : null}
-          </Animated.View>
-        </GestureDetector>
+            ))}
+          </ScrollView>
+        ) : (
+          <ZoomablePhoto
+            uri={uris[0] ?? ''}
+            width={width}
+            height={height}
+            paging={false}
+            onClose={onClose}
+            onZoomChange={setZoomed}
+            accessibilityLabel={accessibilityLabel}
+          />
+        )}
         <View
           pointerEvents="box-none"
           style={[styles.closeWrap, { top: Math.max(insets.top, 12) }]}
         >
+          {paging ? (
+            <Text className="font-outfit-bold text-[15px] text-white">
+              {index + 1} / {uris.length}
+            </Text>
+          ) : (
+            <View />
+          )}
           <FeedbackPressable
             haptic="selection"
-            onPress={close}
+            onPress={onClose}
             className="h-11 w-11 items-center justify-center rounded-full bg-black/50"
             accessibilityRole="button"
             accessibilityLabel="Close photo"
@@ -248,7 +369,11 @@ const styles = StyleSheet.create({
   },
   closeWrap: {
     position: 'absolute',
+    left: 16,
     right: 16,
     zIndex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
 });

@@ -1,5 +1,6 @@
 ﻿import { Feather, Ionicons, Octicons } from '@expo/vector-icons';
 import {
+    type Href,
     useFocusEffect,
     useLocalSearchParams,
     useRouter,
@@ -32,13 +33,20 @@ import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import FeedbackPressable from '../components/FeedbackPressable';
 import ImageLightbox from '../components/image-lightbox';
 import LoginRequiredModal from '../components/LoginRequiredModal';
+import SpotMediaPager from '../components/spot-media-pager';
 import { StickerStripe } from '../components/sticker';
 import images from '../constants/images';
-import { colors, svgHex } from '../constants/colors';
+import { colors } from '../constants/colors';
+import {
+    CAMPUS_MAP_PIN_CSS,
+    buildSelectSpotJavascript,
+    getCampusMapPinScript,
+} from '../lib/campusMapPins';
 import { triggerHaptic } from '../lib/haptics';
 import { formatRelativeTime } from '../lib/relativeTime';
 import { toUserFacingError } from '../lib/userFacingError';
 import { useAuthStore } from '../store/authStore';
+import { useCommentsStore } from '../store/commentsStore';
 import { useFavorites } from '../store/favoritesStore';
 import { useMapViewStore } from '../store/mapViewStore';
 import { useSchools } from '../store/schoolsStore';
@@ -76,6 +84,11 @@ export default function MapScreen() {
   const myLoading = useSpotsStore((s) => s.myLoading);
   const deleteSpot = useSpotsStore((s) => s.deleteSpot);
   const toggleSpotLike = useSpotsStore((s) => s.toggleSpotLike);
+  const reportedSpotIds = useSpotsStore((s) => s.reportedSpotIds);
+  const fetchMySpotRemovalRequest = useSpotsStore(
+    (s) => s.fetchMySpotRemovalRequest
+  );
+  const commentCounts = useCommentsStore((s) => s.commentCounts);
   const fetchMySpots = useSpotsStore((s) => s.fetchMySpots);
   const loading = useSpotsStore((s) => s.loading);
   const error = useSpotsStore((s) => s.error);
@@ -105,9 +118,13 @@ export default function MapScreen() {
   );
   const [showAttribution, setShowAttribution] = useState(false);
   const [showLoginRequired, setShowLoginRequired] = useState(false);
-  const [lightboxUri, setLightboxUri] = useState<string | null>(null);
+  const [loginRequiredReason, setLoginRequiredReason] = useState<
+    'default' | 'removal'
+  >('default');
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [likingSpotId, setLikingSpotId] = useState<string | null>(null);
   const [deletingSpotId, setDeletingSpotId] = useState<string | null>(null);
+  const missingSpotAlertedRef = useRef<string | undefined>(undefined);
   const [emptySpotsNoticeDismissed, setEmptySpotsNoticeDismissed] =
     useState(false);
   const sheetHeight = useSharedValue(0);
@@ -199,6 +216,12 @@ export default function MapScreen() {
       !myLoading &&
       mySpots.some((spot) => spot.id === selectedSpot.id)
   );
+  const selectedSpotWasReported = Boolean(
+    selectedSpot && reportedSpotIds.includes(selectedSpot.id)
+  );
+  const canShowRemovalAction = Boolean(
+    selectedSpot && !selectedSpotIsOwned && (!session || !myLoading)
+  );
 
   // Show "edited …" when the spot was changed after creation, otherwise
   // "added …". created_at and updated_at both default to now() on insert, so a
@@ -252,6 +275,7 @@ export default function MapScreen() {
       #map.satellite .leaflet-tile {
         filter: brightness(.8);
       }
+      ${CAMPUS_MAP_PIN_CSS}
     </style>
   </head>
   <body>
@@ -270,14 +294,12 @@ export default function MapScreen() {
 
       try {
         const center = [${validLat}, ${validLng}];
-        const spotIcon = L.icon({
-          iconUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 22s7-6.4 7-12a7 7 0 1 0-14 0c0 5.6 7 12 7 12z" fill="${svgHex(colors.accent)}" stroke="${svgHex(colors.brand)}" stroke-width="1.5" stroke-linejoin="round"/><circle cx="12" cy="10" r="2.5" fill="${svgHex(colors.white)}"/></svg>',
+        const pinSvg = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 22s7-6.4 7-12a7 7 0 1 0-14 0c0 5.6 7 12 7 12z" fill="${colors.accent}" stroke="${colors.brand}" stroke-width="1.5" stroke-linejoin="round"/><circle cx="12" cy="10" r="2.5" fill="${colors.white}"/></svg>');
+        const spotIcon = L.divIcon({
+          className: 'skateu-pin',
           iconSize: [50, 50],
           iconAnchor: [25, 50],
-
-          shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-          shadowSize: [41, 41],
-          shadowAnchor: [13, 41],
+          html: '<img class="skateu-pin-shadow" alt="" width="41" height="41" src="https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png" /><span class="skateu-pin-scale"><img class="skateu-pin-img" alt="" width="50" height="50" src="' + pinSvg + '" /></span>',
         });
 
         window.map = L.map('map', {
@@ -378,6 +400,7 @@ export default function MapScreen() {
         };
 
         window.markers = {};
+        ${getCampusMapPinScript()}
 
         function escapeHtml(text) {
           return String(text)
@@ -390,6 +413,9 @@ export default function MapScreen() {
         }
 
         window.renderSpots = function (spotsData) {
+          if (window.resetPinAnimations) {
+            window.resetPinAnimations();
+          }
           Object.values(window.markers).forEach(marker => marker.remove());
           window.markers = {};
 
@@ -407,6 +433,10 @@ export default function MapScreen() {
 
             window.markers[spot.id] = marker;
           });
+
+          if (window.selectedSpotId && window.selectSpot) {
+            window.selectSpot(window.selectedSpotId, { pop: false });
+          }
         };
 
         if (${initialSpotId ? 'true' : 'false'}) {
@@ -457,6 +487,14 @@ export default function MapScreen() {
     }
   }, [sendMarkers, spots]);
 
+  useEffect(() => {
+    if (mapStatus !== 'ready' || !webViewReadyRef.current) {
+      return;
+    }
+
+    webViewRef.current?.injectJavaScript(buildSelectSpotJavascript(selectedSpotId));
+  }, [mapStatus, selectedSpotId]);
+
   // Refetch when the screen regains focus so a spot just created on the
   // add-spot screen shows up on return.
   useFocusEffect(
@@ -476,6 +514,24 @@ export default function MapScreen() {
       }
     }, [fetchMySpots, fetchSpots, schoolId, session?.access_token])
   );
+
+  useEffect(() => {
+    const accessToken = session?.access_token;
+    const spotId = selectedSpot?.id;
+    if (!accessToken || !spotId || selectedSpotIsOwned || myLoading) {
+      return;
+    }
+
+    void fetchMySpotRemovalRequest(spotId, accessToken).catch(() => {
+      // Already-submitted state is a convenience; the POST unique check is the source of truth.
+    });
+  }, [
+    fetchMySpotRemovalRequest,
+    myLoading,
+    selectedSpot?.id,
+    selectedSpotIsOwned,
+    session?.access_token,
+  ]);
 
   useEffect(() => {
     if (mapStatus !== 'loading') {
@@ -514,17 +570,26 @@ export default function MapScreen() {
   }, [fetchSpots, schoolId, session?.access_token]);
 
   useEffect(() => {
-    if (selectedSpotId && !selectedSpot) {
-      if (loading || selectedSpotId === initialSpotId) {
-        return;
-      }
-      setSelectedSpotId(undefined);
+    if (!selectedSpotId || selectedSpot) {
+      return;
     }
+    if (loading) {
+      return;
+    }
+
+    if (
+      selectedSpotId === initialSpotId &&
+      missingSpotAlertedRef.current !== selectedSpotId
+    ) {
+      missingSpotAlertedRef.current = selectedSpotId;
+      Alert.alert('This spot is no longer available.');
+    }
+    setSelectedSpotId(undefined);
   }, [initialSpotId, loading, selectedSpot, selectedSpotId]);
 
   useEffect(() => {
     if (!selectedSpot) {
-      setLightboxUri(null);
+      setLightboxIndex(null);
     }
   }, [selectedSpot]);
 
@@ -532,8 +597,8 @@ export default function MapScreen() {
     const subscription = BackHandler.addEventListener(
       'hardwareBackPress',
       () => {
-        if (lightboxUri) {
-          setLightboxUri(null);
+        if (lightboxIndex !== null) {
+          setLightboxIndex(null);
           return true;
         }
 
@@ -547,7 +612,7 @@ export default function MapScreen() {
     );
 
     return () => subscription.remove();
-  }, [lightboxUri, selectedSpotId]);
+  }, [lightboxIndex, selectedSpotId]);
 
   useEffect(() => {
     if (selectedSpot) {
@@ -589,9 +654,11 @@ export default function MapScreen() {
 
   const sheetPanGesture = Gesture.Pan()
     .onBegin(() => {
+      'worklet';
       sheetStartY.value = sheetTranslateY.value;
     })
     .onUpdate((event) => {
+      'worklet';
       const collapsedOffset = Math.max(
         sheetHeight.value - COLLAPSED_SHEET_HEIGHT,
         0
@@ -604,6 +671,7 @@ export default function MapScreen() {
       );
     })
     .onEnd((event) => {
+      'worklet';
       const collapsedOffset = Math.max(
         sheetHeight.value - COLLAPSED_SHEET_HEIGHT,
         0
@@ -638,6 +706,7 @@ export default function MapScreen() {
 
   const handleAddSpotPress = () => {
     if (!session) {
+      setLoginRequiredReason('default');
       setShowLoginRequired(true);
       return;
     }
@@ -653,6 +722,7 @@ export default function MapScreen() {
 
     const accessToken = session?.access_token;
     if (!accessToken) {
+      setLoginRequiredReason('default');
       setShowLoginRequired(true);
       return;
     }
@@ -677,6 +747,33 @@ export default function MapScreen() {
     } finally {
       setLikingSpotId(null);
     }
+  };
+
+  const handleOpenComments = () => {
+    if (!selectedSpot) {
+      return;
+    }
+
+    router.push({
+      pathname: '/spot-comments',
+      params: { spotId: selectedSpot.id, spotName: selectedSpot.name },
+    });
+  };
+
+  const handleRequestRemovalPress = () => {
+    if (!selectedSpot || selectedSpotIsOwned) {
+      return;
+    }
+
+    if (!session?.access_token) {
+      setLoginRequiredReason('removal');
+      setShowLoginRequired(true);
+      return;
+    }
+
+    router.push(
+      `/request-spot-removal?spotId=${encodeURIComponent(selectedSpot.id)}&spotName=${encodeURIComponent(selectedSpot.name)}` as Href
+    );
   };
 
   const handleEditSelectedSpot = () => {
@@ -961,11 +1058,22 @@ export default function MapScreen() {
       <LoginRequiredModal
         visible={showLoginRequired}
         onCancel={() => setShowLoginRequired(false)}
+        title={
+          loginRequiredReason === 'removal'
+            ? 'Sign in to request removal'
+            : undefined
+        }
+        message={
+          loginRequiredReason === 'removal'
+            ? 'You can still browse campuses. Sign in if you want to request that a spot be removed.'
+            : undefined
+        }
       />
       <ImageLightbox
-        visible={lightboxUri != null}
-        uri={lightboxUri ?? ''}
-        onClose={() => setLightboxUri(null)}
+        visible={lightboxIndex !== null}
+        uris={selectedSpot?.imageUris.filter((uri) => uri.length > 0) ?? []}
+        initialIndex={lightboxIndex ?? 0}
+        onClose={() => setLightboxIndex(null)}
         accessibilityLabel={
           selectedSpot
             ? `Full screen photo of ${selectedSpot.name}`
@@ -1270,6 +1378,21 @@ export default function MapScreen() {
                     </Text>
                   </FeedbackPressable>
                   <FeedbackPressable
+                    haptic="light"
+                    onPress={handleOpenComments}
+                    className="mr-2 flex-row items-center rounded-xl bg-surface-soft px-3 py-2"
+                    accessibilityRole="button"
+                    accessibilityLabel={`Comments on ${selectedSpot.name}`}
+                    accessibilityHint="Opens comments for this spot"
+                  >
+                    <Feather name="message-circle" size={16} color={colors.ink} />
+                    <Text className="ml-1.5 font-outfit-semibold text-sm text-ink">
+                      {commentCounts[selectedSpot.id] ??
+                        selectedSpot.commentCount ??
+                        0}
+                    </Text>
+                  </FeedbackPressable>
+                  <FeedbackPressable
                     haptic="selection"
                     onPress={() => setSelectedSpotId(undefined)}
                     className="h-10 w-10 items-center justify-center rounded-full bg-surface-soft"
@@ -1287,22 +1410,15 @@ export default function MapScreen() {
             showsVerticalScrollIndicator={false}
           >
             {selectedSpot.imageUris.length > 0 ? (
-              <FeedbackPressable
-                haptic="light"
-                disablePressScale
-                onPress={() => setLightboxUri(selectedSpot.imageUris[0])}
-                accessibilityRole="button"
-                accessibilityLabel={`View full screen photo of ${selectedSpot.name}`}
-                accessibilityHint="Opens the photo. Pinch or double tap to zoom."
-              >
-                <Image
-                  source={{ uri: selectedSpot.imageUris[0] }}
-                  accessibilityLabel={`Photo of ${selectedSpot.name}`}
-                  accessible={false}
-                  className="mt-4 h-[280px] w-full rounded-2xl"
-                  resizeMode="cover"
+              <View className="mt-4 overflow-hidden rounded-2xl">
+                <SpotMediaPager
+                  uris={selectedSpot.imageUris.filter((uri) => uri.length > 0)}
+                  height={280}
+                  onPressIndex={setLightboxIndex}
+                  accessibilityName={selectedSpot.name}
+                  imageClassName="rounded-2xl"
                 />
-              </FeedbackPressable>
+              </View>
             ) : (
               <View className="mt-4 h-80 items-center justify-center rounded-2xl bg-surface-soft">
                 <Text
@@ -1351,6 +1467,32 @@ export default function MapScreen() {
                   </Text>
                 </FeedbackPressable>
               </View>
+            ) : canShowRemovalAction ? (
+              selectedSpotWasReported ? (
+                <View
+                  className="mt-4 min-h-12 flex-row items-center justify-center rounded-2xl bg-surface-soft px-4"
+                  accessibilityRole="text"
+                  accessibilityLabel="Removal request submitted"
+                >
+                  <Feather name="flag" size={16} color={colors.muted} />
+                  <Text className="ml-2 font-outfit-semibold text-sm text-muted">
+                    Removal request submitted
+                  </Text>
+                </View>
+              ) : (
+                <FeedbackPressable
+                  haptic="selection"
+                  onPress={handleRequestRemovalPress}
+                  className="mt-4 h-12 flex-row items-center justify-center rounded-2xl bg-surface-soft px-4"
+                  accessibilityRole="button"
+                  accessibilityLabel={`Request removal of ${selectedSpot.name}`}
+                >
+                  <Feather name="flag" size={16} color={colors.ink} />
+                  <Text className="ml-2 font-outfit-semibold text-sm text-ink">
+                    Request Removal
+                  </Text>
+                </FeedbackPressable>
+              )
             ) : null}
           </ScrollView>
         </Animated.View>

@@ -27,7 +27,7 @@ create table if not exists public.spots (
   description        text not null check (char_length(description) between 0 and 1000),
   latitude           double precision not null check (latitude between -90 and 90),
   longitude          double precision not null check (longitude between -180 and 180),
-  image_urls         text[] not null default '{}' check (array_length(image_urls, 1) is null or array_length(image_urls, 1) <= 10),
+  image_urls         text[] not null default '{}' check (array_length(image_urls, 1) is null or array_length(image_urls, 1) <= 3),
   created_at         timestamptz not null default now(),
   updated_at         timestamptz not null default now()
 );

@@ -23,9 +23,12 @@ Values beginning with `EXPO_PUBLIC_` are embedded in the client bundle and must 
 | `EXPO_PUBLIC_API_URL` | Client build | Absolute HTTPS origin of deployed API routes. |
 | `SUPABASE_URL` | API server / seed terminal | Supabase project URL. |
 | `SUPABASE_SERVICE_ROLE_KEY` | API server / seed terminal | Elevated server and seed access. |
-| `OPENAI_API_KEY` | API server | Username and spot moderation. |
+| `OPENAI_API_KEY` | API server | Username, spot, and comment moderation. |
+| `RESEND_API_KEY` | API server | Optional email when a spot reaches two unique removal requests. |
+| `RESEND_FROM_EMAIL` | API server | From address for moderation emails. |
+| `MODERATION_NOTIFY_EMAIL` | API server | Inbox that receives spot review emails. |
 
-Never place `SUPABASE_SERVICE_ROLE_KEY` or `OPENAI_API_KEY` in `.env.local` for a client build, an `EXPO_PUBLIC_*` value, or source control.
+Never place `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, `RESEND_API_KEY`, or `MODERATION_NOTIFY_EMAIL` in `.env.local` for a client build, an `EXPO_PUBLIC_*` value, or source control.
 
 ## 2. Create the Supabase data layer
 
@@ -44,10 +47,20 @@ In the Supabase SQL Editor, run the idempotent scripts in this order:
 2. `supabase/spots_setup.sql`
 3. `supabase/spots_creator_link.sql`
 4. `supabase/spot_likes_setup.sql`
-5. `supabase/spots_count_trigger.sql`
-6. `supabase/account_deletion_proofs_setup.sql`
+5. `supabase/spot_comments_setup.sql`
+6. `supabase/spots_count_trigger.sql`
+7. `supabase/account_deletion_proofs_setup.sql`
+8. `supabase/spot_removal_requests_setup.sql`
 
 Create a Storage bucket named `spot-images` with public read enabled. Image upload and deletion are performed by server routes with the service-role key; public read only serves the rendered image URLs.
+
+After `spot_removal_requests_setup.sql` is applied, review spots that need a decision with:
+
+```sql
+select * from public.spots_needing_review;
+```
+
+Keep and remove snippets are documented at the top of that SQL file. If `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, and `MODERATION_NOTIFY_EMAIL` are set on the API server, crossing two unique removal requests also sends one email.
 
 ## 3. Generate and seed schools
 
@@ -69,4 +82,4 @@ The seeder batches 1,000 rows by default. Use `--batch-size 1` through `5000` on
 
 ## 4. Verify safely
 
-Confirm that school search returns records, new spots receive a creator profile, image URLs load from `spot-images`, and likes update `spots.likes_count`. Use a non-production project for the first seed run; the current seeder inserts records and does not provide a rollback command.
+Confirm that school search returns records, new spots receive a creator profile, image URLs load from `spot-images`, likes update `spots.likes_count`, comments update `spots.comments_count`, and `select * from public.spots_needing_review` runs without error. Use a non-production project for the first seed run; the current seeder inserts records and does not provide a rollback command.

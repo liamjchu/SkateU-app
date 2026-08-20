@@ -69,6 +69,9 @@ describe('signInWithGoogle', () => {
       'skateu://auth/callback'
     );
     expect(mockExchangeCodeForSession).toHaveBeenCalledWith('google-auth-code-1');
+    // dismissBrowser is for openBrowserAsync only. Calling it after an
+    // auth session throws "There is no web browser to dismiss" on iOS.
+    expect(mockDismissBrowser).not.toHaveBeenCalled();
   });
 
   it('returns false when the Google sheet is dismissed', async () => {

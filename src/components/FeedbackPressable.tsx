@@ -6,6 +6,7 @@ import {
     type View
 } from 'react-native';
 import Animated, {
+    useAnimatedStyle,
     useSharedValue,
     withTiming,
 } from 'react-native-reanimated';
@@ -34,6 +35,10 @@ const FeedbackPressable = forwardRef<View, FeedbackPressableProps>(
   const [reduceMotion, setReduceMotion] = useState(false);
   const scale = useSharedValue(1);
   const opacity = useSharedValue(1);
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ scale: scale.value }],
+  }));
 
   useEffect(() => {
     void AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion);
@@ -78,13 +83,7 @@ const FeedbackPressable = forwardRef<View, FeedbackPressableProps>(
         }
         onPressOut?.(event);
       }}
-      style={[
-        style,
-        {
-          opacity,
-          transform: [{ scale }],
-        },
-      ]}
+      style={[style, animatedStyle]}
     />
   );
   }

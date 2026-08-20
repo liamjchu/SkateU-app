@@ -9,10 +9,13 @@ import {
     GET,
     mapSpot,
     MAX_IMAGE_BYTES,
+    MAX_IMAGES,
     MAX_SCHOOL_ID_LENGTH,
     NAME_MAX,
     PATCH,
     POST,
+    parseImageOrder,
+    resolveImageOrder,
     SpotImageFile,
     uploadImages,
     ValidatedPostBody,
@@ -142,6 +145,7 @@ describe('mapSpot', () => {
         expect(typeof spot.city).toBe('string');
         expect(typeof spot.state).toBe('string');
         expect(spot.schoolId).toBe(row.school_id);
+        expect(typeof spot.commentCount).toBe('number');
         if (row.schools === null) {
           expect(spot.city).toBe('');
           expect(spot.state).toBe('');
@@ -298,7 +302,7 @@ describe('uploadImages', () => {
       fc.asyncProperty(
         fc.array(fc.constantFrom(...ALLOWED_IMAGE_TYPES), {
           minLength: 1,
-          maxLength: 10,
+          maxLength: MAX_IMAGES,
         }),
         async (types: string[]) => {
           const requestedKeys: string[] = [];
@@ -351,6 +355,8 @@ describe('GET /api/spots', () => {
     );
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ spots: [] });
+    const spotsUrl = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(spotsUrl.searchParams.get('status')).toBe('neq.removed');
   });
 
   it('returns 200 with mapped spots when rows match', async () => {
@@ -366,6 +372,7 @@ describe('GET /api/spots', () => {
       created_at: '2024-01-01T00:00:00.000Z',
       updated_at: '2024-01-01T00:00:00.000Z',
       likes_count: 4,
+      comments_count: 12,
       schools: { name: 'UT Austin', city: 'Austin', state: 'TX' },
       creator: { username: 'skater_jane' },
     };
@@ -391,6 +398,7 @@ describe('GET /api/spots', () => {
           createdAt: '2024-01-01T00:00:00.000Z',
           updatedAt: '2024-01-01T00:00:00.000Z',
           likeCount: 4,
+          commentCount: 12,
           likedByUser: false,
           schoolName: 'UT Austin',
         },
@@ -441,6 +449,7 @@ describe('GET /api/spots', () => {
     expect(fetchMock).toHaveBeenCalled();
     const recentUrl = new URL(String(fetchMock.mock.calls[0][0]));
     expect(recentUrl.searchParams.get('order')).toBe('created_at.desc,id.desc');
+    expect(recentUrl.searchParams.get('status')).toBe('neq.removed');
   });
 
   it('filters recent spots by school type and includes offset', async () => {
@@ -606,6 +615,30 @@ describe('POST /api/spots', () => {
       makePostRequest(form, { Authorization: 'Bearer good-token' })
     );
     expect(response.status).toBe(400);
+  });
+
+  it('returns 400 when more than MAX_IMAGES files are sent', async () => {
+    setConfigured();
+    global.fetch = jest.fn(async () =>
+      jsonResponse({ id: 'user-1' })
+    ) as unknown as typeof fetch;
+
+    const form = validForm();
+    for (let index = 0; index < MAX_IMAGES + 1; index += 1) {
+      form.append(
+        'image',
+        new File([Uint8Array.from([1, 2, 3, 4])], `spot-${index}.jpg`, {
+          type: 'image/jpeg',
+        })
+      );
+    }
+
+    const response = await POST(
+      makePostRequest(form, { Authorization: 'Bearer good-token' })
+    );
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: string };
+    expect(body.error).toBe(`A spot can have at most ${MAX_IMAGES} images.`);
   });
 
   it('returns 500 with no partial spot when the insert fails', async () => {
@@ -834,6 +867,79 @@ describe('validatePatchBody', () => {
   });
 });
 
+describe('parseImageOrder', () => {
+  it('accepts a mixed existing/new list within the 3-photo cap', () => {
+    const result = parseImageOrder(
+      JSON.stringify([
+        { kind: 'existing', url: 'https://img/1.jpg' },
+        { kind: 'new', index: 0 },
+      ])
+    );
+    expect(result).toEqual({
+      ok: true,
+      value: [
+        { kind: 'existing', url: 'https://img/1.jpg' },
+        { kind: 'new', index: 0 },
+      ],
+    });
+  });
+
+  it('accepts exactly MAX_IMAGES entries and rejects one more', () => {
+    const atCap = Array.from({ length: MAX_IMAGES }, (_, index) => ({
+      kind: 'existing' as const,
+      url: `https://img/${index}.jpg`,
+    }));
+    const overCap = [
+      ...atCap,
+      { kind: 'existing' as const, url: 'https://img/extra.jpg' },
+    ];
+
+    expect(parseImageOrder(JSON.stringify(atCap)).ok).toBe(true);
+    expect(parseImageOrder(JSON.stringify(overCap))).toEqual({
+      ok: false,
+      message: `A spot can have at most ${MAX_IMAGES} images.`,
+    });
+  });
+
+  it('rejects an empty list and malformed JSON', () => {
+    expect(parseImageOrder('[]').ok).toBe(false);
+    expect(parseImageOrder('not-json').ok).toBe(false);
+    expect(parseImageOrder(JSON.stringify({ kind: 'new', index: 0 })).ok).toBe(
+      false
+    );
+  });
+});
+
+describe('resolveImageOrder', () => {
+  it('accepts iff existing URLs belong to the spot and new indexes cover the files', () => {
+    const existing = ['https://img/a.jpg', 'https://img/b.jpg'];
+    expect(
+      resolveImageOrder(
+        [
+          { kind: 'existing', url: 'https://img/a.jpg' },
+          { kind: 'new', index: 0 },
+        ],
+        existing,
+        1
+      ).ok
+    ).toBe(true);
+    expect(
+      resolveImageOrder(
+        [{ kind: 'existing', url: 'https://img/missing.jpg' }],
+        existing,
+        0
+      ).ok
+    ).toBe(false);
+    expect(
+      resolveImageOrder(
+        [{ kind: 'existing', url: 'https://img/a.jpg' }],
+        existing,
+        1
+      ).ok
+    ).toBe(false);
+  });
+});
+
 // --- mapSpot: new fields ----------------------------------------------------
 
 describe('mapSpot new fields', () => {
@@ -854,6 +960,7 @@ describe('mapSpot new fields', () => {
     const spot = mapSpot(row);
     expect(spot.updatedAt).toBe('2024-02-02T00:00:00.000Z');
     expect(spot.schoolName).toBe('UT Austin');
+    expect(spot.commentCount).toBe(0);
   });
 
   it('defaults schoolName and timestamps to empty string when absent', () => {
@@ -874,6 +981,7 @@ describe('mapSpot new fields', () => {
     expect(spot.schoolName).toBe('');
     expect(spot.updatedAt).toBe('');
     expect(spot.creatorUsername).toBeNull();
+    expect(spot.commentCount).toBe(0);
   });
 });
 
@@ -940,6 +1048,7 @@ describe('GET /api/spots?mine=1', () => {
       call[0].toString().includes('created_by_user_id=eq.')
     );
     expect(listingCall?.[0].toString()).toContain('created_by_user_id=eq.user-1');
+    expect(listingCall?.[0].toString()).toContain('status=neq.removed');
   });
 });
 
@@ -1035,6 +1144,30 @@ describe('PATCH /api/spots', () => {
     expect(response.status).toBe(404);
   });
 
+  it('returns 404 when the spot has been removed', async () => {
+    setConfigured();
+    global.fetch = jest.fn(async (input) =>
+      input.toString().includes('/auth/v1/user')
+        ? jsonResponse({ id: 'user-1' })
+        : jsonResponse([
+            {
+              created_by_user_id: 'user-1',
+              school_id: 'school1',
+              status: 'removed',
+            },
+          ])
+    ) as unknown as typeof fetch;
+
+    const response = await PATCH(
+      new Request('https://app.test/api/spots?id=spot1', {
+        method: 'PATCH',
+        headers: { Authorization: 'Bearer good-token' },
+        body: validPatchForm(),
+      })
+    );
+    expect(response.status).toBe(404);
+  });
+
   it('returns 403 when the spot belongs to another user', async () => {
     setConfigured();
     global.fetch = jest.fn(async (input) =>
@@ -1081,6 +1214,170 @@ describe('PATCH /api/spots', () => {
     expect(response.status).toBe(200);
     const body = (await response.json()) as { spot: { name: string } };
     expect(body.spot.name).toBe('Updated rail');
+  });
+
+  it('keeps existing photos and appends new ones from imageOrder', async () => {
+    setConfigured();
+    const existingUrl =
+      'https://project.supabase.co/storage/v1/object/public/spot-images/school1/old.jpg';
+    const fetchMock: FetchMock = jest.fn(async (input, init) => {
+      const url = input.toString();
+      if (url.includes('/auth/v1/user')) {
+        return jsonResponse({ id: 'user-1' });
+      }
+      if (url.includes('api.openai.com')) {
+        return openAIApprovalResponse();
+      }
+      if (url.includes('/storage/v1/object/spot-images/')) {
+        return new Response('', { status: 200 });
+      }
+      if (url.includes('/storage/v1/object/remove')) {
+        return jsonResponse({});
+      }
+      if (init?.method === 'PATCH') {
+        const payload = JSON.parse(String(init.body)) as { image_urls: string[] };
+        return jsonResponse([
+          ownedRow({
+            image_urls: payload.image_urls,
+          }),
+        ]);
+      }
+      return jsonResponse([
+        {
+          created_by_user_id: 'user-1',
+          school_id: 'school1',
+          image_urls: [existingUrl],
+        },
+      ]);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const form = validPatchForm();
+    form.append(
+      'imageOrder',
+      JSON.stringify([
+        { kind: 'existing', url: existingUrl },
+        { kind: 'new', index: 0 },
+      ])
+    );
+    form.append(
+      'image',
+      new File([Uint8Array.from([1, 2, 3, 4])], 'spot.jpg', {
+        type: 'image/jpeg',
+      })
+    );
+
+    const response = await PATCH(
+      new Request('https://app.test/api/spots?id=spot1', {
+        method: 'PATCH',
+        headers: { Authorization: 'Bearer good-token' },
+        body: form,
+      })
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { spot: { imageUris: string[] } };
+    expect(body.spot.imageUris).toHaveLength(2);
+    expect(body.spot.imageUris[0]).toBe(existingUrl);
+    expect(body.spot.imageUris[1]).toContain('/storage/v1/object/public/spot-images/');
+
+    const removeCall = fetchMock.mock.calls.find((call) =>
+      call[0].toString().includes('/storage/v1/object/remove')
+    );
+    expect(removeCall).toBeUndefined();
+  });
+
+  it('deletes only photos dropped from imageOrder', async () => {
+    setConfigured();
+    const keepUrl =
+      'https://project.supabase.co/storage/v1/object/public/spot-images/school1/keep.jpg';
+    const dropUrl =
+      'https://project.supabase.co/storage/v1/object/public/spot-images/school1/drop.jpg';
+    const fetchMock: FetchMock = jest.fn(async (input, init) => {
+      const url = input.toString();
+      if (url.includes('/auth/v1/user')) {
+        return jsonResponse({ id: 'user-1' });
+      }
+      if (url.includes('api.openai.com')) {
+        return openAIApprovalResponse();
+      }
+      if (url.includes('/storage/v1/object/remove')) {
+        return jsonResponse({});
+      }
+      if (init?.method === 'PATCH') {
+        return jsonResponse([ownedRow({ image_urls: [keepUrl] })]);
+      }
+      return jsonResponse([
+        {
+          created_by_user_id: 'user-1',
+          school_id: 'school1',
+          image_urls: [keepUrl, dropUrl],
+        },
+      ]);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const form = validPatchForm();
+    form.append(
+      'imageOrder',
+      JSON.stringify([{ kind: 'existing', url: keepUrl }])
+    );
+
+    const response = await PATCH(
+      new Request('https://app.test/api/spots?id=spot1', {
+        method: 'PATCH',
+        headers: { Authorization: 'Bearer good-token' },
+        body: form,
+      })
+    );
+    expect(response.status).toBe(200);
+
+    const removeCall = fetchMock.mock.calls.find((call) =>
+      call[0].toString().includes('/storage/v1/object/remove')
+    );
+    expect(removeCall).toBeDefined();
+    const removeBody = JSON.parse(String(removeCall?.[1]?.body)) as {
+      prefixes: string[];
+    };
+    expect(removeBody.prefixes).toEqual(['school1/drop.jpg']);
+  });
+
+  it('rejects imageOrder that injects a foreign URL', async () => {
+    setConfigured();
+    global.fetch = jest.fn(async (input) => {
+      const url = input.toString();
+      if (url.includes('/auth/v1/user')) {
+        return jsonResponse({ id: 'user-1' });
+      }
+      return jsonResponse([
+        {
+          created_by_user_id: 'user-1',
+          school_id: 'school1',
+          image_urls: [
+            'https://project.supabase.co/storage/v1/object/public/spot-images/school1/old.jpg',
+          ],
+        },
+      ]);
+    }) as unknown as typeof fetch;
+
+    const form = validPatchForm();
+    form.append(
+      'imageOrder',
+      JSON.stringify([
+        {
+          kind: 'existing',
+          url: 'https://evil.example/not-ours.jpg',
+        },
+      ])
+    );
+
+    const response = await PATCH(
+      new Request('https://app.test/api/spots?id=spot1', {
+        method: 'PATCH',
+        headers: { Authorization: 'Bearer good-token' },
+        body: form,
+      })
+    );
+    expect(response.status).toBe(400);
   });
 });
 

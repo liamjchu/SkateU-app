@@ -8,7 +8,6 @@ import {
 } from '@expo-google-fonts/outfit';
 import * as Linking from 'expo-linking';
 import { SplashScreen, Stack, useRouter, useSegments } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import { useEffect } from 'react';
 import { Image, Platform, Pressable, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -58,6 +57,9 @@ export default function RootLayout() {
   const clearProfile = useProfileStore((state) => state.clearProfile);
   const clearMySpots = useSpotsStore((state) => state.clearMySpots);
   const clearLikedSpots = useSpotsStore((state) => state.clearLikedSpots);
+  const clearReportedSpotIds = useSpotsStore(
+    (state) => state.clearReportedSpotIds
+  );
 
   const router = useRouter();
   const segments = useSegments();
@@ -87,13 +89,14 @@ export default function RootLayout() {
   useEffect(() => {
     clearMySpots();
     clearLikedSpots();
+    clearReportedSpotIds();
 
     if (userId) {
       fetchProfile(userId);
     } else {
       clearProfile();
     }
-  }, [clearLikedSpots, clearMySpots, userId, fetchProfile, clearProfile]);
+  }, [clearLikedSpots, clearMySpots, clearReportedSpotIds, userId, fetchProfile, clearProfile]);
 
   useEffect(() => {
     // Supabase redirects OAuth and recovery emails to distinct native paths.
@@ -123,12 +126,6 @@ export default function RootLayout() {
         .then((handled) => {
           if (!handled) {
             return;
-          }
-
-          try {
-            WebBrowser.dismissBrowser();
-          } catch {
-            // No browser is open when a cold-start email link is handled.
           }
 
           if (isRecoveryLink) {
@@ -232,6 +229,8 @@ export default function RootLayout() {
         <Stack.Screen name="map" options={{ contentStyle: { backgroundColor: colors.brand } }} />
         <Stack.Screen name="add-spot" options={{ contentStyle: { backgroundColor: colors.surface } }} />
         <Stack.Screen name="edit-spot" options={{ contentStyle: { backgroundColor: colors.surface } }} />
+        <Stack.Screen name="request-spot-removal" options={{ contentStyle: { backgroundColor: colors.surface } }} />
+        <Stack.Screen name="spot-comments" options={{ contentStyle: { backgroundColor: colors.surface } }} />
       </Stack>
 
       {!appReady || !routeSettled ? (
