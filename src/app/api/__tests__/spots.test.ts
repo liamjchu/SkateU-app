@@ -412,6 +412,42 @@ describe('GET /api/spots', () => {
     expect(spotsUrl.searchParams.get('status')).toBe('neq.removed');
   });
 
+  it('filters blocked creators when a bearer token is present', async () => {
+    setConfigured();
+    const fetchMock: FetchMock = jest.fn(async (input) => {
+      const url = String(input);
+      if (url.includes('/auth/v1/user')) {
+        return jsonResponse({ id: 'viewer-1' });
+      }
+      if (url.includes('/rest/v1/user_blocks')) {
+        return jsonResponse([{ blocked_id: 'blocked-user' }]);
+      }
+      if (url.includes('/rest/v1/spots')) {
+        return jsonResponse([]);
+      }
+      if (url.includes('/rest/v1/spot_likes')) {
+        return jsonResponse([]);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await GET(
+      new Request('https://app.test/api/spots?schoolId=school1', {
+        headers: { Authorization: 'Bearer good-token' },
+      })
+    );
+    expect(response.status).toBe(200);
+    const spotsCall = fetchMock.mock.calls.find(([url]) =>
+      String(url).includes('/rest/v1/spots')
+    );
+    expect(spotsCall).toBeDefined();
+    const spotsUrl = new URL(String(spotsCall?.[0]));
+    expect(spotsUrl.searchParams.get('or')).toBe(
+      '(created_by_user_id.is.null,created_by_user_id.not.in.(blocked-user))'
+    );
+  });
+
   it('returns 200 with mapped spots when rows match', async () => {
     setConfigured();
     const row: DatabaseSpot = {
@@ -448,6 +484,7 @@ describe('GET /api/spots', () => {
           state: 'TX',
           schoolId: 'school1',
           creatorUsername: 'skater_jane',
+          creatorUserId: null,
           createdAt: '2024-01-01T00:00:00.000Z',
           updatedAt: '2024-01-01T00:00:00.000Z',
           likeCount: 4,

@@ -3,11 +3,12 @@ import { useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { colors } from '../constants/colors';
 import { PASSWORD_REQUIREMENTS, validatePassword } from '../lib/password';
-import { changePassword } from '../lib/password-change';
+import { changePassword, setPassword } from '../lib/password-change';
 import FeedbackPressable from './FeedbackPressable';
 
 type ChangePasswordFormProps = {
   email: string;
+  mode?: 'change' | 'set';
 };
 
 type PasswordFieldProps = {
@@ -31,7 +32,7 @@ const getChangePasswordErrorMessage = (changeError: unknown): string => {
     return 'Check your internet connection and try again.';
   }
 
-  return 'Couldn’t update your password right now. Try again in a sec.';
+  return 'We couldn’t update your password right now. Please try again.';
 };
 
 function PasswordField({
@@ -79,7 +80,11 @@ function PasswordField({
   );
 }
 
-export default function ChangePasswordForm({ email }: ChangePasswordFormProps) {
+export default function ChangePasswordForm({
+  email,
+  mode = 'change',
+}: ChangePasswordFormProps) {
+  const isSetMode = mode === 'set';
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -96,10 +101,10 @@ export default function ChangePasswordForm({ email }: ChangePasswordFormProps) {
     }
 
     if (!email) {
-      setError('Sign in to change your password.');
+      setError('Sign in to update your password.');
       return;
     }
-    if (!currentPassword) {
+    if (!isSetMode && !currentPassword) {
       setError('Enter your current password.');
       return;
     }
@@ -120,11 +125,19 @@ export default function ChangePasswordForm({ email }: ChangePasswordFormProps) {
     setSubmitting(true);
 
     try {
-      await changePassword({ email, currentPassword, newPassword });
+      if (isSetMode) {
+        await setPassword(newPassword);
+      } else {
+        await changePassword({ email, currentPassword, newPassword });
+      }
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      setSuccess('Your password has been updated.');
+      setSuccess(
+        isSetMode
+          ? 'Your password has been set. You can now also sign in with email.'
+          : 'Your password has been updated.'
+      );
     } catch (changeError) {
       setError(getChangePasswordErrorMessage(changeError));
     } finally {
@@ -136,26 +149,30 @@ export default function ChangePasswordForm({ email }: ChangePasswordFormProps) {
     <View className="gap-4">
       <View>
         <Text className="font-outfit-black text-2xl text-ink">
-          Change password
+          {isSetMode ? 'Set a password' : 'Change password'}
         </Text>
         <Text className="mt-2 font-outfit-medium text-base text-muted">
-          Verify your current password before choosing a new one.
+          {isSetMode
+            ? 'Add an email password to this account. Your Google or Apple sign-in will keep working.'
+            : 'Verify your current password before choosing a new one.'}
         </Text>
         <Text className="mt-2 font-outfit-medium text-sm text-muted">
           {PASSWORD_REQUIREMENTS}
         </Text>
       </View>
 
-      <PasswordField
-        value={currentPassword}
-        onChangeText={setCurrentPassword}
-        label="Current password"
-        placeholder="Current password"
-        autoComplete="current-password"
-        visible={showCurrentPassword}
-        onToggleVisibility={() => setShowCurrentPassword((visible) => !visible)}
-        editable={!submitting}
-      />
+      {isSetMode ? null : (
+        <PasswordField
+          value={currentPassword}
+          onChangeText={setCurrentPassword}
+          label="Current password"
+          placeholder="Current password"
+          autoComplete="current-password"
+          visible={showCurrentPassword}
+          onToggleVisibility={() => setShowCurrentPassword((visible) => !visible)}
+          editable={!submitting}
+        />
+      )}
       <PasswordField
         value={newPassword}
         onChangeText={setNewPassword}
@@ -209,13 +226,27 @@ export default function ChangePasswordForm({ email }: ChangePasswordFormProps) {
           submitting ? 'bg-actionDisabled' : 'bg-accent'
         }`}
         accessibilityRole="button"
-        accessibilityLabel={submitting ? 'Updating password' : 'Update password'}
+        accessibilityLabel={
+          submitting
+            ? isSetMode
+              ? 'Setting password'
+              : 'Updating password'
+            : isSetMode
+              ? 'Set password'
+              : 'Update password'
+        }
         accessibilityState={{ disabled: submitting, busy: submitting }}
       >
         <Text
           className={`font-outfit-bold text-lg ${submitting ? 'text-muted' : 'text-brand'}`}
         >
-          {submitting ? 'Updating password…' : 'Update password'}
+          {submitting
+            ? isSetMode
+              ? 'Setting password…'
+              : 'Updating password…'
+            : isSetMode
+              ? 'Set password'
+              : 'Update password'}
         </Text>
       </FeedbackPressable>
     </View>

@@ -17,6 +17,10 @@ import {
     resolveUserId,
     validateSpotId,
 } from './spots+api';
+import {
+    fetchBlockedUserIds,
+    fetchReportedCommentIds,
+} from './blockedUsers';
 
 type SupabaseConfig = { url: string; apiKey: string };
 
@@ -232,6 +236,32 @@ export async function GET(request: Request): Promise<Response> {
       return Response.json({ error: 'That spot no longer exists.' }, { status: 404 });
     }
 
+    const hiddenUsers = new Set<string>();
+    const hiddenComments = new Set<string>();
+    const accessToken = readBearerToken(request);
+    if (accessToken) {
+      const auth = await resolveUserId(config, accessToken);
+      if (auth.ok) {
+        try {
+          const [blockedIds, reportedIds] = await Promise.all([
+            fetchBlockedUserIds(config, auth.userId),
+            fetchReportedCommentIds(config, auth.userId),
+          ]);
+          blockedIds.forEach((id) => hiddenUsers.add(id));
+          reportedIds.forEach((id) => hiddenComments.add(id));
+        } catch (error) {
+          console.error('Loading comment safety filters failed:', error);
+        }
+      }
+    }
+
+    const isVisible = (row: DatabaseComment): boolean => {
+      if (row.user_id && hiddenUsers.has(row.user_id)) {
+        return false;
+      }
+      return !hiddenComments.has(row.id);
+    };
+
     const topLevelParams = new URLSearchParams();
     topLevelParams.set('spot_id', `eq.${spotId}`);
     topLevelParams.set('parent_comment_id', 'is.null');
@@ -240,7 +270,9 @@ export async function GET(request: Request): Promise<Response> {
     topLevelParams.set('offset', String(offset));
     topLevelParams.set('limit', String(COMMENT_PAGE_SIZE));
 
-    const topLevelRows = await fetchCommentsByQuery(config, topLevelParams);
+    const topLevelRows = (await fetchCommentsByQuery(config, topLevelParams)).filter(
+      isVisible
+    );
     const parentIds = topLevelRows.map((row) => row.id);
 
     let replyRows: DatabaseComment[] = [];
@@ -249,7 +281,7 @@ export async function GET(request: Request): Promise<Response> {
       replyParams.set('parent_comment_id', `in.(${parentIds.join(',')})`);
       replyParams.set('select', COMMENT_SELECT_COLUMNS);
       replyParams.set('order', 'created_at.asc,id.asc');
-      replyRows = await fetchCommentsByQuery(config, replyParams);
+      replyRows = (await fetchCommentsByQuery(config, replyParams)).filter(isVisible);
     }
 
     const repliesByParent = new Map<string, SpotComment[]>();

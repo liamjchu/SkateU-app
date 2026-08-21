@@ -51,8 +51,8 @@ export default function SpotMediaPager({
           disablePressScale
           onPress={() => onPressIndex(0)}
           accessibilityRole="button"
-          accessibilityLabel={`View full screen photo of ${accessibilityName}`}
-          accessibilityHint="Opens the photo. Pinch or double tap to zoom."
+          accessibilityLabel={`Open full screen view of ${accessibilityName}`}
+          accessibilityHint="Opens the full screen spot view. Pinch or double tap to zoom."
         >
           <Image
             source={{ uri: uris[0] }}
@@ -85,7 +85,7 @@ export default function SpotMediaPager({
                 style={{ width: pageWidth, height }}
                 accessibilityRole="button"
                 accessibilityLabel={`Photo ${photoIndex + 1} of ${uris.length} of ${accessibilityName}`}
-                accessibilityHint="Opens the photo. Pinch or double tap to zoom."
+                accessibilityHint="Opens the full screen spot view. Pinch or double tap to zoom."
               >
                 <Image
                   source={{ uri }}

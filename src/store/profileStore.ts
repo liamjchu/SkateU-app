@@ -75,7 +75,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
         profile: null,
         loading: false,
         loaded: false,
-        error: 'Couldn’t load your profile right now. Try again in a sec.',
+        error: 'We couldn’t load your profile right now. Please try again.',
       });
       return;
     }
@@ -134,7 +134,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
         profile: null,
         loading: false,
         loaded: false,
-        error: 'Couldn’t load your profile right now. Try again in a sec.',
+        error: 'We couldn’t load your profile right now. Please try again.',
       });
     }
   },
@@ -240,7 +240,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
       return { ok: true };
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
-        throw new Error('Saving the username timed out. Try again in a sec.');
+        throw new Error('Saving the username timed out. Please try again.');
       }
       throw error;
     } finally {
@@ -291,7 +291,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
       });
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
-        throw new Error('Saving your agreement timed out. Try again in a sec.');
+        throw new Error('Saving your agreement timed out. Please try again.');
       }
       throw error;
     } finally {

@@ -132,7 +132,7 @@ describe('commentsStore', () => {
     await Promise.resolve();
     await expect(
       useCommentsStore.getState().addComment('spot-1', 'Second', 'token')
-    ).rejects.toThrow('Hang on — still posting.');
+    ).rejects.toThrow('Still posting. Please wait.');
 
     resolvePost?.(
       mockResponse({ comment: makeComment(), commentCount: 1 }, { status: 201 })
@@ -208,5 +208,105 @@ describe('commentsStore', () => {
     expect(useCommentsStore.getState().bySpotId['spot-1'].comments).toEqual([]);
     expect(useSpotsStore.getState().spots[0].commentCount).toBe(0);
     expect(useSpotsStore.getState().mySpots[0].commentCount).toBe(0);
+  });
+
+  it('hides comments and replies from a blocked user', () => {
+    const parent = makeComment({ userId: 'blocked-user' });
+    const other = makeComment({
+      id: 'comment-2',
+      userId: 'other-user',
+      replies: [makeComment({ id: 'reply-1', userId: 'blocked-user' })],
+    });
+    useCommentsStore.setState({
+      bySpotId: {
+        'spot-1': {
+          comments: [parent, other],
+          loading: false,
+          loadingMore: false,
+          submitting: false,
+          error: null,
+          hasMore: false,
+          nextOffset: 2,
+          commentCount: 3,
+        },
+      },
+    });
+
+    useCommentsStore.getState().hideUserComments('blocked-user');
+
+    expect(useCommentsStore.getState().bySpotId['spot-1'].comments).toEqual([
+      expect.objectContaining({ id: 'comment-2', replies: [] }),
+    ]);
+  });
+
+  it('loads the next page and skips a fetch when there is no more', async () => {
+    const first = makeComment({ id: 'comment-1' });
+    useCommentsStore.setState({
+      bySpotId: {
+        'spot-1': {
+          comments: [first],
+          loading: false,
+          loadingMore: false,
+          submitting: false,
+          error: null,
+          hasMore: true,
+          nextOffset: 1,
+          commentCount: 2,
+        },
+      },
+    });
+    fetchMock.mockResolvedValue(
+      mockResponse({
+        comments: [makeComment({ id: 'comment-2', content: 'Second' })],
+        commentCount: 2,
+      })
+    );
+
+    await useCommentsStore.getState().fetchMore('spot-1');
+    expect(useCommentsStore.getState().bySpotId['spot-1'].comments).toHaveLength(2);
+    expect(useCommentsStore.getState().bySpotId['spot-1'].hasMore).toBe(false);
+
+    fetchMock.mockClear();
+    await useCommentsStore.getState().fetchMore('spot-1');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('maps a 401 load failure to a sign-in message', async () => {
+    fetchMock.mockResolvedValue(
+      mockResponse({ error: '' }, { ok: false, status: 401 })
+    );
+    await useCommentsStore.getState().fetchComments('spot-1');
+    expect(useCommentsStore.getState().bySpotId['spot-1'].error).toBe(
+      'Please sign in again.'
+    );
+  });
+
+  it('hides one comment and can reset a spot cache', () => {
+    const parent = makeComment();
+    useCommentsStore.setState({
+      bySpotId: {
+        'spot-1': {
+          comments: [parent],
+          loading: false,
+          loadingMore: false,
+          submitting: false,
+          error: null,
+          hasMore: false,
+          nextOffset: 1,
+          commentCount: 1,
+        },
+      },
+      commentCounts: { 'spot-1': 1 },
+    });
+
+    useCommentsStore.getState().hideComment('spot-missing', parent.id);
+    expect(useCommentsStore.getState().bySpotId['spot-1'].comments).toHaveLength(1);
+
+    useCommentsStore.getState().hideComment('spot-1', parent.id);
+    expect(useCommentsStore.getState().bySpotId['spot-1'].comments).toEqual([]);
+
+    useCommentsStore.getState().resetSpot('spot-1');
+    expect(useCommentsStore.getState().bySpotId['spot-1']).toBeUndefined();
+    expect(useCommentsStore.getState().commentCounts['spot-1']).toBeUndefined();
   });
 });

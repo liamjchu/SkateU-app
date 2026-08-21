@@ -85,6 +85,16 @@ Intro with **bold** and [mail](mailto:support@skateu.app).
     expect(PRIVACY_POLICY_MARKDOWN).toContain(
       'We do not ask for or store your date of birth.'
     );
+    expect(PRIVACY_POLICY_MARKDOWN).toContain(
+      'Feature public spots, photos, descriptions, campus names, and usernames on SkateU’s Instagram, TikTok, and YouTube'
+    );
+    expect(PRIVACY_POLICY_MARKDOWN).toContain('Unpublished spot drafts');
+    expect(TERMS_OF_USE_MARKDOWN).toContain(
+      'On SkateU’s official social media accounts (currently Instagram, TikTok, and YouTube)'
+    );
+    expect(COMMUNITY_GUIDELINES_MARKDOWN).toContain(
+      'SkateU may feature them, including photos, on our Instagram, TikTok, and YouTube.'
+    );
     expect(COMMUNITY_GUIDELINES_MARKDOWN).toContain('support@skateu.app');
     expect(COMMUNITY_GUIDELINES_MARKDOWN).toContain(
       'SkateU accounts are for people 13 and older.'

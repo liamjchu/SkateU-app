@@ -37,3 +37,17 @@ export const changePassword = async ({
     throw updateError;
   }
 };
+
+/**
+ * Adds an email/password credential to the signed-in user. Used when the
+ * account currently only has an OAuth provider such as Google or Apple.
+ */
+export const setPassword = async (newPassword: string): Promise<void> => {
+  const { error } = await supabase.auth.updateUser({
+    password: newPassword,
+  });
+
+  if (error) {
+    throw error;
+  }
+};

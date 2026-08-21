@@ -9,6 +9,7 @@ import {
     validateSpotId,
     type DatabaseSpot,
 } from './spots+api';
+import { fetchBlockedUserIds } from './blockedUsers';
 
 type SupabaseConfig = { url: string; apiKey: string };
 
@@ -127,7 +128,19 @@ async function getLikedSpots(
     })
   );
   const rows = rowsByBatch.flat();
-  const byId = new Map(rows.map((row) => [row.id, row]));
+  let blockedIds: string[] = [];
+  try {
+    blockedIds = await fetchBlockedUserIds(config, userId);
+  } catch (error) {
+    console.error('Loading blocked users failed:', error);
+  }
+  const blocked = new Set(blockedIds);
+  const visibleRows = rows.filter(
+    (row) =>
+      typeof row.created_by_user_id !== 'string' ||
+      !blocked.has(row.created_by_user_id)
+  );
+  const byId = new Map(visibleRows.map((row) => [row.id, row]));
   return Response.json({
     spots: likedIds
       .map((id) => byId.get(id))

@@ -50,6 +50,7 @@ type SpotsState = {
   ) => Promise<void>;
   replaceCreatorUsername: (previousUsername: string, username: string) => void;
   setSpotCommentCount: (spotId: string, commentCount: number) => void;
+  hideCreatorSpots: (userId: string) => void;
   clearMySpots: () => void;
   clearLikedSpots: () => void;
   clearReportedSpotIds: () => void;
@@ -63,12 +64,12 @@ function withReportedSpot(ids: string[], spotId: string): string[] {
 // Reads stay short, while mutations get enough time for moderation and image upload.
 const REQUEST_TIMEOUT_MS = 10_000;
 const MUTATION_TIMEOUT_MS = 60_000;
-const SAVE_TIMEOUT_ERROR = 'Saving this spot timed out. Try again in a sec.';
+const SAVE_TIMEOUT_ERROR = 'Saving this spot timed out. Please try again.';
 
 const INVALID_SCHOOL_ID_ERROR =
   'A valid school identifier is required to load spots.';
 const LOAD_FAILED_ERROR = 'Couldn’t load spots right now.';
-const LOAD_TIMEOUT_ERROR = 'Loading spots timed out. Try again in a sec.';
+const LOAD_TIMEOUT_ERROR = 'Loading spots timed out. Please try again.';
 const MY_SPOTS_LOAD_FAILED_ERROR = 'Couldn’t load your spots right now.';
 const LIKED_SPOTS_LOAD_FAILED_ERROR = 'Couldn’t load liked spots right now.';
 
@@ -151,7 +152,7 @@ async function readErrorMessage(response: Response): Promise<string> {
   // paused backend, a flaky tunnel), not our API — which always returns a JSON
   // `{ error }`. Show a friendlier, retryable message instead of a raw status.
   if (response.status >= 500) {
-    return 'The server is temporarily unavailable. Try again in a sec.';
+    return 'The server is temporarily unavailable. Please try again.';
   }
 
   if (response.status === 401) {
@@ -627,7 +628,7 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
 
   // Existing spot records cache the public creator name, so update every
   // collection immediately after the profile username has changed.
-  replaceCreatorUsername: (previousUsername, username) => {
+    replaceCreatorUsername: (previousUsername, username) => {
     if (previousUsername === username) {
       return;
     }
@@ -641,6 +642,14 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
       spots: state.spots.map(replace),
       mySpots: state.mySpots.map(replace),
       likedSpots: state.likedSpots.map(replace),
+    }));
+  },
+
+  hideCreatorSpots: (userId) => {
+    const keep = (spot: Spot): boolean => spot.creatorUserId !== userId;
+    set((state) => ({
+      spots: state.spots.filter(keep),
+      likedSpots: state.likedSpots.filter(keep),
     }));
   },
 

@@ -13,6 +13,8 @@ export type Spot = {
   // The creator's public username, or null when the profile has no username
   // yet or the creator's account was deleted.
   creatorUsername: string | null
+  // The creator's user id, or null when the account was deleted.
+  creatorUserId?: string | null
   // ISO timestamp of when the spot was created. Empty string when unknown.
   createdAt: string
   // ISO timestamp of the spot's last edit. Equals createdAt until edited.

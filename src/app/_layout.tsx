@@ -9,7 +9,7 @@ import {
 import * as Linking from 'expo-linking';
 import { SplashScreen, Stack, useRouter, useSegments } from 'expo-router';
 import { useEffect } from 'react';
-import { Image, Platform, Pressable, Text, View } from 'react-native';
+import { Image, Platform, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import {
     configureReanimatedLogger,
@@ -26,11 +26,17 @@ import {
     isSettledLegalRoute,
     legalGateRedirectPath,
 } from '../lib/legalAcceptance';
+import { shouldLeaveAuthEntryRoute } from '../lib/authNavigation';
 import { useAgeEligibilityStore } from '../store/ageEligibilityStore';
 import { useAuthStore } from '../store/authStore';
+import { useBlocksStore } from '../store/blocksStore';
+import { useDraftSpotsStore } from '../store/draftSpotsStore';
 import { useFavorites } from '../store/favoritesStore';
 import { useProfileStore } from '../store/profileStore';
 import { useSpotsStore } from '../store/spotsStore';
+import { initCrashReporting, wrapRoot } from '../lib/crashReporting';
+
+initCrashReporting();
 
 if (Platform.OS !== 'web') {
   void SplashScreen.preventAutoHideAsync();
@@ -41,7 +47,7 @@ configureReanimatedLogger({
   strict: false,
 });
 
-export default function RootLayout() {
+function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     Outfit_400Regular,
     Outfit_500Medium,
@@ -57,6 +63,7 @@ export default function RootLayout() {
   const userId = useAuthStore((state) => state.user?.id ?? null);
   const accessToken = useAuthStore((state) => state.session?.access_token ?? null);
   const authInitializing = useAuthStore((state) => state.initializing);
+  const passwordRecovery = useAuthStore((state) => state.passwordRecovery);
   const confirmedAgeEligibleThisSession = useAgeEligibilityStore(
     (state) => state.confirmedThisSession
   );
@@ -71,10 +78,15 @@ export default function RootLayout() {
   const clearReportedSpotIds = useSpotsStore(
     (state) => state.clearReportedSpotIds
   );
+  const fetchBlocks = useBlocksStore((state) => state.fetchBlocks);
+  const clearBlocks = useBlocksStore((state) => state.clear);
 
   const router = useRouter();
   const segments = useSegments();
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+  const splashLogoWidth = Math.min(240, Math.max(168, windowWidth * 0.68));
+  const splashLogoHeight = splashLogoWidth * (36 / 195);
 
   useEffect(() => {
     // Restore any persisted Supabase session and subscribe to auth changes.
@@ -85,6 +97,7 @@ export default function RootLayout() {
     // Persistent saved schools are browser/device state, so restore them only
     // after client mounting instead of during the web server render.
     void useFavorites.persist.rehydrate();
+    void useDraftSpotsStore.persist.rehydrate();
   }, []);
 
   useEffect(() => {
@@ -104,10 +117,14 @@ export default function RootLayout() {
 
     if (userId) {
       fetchProfile(userId, accessToken);
+      if (accessToken) {
+        void fetchBlocks(accessToken);
+      }
     } else {
       clearProfile();
+      clearBlocks();
     }
-  }, [clearLikedSpots, clearMySpots, clearReportedSpotIds, userId, accessToken, fetchProfile, clearProfile]);
+  }, [clearBlocks, clearLikedSpots, clearMySpots, clearReportedSpotIds, fetchBlocks, userId, accessToken, fetchProfile, clearProfile]);
 
   useEffect(() => {
     // Supabase redirects OAuth and recovery emails to distinct native paths.
@@ -180,7 +197,14 @@ export default function RootLayout() {
     confirmedAgeEligibleThisSession,
   });
   const routeRoot = segments[0];
-  const routeSettled = isSettledLegalRoute(legalGate, routeRoot);
+  const leavingAuthEntry = shouldLeaveAuthEntryRoute({
+    userId,
+    legalGate,
+    passwordRecovery,
+    routeRoot,
+  });
+  const routeSettled =
+    isSettledLegalRoute(legalGate, routeRoot) && !leavingAuthEntry;
 
   useEffect(() => {
     if (!appReady) {
@@ -193,13 +217,18 @@ export default function RootLayout() {
       return;
     }
 
+    if (leavingAuthEntry) {
+      router.replace('/');
+      return;
+    }
+
     if (
       legalGate === 'none' &&
       (routeRoot === 'onboarding' || routeRoot === 'accept-legal')
     ) {
       router.replace('/');
     }
-  }, [appReady, legalGate, routeRoot, router]);
+  }, [appReady, leavingAuthEntry, legalGate, routeRoot, router]);
 
   useEffect(() => {
     // Keep the native splash up until fonts are ready, then hand off to a
@@ -239,6 +268,7 @@ export default function RootLayout() {
         <Stack.Screen name="legal" />
         <Stack.Screen name="profile" />
         <Stack.Screen name="settings" />
+        <Stack.Screen name="blocked-accounts" />
         <Stack.Screen name="help" />
         <Stack.Screen name="change-username" />
         <Stack.Screen name="change-password" />
@@ -261,19 +291,20 @@ export default function RootLayout() {
         <Stack.Screen name="add-spot" options={{ contentStyle: { backgroundColor: colors.surface } }} />
         <Stack.Screen name="edit-spot" options={{ contentStyle: { backgroundColor: colors.surface } }} />
         <Stack.Screen name="request-spot-removal" options={{ contentStyle: { backgroundColor: colors.surface } }} />
+        <Stack.Screen name="report-comment" options={{ contentStyle: { backgroundColor: colors.surface } }} />
         <Stack.Screen name="spot-comments" options={{ contentStyle: { backgroundColor: colors.surface } }} />
       </Stack>
 
       {!appReady || !routeSettled ? (
         <View
-          className="absolute inset-0 z-50 items-center justify-center bg-surface"
+          className="absolute inset-0 z-50 items-center justify-center bg-surface px-8"
           accessibilityRole="progressbar"
           accessibilityLabel="Loading SkateU"
         >
           <Image
             source={images.brandLockupCentered}
             accessibilityLabel="SkateU"
-            style={{ width: 195, height: 36 }}
+            style={{ width: splashLogoWidth, height: splashLogoHeight }}
             resizeMode="contain"
           />
           {userId && profileError ? (
@@ -307,3 +338,5 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
+
+export default wrapRoot(RootLayout);

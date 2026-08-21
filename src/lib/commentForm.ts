@@ -23,9 +23,6 @@ export function isCommentContentValid(content: string): boolean {
 type CommentPrefilterResult = { ok: true } | { ok: false; reason: string };
 
 const BLOCKED_TOKENS = [
-  'fuck',
-  'shit',
-  'bitch',
   'cunt',
   'nigger',
   'nigga',
@@ -89,8 +86,8 @@ function containsBlockedToken(value: string): boolean {
 
 /**
  * Cheap server-side filter run before OpenAI. Rejects obvious PII-looking
- * numbers, repeated-character spam, and a small blocked-token list. Does not
- * replace model moderation.
+ * numbers, repeated-character spam, and a small slur/NSFW token list. Does not
+ * block ordinary cussing and does not replace model moderation.
  */
 export function prefilterComment(content: string): CommentPrefilterResult {
   const trimmed = content.trim();

@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useState } from 'react';
+import { forwardRef, useEffect, useRef, useState } from 'react';
 import {
     AccessibilityInfo,
     Pressable,
@@ -16,6 +16,8 @@ type FeedbackPressableProps = PressableProps & {
   disablePressOpacity?: boolean;
   disablePressScale?: boolean;
   haptic?: HapticFeedback;
+  // Ignores extra taps on the same control while navigation or an action starts.
+  pressLockMs?: number;
 };
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -26,12 +28,14 @@ const FeedbackPressable = forwardRef<View, FeedbackPressableProps>(
   disablePressOpacity = false,
   disablePressScale = false,
   haptic,
+  pressLockMs = 0,
   onPress,
   onPressIn,
   onPressOut,
   style,
   ...props
 }: FeedbackPressableProps, ref) {
+  const lockedUntilRef = useRef(0);
   const [reduceMotion, setReduceMotion] = useState(false);
   const scale = useSharedValue(1);
   const opacity = useSharedValue(1);
@@ -56,6 +60,13 @@ const FeedbackPressable = forwardRef<View, FeedbackPressableProps>(
       {...props}
       disabled={disabled}
       onPress={(event) => {
+        if (pressLockMs > 0) {
+          const now = Date.now();
+          if (now < lockedUntilRef.current) {
+            return;
+          }
+          lockedUntilRef.current = now + pressLockMs;
+        }
         onPress?.(event);
         if (!disabled && haptic) {
           triggerHaptic(haptic);

@@ -46,8 +46,10 @@ describe('prefilterComment', () => {
     expect(prefilterComment('aaaaaaaaaaaa').ok).toBe(false);
   });
 
-  it('rejects blocked tokens without treating them as substrings of other words', () => {
-    expect(prefilterComment('this is shit').ok).toBe(false);
+  it('allows ordinary cussing and still blocks slurs without substring matches', () => {
+    expect(prefilterComment('this is shit').ok).toBe(true);
+    expect(prefilterComment('this is fucking sick')).toEqual({ ok: true });
+    expect(prefilterComment('retard ledge').ok).toBe(false);
     expect(prefilterComment('assassin row is clean').ok).toBe(true);
   });
 });

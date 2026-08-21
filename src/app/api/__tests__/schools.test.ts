@@ -1,5 +1,5 @@
 import { HOME_RAIL_PAGE_SIZE } from '../../../lib/homeFeed';
-import { GET } from '../schools+api';
+import { GET, SEARCH_LIMIT } from '../schools+api';
 
 const originalFetch = global.fetch;
 const originalEnv = { ...process.env };
@@ -110,5 +110,86 @@ describe('GET /api/schools popular pagination', () => {
     expect(schoolRequests[1]?.searchParams.get('offset')).toBe(
       String(HOME_RAIL_PAGE_SIZE)
     );
+  });
+});
+
+describe('GET /api/schools search', () => {
+  it('returns empty schools without calling PostgREST when the query is shorter than 2 characters', async () => {
+    setConfigured();
+    const fetchMock = jest.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await GET(
+      new Request('https://app.test/api/schools?search=b')
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ schools: [] });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('posts once to search_schools and preserves RPC order', async () => {
+    setConfigured();
+    const ranked = [
+      { ...makeSchool('brown-university', 12), name: 'Brown University' },
+      { ...makeSchool('brownsville-elem', 0), name: 'Brownsville Elementary' },
+    ];
+    let rpcBody: unknown;
+
+    const fetchMock = jest.fn(
+      async (input: string | URL | Request, init?: RequestInit) => {
+        const requestUrl = new URL(String(input));
+        expect(requestUrl.pathname).toBe('/rest/v1/rpc/search_schools');
+        expect(init?.method).toBe('POST');
+        rpcBody = init?.body ? JSON.parse(String(init.body)) : null;
+        return jsonResponse(ranked);
+      }
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await GET(
+      new Request('https://app.test/api/schools?search=brown')
+    );
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { schools: Array<{ id: string }> };
+    expect(body.schools.map((school) => school.id)).toEqual([
+      'brown-university',
+      'brownsville-elem',
+    ]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(rpcBody).toEqual({
+      p_query: 'brown',
+      p_types: null,
+      p_limit: SEARCH_LIMIT,
+    });
+  });
+
+  it('passes a type filter array to the RPC and omits unknown types', async () => {
+    setConfigured();
+    let rpcBody: unknown;
+    const fetchMock = jest.fn(
+      async (_input: string | URL | Request, init?: RequestInit) => {
+        rpcBody = init?.body ? JSON.parse(String(init.body)) : null;
+        return jsonResponse([]);
+      }
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await GET(
+      new Request(
+        'https://app.test/api/schools?search=austin&type=higher_ed,unknown'
+      )
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ schools: [] });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(rpcBody).toEqual({
+      p_query: 'austin',
+      p_types: ['higher_ed'],
+      p_limit: SEARCH_LIMIT,
+    });
   });
 });

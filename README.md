@@ -19,7 +19,7 @@ Use this guide when cloning the project on a new development computer or running
 
 ### Prerequisites
 
-- Git, Node.js 20.19.0 (pinned in `.nvmrc` and EAS), and npm.
+- Git, Node.js 22.19.0 (pinned in `.nvmrc` and EAS), and npm.
 - Access to this repository and, for data-backed features, access to either the existing Supabase project or a new Supabase project you configure.
 - An Android device with Expo Go for quick testing, or an EAS account and a development build for full native-device testing. iOS simulator builds require macOS; iOS device builds also require the appropriate Apple Developer credentials.
 
@@ -86,10 +86,11 @@ Follow the complete [Backend setup](docs/backend-setup.md). Before this app can 
    skateu://auth/reset-password
    ```
 
-3. Create the `public.schools` table before the remaining scripts. It needs `id`, `name`, `city`, `state`, `latitude`, `longitude`, `numspots`, and `type` columns; `type` must accept `k12_public`, `k12_private`, and `higher_ed`. Add this as a versioned migration before production use.
+3. Create the `public.schools` table by running `supabase/schools_setup.sql` before the remaining scripts.
 4. In the Supabase SQL Editor, run these repository scripts in order:
 
    ```text
+   supabase/schools_setup.sql
    supabase/profiles_setup.sql
    supabase/profile_legal_acceptance_setup.sql
    supabase/profile_legal_private_setup.sql
@@ -100,6 +101,10 @@ Follow the complete [Backend setup](docs/backend-setup.md). Before this app can 
    supabase/spots_count_trigger.sql
    supabase/account_deletion_proofs_setup.sql
    supabase/spot_removal_requests_setup.sql
+   supabase/user_feedback_setup.sql
+   supabase/user_blocks_setup.sql
+   supabase/comment_reports_setup.sql
+   supabase/school_search_setup.sql
    ```
 
 5. Create a `spot-images` Storage bucket with public read enabled.

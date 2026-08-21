@@ -71,6 +71,8 @@ describe('moderateComment', () => {
       messages: { content: string }[];
     };
     expect(body.response_format).toEqual({ type: 'json_object' });
+    expect(body.messages[0].content).toContain('Off-topic chat is allowed');
+    expect(body.messages[0].content).toContain('Do not reject ordinary cussing on its own');
     expect(body.messages[1].content).toContain('Sick ledge');
   });
 
@@ -97,7 +99,7 @@ describe('softenCommentModerationReason', () => {
       'Let’s keep this one school-friendly and try again.'
     );
     expect(softenCommentModerationReason('IRRELEVANT')).toBe(
-      'That doesn’t really work as a comment — try saying something about the spot.'
+      'That reads like spam — try a real comment.'
     );
   });
 });

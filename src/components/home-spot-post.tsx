@@ -1,12 +1,9 @@
 import { Feather, Octicons } from '@expo/vector-icons';
-import { useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { colors } from '../constants/colors';
 import { formatCompactRelativeTime } from '../lib/relativeTime';
 import type { Spot } from '../types/spot';
-import ExpandableText from './expandable-text';
 import FeedbackPressable from './FeedbackPressable';
-import ImageLightbox from './image-lightbox';
 import SpotMediaPager from './spot-media-pager';
 
 type HomeSpotPostProps = {
@@ -15,6 +12,7 @@ type HomeSpotPostProps = {
   onLike: (spot: Spot) => void;
   onViewMap: (spot: Spot) => void;
   onOpenComments: (spot: Spot) => void;
+  onOpenFullscreen: (spot: Spot, photoIndex: number) => void;
 };
 
 function spotAttribution(spot: Spot): string {
@@ -38,10 +36,10 @@ export default function HomeSpotPost({
   onLike,
   onViewMap,
   onOpenComments,
+  onOpenFullscreen,
 }: HomeSpotPostProps) {
   const liked = spot.likedByUser === true;
   const imageUris = spot.imageUris.filter((uri) => uri.length > 0);
-  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   return (
     <View className="overflow-hidden rounded-2xl bg-field">
@@ -49,123 +47,130 @@ export default function HomeSpotPost({
         <SpotMediaPager
           uris={imageUris}
           height={224}
-          onPressIndex={setLightboxIndex}
+          onPressIndex={(index) => onOpenFullscreen(spot, index)}
           accessibilityName={spot.name}
         />
       ) : (
-        <View
+        <FeedbackPressable
+          haptic="light"
+          disablePressScale
+          onPress={() => onOpenFullscreen(spot, 0)}
           className="h-56 w-full items-center justify-center bg-surface-soft"
-          accessibilityLabel={`No photo for ${spot.name}`}
+          accessibilityRole="button"
+          accessibilityLabel={`Open full screen view of ${spot.name}`}
         >
-          <Feather name="map-pin" size={28} color={colors.muted} />
-        </View>
+          <Feather name="image" size={28} color={colors.muted} />
+          <Text className="mt-2 font-outfit-medium text-sm text-muted">
+            No photo yet
+          </Text>
+        </FeedbackPressable>
       )}
 
-      <View className="px-4 py-4">
+      <FeedbackPressable
+        haptic="light"
+        disablePressScale
+        onPress={() => onOpenFullscreen(spot, 0)}
+        accessibilityRole="button"
+        accessibilityLabel={`Open full screen view of ${spot.name}`}
+        className="px-4 pt-4"
+      >
         <View className="flex-row items-center">
           <Feather name="user" size={13} color={colors.muted} />
-          <View className="ml-1.5 min-w-0 flex-1">
-            <ExpandableText
-              collapsedLines={1}
-              className="font-outfit-medium text-sm text-muted"
-            >
-              {spotAttribution(spot)}
-            </ExpandableText>
-          </View>
+          <Text
+            numberOfLines={1}
+            className="ml-1.5 min-w-0 flex-1 font-outfit-medium text-sm text-muted"
+          >
+            {spotAttribution(spot)}
+          </Text>
         </View>
-        <ExpandableText
-          collapsedLines={1}
-          className="mt-1 font-outfit-bold text-lg text-ink"
-        >
-          {spot.name}
-        </ExpandableText>
-        <ExpandableText
-          collapsedLines={1}
+        <View className="mt-1 flex-row items-center">
+          <Text
+            numberOfLines={1}
+            className="min-w-0 flex-1 font-outfit-bold text-lg text-ink"
+          >
+            {spot.name}
+          </Text>
+          <Feather name="chevron-right" size={18} color={colors.mutedSoft} />
+        </View>
+        <Text
+          numberOfLines={1}
           className="mt-0.5 font-outfit-medium text-sm text-muted-soft"
         >
           {spotPlace(spot)}
-        </ExpandableText>
+        </Text>
         {spot.description.trim().length > 0 ? (
-          <ExpandableText
-            collapsedLines={2}
+          <Text
+            numberOfLines={2}
             className="mt-2 font-outfit-medium text-sm leading-5 text-ink"
           >
             {spot.description.trim()}
-          </ExpandableText>
+          </Text>
         ) : null}
+      </FeedbackPressable>
 
-        <View className="mt-3 flex-row items-center">
-          <FeedbackPressable
-            haptic="light"
-            onPress={() => onLike(spot)}
-            disabled={isLiking}
-            className={`min-h-11 flex-row items-center rounded-xl px-3.5 ${
-              liked ? 'bg-accent' : 'bg-surface-soft'
+      <View className="flex-row items-center px-4 pb-4 pt-3">
+        <FeedbackPressable
+          haptic="light"
+          onPress={() => onLike(spot)}
+          disabled={isLiking}
+          className={`min-h-11 flex-row items-center rounded-xl px-3.5 ${
+            liked ? 'bg-accent' : 'bg-surface-soft'
+          }`}
+          accessibilityRole="button"
+          accessibilityLabel={
+            liked ? `Unlike ${spot.name}` : `Like ${spot.name}`
+          }
+          accessibilityState={{ selected: liked, busy: isLiking }}
+        >
+          {isLiking ? (
+            <ActivityIndicator
+              size="small"
+              color={liked ? colors.brand : colors.ink}
+            />
+          ) : (
+            <Octicons
+              name={liked ? 'heart-fill' : 'heart'}
+              size={17}
+              color={liked ? colors.brand : colors.ink}
+            />
+          )}
+          <Text
+            className={`ml-1.5 font-outfit-semibold text-sm ${
+              liked ? 'text-brand' : 'text-ink'
             }`}
-            accessibilityRole="button"
-            accessibilityLabel={
-              liked ? `Unlike ${spot.name}` : `Like ${spot.name}`
-            }
-            accessibilityState={{ selected: liked, busy: isLiking }}
           >
-            {isLiking ? (
-              <ActivityIndicator
-                size="small"
-                color={liked ? colors.brand : colors.ink}
-              />
-            ) : (
-              <Octicons
-                name={liked ? 'heart-fill' : 'heart'}
-                size={17}
-                color={liked ? colors.brand : colors.ink}
-              />
-            )}
-            <Text
-              className={`ml-1.5 font-outfit-semibold text-sm ${
-                liked ? 'text-brand' : 'text-ink'
-              }`}
-            >
-              {spot.likeCount ?? 0}
-            </Text>
-          </FeedbackPressable>
+            {spot.likeCount ?? 0}
+          </Text>
+        </FeedbackPressable>
 
-          <FeedbackPressable
-            haptic="light"
-            onPress={() => onOpenComments(spot)}
-            className="ml-2 min-h-11 flex-row items-center rounded-xl bg-surface-soft px-3.5"
-            accessibilityRole="button"
-            accessibilityLabel={`Comments on ${spot.name}`}
-            accessibilityHint="Opens comments for this spot"
-          >
-            <Feather name="message-circle" size={16} color={colors.ink} />
-            <Text className="ml-1.5 font-outfit-semibold text-sm text-ink">
-              {spot.commentCount ?? 0}
-            </Text>
-          </FeedbackPressable>
+        <FeedbackPressable
+          haptic="light"
+          onPress={() => onOpenComments(spot)}
+          className="ml-2 min-h-11 flex-row items-center rounded-xl bg-surface-soft px-3.5"
+          accessibilityRole="button"
+          accessibilityLabel={`Comments on ${spot.name}`}
+          accessibilityHint="Opens comments for this spot"
+        >
+          <Feather name="message-circle" size={16} color={colors.ink} />
+          <Text className="ml-1.5 font-outfit-semibold text-sm text-ink">
+            {spot.commentCount ?? 0}
+          </Text>
+        </FeedbackPressable>
 
-          <FeedbackPressable
-            haptic="light"
-            onPress={() => onViewMap(spot)}
-            className="ml-2 min-h-11 flex-1 flex-row items-center justify-center rounded-xl bg-surface-soft px-3.5"
-            accessibilityRole="button"
-            accessibilityLabel={`View ${spot.name} on the campus map`}
-            accessibilityHint="Opens the campus map with this spot selected"
-          >
-            <Feather name="map" size={16} color={colors.ink} />
-            <Text className="ml-1.5 font-outfit-bold text-sm text-ink">
-              View map
-            </Text>
-          </FeedbackPressable>
-        </View>
+        <FeedbackPressable
+          haptic="light"
+          onPress={() => onViewMap(spot)}
+          className="ml-2 min-h-11 flex-1 flex-row items-center justify-center rounded-xl bg-surface-soft px-3.5"
+          accessibilityRole="button"
+          accessibilityLabel={`View ${spot.name} on the campus map`}
+          accessibilityHint="Opens the campus map with this spot selected"
+        >
+          <Feather name="map" size={16} color={colors.ink} />
+          <Text className="ml-1.5 font-outfit-bold text-sm text-ink">
+            View map
+          </Text>
+        </FeedbackPressable>
       </View>
-
-      <ImageLightbox
-        visible={lightboxIndex !== null}
-        uris={imageUris}
-        initialIndex={lightboxIndex ?? 0}
-        onClose={() => setLightboxIndex(null)}
-        accessibilityLabel={`Full screen photo of ${spot.name}`}
-      />
     </View>
   );
 }

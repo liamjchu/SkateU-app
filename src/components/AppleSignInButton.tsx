@@ -86,7 +86,7 @@ export default function AppleSignInButton({
       onError?.(
         error instanceof Error
           ? error.message
-          : 'Could not sign in with Apple. Try again.'
+          : 'Could not sign in with Apple. Please try again.'
       );
     } finally {
       setLoading(false);

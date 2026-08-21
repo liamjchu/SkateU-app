@@ -12,6 +12,10 @@ import {
     type SpotModerationVerdict,
 } from '../../lib/spotModeration';
 import type { Spot } from '../../types/spot';
+import {
+    applyBlockedUserFilter,
+    fetchBlockedUserIds,
+} from './blockedUsers';
 
 // --- Configuration & constants (mirrors schools+api.ts) ---------------------
 
@@ -36,9 +40,9 @@ const IMAGE_EXTENSIONS: Record<string, string> = {
 };
 
 export const SPOT_SELECT_COLUMNS =
-  'id,school_id,name,description,latitude,longitude,image_urls,created_at,updated_at,likes_count,comments_count,schools(name,city,state),creator:profiles(username)';
+  'id,school_id,created_by_user_id,name,description,latitude,longitude,image_urls,created_at,updated_at,likes_count,comments_count,schools(name,city,state),creator:profiles(username)';
 const RECENT_SPOT_SELECT_COLUMNS =
-  'id,school_id,name,description,latitude,longitude,image_urls,created_at,updated_at,likes_count,comments_count,schools!inner(name,city,state,type),creator:profiles(username)';
+  'id,school_id,created_by_user_id,name,description,latitude,longitude,image_urls,created_at,updated_at,likes_count,comments_count,schools!inner(name,city,state,type),creator:profiles(username)';
 const VALID_SCHOOL_TYPES = ['k12_public', 'k12_private', 'higher_ed'] as const;
 
 export const HIDDEN_SPOT_STATUS = 'removed';
@@ -115,6 +119,7 @@ export function validateSpotId(value: string | null): ValidationResult<string> {
 export type DatabaseSpot = {
   id: string;
   school_id: string;
+  created_by_user_id?: string | null;
   name: string;
   description: string;
   latitude: number;
@@ -154,6 +159,7 @@ export function mapSpot(row: DatabaseSpot, likedByUser = false): Spot {
     state: row.schools?.state ?? '',
     schoolName: row.schools?.name ?? '',
     schoolId: row.school_id,
+    creatorUserId: row.created_by_user_id ?? null,
     creatorUsername: row.creator?.username ?? null,
     createdAt: row.created_at ?? '',
     updatedAt: row.updated_at ?? '',
@@ -747,6 +753,31 @@ async function fetchLikedSpotIds(
   return new Set(rowsByBatch.flat().map((row) => row.spot_id));
 }
 
+async function resolveViewerAndBlocks(
+  request: Request,
+  config: SupabaseConfig
+): Promise<{ userId: string | null; blockedIds: string[] }> {
+  const accessToken = readBearerToken(request);
+  if (!accessToken) {
+    return { userId: null, blockedIds: [] };
+  }
+
+  const auth = await resolveUserId(config, accessToken);
+  if (!auth.ok) {
+    return { userId: null, blockedIds: [] };
+  }
+
+  try {
+    return {
+      userId: auth.userId,
+      blockedIds: await fetchBlockedUserIds(config, auth.userId),
+    };
+  } catch (error) {
+    console.error('Loading blocked users failed:', error);
+    return { userId: auth.userId, blockedIds: [] };
+  }
+}
+
 async function mapSpotsForUser(
   config: SupabaseConfig,
   rows: DatabaseSpot[],
@@ -801,11 +832,13 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   try {
+    const viewer = await resolveViewerAndBlocks(request, config);
     const query = new URL(`${config.url}/rest/v1/spots`);
     query.searchParams.set('school_id', `eq.${validation.value}`);
     query.searchParams.set('select', SPOT_SELECT_COLUMNS);
     query.searchParams.set('order', 'created_at.asc');
     applyVisibleSpotFilter(query);
+    applyBlockedUserFilter(query, 'created_by_user_id', viewer.blockedIds);
 
     const response = await fetch(query.toString(), {
       headers: {
@@ -820,16 +853,9 @@ export async function GET(request: Request): Promise<Response> {
     }
 
     const rows = (await response.json()) as DatabaseSpot[];
-    let userId: string | null = null;
-    const accessToken = readBearerToken(request);
-    if (accessToken) {
-      const auth = await resolveUserId(config, accessToken);
-      if (auth.ok) {
-        userId = auth.userId;
-      }
-    }
-
-    return Response.json({ spots: await mapSpotsForUser(config, rows, userId) });
+    return Response.json({
+      spots: await mapSpotsForUser(config, rows, viewer.userId),
+    });
   } catch (error) {
     console.error('Loading spots failed:', error);
     return Response.json(
@@ -852,6 +878,7 @@ async function getRecentSpots(
     );
 
   try {
+    const viewer = await resolveViewerAndBlocks(request, config);
     const query = new URL(`${config.url}/rest/v1/spots`);
     if (typeFilter.length > 0) {
       query.searchParams.set('select', RECENT_SPOT_SELECT_COLUMNS);
@@ -862,6 +889,7 @@ async function getRecentSpots(
     query.searchParams.set('order', 'created_at.desc,id.desc');
     query.searchParams.set('limit', String(HOME_RAIL_PAGE_SIZE));
     applyVisibleSpotFilter(query);
+    applyBlockedUserFilter(query, 'created_by_user_id', viewer.blockedIds);
     const offset = parseOffset(url.searchParams.get('offset'));
     if (offset > 0) {
       query.searchParams.set('offset', String(offset));
@@ -879,16 +907,9 @@ async function getRecentSpots(
     }
 
     const rows = (await response.json()) as DatabaseSpot[];
-    let userId: string | null = null;
-    const accessToken = readBearerToken(request);
-    if (accessToken) {
-      const auth = await resolveUserId(config, accessToken);
-      if (auth.ok) {
-        userId = auth.userId;
-      }
-    }
-
-    return Response.json({ spots: await mapSpotsForUser(config, rows, userId) });
+    return Response.json({
+      spots: await mapSpotsForUser(config, rows, viewer.userId),
+    });
   } catch (error) {
     console.error('Loading recent spots failed:', error);
     return Response.json(

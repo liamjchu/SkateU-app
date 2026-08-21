@@ -21,6 +21,7 @@ import FeedbackPressable from './FeedbackPressable';
 import GoogleSignInButton from './GoogleSignInButton';
 import LegalAuthNotice from './LegalAuthNotice';
 import ScreenHeader from './screen-header';
+import SocialLinks from './social-links';
 
 type AuthCredentialsFormProps = {
   mode: 'login' | 'signup';
@@ -67,16 +68,6 @@ export default function AuthCredentialsForm({
   ];
 
   const finishAuth = () => {
-    if (isSignup) {
-      router.replace('/');
-      return;
-    }
-
-    if (router.canGoBack()) {
-      router.back();
-      return;
-    }
-
     router.replace('/');
   };
 
@@ -141,7 +132,7 @@ export default function AuthCredentialsForm({
 
       finishAuth();
     } catch (submitError) {
-      setError(toUserFacingError(submitError, 'Something went wrong. Try again.'));
+      setError(toUserFacingError(submitError, 'Something went wrong. Please try again.'));
     } finally {
       setSubmitting(false);
     }
@@ -291,7 +282,13 @@ export default function AuthCredentialsForm({
           <Text
             className={`font-outfit-bold text-lg ${submitting ? 'text-muted' : 'text-brand'}`}
           >
-            {submitting ? 'Hang on…' : isSignup ? 'Sign up' : 'Sign in'}
+            {submitting
+              ? isSignup
+                ? 'Creating account…'
+                : 'Signing in…'
+              : isSignup
+                ? 'Sign up'
+                : 'Sign in'}
           </Text>
         </FeedbackPressable>
 
@@ -318,35 +315,34 @@ export default function AuthCredentialsForm({
           </Text>
         </FeedbackPressable>
 
-        {!isSignup ? (
-          <>
-            <View className="flex-row items-center">
-              <View className="h-px flex-1 bg-border-soft" />
-              <Text className="mx-3 font-outfit-semibold text-sm text-muted">
-                or
-              </Text>
-              <View className="h-px flex-1 bg-border-soft" />
-            </View>
+        <View className="flex-row items-center">
+          <View className="h-px flex-1 bg-border-soft" />
+          <Text className="mx-3 font-outfit-semibold text-sm text-muted">
+            or
+          </Text>
+          <View className="h-px flex-1 bg-border-soft" />
+        </View>
 
-            <View className={isIOS ? 'flex-row gap-3' : 'gap-3'}>
-              <GoogleSignInButton
-                compact={isIOS}
-                disabled={submitting}
-                onSuccess={finishAuth}
-                onError={(message) => setError(message)}
-              />
-              <AppleSignInButton
-                compact={isIOS}
-                disabled={submitting}
-                onSuccess={finishAuth}
-                onError={(message) => setError(message)}
-              />
-            </View>
-          </>
-        ) : null}
+        <View className={isIOS ? 'flex-row gap-3' : 'gap-3'}>
+          <GoogleSignInButton
+            compact={isIOS}
+            disabled={submitting}
+            onSuccess={finishAuth}
+            onError={(message) => setError(message)}
+          />
+          <AppleSignInButton
+            compact={isIOS}
+            disabled={submitting}
+            onSuccess={finishAuth}
+            onError={(message) => setError(message)}
+          />
+        </View>
       </View>
 
       <LegalAuthNotice />
+      <View className="mt-6">
+        <SocialLinks showCaption />
+      </View>
     </View>
   );
 

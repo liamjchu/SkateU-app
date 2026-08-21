@@ -118,12 +118,22 @@ describe('add-spot missing summary', () => {
     );
     expect(
       getSpotFormMissingSummary(1, 'a'.repeat(SPOT_NAME_MAX + 1), 'Nice ledge')
-    ).toBe('That name’s a bit long.');
+    ).toBe('That name is too long.');
     expect(
       getSpotFormMissingSummary(SPOT_IMAGE_MAX + 1, 'Ledge', 'Nice ledge')
-    ).toBe(`That’s the max — ${SPOT_IMAGE_MAX} photos.`);
+    ).toBe(`You can add up to ${SPOT_IMAGE_MAX} photos.`);
     expect(getSpotFormMissingSummary(1, 'Ledge', 'Nice ledge')).toBe(
       null
     );
+    expect(
+      getSpotFormMissingSummary(
+        1,
+        'a'.repeat(SPOT_NAME_MAX + 1),
+        'b'.repeat(SPOT_DESCRIPTION_MAX + 1)
+      )
+    ).toBe('Those name and description are too long.');
+    expect(
+      getSpotFormMissingSummary(1, 'Ledge', 'b'.repeat(SPOT_DESCRIPTION_MAX + 1))
+    ).toBe('That description is too long.');
   });
 });

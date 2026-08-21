@@ -71,6 +71,7 @@ export default function HelpSupportScreen() {
               <FeedbackPressable
                 haptic="selection"
                 onPress={() => router.push(row.href)}
+                pressLockMs={700}
                 className="min-h-16 flex-row items-center px-4 py-4"
                 accessibilityRole="button"
                 accessibilityLabel={row.title}

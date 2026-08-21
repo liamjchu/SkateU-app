@@ -15,6 +15,31 @@ module.exports = {
     '/node_modules/',
     '<rootDir>/supabase/functions/',
   ],
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+  collectCoverageFrom: [
+    'src/lib/**/*.ts',
+    'src/store/**/*.ts',
+    'src/app/api/**/*.ts',
+    'src/constants/**/*.ts',
+    'src/content/**/*.ts',
+    'src/types/**/*.ts',
+    '!src/**/__tests__/**',
+    '!src/**/*.d.ts',
+    '!src/lib/supabase.ts',
+  ],
+  coveragePathIgnorePatterns: [
+    '/node_modules/',
+    '<rootDir>/apps/',
+    '<rootDir>/supabase/functions/',
+  ],
+  coverageThreshold: {
+    global: {
+      statements: 80,
+      branches: 70,
+      functions: 80,
+      lines: 80,
+    },
+  },
   // Expo/React Native ship untranspiled ESM in node_modules; allow the RN/Expo
   // toolchain packages through Babel so tests can import them.
   transformIgnorePatterns: [

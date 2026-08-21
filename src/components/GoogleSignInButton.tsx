@@ -51,7 +51,7 @@ export default function GoogleSignInButton({
       }
     } catch (error) {
       onError?.(
-        toUserFacingError(error, 'Could not sign in with Google. Try again.')
+        toUserFacingError(error, 'Could not sign in with Google. Please try again.')
       );
     } finally {
       setLoading(false);

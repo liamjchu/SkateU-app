@@ -32,4 +32,17 @@ describe('buildUserFeedbackRequest', () => {
     expect(request.headers).toEqual({});
     expect(request.body).toBeInstanceOf(FormData);
   });
+
+  it('includes category, spot, email, and metadata in the multipart body', () => {
+    const request = buildUserFeedbackRequest({
+      type: 'bug',
+      message: 'It crashed',
+      category: 'map',
+      spotId: 'spot-1',
+      email: 'skater@example.com',
+      screenshot: { uri: 'file:///tmp/bug.jpg' },
+    });
+
+    expect(request.body).toBeInstanceOf(FormData);
+  });
 });

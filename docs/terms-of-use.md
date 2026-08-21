@@ -22,7 +22,7 @@ SkateU includes schools and campuses, including K-12 schools and colleges. A sch
 
 ## 2. Accounts
 
-You can browse schools, maps, spots, photos, and comments without an account. An account is required to like spots, add or edit spots, post comments, use a profile, or request that a spot be removed.
+You can browse schools, maps, spots, photos, and comments without an account. An account is required to like spots, add or edit spots, post comments, use a profile, request that a spot be removed, report a comment, or block another account.
 
 You can create an account with an email and password, or sign in with Google or Apple where those options are available.
 
@@ -44,12 +44,21 @@ SkateU is built from what skaters share. If you have an account, you may submit:
 - Comments and replies on spots
 - Likes
 - Requests to remove a spot, with a reason and optional details
+- Reports about a comment, with a reason and optional details
+- A list of accounts you block
 
 You are responsible for the content you submit. Do not submit content you do not have the right to share.
 
-You keep whatever ownership you have in your content. You grant SkateU a worldwide, non-exclusive, royalty-free license to host, store, display, reproduce, and share that content in SkateU so other people can use the app. This license lasts for as long as the content remains on SkateU.
+You keep whatever ownership you have in your content. You grant SkateU a worldwide, non-exclusive, royalty-free license to host, store, display, reproduce, adapt (including crop, resize, caption, and add SkateU branding), and share that content:
 
-If you delete a spot or comment you posted, we will remove that content from the app when the product allows it. If you delete your account, spots you added stay in SkateU, unlinked from your account. Comments you posted stay in SkateU without your username. Likes and your profile are deleted. See the Privacy Policy for details.
+- In SkateU, so other people can use the app
+- On SkateU’s official social media accounts (currently Instagram, TikTok, and YouTube) and similar SkateU promotional posts
+
+When we feature a spot on social media, we may include the campus name and your public username when that is practical.
+
+The in-app license lasts for as long as the content remains on SkateU. If you delete a spot or comment you posted, we will remove that content from the app when the product allows it. If you delete a spot or your account, we will not make new social posts from that content. Copies already posted on social media may remain until we remove them. Email [support@skateu.app](mailto:support@skateu.app) if you want a specific post taken down.
+
+If you delete your account, spots you added stay in SkateU, unlinked from your account. Comments you posted stay in SkateU without your username. Likes, comment reports, account blocks, and your profile are deleted. See the Privacy Policy for details.
 
 ## 4. Photos
 
@@ -97,7 +106,7 @@ SkateU may review, refuse, hide, or remove content, and may suspend or close acc
 
 We do not promise to review everything, and we do not promise that harmful content will never appear.
 
-For spots that may no longer belong in SkateU, signed-in users can submit a removal request in the app. Other concerns can be sent to [support@skateu.app](mailto:support@skateu.app).
+For spots that may no longer belong in SkateU, signed-in users can submit a removal request in the app. Signed-in users can report a comment and block another account in the app. Other concerns can be sent to [support@skateu.app](mailto:support@skateu.app).
 
 SkateU may keep, hide, or remove a spot after review. A removal request is a request, not a guarantee that a spot will be taken down.
 
@@ -111,7 +120,7 @@ If you believe content in SkateU infringes your copyright, email [support@skateu
 
 ## 10. Third-party services
 
-SkateU uses third-party services to run, including sign-in providers, hosting, maps, email, and content moderation. Those services have their own terms and privacy practices. SkateU is not responsible for third-party services we do not control.
+SkateU uses third-party services to run, including sign-in providers, hosting, maps, email, content moderation, and crash reporting. Those services have their own terms and privacy practices. SkateU is not responsible for third-party services we do not control.
 
 Maps may load tiles and images from map providers. Sign-in with Google or Apple is handled by those companies.
 

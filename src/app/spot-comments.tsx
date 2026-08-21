@@ -24,6 +24,7 @@ import {
 import { triggerHaptic } from '../lib/haptics';
 import { toUserFacingError } from '../lib/userFacingError';
 import { useAuthStore } from '../store/authStore';
+import { useBlocksStore } from '../store/blocksStore';
 import { useCommentsStore } from '../store/commentsStore';
 import type { SpotComment } from '../types/comment';
 
@@ -49,6 +50,7 @@ export default function SpotCommentsScreen() {
   const fetchMore = useCommentsStore((state) => state.fetchMore);
   const addComment = useCommentsStore((state) => state.addComment);
   const deleteComment = useCommentsStore((state) => state.deleteComment);
+  const blockUser = useBlocksStore((state) => state.blockUser);
 
   const comments = cache?.comments ?? [];
   const loading = cache?.loading === true;
@@ -67,8 +69,8 @@ export default function SpotCommentsScreen() {
     if (!spotId) {
       return;
     }
-    void fetchComments(spotId);
-  }, [fetchComments, spotId]);
+    void fetchComments(spotId, session?.access_token);
+  }, [fetchComments, session?.access_token, spotId]);
 
   const contentError = useMemo(() => getCommentContentError(draft), [draft]);
   const canSubmit = contentError === null && !submitting;
@@ -89,6 +91,57 @@ export default function SpotCommentsScreen() {
     setReplyTo(comment);
     setSubmitError(null);
     inputRef.current?.focus();
+  };
+
+  const handleReport = (comment: SpotComment) => {
+    if (!requireAuth()) {
+      return;
+    }
+    router.push({
+      pathname: '/report-comment',
+      params: {
+        commentId: comment.id,
+        spotId,
+        username: comment.creatorUsername ?? '',
+      },
+    });
+  };
+
+  const handleBlock = (comment: SpotComment) => {
+    if (!requireAuth()) {
+      return;
+    }
+    const accessToken = session?.access_token;
+    const blockedId = comment.userId;
+    if (!accessToken || !blockedId) {
+      return;
+    }
+    const label = comment.creatorUsername
+      ? `@${comment.creatorUsername}`
+      : 'this skater';
+    Alert.alert(
+      `Block ${label}?`,
+      'You won’t see their spots or comments. You can unblock them in Settings.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block',
+          style: 'destructive',
+          onPress: () => {
+            void blockUser(blockedId, accessToken, comment.creatorUsername)
+              .then(() => {
+                triggerHaptic('success');
+              })
+              .catch((caught: unknown) => {
+                Alert.alert(
+                  'Couldn’t block that skater',
+                  toUserFacingError(caught, 'Try again in a sec.')
+                );
+              });
+          },
+        },
+      ]
+    );
   };
 
   const handleSubmit = async () => {
@@ -190,7 +243,7 @@ export default function SpotCommentsScreen() {
           </Text>
           <FeedbackPressable
             onPress={() => {
-              void fetchComments(spotId);
+              void fetchComments(spotId, session?.access_token);
             }}
             className="mt-3 self-start rounded-xl bg-accent px-3 py-2"
             accessibilityRole="button"
@@ -221,7 +274,7 @@ export default function SpotCommentsScreen() {
         <ScreenHeader title="Comments" onBack={() => router.back()} />
         <View className="px-6 pt-8">
           <Text className="font-outfit-medium text-base text-muted">
-            This spot isn’t available.
+            We couldn’t load this spot. Please try again.
           </Text>
         </View>
       </SafeAreaView>
@@ -260,7 +313,7 @@ export default function SpotCommentsScreen() {
             </Text>
             <FeedbackPressable
               onPress={() => {
-                void fetchComments(spotId);
+                void fetchComments(spotId, session?.access_token);
               }}
               className="rounded-xl bg-accent px-3 py-1.5"
               accessibilityRole="button"
@@ -281,7 +334,7 @@ export default function SpotCommentsScreen() {
           showsVerticalScrollIndicator={false}
           onEndReachedThreshold={0.4}
           onEndReached={() => {
-            void fetchMore(spotId);
+            void fetchMore(spotId, session?.access_token);
           }}
           ListEmptyComponent={listEmpty}
           ListFooterComponent={
@@ -299,6 +352,8 @@ export default function SpotCommentsScreen() {
                 deletingId={deletingId}
                 onReply={handleReply}
                 onDelete={handleDelete}
+                onReport={handleReport}
+                onBlock={handleBlock}
               />
             </View>
           )}
@@ -398,7 +453,7 @@ export default function SpotCommentsScreen() {
         visible={showLoginRequired}
         onCancel={() => setShowLoginRequired(false)}
         title="Sign in to comment"
-        message="You can still read comments. Sign in if you want to join the conversation."
+        message="You can still read comments. Sign in if you want to join the conversation, report a comment, or block a skater."
       />
     </SafeAreaView>
   );

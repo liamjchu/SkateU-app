@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+import * as Device from 'expo-device';
 import { collectClientDiagnostics } from '../appDiagnostics';
 import { METADATA_VALUE_MAX } from '../userFeedback';
 
@@ -20,5 +22,31 @@ describe('collectClientDiagnostics', () => {
 
     expect(diagnostics.platform.length).toBeGreaterThan(0);
     expect(diagnostics.route).toBe('/help/bug');
+  });
+
+  it('falls back to Platform.Version when the device OS is missing', () => {
+    const osDescriptor = Object.getOwnPropertyDescriptor(Device, 'osVersion');
+    const versionDescriptor = Object.getOwnPropertyDescriptor(Platform, 'Version');
+    Object.defineProperty(Device, 'osVersion', {
+      configurable: true,
+      value: null,
+    });
+    Object.defineProperty(Platform, 'Version', {
+      configurable: true,
+      value: 34,
+    });
+
+    try {
+      const diagnostics = collectClientDiagnostics();
+      expect(diagnostics.osVersion).toBe('34');
+      expect(diagnostics.route).toBe('');
+    } finally {
+      if (osDescriptor) {
+        Object.defineProperty(Device, 'osVersion', osDescriptor);
+      }
+      if (versionDescriptor) {
+        Object.defineProperty(Platform, 'Version', versionDescriptor);
+      }
+    }
   });
 });

@@ -19,6 +19,7 @@ import LocationPicker, {
 } from '../components/LocationPicker';
 import ScreenHeader from '../components/screen-header';
 import SpotImagePicker from '../components/SpotImagePicker';
+import SpotSocialNotice from '../components/spot-social-notice';
 import {
     getSpotFormErrors,
     getSpotFormMissingSummary,
@@ -121,7 +122,7 @@ export default function EditSpotScreen() {
   const locationError =
     locationPickerStatus === 'error'
       ? 'Map didn’t load. Retry it, then save.'
-      : 'Hang on, the map’s still loading.';
+      : 'The map is still loading.';
   const hasUnsavedChanges = Boolean(
     spot &&
       (name !== spot.name ||
@@ -377,6 +378,8 @@ export default function EditSpotScreen() {
               {saveError ?? missingSummary}
             </Text>
           ) : null}
+
+          <SpotSocialNotice action="saving" />
 
           <FeedbackPressable
             haptic="light"

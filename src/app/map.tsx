@@ -1,4 +1,4 @@
-﻿import { Feather, Ionicons, Octicons } from '@expo/vector-icons';
+﻿import { Feather, Ionicons } from '@expo/vector-icons';
 import {
     type Href,
     useFocusEffect,
@@ -10,8 +10,11 @@ import {
     ActivityIndicator,
     Alert,
     BackHandler,
+    FlatList,
     Image,
     Modal,
+    NativeScrollEvent,
+    NativeSyntheticEvent,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -31,9 +34,9 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import FeedbackPressable from '../components/FeedbackPressable';
-import ImageLightbox from '../components/image-lightbox';
 import LoginRequiredModal from '../components/LoginRequiredModal';
-import SpotMediaPager from '../components/spot-media-pager';
+import MapSpotSheetPage from '../components/map-spot-sheet-page';
+import SpotFullscreenViewer from '../components/spot-fullscreen-viewer';
 import { StickerStripe } from '../components/sticker';
 import images from '../constants/images';
 import { colors } from '../constants/colors';
@@ -43,15 +46,24 @@ import {
     getCampusMapPinScript,
 } from '../lib/campusMapPins';
 import { triggerHaptic } from '../lib/haptics';
-import { formatRelativeTime } from '../lib/relativeTime';
+import { sortSpotsByDistanceFrom } from '../lib/spotDistance';
+import {
+    getSpotSelectionStatus,
+    SPOT_LOAD_FAILED_MESSAGE,
+} from '../lib/spotAvailability';
 import { toUserFacingError } from '../lib/userFacingError';
+import { guardedNavigate } from '../lib/navigationGuard';
+import { draftsForSchool } from '../lib/spotDraft';
 import { useAuthStore } from '../store/authStore';
+import { useBlocksStore } from '../store/blocksStore';
 import { useCommentsStore } from '../store/commentsStore';
+import { useDraftSpotsStore } from '../store/draftSpotsStore';
 import { useFavorites } from '../store/favoritesStore';
 import { useMapViewStore } from '../store/mapViewStore';
 import { useSchools } from '../store/schoolsStore';
 import { useSpotsStore } from '../store/spotsStore';
 import type { School } from '../types/school';
+import type { Spot } from '../types/spot';
 
 const COLLAPSED_SHEET_HEIGHT = 100;
 const TILE_ERROR_THRESHOLD = 3;
@@ -79,6 +91,8 @@ export default function MapScreen() {
   const isTabletLayout = width >= 768 && height >= 600;
   const tabletSheetWidth = Math.min(width - 48, 520);
   const session = useAuthStore((state) => state.session);
+  const userId = useAuthStore((state) => state.user?.id);
+  const draftSpots = useDraftSpotsStore((state) => state.drafts);
   const spots = useSpotsStore((s) => s.spots);
   const mySpots = useSpotsStore((s) => s.mySpots);
   const myLoading = useSpotsStore((s) => s.myLoading);
@@ -89,9 +103,11 @@ export default function MapScreen() {
     (s) => s.fetchMySpotRemovalRequest
   );
   const commentCounts = useCommentsStore((s) => s.commentCounts);
+  const blockUser = useBlocksStore((s) => s.blockUser);
   const fetchMySpots = useSpotsStore((s) => s.fetchMySpots);
   const loading = useSpotsStore((s) => s.loading);
   const error = useSpotsStore((s) => s.error);
+  const loadedSchoolId = useSpotsStore((s) => s.schoolId);
   const fetchSpots = useSpotsStore((s) => s.fetchSpots);
   const { schools, upsertSchool } = useSchools();
   const { favoriteSchoolIds, toggleFavoriteSchool } = useFavorites();
@@ -103,9 +119,12 @@ export default function MapScreen() {
   const [mapAttempt, setMapAttempt] = useState(0);
   const [mapStatus, setMapStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [mapError, setMapError] = useState('');
-  const [selectedSpotId, setSelectedSpotId] = useState<string | undefined>(initialSpotId);
+  const [selectedSpotId, setSelectedSpotId] = useState<string | undefined>(
+    undefined
+  );
   // Recenter only when arriving from another screen with a spot selected.
-  // Tapping a pin on the map should leave the camera alone.
+  // Pin taps and sheet/fullscreen paging leave the camera alone — Leaflet
+  // WebView pans are jumpy, and the selected pin already pops in place.
   const selectionSourceRef = useRef<'navigation' | 'map'>(
     initialSpotId ? 'navigation' : 'map'
   );
@@ -119,9 +138,22 @@ export default function MapScreen() {
   const [showAttribution, setShowAttribution] = useState(false);
   const [showLoginRequired, setShowLoginRequired] = useState(false);
   const [loginRequiredReason, setLoginRequiredReason] = useState<
-    'default' | 'removal' | 'spot_problem'
+    'default' | 'removal' | 'spot_problem' | 'block'
   >('default');
-  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [fullscreenOpen, setFullscreenOpen] = useState(false);
+  const [fullscreenPhotoIndex, setFullscreenPhotoIndex] = useState(0);
+  const [fullscreenSpots, setFullscreenSpots] = useState<Spot[]>([]);
+  const [fullscreenOriginId, setFullscreenOriginId] = useState<string | undefined>(
+    undefined
+  );
+  const [commentsCoveringViewer, setCommentsCoveringViewer] = useState(false);
+  const [sheetSpots, setSheetSpots] = useState<Spot[]>([]);
+  const [sheetOriginId, setSheetOriginId] = useState<string | undefined>(
+    undefined
+  );
+  const [sheetPagerEnabled, setSheetPagerEnabled] = useState(true);
+  const sheetListRef = useRef<FlatList<Spot>>(null);
+  const didSelectInitialSpotRef = useRef(false);
   const [likingSpotId, setLikingSpotId] = useState<string | null>(null);
   const [deletingSpotId, setDeletingSpotId] = useState<string | null>(null);
   const missingSpotAlertedRef = useRef<string | undefined>(undefined);
@@ -216,37 +248,39 @@ export default function MapScreen() {
       !myLoading &&
       mySpots.some((spot) => spot.id === selectedSpot.id)
   );
-  const selectedSpotWasReported = Boolean(
-    selectedSpot && reportedSpotIds.includes(selectedSpot.id)
-  );
-  const canShowRemovalAction = Boolean(
-    selectedSpot && !selectedSpotIsOwned && (!session || !myLoading)
-  );
-
-  // Show "edited …" when the spot was changed after creation, otherwise
-  // "added …". created_at and updated_at both default to now() on insert, so a
-  // small threshold avoids labelling a brand-new spot as edited.
-  const spotTimeInfo = useMemo(() => {
-    if (!selectedSpot) {
-      return null;
+  const campusDrafts = useMemo(() => {
+    if (!userId || !schoolId) {
+      return [];
     }
 
-    const createdMs = Date.parse(selectedSpot.createdAt);
-    const updatedMs = Date.parse(selectedSpot.updatedAt);
-    const wasEdited =
-      Number.isFinite(createdMs) &&
-      Number.isFinite(updatedMs) &&
-      updatedMs - createdMs > 2000;
-
-    const relative = formatRelativeTime(
-      wasEdited ? selectedSpot.updatedAt : selectedSpot.createdAt
-    );
-    if (!relative) {
-      return null;
-    }
-
-    return { label: wasEdited ? 'edited' : 'added', relative };
-  }, [selectedSpot]);
+    return draftsForSchool(draftSpots, userId, schoolId);
+  }, [draftSpots, schoolId, userId]);
+  const ownedSpotIds = useMemo(
+    () => mySpots.map((spot) => spot.id),
+    [mySpots]
+  );
+  const viewerSpots = useMemo(() => {
+    const byId = new Map(spots.map((spot) => [spot.id, spot]));
+    return fullscreenSpots
+      .map((spot) => byId.get(spot.id))
+      .filter((spot): spot is Spot => Boolean(spot))
+      .map((spot) => ({
+        ...spot,
+        commentCount: commentCounts[spot.id] ?? spot.commentCount,
+      }));
+  }, [commentCounts, fullscreenSpots, spots]);
+  const liveSheetSpots = useMemo(() => {
+    const byId = new Map(spots.map((spot) => [spot.id, spot]));
+    return sheetSpots
+      .map((spot) => byId.get(spot.id))
+      .filter((spot): spot is Spot => Boolean(spot))
+      .map((spot) => ({
+        ...spot,
+        commentCount: commentCounts[spot.id] ?? spot.commentCount,
+      }));
+  }, [commentCounts, sheetSpots, spots]);
+  const sheetWidth = isTabletLayout ? tabletSheetWidth : width;
+  const sheetBodyHeight = Math.round(height * (isTabletLayout ? 0.5 : 0.56));
 
   const htmlMapLayerRef = useRef<'default' | 'satellite'>(initialMapLayer);
 
@@ -342,15 +376,21 @@ export default function MapScreen() {
 
         window.focusLatLng = function (lat, lng, bottomPadding, topPadding) {
           if (!window.map) return;
-          window.map.invalidateSize();
           const target = L.latLng(lat, lng);
           const zoom = window.map.getZoom();
-          window.map.setView(target, zoom, { animate: false });
           const size = window.map.getSize();
           const top = Number(topPadding) || 0;
           const bottom = Number(bottomPadding) || 0;
           const visibleMidY = top + Math.max(size.y - top - bottom, 0) / 2;
-          window.map.panBy([0, size.y / 2 - visibleMidY], { animate: true });
+          const targetPoint = window.map.project(target, zoom);
+          const desiredCenter = window.map.unproject(
+            L.point(
+              targetPoint.x,
+              targetPoint.y - (visibleMidY - size.y / 2)
+            ),
+            zoom
+          );
+          window.map.setView(desiredCenter, zoom, { animate: false });
         };
 
         window.setMapLayer = function (layer) {
@@ -500,6 +540,7 @@ export default function MapScreen() {
   useFocusEffect(
     useCallback(() => {
       setEmptySpotsNoticeDismissed(false);
+      setCommentsCoveringViewer(false);
     }, [schoolId])
   );
 
@@ -548,11 +589,24 @@ export default function MapScreen() {
   }, [mapAttempt, mapStatus]);
 
   useEffect(() => {
-    if (initialSpotId && spots.some((spot) => spot.id === initialSpotId)) {
-      selectionSourceRef.current = 'navigation';
-      setSelectedSpotId(initialSpotId);
+    if (!initialSpotId || didSelectInitialSpotRef.current) {
+      return;
     }
-  }, [initialSpotId, spots]);
+    if (loadedSchoolId !== schoolId) {
+      return;
+    }
+
+    const spot = spots.find((item) => item.id === initialSpotId);
+    if (!spot) {
+      return;
+    }
+
+    didSelectInitialSpotRef.current = true;
+    selectionSourceRef.current = 'navigation';
+    setSheetSpots(sortSpotsByDistanceFrom(spots, spot));
+    setSheetOriginId(spot.id);
+    setSelectedSpotId(spot.id);
+  }, [initialSpotId, loadedSchoolId, schoolId, spots]);
 
   const retryMap = useCallback(() => {
     htmlMapLayerRef.current = mapLayer;
@@ -564,32 +618,50 @@ export default function MapScreen() {
   }, [mapLayer]);
 
   const retrySpots = useCallback(() => {
+    missingSpotAlertedRef.current = undefined;
+    didSelectInitialSpotRef.current = false;
     if (schoolId) {
       fetchSpots(schoolId, session?.access_token);
     }
   }, [fetchSpots, schoolId, session?.access_token]);
 
   useEffect(() => {
+    const requestedSpot = spots.find((item) => item.id === initialSpotId);
+    const status = getSpotSelectionStatus({
+      requestedSpotId: initialSpotId,
+      selectedSpot: requestedSpot,
+      loading,
+      loadedSchoolId,
+      routeSchoolId: schoolId,
+      error,
+    });
+
+    if (
+      (status === 'missing' || status === 'failed') &&
+      initialSpotId &&
+      missingSpotAlertedRef.current !== initialSpotId
+    ) {
+      missingSpotAlertedRef.current = initialSpotId;
+      Alert.alert(SPOT_LOAD_FAILED_MESSAGE);
+    }
+  }, [error, initialSpotId, loadedSchoolId, loading, schoolId, spots]);
+
+  useEffect(() => {
     if (!selectedSpotId || selectedSpot) {
       return;
     }
-    if (loading) {
+    if (loading || loadedSchoolId !== schoolId) {
       return;
     }
 
-    if (
-      selectedSpotId === initialSpotId &&
-      missingSpotAlertedRef.current !== selectedSpotId
-    ) {
-      missingSpotAlertedRef.current = selectedSpotId;
-      Alert.alert('This spot is no longer available.');
-    }
     setSelectedSpotId(undefined);
-  }, [initialSpotId, loading, selectedSpot, selectedSpotId]);
+    setSheetSpots([]);
+    setSheetOriginId(undefined);
+  }, [loadedSchoolId, loading, schoolId, selectedSpot, selectedSpotId]);
 
   useEffect(() => {
     if (!selectedSpot) {
-      setLightboxIndex(null);
+      setFullscreenOpen(false);
     }
   }, [selectedSpot]);
 
@@ -597,8 +669,8 @@ export default function MapScreen() {
     const subscription = BackHandler.addEventListener(
       'hardwareBackPress',
       () => {
-        if (lightboxIndex !== null) {
-          setLightboxIndex(null);
+        if (fullscreenOpen) {
+          setFullscreenOpen(false);
           return true;
         }
 
@@ -607,12 +679,14 @@ export default function MapScreen() {
         }
 
         setSelectedSpotId(undefined);
+        setSheetSpots([]);
+        setSheetOriginId(undefined);
         return true;
       }
     );
 
     return () => subscription.remove();
-  }, [lightboxIndex, selectedSpotId]);
+  }, [fullscreenOpen, selectedSpotId]);
 
   useEffect(() => {
     if (selectedSpot) {
@@ -712,11 +786,108 @@ export default function MapScreen() {
     }
 
     setSelectedSpotId(undefined);
+    setSheetSpots([]);
+    setSheetOriginId(undefined);
     webViewRef.current?.injectJavaScript(`window.sendCenter(); true;`);
   };
 
-  const handleLikePress = async () => {
+  const handleDraftsChipPress = () => {
+    if (campusDrafts.length === 1) {
+      const draft = campusDrafts[0];
+      guardedNavigate(`add-spot-draft:${draft.id}`, () => {
+        router.push({
+          pathname: '/add-spot',
+          params: {
+            draftId: draft.id,
+            schoolId: draft.schoolId,
+            schoolName: draft.schoolName,
+            lat: draft.latitude.toString(),
+            lng: draft.longitude.toString(),
+            layer: mapLayer,
+          },
+        });
+      });
+      return;
+    }
+
+    guardedNavigate('profile-drafts', () => {
+      router.push('/profile?tab=drafts');
+    });
+  };
+
+  const openSheetForSpot = (spot: Spot, source: 'map' | 'navigation') => {
+    selectionSourceRef.current = source;
+    setSheetSpots(sortSpotsByDistanceFrom(spots, spot));
+    setSheetOriginId(spot.id);
+    setSelectedSpotId(spot.id);
+    sheetTranslateY.value = 0;
+    sheetStartY.value = 0;
+  };
+
+  const clearSelectedSpot = () => {
+    setSelectedSpotId(undefined);
+    setSheetSpots([]);
+    setSheetOriginId(undefined);
+  };
+
+  const goToSheetIndex = (index: number) => {
+    if (index < 0 || index >= liveSheetSpots.length) {
+      return;
+    }
+
+    const spot = liveSheetSpots[index];
+    if (!spot) {
+      return;
+    }
+
+    setSheetPagerEnabled(true);
+    sheetListRef.current?.scrollToIndex({ index, animated: true });
+    selectionSourceRef.current = 'map';
+    setSelectedSpotId(spot.id);
+    sheetTranslateY.value = withTiming(0, {
+      duration: 160,
+      easing: Easing.out(Easing.cubic),
+    });
+    triggerHaptic('selection');
+  };
+
+  const handleSheetScrollEnd = (
+    event: NativeSyntheticEvent<NativeScrollEvent>
+  ) => {
+    const next = Math.round(event.nativeEvent.contentOffset.x / sheetWidth);
+    const spot = liveSheetSpots[next];
+    if (!spot || spot.id === selectedSpotId) {
+      return;
+    }
+
+    selectionSourceRef.current = 'map';
+    setSelectedSpotId(spot.id);
+    sheetTranslateY.value = withTiming(0, {
+      duration: 160,
+      easing: Easing.out(Easing.cubic),
+    });
+    triggerHaptic('selection');
+  };
+
+  const openFullscreen = (photoIndex = 0) => {
     if (!selectedSpot) {
+      return;
+    }
+
+    setFullscreenSpots(sortSpotsByDistanceFrom(spots, selectedSpot));
+    setFullscreenOriginId(selectedSpot.id);
+    setFullscreenPhotoIndex(photoIndex);
+    setFullscreenOpen(true);
+  };
+
+  const handleFullscreenSpotChange = (spot: Spot) => {
+    selectionSourceRef.current = 'map';
+    setSelectedSpotId(spot.id);
+  };
+
+  const handleLikePress = async (spot?: Spot) => {
+    const target = spot ?? selectedSpot;
+    if (!target) {
       return;
     }
 
@@ -731,37 +902,44 @@ export default function MapScreen() {
       return;
     }
 
-    setLikingSpotId(selectedSpot.id);
+    setLikingSpotId(target.id);
     try {
       await toggleSpotLike(
-        selectedSpot.id,
-        selectedSpot.likedByUser === true,
+        target.id,
+        target.likedByUser === true,
         accessToken
       );
       triggerHaptic('light');
     } catch (error) {
       Alert.alert(
         'Couldn’t update that like',
-        toUserFacingError(error, 'Try again in a sec.')
+        toUserFacingError(error, 'Please try again.')
       );
     } finally {
       setLikingSpotId(null);
     }
   };
 
-  const handleOpenComments = () => {
-    if (!selectedSpot) {
+  const handleOpenComments = (spot?: Spot) => {
+    const target = spot ?? selectedSpot;
+    if (!target) {
       return;
     }
 
-    router.push({
-      pathname: '/spot-comments',
-      params: { spotId: selectedSpot.id, spotName: selectedSpot.name },
+    if (fullscreenOpen) {
+      setCommentsCoveringViewer(true);
+    }
+    guardedNavigate(`comments:${target.id}`, () => {
+      router.push({
+        pathname: '/spot-comments',
+        params: { spotId: target.id, spotName: target.name },
+      });
     });
   };
 
-  const handleReportProblemPress = () => {
-    if (!selectedSpot || selectedSpotIsOwned) {
+  const handleReportProblemPress = (spot?: Spot) => {
+    const target = spot ?? selectedSpot;
+    if (!target || ownedSpotIds.includes(target.id)) {
       return;
     }
 
@@ -771,14 +949,18 @@ export default function MapScreen() {
       return;
     }
 
-    router.push({
-      pathname: '/help/spot-problem',
-      params: { spotId: selectedSpot.id, spotName: selectedSpot.name },
+    setFullscreenOpen(false);
+    guardedNavigate(`spot-problem:${target.id}`, () => {
+      router.push({
+        pathname: '/help/spot-problem',
+        params: { spotId: target.id, spotName: target.name },
+      });
     });
   };
 
-  const handleRequestRemovalPress = () => {
-    if (!selectedSpot || selectedSpotIsOwned) {
+  const handleRequestRemovalPress = (spot?: Spot) => {
+    const target = spot ?? selectedSpot;
+    if (!target || ownedSpotIds.includes(target.id)) {
       return;
     }
 
@@ -788,28 +970,81 @@ export default function MapScreen() {
       return;
     }
 
-    router.push(
-      `/request-spot-removal?spotId=${encodeURIComponent(selectedSpot.id)}&spotName=${encodeURIComponent(selectedSpot.name)}` as Href
-    );
+    setFullscreenOpen(false);
+    guardedNavigate(`spot-removal:${target.id}`, () => {
+      router.push(
+        `/request-spot-removal?spotId=${encodeURIComponent(target.id)}&spotName=${encodeURIComponent(target.name)}` as Href
+      );
+    });
   };
 
-  const handleEditSelectedSpot = () => {
-    if (!selectedSpot || !selectedSpotIsOwned || deletingSpotId) {
+  const handleBlockCreatorPress = (spot?: Spot) => {
+    const target = spot ?? selectedSpot;
+    const blockedId = target?.creatorUserId;
+    if (!target || ownedSpotIds.includes(target.id) || !blockedId) {
       return;
     }
 
-    router.push(
-      `/edit-spot?id=${encodeURIComponent(selectedSpot.id)}&layer=${mapLayer}`
+    if (!session?.access_token) {
+      setLoginRequiredReason('block');
+      setShowLoginRequired(true);
+      return;
+    }
+
+    const accessToken = session.access_token;
+    const label = target.creatorUsername
+      ? `@${target.creatorUsername}`
+      : 'this skater';
+    Alert.alert(
+      `Block ${label}?`,
+      'You won’t see their spots or comments. You can unblock them in Settings.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block',
+          style: 'destructive',
+          onPress: () => {
+            void blockUser(blockedId, accessToken, target.creatorUsername)
+              .then(() => {
+                triggerHaptic('success');
+                if (selectedSpotId === target.id) {
+                  setSelectedSpotId(undefined);
+                }
+              })
+              .catch((caught: unknown) => {
+                Alert.alert(
+                  'Couldn’t block that skater',
+                  toUserFacingError(caught, 'Please try again.')
+                );
+              });
+          },
+        },
+      ]
     );
   };
 
-  const handleDeleteSelectedSpot = () => {
-    if (!selectedSpot || !selectedSpotIsOwned || deletingSpotId) {
+  const handleEditSelectedSpot = (spot?: Spot) => {
+    const target = spot ?? selectedSpot;
+    if (!target || !ownedSpotIds.includes(target.id) || deletingSpotId) {
+      return;
+    }
+
+    setFullscreenOpen(false);
+    guardedNavigate(`edit-spot:${target.id}`, () => {
+      router.push(
+        `/edit-spot?id=${encodeURIComponent(target.id)}&layer=${mapLayer}`
+      );
+    });
+  };
+
+  const handleDeleteSelectedSpot = (spot?: Spot) => {
+    const target = spot ?? selectedSpot;
+    if (!target || !ownedSpotIds.includes(target.id) || deletingSpotId) {
       return;
     }
 
     triggerHaptic('warning');
-    const spotToDelete = selectedSpot;
+    const spotToDelete = target;
     Alert.alert(
       'Delete this spot?',
       `"${spotToDelete.name}" will be gone for everyone.`,
@@ -829,11 +1064,14 @@ export default function MapScreen() {
 
             try {
               await deleteSpot(spotToDelete.id, accessToken);
+              setFullscreenOpen(false);
               setSelectedSpotId(undefined);
+              setSheetSpots([]);
+              setSheetOriginId(undefined);
             } catch (error) {
               Alert.alert(
                 'Couldn’t delete that spot',
-                toUserFacingError(error, 'Try again in a sec.')
+                toUserFacingError(error, 'Please try again.')
               );
             } finally {
               setDeletingSpotId(null);
@@ -902,7 +1140,10 @@ export default function MapScreen() {
         params.set('lng', data.longitude.toString());
         params.set('layer', layer);
         if (schoolId) params.set('schoolId', schoolId);
-        router.push(`/add-spot?${params.toString()}`);
+        if (schoolName) params.set('schoolName', schoolName);
+        guardedNavigate('add-spot', () => {
+          router.push(`/add-spot?${params.toString()}`);
+        });
         return;
       }
 
@@ -920,10 +1161,17 @@ export default function MapScreen() {
             easing: Easing.out(Easing.cubic),
           });
           setSelectedSpotId(undefined);
+          setSheetSpots([]);
+          setSheetOriginId(undefined);
           return;
         }
 
-        setSelectedSpotId(data.id);
+        const pressed = spots.find((spot) => spot.id === data.id);
+        if (pressed) {
+          openSheetForSpot(pressed, 'map');
+        } else {
+          setSelectedSpotId(data.id);
+        }
       }
     } catch (error) {
       console.error('MapScreen message parse error', error);
@@ -1040,9 +1288,33 @@ export default function MapScreen() {
         </FeedbackPressable>
       </View>
       <View
-        className="absolute right-4 z-[999]"
+        className="absolute right-4 z-[999] items-end"
         style={{ bottom: Math.max(insets.bottom, 12) + 36 }}
       >
+        {campusDrafts.length > 0 ? (
+          <FeedbackPressable
+            haptic="light"
+            onPress={handleDraftsChipPress}
+            className="mb-3 flex-row items-center rounded-full bg-white px-4 py-2.5"
+            style={styles.mapControl}
+            accessibilityRole="button"
+            accessibilityLabel={
+              campusDrafts.length === 1
+                ? 'Continue campus draft'
+                : `Open drafts, ${campusDrafts.length} on this campus`
+            }
+            accessibilityHint={
+              campusDrafts.length === 1
+                ? 'Opens the draft you started on this campus'
+                : 'Opens your drafts list'
+            }
+          >
+            <Feather name="edit-3" size={16} color={colors.brand} />
+            <Text className="ml-2 font-outfit-bold text-sm text-brand">
+              Drafts ({campusDrafts.length})
+            </Text>
+          </FeedbackPressable>
+        ) : null}
         <FeedbackPressable
           haptic="light"
           className="h-16 w-16 items-center justify-center rounded-full bg-accent"
@@ -1080,26 +1352,49 @@ export default function MapScreen() {
             ? 'Sign in to request removal'
             : loginRequiredReason === 'spot_problem'
               ? 'Sign in to report a problem'
-              : undefined
+              : loginRequiredReason === 'block'
+                ? 'Sign in to block this skater'
+                : undefined
         }
         message={
           loginRequiredReason === 'removal'
             ? 'You can still browse campuses. Sign in if you want to request that a spot be removed.'
             : loginRequiredReason === 'spot_problem'
               ? 'You can still browse campuses. Sign in if you want to report a problem with this spot.'
-              : undefined
+              : loginRequiredReason === 'block'
+                ? 'You can still browse campuses. Sign in if you want to hide this skater’s spots and comments.'
+                : undefined
         }
       />
-      <ImageLightbox
-        visible={lightboxIndex !== null}
-        uris={selectedSpot?.imageUris.filter((uri) => uri.length > 0) ?? []}
-        initialIndex={lightboxIndex ?? 0}
-        onClose={() => setLightboxIndex(null)}
-        accessibilityLabel={
-          selectedSpot
-            ? `Full screen photo of ${selectedSpot.name}`
-            : 'Full screen photo'
-        }
+      <SpotFullscreenViewer
+        visible={fullscreenOpen && !commentsCoveringViewer}
+        spots={viewerSpots}
+        initialSpotId={fullscreenOriginId ?? selectedSpot?.id ?? ''}
+        initialPhotoIndex={fullscreenPhotoIndex}
+        variant="map"
+        originSpotId={fullscreenOriginId}
+        onClose={() => {
+          setFullscreenOpen(false);
+          if (selectedSpot) {
+            setSheetSpots(sortSpotsByDistanceFrom(spots, selectedSpot));
+            setSheetOriginId(selectedSpot.id);
+          }
+        }}
+        onChangeSpot={handleFullscreenSpotChange}
+        onLike={(spot) => {
+          void handleLikePress(spot);
+        }}
+        onOpenComments={handleOpenComments}
+        likingSpotId={likingSpotId}
+        ownedSpotIds={ownedSpotIds}
+        reportedSpotIds={reportedSpotIds}
+        mySpotsLoading={myLoading}
+        isSignedIn={Boolean(session)}
+        deletingSpotId={deletingSpotId}
+        onEdit={handleEditSelectedSpot}
+        onDelete={handleDeleteSelectedSpot}
+        onReportProblem={handleReportProblemPress}
+        onRequestRemoval={handleRequestRemovalPress}
       />
       <Modal
         visible={showAttribution}
@@ -1154,8 +1449,10 @@ export default function MapScreen() {
         onAccessibilityAction={(event) => {
           const spotId = event.nativeEvent.actionName.replace('select-', '');
           if (spots.some((spot) => spot.id === spotId)) {
-            selectionSourceRef.current = 'map';
-            setSelectedSpotId(spotId);
+            const pressed = spots.find((spot) => spot.id === spotId);
+            if (pressed) {
+              openSheetForSpot(pressed, 'map');
+            }
           }
         }}
         key={mapAttempt}
@@ -1295,7 +1592,7 @@ export default function MapScreen() {
         </View>
       ) : null}
 
-      {selectedSpot && (
+      {selectedSpot && liveSheetSpots.length > 0 ? (
         <Animated.View
           accessibilityViewIsModal
           accessibilityLabel={`${selectedSpot.name} spot details`}
@@ -1312,226 +1609,218 @@ export default function MapScreen() {
               left: 24,
               right: undefined,
               width: tabletSheetWidth,
-              maxHeight: '72%',
             },
-            { paddingBottom: Math.max(insets.bottom, 16) },
+            {
+              ...(liveSheetSpots.length > 1
+                ? { height: sheetBodyHeight }
+                : { maxHeight: sheetBodyHeight }),
+              paddingBottom: Math.max(insets.bottom, 16),
+            },
             sheetAnimatedStyle,
           ]}
         >
           <GestureDetector gesture={sheetPanGesture}>
-            <View>
-              <View className="mb-3 h-1.5 w-12 self-center rounded-full bg-accent" />
-              <View className="flex-row items-start">
-                <View className="min-w-0 flex-1 pr-3">
-                  <Text className="font-outfit-bold text-xl text-ink">
-                    {selectedSpot.name}
-                  </Text>
-                  <View className="mt-1 flex-row items-center">
-                    <Feather name="user" size={13} color={colors.muted} />
-                    <Text
-                      className="ml-1.5 font-outfit-medium text-sm text-muted"
-                  >
-                      {selectedSpot.creatorUsername
-                        ? `@${selectedSpot.creatorUsername}`
-                        : 'Deleted User'}
-                    </Text>
-                    {spotTimeInfo ? (
-                      <>
-                        <Text
-                          className="mx-1.5 font-outfit-medium text-sm text-muted"
-                        >
-                          ·
-                        </Text>
-                        <Text
-                          className="font-outfit-medium text-sm text-muted-strong"
-                        >
-                          {`${spotTimeInfo.label} ${spotTimeInfo.relative}`}
-                        </Text>
-                      </>
-                    ) : null}
-                  </View>
-                </View>
-                <FeedbackPressable
-                    onPress={handleLikePress}
-                    disabled={likingSpotId === selectedSpot.id}
-                    className={`mr-2 flex-row items-center rounded-xl px-3 py-2 ${
-                      selectedSpot.likedByUser === true ? 'bg-accent' : 'bg-surface-soft'
-                    }`}
-                    accessibilityLabel={
-                      selectedSpot.likedByUser === true
-                        ? `Unlike ${selectedSpot.name}`
-                        : `Like ${selectedSpot.name}`
-                    }
-                    accessibilityRole="button"
-                  >
-                    {likingSpotId === selectedSpot.id ? (
-                      <ActivityIndicator
-                        size="small"
-                        color={
-                          selectedSpot.likedByUser === true
-                            ? colors.brand
-                            : colors.ink
-                        }
-                      />
-                    ) : (
-                      <Octicons
-                        name={
-                          selectedSpot.likedByUser === true
-                            ? 'heart-fill'
-                            : 'heart'
-                        }
-                        size={17}
-                        color={
-                          selectedSpot.likedByUser === true
-                            ? colors.brand
-                            : colors.ink
-                        }
-                      />
-                    )}
-                    <Text
-                      className={`ml-1.5 font-outfit-semibold text-sm ${
-                        selectedSpot.likedByUser === true
-                          ? 'text-brand'
-                          : 'text-ink'
-                      }`}
-                    >
-                      {selectedSpot.likeCount ?? 0}
-                    </Text>
-                  </FeedbackPressable>
+            <View className={liveSheetSpots.length > 1 ? 'mb-2' : 'mb-3'}>
+              {liveSheetSpots.length > 1 ? (
+                <>
+                  <View className="h-1.5 w-12 self-center rounded-full bg-accent" />
+                  <View className="mt-3 flex-row items-center px-5">
                   <FeedbackPressable
-                    haptic="light"
-                    onPress={handleOpenComments}
-                    className="mr-2 flex-row items-center rounded-xl bg-surface-soft px-3 py-2"
+                    haptic="selection"
+                    onPress={() =>
+                      goToSheetIndex(
+                        Math.max(
+                          0,
+                          liveSheetSpots.findIndex(
+                            (item) => item.id === selectedSpot.id
+                          ) - 1
+                        )
+                      )
+                    }
+                    disabled={selectedSpot.id === liveSheetSpots[0]?.id}
+                    className="h-9 w-9 items-center justify-center rounded-full bg-surface-soft"
                     accessibilityRole="button"
-                    accessibilityLabel={`Comments on ${selectedSpot.name}`}
-                    accessibilityHint="Opens comments for this spot"
+                    accessibilityLabel="Previous nearby spot"
                   >
-                    <Feather name="message-circle" size={16} color={colors.ink} />
-                    <Text className="ml-1.5 font-outfit-semibold text-sm text-ink">
-                      {commentCounts[selectedSpot.id] ??
-                        selectedSpot.commentCount ??
-                        0}
-                    </Text>
+                    <Feather
+                      name="chevron-left"
+                      size={18}
+                      color={
+                        selectedSpot.id === liveSheetSpots[0]?.id
+                          ? colors.mutedSoft
+                          : colors.ink
+                      }
+                    />
+                  </FeedbackPressable>
+                  <Text
+                    className="min-w-0 flex-1 text-center font-outfit-semibold text-xs text-muted"
+                    style={{ fontVariant: ['tabular-nums'] }}
+                  >
+                    {liveSheetSpots.findIndex(
+                      (item) => item.id === selectedSpot.id
+                    ) + 1}{' '}
+                    of {liveSheetSpots.length} nearby
+                  </Text>
+                  <FeedbackPressable
+                    haptic="selection"
+                    onPress={() =>
+                      goToSheetIndex(
+                        Math.min(
+                          liveSheetSpots.length - 1,
+                          liveSheetSpots.findIndex(
+                            (item) => item.id === selectedSpot.id
+                          ) + 1
+                        )
+                      )
+                    }
+                    disabled={
+                      selectedSpot.id ===
+                      liveSheetSpots[liveSheetSpots.length - 1]?.id
+                    }
+                    className="mr-2 h-9 w-9 items-center justify-center rounded-full bg-surface-soft"
+                    accessibilityRole="button"
+                    accessibilityLabel="Next nearby spot"
+                  >
+                    <Feather
+                      name="chevron-right"
+                      size={18}
+                      color={
+                        selectedSpot.id ===
+                        liveSheetSpots[liveSheetSpots.length - 1]?.id
+                          ? colors.mutedSoft
+                          : colors.ink
+                      }
+                    />
                   </FeedbackPressable>
                   <FeedbackPressable
                     haptic="selection"
-                    onPress={() => setSelectedSpotId(undefined)}
+                    onPress={clearSelectedSpot}
                     className="h-10 w-10 items-center justify-center rounded-full bg-surface-soft"
                     accessibilityRole="button"
                     accessibilityLabel={`Close ${selectedSpot.name} details`}
                   >
                     <Ionicons name="close" size={18} color={colors.muted} />
                   </FeedbackPressable>
-              </View>
+                </View>
+                </>
+              ) : (
+                <View className="h-10 justify-center">
+                  <View className="h-1.5 w-12 self-center rounded-full bg-accent" />
+                  <FeedbackPressable
+                    haptic="selection"
+                    onPress={clearSelectedSpot}
+                    className="absolute right-5 top-0 h-10 w-10 items-center justify-center rounded-full bg-surface-soft"
+                    accessibilityRole="button"
+                    accessibilityLabel={`Close ${selectedSpot.name} details`}
+                  >
+                    <Ionicons name="close" size={18} color={colors.muted} />
+                  </FeedbackPressable>
+                </View>
+              )}
             </View>
           </GestureDetector>
 
-          <ScrollView
-            contentContainerClassName="pb-6"
-            showsVerticalScrollIndicator={false}
-          >
-            {selectedSpot.imageUris.length > 0 ? (
-              <View className="mt-4 overflow-hidden rounded-2xl">
-                <SpotMediaPager
-                  uris={selectedSpot.imageUris.filter((uri) => uri.length > 0)}
-                  height={280}
-                  onPressIndex={setLightboxIndex}
-                  accessibilityName={selectedSpot.name}
-                  imageClassName="rounded-2xl"
-                />
-              </View>
-            ) : (
-              <View className="mt-4 h-80 items-center justify-center rounded-2xl bg-surface-soft">
-                <Text
-                  className="font-outfit-medium text-muted-strong"
-                >
-                  No image available
-                </Text>
-              </View>
+          {liveSheetSpots.length > 1 ? (
+          <FlatList
+            ref={sheetListRef}
+            style={{ flex: 1 }}
+            data={liveSheetSpots}
+            key={sheetOriginId ?? selectedSpot.id}
+            keyExtractor={(item) => item.id}
+            horizontal
+            pagingEnabled
+            nestedScrollEnabled
+            directionalLockEnabled
+            scrollEnabled={sheetPagerEnabled}
+            showsHorizontalScrollIndicator={false}
+            getItemLayout={(_data, index) => ({
+              length: sheetWidth,
+              offset: sheetWidth * index,
+              index,
+            })}
+            onMomentumScrollEnd={handleSheetScrollEnd}
+            extraData={{
+              likingSpotId,
+              selectedSpotId,
+              deletingSpotId,
+              commentCounts,
+            }}
+            renderItem={({ item }) => (
+              <MapSpotSheetPage
+                spot={item}
+                width={sheetWidth}
+                likingSpotId={likingSpotId}
+                commentCount={
+                  commentCounts[item.id] ?? item.commentCount ?? 0
+                }
+                isOwned={ownedSpotIds.includes(item.id)}
+                wasReported={reportedSpotIds.includes(item.id)}
+                canShowRemoval={
+                  !ownedSpotIds.includes(item.id) &&
+                  (!session || !myLoading)
+                }
+                deletingSpotId={deletingSpotId}
+                onOpenFullscreen={openFullscreen}
+                onLike={() => {
+                  void handleLikePress(item);
+                }}
+                onOpenComments={() => handleOpenComments(item)}
+                onEdit={() => handleEditSelectedSpot(item)}
+                onDelete={() => handleDeleteSelectedSpot(item)}
+                onReportProblem={() => handleReportProblemPress(item)}
+                onRequestRemoval={() => handleRequestRemovalPress(item)}
+                onBlockCreator={() => handleBlockCreatorPress(item)}
+                onPhotoZoneTouch={() => setSheetPagerEnabled(false)}
+                onDetailsZoneTouch={() => setSheetPagerEnabled(true)}
+              />
             )}
-
-            <Text
-              className="font-outfit-medium mt-4 text-base text-muted-strong"
+          />
+          ) : (
+            <ScrollView
+              style={{ flexGrow: 0, flexShrink: 1 }}
+              showsVerticalScrollIndicator={false}
+              nestedScrollEnabled
+              directionalLockEnabled
+              keyboardShouldPersistTaps="handled"
             >
-              {selectedSpot.description}
-            </Text>
-
-            {selectedSpotIsOwned ? (
-              <View className="mt-4 flex-row gap-3">
-                <FeedbackPressable
-                  haptic="light"
-                  onPress={handleEditSelectedSpot}
-                  disabled={deletingSpotId !== null}
-                  className="h-12 flex-1 flex-row items-center justify-center rounded-2xl bg-accent"
-                  accessibilityLabel={`Edit ${selectedSpot.name}`}
-                  accessibilityRole="button"
-                >
-                  <Feather name="edit-2" size={16} color={colors.brand} />
-                  <Text className="ml-2 font-outfit-semibold text-sm text-brand">
-                    Edit spot
-                  </Text>
-                </FeedbackPressable>
-                <FeedbackPressable
-                  onPress={handleDeleteSelectedSpot}
-                  disabled={deletingSpotId !== null}
-                  className="h-12 flex-1 flex-row items-center justify-center rounded-2xl bg-errorSurface"
-                  accessibilityLabel={`Delete ${selectedSpot.name}`}
-                  accessibilityRole="button"
-                >
-                  {deletingSpotId === selectedSpot.id ? (
-                    <ActivityIndicator size="small" color={colors.errorText} />
-                  ) : (
-                    <Feather name="trash-2" size={16} color={colors.errorText} />
-                  )}
-                  <Text className="ml-2 font-outfit-semibold text-sm text-errorText">
-                    Delete spot
-                  </Text>
-                </FeedbackPressable>
-              </View>
-            ) : canShowRemovalAction ? (
-              <View className="mt-4 gap-3">
-                <FeedbackPressable
-                  haptic="selection"
-                  onPress={handleReportProblemPress}
-                  className="h-12 flex-row items-center justify-center rounded-2xl bg-surface-soft px-4"
-                  accessibilityRole="button"
-                  accessibilityLabel={`Report a problem with ${selectedSpot.name}`}
-                >
-                  <Feather name="alert-circle" size={16} color={colors.ink} />
-                  <Text className="ml-2 font-outfit-semibold text-sm text-ink">
-                    Report a Problem
-                  </Text>
-                </FeedbackPressable>
-                {selectedSpotWasReported ? (
-                  <View
-                    className="min-h-12 flex-row items-center justify-center rounded-2xl bg-surface-soft px-4"
-                    accessibilityRole="text"
-                    accessibilityLabel="Removal request submitted"
-                  >
-                    <Feather name="flag" size={16} color={colors.muted} />
-                    <Text className="ml-2 font-outfit-semibold text-sm text-muted">
-                      Removal request submitted
-                    </Text>
-                  </View>
-                ) : (
-                  <FeedbackPressable
-                    haptic="selection"
-                    onPress={handleRequestRemovalPress}
-                    className="h-12 flex-row items-center justify-center rounded-2xl bg-surface-soft px-4"
-                    accessibilityRole="button"
-                    accessibilityLabel={`Request removal of ${selectedSpot.name}`}
-                  >
-                    <Feather name="flag" size={16} color={colors.ink} />
-                    <Text className="ml-2 font-outfit-semibold text-sm text-ink">
-                      Request Removal
-                    </Text>
-                  </FeedbackPressable>
-                )}
-              </View>
-            ) : null}
-          </ScrollView>
+              <MapSpotSheetPage
+                spot={selectedSpot}
+                width={sheetWidth}
+                fill={false}
+                likingSpotId={likingSpotId}
+                commentCount={
+                  commentCounts[selectedSpot.id] ??
+                  selectedSpot.commentCount ??
+                  0
+                }
+                isOwned={ownedSpotIds.includes(selectedSpot.id)}
+                wasReported={reportedSpotIds.includes(selectedSpot.id)}
+                canShowRemoval={
+                  !ownedSpotIds.includes(selectedSpot.id) &&
+                  (!session || !myLoading)
+                }
+                deletingSpotId={deletingSpotId}
+                onOpenFullscreen={openFullscreen}
+                onLike={() => {
+                  void handleLikePress(selectedSpot);
+                }}
+                onOpenComments={() => handleOpenComments(selectedSpot)}
+                onEdit={() => handleEditSelectedSpot(selectedSpot)}
+                onDelete={() => handleDeleteSelectedSpot(selectedSpot)}
+                onReportProblem={() =>
+                  handleReportProblemPress(selectedSpot)
+                }
+                onRequestRemoval={() =>
+                  handleRequestRemovalPress(selectedSpot)
+                }
+                onBlockCreator={() => handleBlockCreatorPress(selectedSpot)}
+                onPhotoZoneTouch={() => setSheetPagerEnabled(false)}
+                onDetailsZoneTouch={() => setSheetPagerEnabled(true)}
+              />
+            </ScrollView>
+          )}
         </Animated.View>
-      )}
+      ) : null}
     </View>
   );
 }
@@ -1550,11 +1839,9 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: 1000,
-    maxHeight: '56%',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     backgroundColor: colors.field,
-    paddingHorizontal: 20,
     paddingTop: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },

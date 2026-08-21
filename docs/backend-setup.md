@@ -21,6 +21,7 @@ Values beginning with `EXPO_PUBLIC_` are embedded in the client bundle and must 
 | `EXPO_PUBLIC_SUPABASE_URL` | Client | Supabase project URL. |
 | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Client | Public Supabase anon key for auth. |
 | `EXPO_PUBLIC_API_URL` | Client build | Absolute HTTPS origin of deployed API routes. |
+| `EXPO_PUBLIC_SENTRY_DSN` | Client build | Optional public Sentry DSN. Crash reporting stays off when this is empty. |
 | `SUPABASE_URL` | API server / seed terminal | Supabase project URL. |
 | `SUPABASE_SERVICE_ROLE_KEY` | API server / seed terminal | Elevated server and seed access. |
 | `OPENAI_API_KEY` | API server | Username, spot, and comment moderation, and a safety filter on Help & Support submissions. |
@@ -28,7 +29,7 @@ Values beginning with `EXPO_PUBLIC_` are embedded in the client bundle and must 
 | `RESEND_FROM_EMAIL` | API server | From address for moderation and Help & Support emails. |
 | `MODERATION_NOTIFY_EMAIL` | API server | Inbox that receives spot review emails and Help & Support submissions. |
 
-Never place `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, `RESEND_API_KEY`, or `MODERATION_NOTIFY_EMAIL` in `.env.local` for a client build, an `EXPO_PUBLIC_*` value, or source control.
+Never place `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, `RESEND_API_KEY`, `MODERATION_NOTIFY_EMAIL`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, or `SENTRY_PROJECT` in `.env.local` for a client build, an `EXPO_PUBLIC_*` value, or source control. `EXPO_PUBLIC_SENTRY_DSN` is a public client DSN and may live in the app build.
 
 ## 2. Create the Supabase data layer
 
@@ -39,21 +40,25 @@ skateu://auth/callback
 skateu://auth/reset-password
 ```
 
-The repository does not yet include a migration for `public.schools`. Create it before applying the remaining scripts or seeding data. It needs `id`, `name`, `city`, `state`, `latitude`, `longitude`, `numspots`, and `type` (`k12_public`, `k12_private`, or `higher_ed`) columns. Add this schema as a versioned migration before production use.
+The repository includes `supabase/schools_setup.sql` for `public.schools`. Run it before applying the remaining scripts or seeding data.
 
 In the Supabase SQL Editor, run the idempotent scripts in this order:
 
-1. `supabase/profiles_setup.sql`
-2. `supabase/profile_legal_acceptance_setup.sql`
-3. `supabase/profile_legal_private_setup.sql`
-4. `supabase/spots_setup.sql`
-5. `supabase/spots_creator_link.sql`
-6. `supabase/spot_likes_setup.sql`
-7. `supabase/spot_comments_setup.sql`
-8. `supabase/spots_count_trigger.sql`
-9. `supabase/account_deletion_proofs_setup.sql`
-10. `supabase/spot_removal_requests_setup.sql`
-11. `supabase/user_feedback_setup.sql`
+1. `supabase/schools_setup.sql`
+2. `supabase/profiles_setup.sql`
+3. `supabase/profile_legal_acceptance_setup.sql`
+4. `supabase/profile_legal_private_setup.sql`
+5. `supabase/spots_setup.sql`
+6. `supabase/spots_creator_link.sql`
+7. `supabase/spot_likes_setup.sql`
+8. `supabase/spot_comments_setup.sql`
+9. `supabase/spots_count_trigger.sql`
+10. `supabase/account_deletion_proofs_setup.sql`
+11. `supabase/spot_removal_requests_setup.sql`
+12. `supabase/user_feedback_setup.sql`
+13. `supabase/user_blocks_setup.sql`
+14. `supabase/comment_reports_setup.sql`
+15. `supabase/school_search_setup.sql`
 
 Draft Terms of Use, Privacy Policy, and Community Guidelines live in `docs/`. They are product policies for later lawyer review, not legal advice.
 
@@ -71,6 +76,12 @@ After `user_feedback_setup.sql` is applied, review incoming Help & Support messa
 
 ```sql
 select * from public.user_feedback order by created_at desc;
+```
+
+After `comment_reports_setup.sql` is applied, review reported comments with:
+
+```sql
+select * from public.comment_reports order by created_at desc;
 ```
 
 Keep and remove snippets are documented at the top of the removal SQL file. If `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, and `MODERATION_NOTIFY_EMAIL` are set on the API server, crossing two unique removal requests also sends one email, and each Help & Support submission sends a notification to the same inbox.

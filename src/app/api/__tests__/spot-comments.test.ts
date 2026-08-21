@@ -167,6 +167,42 @@ describe('GET /api/spot-comments', () => {
     );
   });
 
+  it('hides comments from blocked users when signed in', async () => {
+    setConfigured();
+    const fetchMock: FetchMock = jest.fn(async (input) => {
+      const url = String(input);
+      if (url.includes('/auth/v1/user')) {
+        return jsonResponse({ id: 'viewer-1' });
+      }
+      if (url.includes('/rest/v1/user_blocks')) {
+        return jsonResponse([{ blocked_id: parentRow.user_id }]);
+      }
+      if (url.includes('/rest/v1/comment_reports')) {
+        return jsonResponse([]);
+      }
+      if (url.includes('/rest/v1/spots')) {
+        return jsonResponse([{ id: parentRow.spot_id, comments_count: 2 }]);
+      }
+      if (url.includes('parent_comment_id=is.null')) {
+        return jsonResponse([parentRow]);
+      }
+      return jsonResponse([replyRow]);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await GET(
+      new Request(
+        `https://app.test/api/spot-comments?spotId=${parentRow.spot_id}`,
+        { headers: { Authorization: 'Bearer good-token' } }
+      )
+    );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      commentCount: 2,
+      comments: [],
+    });
+  });
+
   it('returns 400 when spotId is missing', async () => {
     setConfigured();
     const response = await GET(new Request('https://app.test/api/spot-comments'));

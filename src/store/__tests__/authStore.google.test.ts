@@ -41,6 +41,7 @@ beforeEach(() => {
   mockSetSession.mockReset();
   mockCreateURL.mockReturnValue('skateu://auth/callback');
   mockDismissBrowser.mockReturnValue(undefined);
+  useAuthStore.setState({ session: null, user: null });
 });
 
 describe('signInWithGoogle', () => {
@@ -85,6 +86,23 @@ describe('signInWithGoogle', () => {
     expect(mockExchangeCodeForSession).not.toHaveBeenCalled();
   });
 
+  it('returns true when a session was already established after the sheet closed', async () => {
+    mockSignInWithOAuth.mockResolvedValue({
+      data: { url: 'https://accounts.google.com/o/oauth2/auth' },
+      error: null,
+    });
+    mockOpenAuthSessionAsync.mockImplementation(async () => {
+      useAuthStore.setState({
+        session: { access_token: 'token' } as never,
+        user: { id: 'user-1' } as never,
+      });
+      return { type: 'cancel' };
+    });
+
+    await expect(useAuthStore.getState().signInWithGoogle()).resolves.toBe(true);
+    expect(mockExchangeCodeForSession).not.toHaveBeenCalled();
+  });
+
   it('throws when Google OAuth cannot start', async () => {
     mockSignInWithOAuth.mockResolvedValue({
       data: { url: null },
@@ -92,7 +110,7 @@ describe('signInWithGoogle', () => {
     });
 
     await expect(useAuthStore.getState().signInWithGoogle()).rejects.toThrow(
-      'Could not start Google log in. Try again.'
+      'Could not start Google sign-in. Please try again.'
     );
   });
 });

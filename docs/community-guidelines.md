@@ -1,6 +1,6 @@
 # Community Guidelines
 
-Last updated: August 20, 2026
+Last updated: August 21, 2026
 
 SkateU is a campus skate-spot map. The point is to help skaters find spots, share what they know, and not wreck the session for everyone else.
 
@@ -36,6 +36,8 @@ If a spot is gone, private, or a duplicate, use Request Removal instead of start
 
 Add spots you have skated or can describe honestly. Use a clear name, a useful description, and photos that show the spot.
 
+Spots you post are public. SkateU may feature them, including photos, on our Instagram, TikTok, and YouTube.
+
 Do not upload photos you do not have the right to share.
 
 Do not post photos or comments that expose someone else’s private personal information, such as a phone number, home address, or private document.
@@ -62,10 +64,14 @@ Request Removal is for spots that should not stay up: gone, private or restricte
 
 Do not use it to harass a skater, settle a score, or spam the review process.
 
+Do not abuse comment reports or blocking. Those tools are for keeping SkateU usable, not for silencing people you disagree with about a spot.
+
 ## How to report a problem
 
 - **Spots:** open the spot on the map and use Request Removal. You will pick a reason and can add details.
-- **Anything else,** including a comment, photo, username, or behavior that is not a spot-removal issue: email [support@skateu.app](mailto:support@skateu.app) and tell us where it is.
+- **Comments:** open the comment and use Report. You will pick a reason and can add details.
+- **A skater:** use Block on their comment or spot. You will stop seeing their spots and comments. You can unblock them in Settings.
+- **Anything else,** including a photo, username, or behavior that is not covered above: email [support@skateu.app](mailto:support@skateu.app) and tell us where it is.
 
 We may not be able to reply to every message, but we use reports to keep SkateU in shape.
 

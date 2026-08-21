@@ -13,7 +13,7 @@ export default function LoginRequiredModal({
   visible,
   onCancel,
   title = 'Sign in to like and add spots',
-  message = 'You can still browse campuses. Sign in if you want to like spots or drop your own.',
+  message = 'You can still browse campuses, view spots, and read comments. Sign in to like spots, add your own, or report content.',
 }: LoginRequiredModalProps) {
   const router = useRouter();
 

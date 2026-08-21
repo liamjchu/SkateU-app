@@ -19,8 +19,8 @@ type SpotCommentsCache = {
 type CommentsState = {
   bySpotId: Record<string, SpotCommentsCache>;
   commentCounts: Record<string, number>;
-  fetchComments: (spotId: string) => Promise<void>;
-  fetchMore: (spotId: string) => Promise<void>;
+  fetchComments: (spotId: string, accessToken?: string) => Promise<void>;
+  fetchMore: (spotId: string, accessToken?: string) => Promise<void>;
   addComment: (
     spotId: string,
     content: string,
@@ -32,6 +32,8 @@ type CommentsState = {
     commentId: string,
     accessToken: string
   ) => Promise<void>;
+  hideUserComments: (userId: string) => void;
+  hideComment: (spotId: string, commentId: string) => void;
   resetSpot: (spotId: string) => void;
   reset: () => void;
 };
@@ -39,9 +41,9 @@ type CommentsState = {
 const REQUEST_TIMEOUT_MS = 10_000;
 const MUTATION_TIMEOUT_MS = 60_000;
 const LOAD_FAILED_ERROR = 'Couldn’t load comments right now.';
-const LOAD_TIMEOUT_ERROR = 'Loading comments timed out. Try again in a sec.';
-const POST_TIMEOUT_ERROR = 'Posting this comment timed out. Try again in a sec.';
-const ALREADY_POSTING_ERROR = 'Hang on — still posting.';
+const LOAD_TIMEOUT_ERROR = 'Loading comments timed out. Please try again.';
+const POST_TIMEOUT_ERROR = 'Posting this comment timed out. Please try again.';
+const ALREADY_POSTING_ERROR = 'Still posting. Please wait.';
 
 const emptyCache = (): SpotCommentsCache => ({
   comments: [],
@@ -139,7 +141,7 @@ async function readErrorMessage(response: Response): Promise<string> {
   }
 
   if (response.status >= 500) {
-    return 'The server is temporarily unavailable. Try again in a sec.';
+    return 'The server is temporarily unavailable. Please try again.';
   }
   if (response.status === 401) {
     return 'Sign in again to keep going.';
@@ -195,6 +197,24 @@ function insertCreatedComment(
   });
 }
 
+function authHeaders(accessToken?: string): HeadersInit | undefined {
+  return accessToken
+    ? { Authorization: `Bearer ${accessToken}` }
+    : undefined;
+}
+
+function commentsWithoutUser(
+  comments: SpotComment[],
+  userId: string
+): SpotComment[] {
+  return comments
+    .filter((comment) => comment.userId !== userId)
+    .map((comment) => ({
+      ...comment,
+      replies: comment.replies.filter((reply) => reply.userId !== userId),
+    }));
+}
+
 function removeComment(
   comments: SpotComment[],
   commentId: string
@@ -211,7 +231,7 @@ export const useCommentsStore = create<CommentsState>((set, get) => ({
   bySpotId: {},
   commentCounts: {},
 
-  fetchComments: async (spotId: string) => {
+  fetchComments: async (spotId, accessToken) => {
     const version = bumpVersion(spotId);
     set((state) =>
       patchCache(state, spotId, {
@@ -225,7 +245,7 @@ export const useCommentsStore = create<CommentsState>((set, get) => ({
         getApiUrl(
           `/api/spot-comments?spotId=${encodeURIComponent(spotId)}&offset=0`
         ),
-        {}
+        { headers: authHeaders(accessToken) }
       );
 
       if (currentVersion(spotId) !== version) {
@@ -269,7 +289,7 @@ export const useCommentsStore = create<CommentsState>((set, get) => ({
     }
   },
 
-  fetchMore: async (spotId: string) => {
+  fetchMore: async (spotId, accessToken) => {
     const cache = get().bySpotId[spotId] ?? emptyCache();
     if (cache.loading || cache.loadingMore || !cache.hasMore) {
       return;
@@ -283,7 +303,7 @@ export const useCommentsStore = create<CommentsState>((set, get) => ({
         getApiUrl(
           `/api/spot-comments?spotId=${encodeURIComponent(spotId)}&offset=${cache.nextOffset}`
         ),
-        {}
+        { headers: authHeaders(accessToken) }
       );
 
       if (currentVersion(spotId) !== version) {
@@ -426,6 +446,31 @@ export const useCommentsStore = create<CommentsState>((set, get) => ({
         commentCounts: { ...state.commentCounts, [spotId]: commentCount },
       };
     });
+  },
+
+  hideUserComments: (userId) => {
+    set((state) => {
+      const bySpotId = { ...state.bySpotId };
+      for (const [spotId, cache] of Object.entries(bySpotId)) {
+        bySpotId[spotId] = {
+          ...cache,
+          comments: commentsWithoutUser(cache.comments, userId),
+        };
+      }
+      return { bySpotId };
+    });
+  },
+
+  hideComment: (spotId, commentId) => {
+    const cache = get().bySpotId[spotId];
+    if (!cache) {
+      return;
+    }
+    set((state) =>
+      patchCache(state, spotId, {
+        comments: removeComment(cache.comments, commentId),
+      })
+    );
   },
 
   resetSpot: (spotId) => {

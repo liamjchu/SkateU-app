@@ -27,19 +27,19 @@ export function getSpotFormErrors(
   if (photoCount < SPOT_IMAGE_MIN) {
     errors.image = 'Still needs a photo.';
   } else if (photoCount > SPOT_IMAGE_MAX) {
-    errors.image = `That’s the max — ${SPOT_IMAGE_MAX} photos.`;
+    errors.image = `You can add up to ${SPOT_IMAGE_MAX} photos.`;
   }
 
   if (nameLength < SPOT_NAME_MIN) {
     errors.name = 'Still needs a name.';
   } else if (nameLength > SPOT_NAME_MAX) {
-    errors.name = 'That name’s a bit long.';
+    errors.name = 'That name is too long.';
   }
 
   if (descriptionLength < SPOT_DESCRIPTION_MIN) {
     errors.description = 'Still needs a description.';
   } else if (descriptionLength > SPOT_DESCRIPTION_MAX) {
-    errors.description = 'That description’s a bit long.';
+    errors.description = 'That description is too long.';
   }
 
   return errors;
@@ -112,10 +112,10 @@ export function getSpotFormMissingSummary(
     return `Still needs ${joinWithArticles(missing)}.`;
   }
   if (missing.length === 0 && tooLong.length === 1) {
-    return `That ${tooLong[0]}’s a bit long.`;
+    return `That ${tooLong[0]} is too long.`;
   }
   if (missing.length === 0 && tooLong.length > 1) {
-    return `That ${joinCasualList(tooLong)} are a bit long.`;
+    return `Those ${joinCasualList(tooLong)} are too long.`;
   }
 
   return messages.join(' ');

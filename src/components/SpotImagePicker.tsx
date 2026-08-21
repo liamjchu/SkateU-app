@@ -318,7 +318,7 @@ export default function SpotImagePicker({
           </Text>
           {atMax ? (
             <Text className="mt-1 px-1 font-outfit-medium text-xs text-muted">
-              That’s the max — {max} photos.
+              You can add up to {max} photos.
             </Text>
           ) : null}
         </View>
