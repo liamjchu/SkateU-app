@@ -5,6 +5,7 @@ type SubscriberConfirmation = {
   email: string;
   confirmation_token: string | null;
   confirmation_expires_at: string | null;
+  confirmation_sent_at: string | null;
   confirmed: boolean;
   subscribed: boolean;
 };
@@ -118,7 +119,7 @@ Deno.serve(async (request) => {
   const { data, error } = await supabase
     .from("subscribers")
     .select(
-      "email, confirmation_token, confirmation_expires_at, confirmed, subscribed"
+      "email, confirmation_token, confirmation_expires_at, confirmation_sent_at, confirmed, subscribed"
     )
     .eq("email", email)
     .maybeSingle();
