@@ -4,9 +4,11 @@ import { useState } from 'react';
 import { Alert, ScrollView, Text, View } from 'react-native';
 import FeedbackPressable from '../components/FeedbackPressable';
 import ScreenHeader from '../components/screen-header';
+import { LEGAL_APP_ROUTES } from '../lib/legalAcceptance';
 import { toUserFacingError } from '../lib/userFacingError';
 import { colors } from '../constants/colors';
 import { useAuthStore } from '../store/authStore';
+import { userCanSignInWithPassword } from '../lib/authAccount';
 
 type SettingsRowProps = {
   icon: keyof typeof Feather.glyphMap;
@@ -39,6 +41,7 @@ function SettingsRow({
       haptic={destructive ? 'warning' : 'selection'}
       onPress={onPress}
       disabled={disabled}
+      pressLockMs={700}
       className="min-h-14 flex-row items-center px-4 py-3"
       accessibilityRole="button"
       accessibilityLabel={label}
@@ -63,6 +66,9 @@ function SettingsRow({
 export default function SettingsScreen() {
   const router = useRouter();
   const email = useAuthStore((state) => state.user?.email ?? '');
+  const canSignInWithPassword = useAuthStore((state) =>
+    userCanSignInWithPassword(state.user)
+  );
   const signOut = useAuthStore((state) => state.signOut);
   const sendDeleteAccountOtp = useAuthStore(
     (state) => state.sendDeleteAccountOtp
@@ -94,7 +100,7 @@ export default function SettingsScreen() {
       console.warn('Failed to log out', error);
       Alert.alert(
         'Couldn’t log out',
-        toUserFacingError(error, 'Try again in a sec.')
+        toUserFacingError(error, 'Please try again.')
       );
       setLoggingOut(false);
     }
@@ -131,7 +137,7 @@ export default function SettingsScreen() {
     } catch (error) {
       Alert.alert(
         'Couldn’t send that code',
-        toUserFacingError(error, 'Try again in a sec.')
+        toUserFacingError(error, 'Please try again.')
       );
     } finally {
       setSendingDeleteOtp(false);
@@ -176,10 +182,64 @@ export default function SettingsScreen() {
           <View className="ml-16 h-px bg-border-soft" />
           <SettingsRow
             icon="lock"
-            label="Change password"
+            label={canSignInWithPassword ? 'Change password' : 'Set a password'}
             showChevron
             onPress={() => router.push('/change-password')}
-            accessibilityHint="Opens the password editor"
+            accessibilityHint={
+              canSignInWithPassword
+                ? 'Opens the password editor'
+                : 'Opens the form to add a password to this account'
+            }
+          />
+          <View className="ml-16 h-px bg-border-soft" />
+          <SettingsRow
+            icon="slash"
+            label="Blocked accounts"
+            showChevron
+            onPress={() => router.push('/blocked-accounts')}
+            accessibilityHint="Opens the list of skaters you blocked"
+          />
+        </View>
+
+        <Text className="mb-2 mt-8 px-1 font-outfit-bold text-xs uppercase tracking-wide text-muted">
+          Support
+        </Text>
+        <View className="overflow-hidden rounded-2xl bg-field">
+          <SettingsRow
+            icon="help-circle"
+            label="Help & Support"
+            showChevron
+            onPress={() => router.push('/help')}
+            accessibilityHint="Opens Help and Support"
+          />
+        </View>
+
+        <Text className="mb-2 mt-8 px-1 font-outfit-bold text-xs uppercase tracking-wide text-muted">
+          Legal
+        </Text>
+        <View className="overflow-hidden rounded-2xl bg-field">
+          <SettingsRow
+            icon="file-text"
+            label="Terms of Use"
+            showChevron
+            onPress={() => router.push(LEGAL_APP_ROUTES.terms)}
+            accessibilityHint="Opens the Terms of Use"
+          />
+          <View className="ml-16 h-px bg-border-soft" />
+          <SettingsRow
+            icon="shield"
+            label="Privacy Policy"
+            showChevron
+            onPress={() => router.push(LEGAL_APP_ROUTES.privacy)}
+            accessibilityHint="Opens the Privacy Policy"
+          />
+          <View className="ml-16 h-px bg-border-soft" />
+          <SettingsRow
+            icon="users"
+            label="Community Guidelines"
+            showChevron
+            onPress={() => router.push(LEGAL_APP_ROUTES.communityGuidelines)}
+            accessibilityHint="Opens the Community Guidelines"
           />
         </View>
 

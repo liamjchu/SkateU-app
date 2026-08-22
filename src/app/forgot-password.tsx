@@ -23,7 +23,7 @@ const getRequestErrorMessage = (requestError: unknown): string => {
     return 'Check your internet connection and try again.';
   }
 
-  return 'Couldn’t send a reset link right now. Try again in a sec.';
+  return 'We couldn’t send a reset link right now. Please try again.';
 };
 
 export default function ForgotPasswordScreen() {

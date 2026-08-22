@@ -13,6 +13,8 @@ export type Spot = {
   // The creator's public username, or null when the profile has no username
   // yet or the creator's account was deleted.
   creatorUsername: string | null
+  // The creator's user id, or null when the account was deleted.
+  creatorUserId?: string | null
   // ISO timestamp of when the spot was created. Empty string when unknown.
   createdAt: string
   // ISO timestamp of the spot's last edit. Equals createdAt until edited.
@@ -22,6 +24,8 @@ export type Spot = {
   likeCount?: number
   // Whether the current authenticated user likes this spot.
   likedByUser?: boolean
+  // Total comments on this spot, including one-level replies.
+  commentCount?: number
 }
 
 export type SpotImageAsset = {
@@ -30,14 +34,17 @@ export type SpotImageAsset = {
   mimeType?: string
 }
 
+export type SpotMediaItem =
+  | { kind: 'existing'; uri: string }
+  | { kind: 'new'; asset: SpotImageAsset }
+
 export type NewSpotInput = {
   schoolId: string
   name: string
   description: string
   latitude: number
   longitude: number
-  imageUri?: string
-  image?: SpotImageAsset
+  images: SpotImageAsset[]
 }
 
 export type UpdateSpotInput = {
@@ -45,7 +52,6 @@ export type UpdateSpotInput = {
   description: string
   latitude: number
   longitude: number
-  // A new local image URI to upload. When omitted, the existing image is kept.
-  imageUri?: string
-  image?: SpotImageAsset
+  // Ordered photos after the edit. When omitted, the existing photos are kept.
+  media?: SpotMediaItem[]
 }

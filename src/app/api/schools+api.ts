@@ -1,4 +1,5 @@
 import { HOME_RAIL_PAGE_SIZE, parseOffset } from '../../lib/homeFeed';
+import { MIN_SEARCH_LENGTH } from '../../lib/schoolSearch';
 
 type SchoolType = 'k12_public' | 'k12_private' | 'higher_ed';
 
@@ -27,7 +28,6 @@ type SchoolSearchResult = {
 };
 
 export const SEARCH_LIMIT = 20;
-const MIN_SEARCH_LENGTH = 2;
 const IDS_LIMIT = 50;
 const SPOT_IMAGE_LOOKUP_LIMIT = 200;
 const SCHOOL_SELECT_COLUMNS = 'id,name,city,state,latitude,longitude,numspots,type';
@@ -48,14 +48,6 @@ function getSupabaseConfig() {
   return { url, apiKey };
 }
 
-function escapeLikeSearch(search: string) {
-  return search
-    .replaceAll('\\', '\\\\')
-    .replaceAll('%', '\\%')
-    .replaceAll('_', '\\_')
-    .replaceAll('*', '\\*');
-}
-
 function mapSchool(row: DatabaseSchool): SchoolSearchResult {
   return {
     id: row.id,
@@ -67,20 +59,6 @@ function mapSchool(row: DatabaseSchool): SchoolSearchResult {
     numSpots: row.numspots,
     type: row.type,
   };
-}
-
-function mergeSchoolRows(schoolGroups: DatabaseSchool[][]) {
-  const schoolMap = new Map<string, DatabaseSchool>();
-
-  schoolGroups.flat().forEach((school) => {
-    schoolMap.set(school.id, school);
-  });
-
-  return Array.from(schoolMap.values())
-    .sort((firstSchool, secondSchool) =>
-      firstSchool.name.localeCompare(secondSchool.name)
-    )
-    .slice(0, SEARCH_LIMIT);
 }
 
 // Parses the `type` query param ("k12_public,higher_ed") into valid types.
@@ -119,6 +97,34 @@ async function fetchSchoolRows(
       apikey: config.apiKey,
       Authorization: `Bearer ${config.apiKey}`,
     },
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message);
+  }
+
+  return (await response.json()) as DatabaseSchool[];
+}
+
+async function searchSchoolRows(
+  config: { url: string; apiKey: string },
+  query: string,
+  types: SchoolType[],
+  limit: number
+) {
+  const response = await fetch(`${config.url}/rest/v1/rpc/search_schools`, {
+    method: 'POST',
+    headers: {
+      apikey: config.apiKey,
+      Authorization: `Bearer ${config.apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      p_query: query,
+      p_types: types.length > 0 ? types : null,
+      p_limit: limit,
+    }),
   });
 
   if (!response.ok) {
@@ -250,39 +256,18 @@ export async function GET(request: Request) {
       });
     }
 
-    const escapedSearch = escapeLikeSearch(search);
-    const [schoolsByName, schoolsByCity, schoolsByState] = await Promise.all([
-      fetchSchoolRows(
-        config,
-        { name: `ilike.*${escapedSearch}*`, ...typeParams },
-        SEARCH_LIMIT
-      ),
-      fetchSchoolRows(
-        config,
-        { city: `ilike.*${escapedSearch}*`, ...typeParams },
-        SEARCH_LIMIT
-      ),
-      fetchSchoolRows(
-        config,
-        { state: `ilike.*${escapedSearch}*`, ...typeParams },
-        SEARCH_LIMIT
-      ),
-    ]);
-    const schools = mergeSchoolRows([
-      schoolsByName,
-      schoolsByCity,
-      schoolsByState,
-    ]);
+    const schools = await searchSchoolRows(
+      config,
+      search,
+      typeFilter,
+      SEARCH_LIMIT
+    );
 
     return Response.json({ schools: schools.map(mapSchool) });
   } catch (error) {
     console.error('School search failed:', error);
     return Response.json(
-      {
-        error: `Unable to search schools right now${
-          error instanceof Error ? `: ${error.message}` : '.'
-        }`,
-      },
+      { error: 'Unable to search schools right now.' },
       { status: 500 }
     );
   }

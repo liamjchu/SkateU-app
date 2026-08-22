@@ -27,7 +27,7 @@ const getUpdateErrorMessage = (updateError: unknown): string => {
     return 'Check your internet connection and try again.';
   }
 
-  return 'Couldn’t update your password right now. Try again in a sec.';
+  return 'We couldn’t update your password right now. Please try again.';
 };
 
 export default function UpdatePasswordScreen() {

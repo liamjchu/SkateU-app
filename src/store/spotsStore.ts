@@ -1,7 +1,12 @@
 import { create } from 'zustand';
 import { getApiUrl } from '../lib/api';
+import { buildImageOrder } from '../lib/spotMedia';
 import { sanitizeErrorMessage } from '../lib/userFacingError';
 import type { NewSpotInput, Spot, UpdateSpotInput } from '../types/spot';
+import type {
+  SpotRemovalReason,
+  SpotRemovalRequest,
+} from '../types/spotRemovalRequest';
 
 
 type SpotsState = {
@@ -17,6 +22,7 @@ type SpotsState = {
   likedSpots: Spot[];
   likedLoading: boolean;
   likedError: string | null;
+  reportedSpotIds: string[];
   fetchSpots: (schoolId: string, accessToken?: string) => Promise<void>;
   addSpot: (input: NewSpotInput, accessToken: string) => Promise<Spot>;
   fetchMySpots: (accessToken: string) => Promise<void>;
@@ -32,21 +38,38 @@ type SpotsState = {
     accessToken: string
   ) => Promise<Spot>;
   deleteSpot: (id: string, accessToken: string) => Promise<void>;
+  fetchMySpotRemovalRequest: (
+    spotId: string,
+    accessToken: string
+  ) => Promise<boolean>;
+  submitSpotRemovalRequest: (
+    spotId: string,
+    reason: SpotRemovalReason,
+    details: string,
+    accessToken: string
+  ) => Promise<void>;
   replaceCreatorUsername: (previousUsername: string, username: string) => void;
+  setSpotCommentCount: (spotId: string, commentCount: number) => void;
+  hideCreatorSpots: (userId: string) => void;
   clearMySpots: () => void;
   clearLikedSpots: () => void;
+  clearReportedSpotIds: () => void;
   reset: () => void;
 };
+
+function withReportedSpot(ids: string[], spotId: string): string[] {
+  return ids.includes(spotId) ? ids : [...ids, spotId];
+}
 
 // Reads stay short, while mutations get enough time for moderation and image upload.
 const REQUEST_TIMEOUT_MS = 10_000;
 const MUTATION_TIMEOUT_MS = 60_000;
-const SAVE_TIMEOUT_ERROR = 'Saving this spot timed out. Try again in a sec.';
+const SAVE_TIMEOUT_ERROR = 'Saving this spot timed out. Please try again.';
 
 const INVALID_SCHOOL_ID_ERROR =
   'A valid school identifier is required to load spots.';
 const LOAD_FAILED_ERROR = 'Couldn’t load spots right now.';
-const LOAD_TIMEOUT_ERROR = 'Loading spots timed out. Try again in a sec.';
+const LOAD_TIMEOUT_ERROR = 'Loading spots timed out. Please try again.';
 const MY_SPOTS_LOAD_FAILED_ERROR = 'Couldn’t load your spots right now.';
 const LIKED_SPOTS_LOAD_FAILED_ERROR = 'Couldn’t load liked spots right now.';
 
@@ -129,7 +152,7 @@ async function readErrorMessage(response: Response): Promise<string> {
   // paused backend, a flaky tunnel), not our API — which always returns a JSON
   // `{ error }`. Show a friendlier, retryable message instead of a raw status.
   if (response.status >= 500) {
-    return 'The server is temporarily unavailable. Try again in a sec.';
+    return 'The server is temporarily unavailable. Please try again.';
   }
 
   if (response.status === 401) {
@@ -208,6 +231,7 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
   likedSpots: [],
   likedLoading: false,
   likedError: null,
+  reportedSpotIds: [],
 
   fetchSpots: async (schoolId: string, accessToken?: string) => {
     const requestVersion = ++spotsRequestVersion;
@@ -284,11 +308,11 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
     form.append('latitude', String(input.latitude));
     form.append('longitude', String(input.longitude));
 
-    if (input.imageUri || input.image) {
+    for (const image of input.images) {
       appendFilePart(form, 'image', {
-        uri: input.image?.uri ?? input.imageUri ?? '',
-        name: input.image?.fileName ?? 'spot.jpg',
-        type: input.image?.mimeType ?? 'image/jpeg',
+        uri: image.uri,
+        name: image.fileName ?? 'spot.jpg',
+        type: image.mimeType ?? 'image/jpeg',
       });
     }
 
@@ -474,14 +498,18 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
     form.append('latitude', String(input.latitude));
     form.append('longitude', String(input.longitude));
 
-    // Only send an image part when the user picked a new one; otherwise the
-    // server keeps the existing image.
-    if (input.imageUri || input.image) {
-      appendFilePart(form, 'image', {
-        uri: input.image?.uri ?? input.imageUri ?? '',
-        name: input.image?.fileName ?? 'spot.jpg',
-        type: input.image?.mimeType ?? 'image/jpeg',
-      });
+    // Only send media when the photo list changed; otherwise the server keeps
+    // the existing image_urls.
+    if (input.media) {
+      const { imageOrder, newAssets } = buildImageOrder(input.media);
+      form.append('imageOrder', JSON.stringify(imageOrder));
+      for (const image of newAssets) {
+        appendFilePart(form, 'image', {
+          uri: image.uri,
+          name: image.fileName ?? 'spot.jpg',
+          type: image.mimeType ?? 'image/jpeg',
+        });
+      }
     }
 
     const response = await fetchMutationWithTimeout(
@@ -539,9 +567,68 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
     }));
   },
 
+  fetchMySpotRemovalRequest: async (spotId, accessToken) => {
+    const response = await fetchGetWithRetry(
+      getApiUrl(
+        `/api/spot-removal-requests?spotId=${encodeURIComponent(spotId)}`
+      ),
+      {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response));
+    }
+
+    const data = (await response.json()) as { request?: SpotRemovalRequest | null };
+    const submitted = Boolean(data.request);
+    if (submitted) {
+      set((state) => ({
+        reportedSpotIds: withReportedSpot(state.reportedSpotIds, spotId),
+      }));
+    }
+    return submitted;
+  },
+
+  submitSpotRemovalRequest: async (spotId, reason, details, accessToken) => {
+    const response = await fetchMutationWithTimeout(
+      getApiUrl('/api/spot-removal-requests'),
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ spotId, reason, details }),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response));
+    }
+
+    set((state) => ({
+      reportedSpotIds: withReportedSpot(state.reportedSpotIds, spotId),
+    }));
+  },
+
+  setSpotCommentCount: (spotId, commentCount) => {
+    const nextCount = Math.max(0, commentCount);
+    const updateSpot = (spot: Spot): Spot =>
+      spot.id === spotId ? { ...spot, commentCount: nextCount } : spot;
+
+    set((state) => ({
+      spots: state.spots.map(updateSpot),
+      mySpots: state.mySpots.map(updateSpot),
+      likedSpots: state.likedSpots.map(updateSpot),
+    }));
+  },
+
   // Existing spot records cache the public creator name, so update every
   // collection immediately after the profile username has changed.
-  replaceCreatorUsername: (previousUsername, username) => {
+    replaceCreatorUsername: (previousUsername, username) => {
     if (previousUsername === username) {
       return;
     }
@@ -555,6 +642,14 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
       spots: state.spots.map(replace),
       mySpots: state.mySpots.map(replace),
       likedSpots: state.likedSpots.map(replace),
+    }));
+  },
+
+  hideCreatorSpots: (userId) => {
+    const keep = (spot: Spot): boolean => spot.creatorUserId !== userId;
+    set((state) => ({
+      spots: state.spots.filter(keep),
+      likedSpots: state.likedSpots.filter(keep),
     }));
   },
 
@@ -575,6 +670,10 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
     }));
   },
 
+  clearReportedSpotIds: () => {
+    set({ reportedSpotIds: [] });
+  },
+
   reset: () => {
     spotsRequestVersion += 1;
     mySpotsRequestVersion += 1;
@@ -591,6 +690,7 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
       likedSpots: [],
       likedLoading: false,
       likedError: null,
+      reportedSpotIds: [],
     });
   },
 }));

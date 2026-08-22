@@ -19,6 +19,7 @@ import LocationPicker, {
 } from '../components/LocationPicker';
 import ScreenHeader from '../components/screen-header';
 import SpotImagePicker from '../components/SpotImagePicker';
+import SpotSocialNotice from '../components/spot-social-notice';
 import {
     getSpotFormErrors,
     getSpotFormMissingSummary,
@@ -28,11 +29,12 @@ import {
 } from '../lib/addSpotForm';
 import { triggerHaptic } from '../lib/haptics';
 import { colors } from '../constants/colors';
+import { existingMediaItems, mediaListsEqual } from '../lib/spotMedia';
 import { toUserFacingError } from '../lib/userFacingError';
 import { useAuthStore } from '../store/authStore';
 import { useMapViewStore } from '../store/mapViewStore';
 import { useSpotsStore } from '../store/spotsStore';
-import type { SpotImageAsset } from '../types/spot';
+import type { SpotMediaItem } from '../types/spot';
 
 
 type Coordinates = {
@@ -71,12 +73,9 @@ export default function EditSpotScreen() {
 
   const [name, setName] = useState(spot?.name ?? '');
   const [description, setDescription] = useState(spot?.description ?? '');
-  // Start from the existing image; only send a new one if the user picks one.
-  const [imageUri, setImageUri] = useState<string | undefined>(
-    spot?.imageUris[0]
+  const [media, setMedia] = useState<SpotMediaItem[]>(
+    existingMediaItems(spot?.imageUris ?? [])
   );
-  const [imageAsset, setImageAsset] = useState<SpotImageAsset | undefined>();
-  const [imageChanged, setImageChanged] = useState(false);
 
   const [selectedLocation, setSelectedLocation] = useState<Coordinates>({
     latitude: spot?.latitude ?? 41.8268,
@@ -107,37 +106,31 @@ export default function EditSpotScreen() {
 
     setName(spot.name);
     setDescription(spot.description);
-    setImageUri(spot.imageUris[0]);
-    setImageAsset(undefined);
-    setImageChanged(false);
+    setMedia(existingMediaItems(spot.imageUris));
     setSelectedLocation({
       latitude: spot.latitude,
       longitude: spot.longitude,
     });
   }, [spot]);
 
-  const isFormValid = isAddSpotFormValid(imageUri, name, description);
-  const formErrors = getSpotFormErrors(imageUri, name, description);
-  const missingSummary = getSpotFormMissingSummary(imageUri, name, description);
+  const originalMedia = existingMediaItems(spot?.imageUris ?? []);
+  const mediaChanged = !mediaListsEqual(media, originalMedia);
+  const isFormValid = isAddSpotFormValid(media.length, name, description);
+  const formErrors = getSpotFormErrors(media.length, name, description);
+  const missingSummary = getSpotFormMissingSummary(media.length, name, description);
   const showFieldErrors = hasSubmitted;
   const locationError =
     locationPickerStatus === 'error'
       ? 'Map didn’t load. Retry it, then save.'
-      : 'Hang on, the map’s still loading.';
+      : 'The map is still loading.';
   const hasUnsavedChanges = Boolean(
     spot &&
       (name !== spot.name ||
         description !== spot.description ||
-        imageChanged ||
+        mediaChanged ||
         selectedLocation.latitude !== spot.latitude ||
         selectedLocation.longitude !== spot.longitude)
   );
-
-  const handleImageSelected = (asset: SpotImageAsset) => {
-    setImageUri(asset.uri);
-    setImageAsset(asset);
-    setImageChanged(true);
-  };
 
   const handleLocationChange = useCallback(
     (latitude: number, longitude: number) => {
@@ -222,7 +215,7 @@ export default function EditSpotScreen() {
           description: description.trim(),
           latitude: selectedLocation.latitude,
           longitude: selectedLocation.longitude,
-          image: imageChanged ? imageAsset : undefined,
+          media: mediaChanged ? media : undefined,
         },
         accessToken
       );
@@ -306,11 +299,11 @@ export default function EditSpotScreen() {
           ) : null}
 
           <Text className="mb-2 mt-6 font-outfit-bold text-base text-ink">
-            Photo
+            Photos
           </Text>
           <SpotImagePicker
-            imageUri={imageUri}
-            onImageSelected={handleImageSelected}
+            items={media}
+            onChange={setMedia}
             highlighted={Boolean(showFieldErrors && formErrors.image)}
           />
 
@@ -385,6 +378,8 @@ export default function EditSpotScreen() {
               {saveError ?? missingSummary}
             </Text>
           ) : null}
+
+          <SpotSocialNotice action="saving" />
 
           <FeedbackPressable
             haptic="light"

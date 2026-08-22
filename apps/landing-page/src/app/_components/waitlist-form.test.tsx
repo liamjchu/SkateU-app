@@ -1,12 +1,17 @@
 // @vitest-environment jsdom
 
+import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { change, cleanup, render, submit, waitFor } from "../../test/react-dom";
+import { WAITLIST_EMAIL_STORAGE_KEY } from "../../constants/site";
+import { change, click, cleanup, render, submit, waitFor } from "../../test/react-dom";
 import { WaitlistForm } from "./waitlist-form";
 
 const email = "skater@example.test";
-const storageKey = "skateu.waitlistEmail";
+const subscribeBody = {
+  email,
+  confirmedAge13Plus: true,
+};
 let fetchMock: ReturnType<typeof vi.fn>;
 
 function emailInput(container: HTMLElement): HTMLInputElement {
@@ -19,6 +24,24 @@ function emailInput(container: HTMLElement): HTMLInputElement {
   return input;
 }
 
+function ageCheckbox(container: HTMLElement): HTMLInputElement {
+  const input = container.querySelector("input[name=confirmedAge13Plus]");
+
+  if (!(input instanceof HTMLInputElement)) {
+    throw new Error("Age confirmation checkbox is unavailable.");
+  }
+
+  return input;
+}
+
+function checkAge(container: HTMLElement): void {
+  const input = ageCheckbox(container);
+
+  act(() => {
+    input.click();
+  });
+}
+
 function form(container: HTMLElement): HTMLFormElement {
   const waitlistForm = container.querySelector("form");
 
@@ -27,6 +50,35 @@ function form(container: HTMLElement): HTMLFormElement {
   }
 
   return waitlistForm;
+}
+
+function submitButton(container: HTMLElement): HTMLButtonElement {
+  const button = container.querySelector('button[type="submit"]');
+
+  if (!(button instanceof HTMLButtonElement)) {
+    throw new Error("Submit button is unavailable.");
+  }
+
+  return button;
+}
+
+function resendButton(container: HTMLElement): HTMLButtonElement {
+  const button = [...container.querySelectorAll("button")].find((item) =>
+    item.textContent?.includes("Resend confirmation email")
+  );
+
+  if (!(button instanceof HTMLButtonElement)) {
+    throw new Error("Resend button is unavailable.");
+  }
+
+  return button;
+}
+
+function jsonOk(emailSent = true): Response {
+  return new Response(JSON.stringify({ success: true, emailSent }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
 }
 
 beforeEach(() => {
@@ -47,33 +99,79 @@ describe("WaitlistForm", () => {
     const container = render(<WaitlistForm />);
 
     expect(emailInput(container).required).toBe(true);
-    expect(container.textContent).toContain("No spam. Just the invite when we drop.");
+    expect(ageCheckbox(container).required).toBe(true);
+    expect(container.textContent).toContain("You must be 13 or older.");
+  });
+
+  it("does not submit without a 13+ confirmation", () => {
+    const container = render(<WaitlistForm />);
+
+    change(emailInput(container), email);
+    submit(form(container));
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(container.textContent).toContain(
+      "You must be at least 13 years old to join the waitlist."
+    );
   });
 
   it("submits a normalized synthetic email and stores it after success", async () => {
-    fetchMock.mockResolvedValue(new Response(null, { status: 200 }));
+    fetchMock.mockResolvedValue(jsonOk());
     const container = render(<WaitlistForm />);
     const input = emailInput(container);
 
     change(input, "  SKATER@EXAMPLE.TEST ");
+    checkAge(container);
     submit(form(container));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
     expect(fetchMock).toHaveBeenCalledWith("/api/subscribe", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify(subscribeBody),
     });
     await waitFor(() => expect(container.textContent).toContain("You’re subscribed."));
-    expect(window.localStorage.getItem(storageKey)).toBe(email);
+    expect(window.localStorage.getItem(WAITLIST_EMAIL_STORAGE_KEY)).toBe(email);
     expect(input.value).toBe("");
+    expect(resendButton(container).textContent).toContain("Resend confirmation email");
+  });
+
+  it("lets the user resend a confirmation email", async () => {
+    fetchMock.mockResolvedValue(jsonOk());
+    const container = render(<WaitlistForm />);
+
+    change(emailInput(container), email);
+    checkAge(container);
+    submit(form(container));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+
+    click(resendButton(container));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(container.textContent).toContain("Confirmation email sent.")
+    );
+  });
+
+  it("says so when the confirmation email did not send", async () => {
+    fetchMock.mockResolvedValue(jsonOk(false));
+    const container = render(<WaitlistForm />);
+
+    change(emailInput(container), email);
+    checkAge(container);
+    submit(form(container));
+
+    await waitFor(() =>
+      expect(container.textContent).toContain("confirmation email didn’t send")
+    );
+    expect(resendButton(container)).toBeTruthy();
   });
 
   it("does not submit an email that is already stored on this device", () => {
-    window.localStorage.setItem(storageKey, email);
+    window.localStorage.setItem(WAITLIST_EMAIL_STORAGE_KEY, email);
     const container = render(<WaitlistForm />);
 
     expect(container.textContent).toContain("already subscribed");
+    expect(resendButton(container).textContent).toContain("Resend confirmation email");
     change(emailInput(container), email);
     submit(form(container));
 
@@ -86,19 +184,33 @@ describe("WaitlistForm", () => {
     const container = render(<WaitlistForm />);
 
     change(emailInput(container), email);
+    checkAge(container);
     submit(form(container));
 
     await waitFor(() => expect(container.textContent).toContain("couldn’t add you"));
+    expect(container.textContent).not.toContain(email);
+  });
+
+  it("shows a rate-limit message", async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 429 }));
+    const container = render(<WaitlistForm />);
+
+    change(emailInput(container), email);
+    checkAge(container);
+    submit(form(container));
+
+    await waitFor(() => expect(container.textContent).toContain("Too many tries"));
   });
 
   it("keeps the success message when local storage is unavailable", async () => {
-    fetchMock.mockResolvedValue(new Response(null, { status: 200 }));
+    fetchMock.mockResolvedValue(jsonOk());
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
       throw new Error("Storage unavailable");
     });
     const container = render(<WaitlistForm />);
 
     change(emailInput(container), email);
+    checkAge(container);
     submit(form(container));
 
     await waitFor(() => expect(container.textContent).toContain("You’re subscribed."));
@@ -106,16 +218,21 @@ describe("WaitlistForm", () => {
 
   it("disables controls while a request is pending", async () => {
     let resolveResponse!: (response: Response) => void;
-    fetchMock.mockReturnValue(new Promise<Response>((resolve) => { resolveResponse = resolve; }));
+    fetchMock.mockReturnValue(
+      new Promise<Response>((resolve) => {
+        resolveResponse = resolve;
+      })
+    );
     const container = render(<WaitlistForm />);
     const input = emailInput(container);
-    const button = container.querySelector("button") as HTMLButtonElement;
+    const button = submitButton(container);
 
     change(input, email);
+    checkAge(container);
     submit(form(container));
     expect(input.disabled).toBe(true);
     expect(button.disabled).toBe(true);
-    resolveResponse(new Response(null, { status: 200 }));
+    resolveResponse(jsonOk());
     await waitFor(() => expect(button.disabled).toBe(false));
   });
 });

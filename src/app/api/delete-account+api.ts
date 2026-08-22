@@ -1,5 +1,4 @@
-import { createHash } from 'crypto';
-
+import { sha256Hex } from '../../lib/webCrypto';
 import {
     AUTH_REQUEST_TIMEOUT_MS,
     getSupabaseConfig,
@@ -27,8 +26,8 @@ function readDeletionProof(request: Request): string | null {
   return proof && proof.length > 0 ? proof : null;
 }
 
-function hashProof(proof: string): string {
-  return createHash('sha256').update(proof).digest('hex');
+async function hashProof(proof: string): Promise<string> {
+  return sha256Hex(proof);
 }
 
 type ProofConsumption = 'consumed' | 'invalid' | 'unavailable';
@@ -41,7 +40,7 @@ async function consumeDeletionProof(
   try {
     const url = new URL(`${config.url}/rest/v1/account_deletion_proofs`);
     url.searchParams.set('user_id', `eq.${userId}`);
-    url.searchParams.set('proof_hash', `eq.${hashProof(proof)}`);
+    url.searchParams.set('proof_hash', `eq.${await hashProof(proof)}`);
     url.searchParams.set('expires_at', `gt.${new Date().toISOString()}`);
 
     const response = await fetch(url.toString(), {

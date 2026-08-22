@@ -24,9 +24,29 @@ export function getClientStorage(): ClientStorage {
 
   if (!clientStorage) {
     const storageModule = require('@react-native-async-storage/async-storage') as {
-      default: ClientStorage;
+      default?: ClientStorage;
+      getItem?: ClientStorage['getItem'];
+      setItem?: ClientStorage['setItem'];
+      removeItem?: ClientStorage['removeItem'];
     };
-    clientStorage = storageModule.default;
+    const resolved =
+      storageModule.default && typeof storageModule.default.getItem === 'function'
+        ? storageModule.default
+        : storageModule;
+
+    if (
+      typeof resolved.getItem !== 'function' ||
+      typeof resolved.setItem !== 'function' ||
+      typeof resolved.removeItem !== 'function'
+    ) {
+      return serverStorage;
+    }
+
+    clientStorage = {
+      getItem: resolved.getItem.bind(resolved),
+      setItem: resolved.setItem.bind(resolved),
+      removeItem: resolved.removeItem.bind(resolved),
+    };
   }
 
   return clientStorage;

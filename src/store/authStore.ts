@@ -3,7 +3,14 @@ import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { create } from 'zustand';
 import { getApiUrl } from '../lib/api';
+import {
+  AccountExistsError,
+  isAlreadyRegisteredAuthError,
+  isObfuscatedExistingUser,
+} from '../lib/authAccount';
 import { supabase } from '../lib/supabase';
+import { useAgeEligibilityStore } from './ageEligibilityStore';
+import { useDraftSpotsStore } from './draftSpotsStore';
 
 type AuthState = {
   session: Session | null;
@@ -114,7 +121,7 @@ async function createDeleteAccountProof(accessToken: string): Promise<string> {
 
   if (!response.ok || !data?.proof) {
     throw new Error(
-      data?.error ?? 'Couldn’t verify account deletion right now. Try again in a sec.'
+      data?.error ?? 'We couldn’t verify account deletion right now. Please try again.'
     );
   }
 
@@ -173,8 +180,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   signIn: async (email, password) => {
+    const trimmedEmail = email.trim();
     const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
+      email: trimmedEmail,
       password,
     });
 
@@ -184,13 +192,27 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   signUp: async (email, password) => {
+    if (!useAgeEligibilityStore.getState().confirmedThisSession) {
+      throw new Error('Confirm you are 13 or older before creating an account.');
+    }
+
+    const trimmedEmail = email.trim();
     const { data, error } = await supabase.auth.signUp({
-      email: email.trim(),
+      email: trimmedEmail,
       password,
     });
 
     if (error) {
+      if (isAlreadyRegisteredAuthError(error)) {
+        throw new AccountExistsError();
+      }
       throw error;
+    }
+
+    // Confirm-email projects return a fake user with no identities when the
+    // address is already registered. Treat that as a conflict, not a new OTP.
+    if (isObfuscatedExistingUser(data.user)) {
+      throw new AccountExistsError();
     }
 
     // When email confirmation is on, Supabase returns a user but no session
@@ -243,24 +265,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
 
     if (!data?.url) {
-      throw new Error('Could not start Google log in. Try again.');
+      throw new Error('Could not start Google sign-in. Please try again.');
     }
 
     // Open the Google login in an in-app browser sheet. It resolves once the
     // browser navigates to our redirectTo URL (which carries the auth code).
+    // Do not call dismissBrowser() afterward: that API only closes
+    // openBrowserAsync (SFSafariViewController). Google sign-in uses
+    // openAuthSessionAsync (ASWebAuthenticationSession), which already
+    // closes itself. Calling dismissBrowser throws
+    // "There is no web browser to dismiss" on iOS.
     const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
 
-    // Make sure the sheet is gone. In Expo Go the deep link can reopen the app
-    // without auto-dismissing the browser, which looks like an endless spinner.
-    try {
-      WebBrowser.dismissBrowser();
-    } catch {
-      // No browser open to dismiss; ignore.
-    }
-
     if (result.type !== 'success' || !result.url) {
-      // User dismissed the sheet or cancelled; nothing to do.
-      return false;
+      // Android especially can close the sheet as a dismiss after the deep
+      // link has already established the session.
+      return Boolean(get().session);
     }
 
     // Hand the returned URL to Supabase to establish the session. The global
@@ -274,7 +294,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // Google/Supabase can report failures on the redirect URL itself.
     if (params.error || params.error_description) {
       throw new Error(
-        params.error_description || params.error || 'Google log in failed.'
+        params.error_description || params.error || 'Google sign-in failed.'
       );
     }
 
@@ -328,6 +348,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
 
     deleteAccountProof = null;
+    useAgeEligibilityStore.getState().clear();
     set({ passwordRecovery: false });
   },
 
@@ -361,7 +382,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     const accessToken = data.session?.access_token;
     if (!accessToken) {
-      throw new Error('Couldn’t verify account deletion. Try again in a sec.');
+      throw new Error('We couldn’t verify account deletion. Please try again.');
     }
 
     deleteAccountProof = await createDeleteAccountProof(accessToken);
@@ -392,12 +413,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         | { error?: string }
         | null;
       throw new Error(
-        body?.error ?? 'Couldn’t delete your account right now. Try again in a sec.'
+        body?.error ?? 'We couldn’t delete your account right now. Please try again.'
       );
     }
 
     // The server has deleted the auth user; drop the local session too.
+    const userId = get().user?.id ?? data.session?.user.id;
     await supabase.auth.signOut();
+    if (userId) {
+      await useDraftSpotsStore.getState().clearUserDrafts(userId);
+    }
     set({ passwordRecovery: false });
   },
 }));

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { SiteShell } from "../_components/site-shell";
+import { WaitlistForm } from "../_components/waitlist-form";
 import {
   confirmSubscription,
   waitlistTokenFromSearchParam,
@@ -24,8 +25,8 @@ export default async function ConfirmPage({ searchParams }: ConfirmPageProps) {
     ? "Your email is confirmed."
     : "This confirmation link is invalid or expired.";
   const message = confirmed
-    ? "Thanks for joining the SkateU waitlist."
-    : "Request a new confirmation email from the SkateU landing page.";
+    ? "You’re on the SkateU waitlist. We’ll email you when we drop."
+    : "Request a new confirmation email below if you still need to confirm.";
 
   return (
     <SiteShell>
@@ -51,12 +52,18 @@ export default async function ConfirmPage({ searchParams }: ConfirmPageProps) {
             <p className="mx-auto mt-6 max-w-md text-pretty text-base leading-7 text-muted sm:text-lg">
               {message}
             </p>
-            <a
-              href="/"
-              className="mt-8 inline-flex min-h-14 items-center justify-center rounded-xl bg-accent px-6 text-sm font-bold text-brand transition-colors hover:bg-accent-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-field motion-reduce:transition-none"
-            >
-              Back to SkateU
-            </a>
+            {confirmed ? (
+              <a
+                href="/"
+                className="mt-8 inline-flex min-h-14 items-center justify-center rounded-xl bg-accent px-6 text-sm font-bold text-brand transition-colors hover:bg-accent-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-field motion-reduce:transition-none"
+              >
+                Back to SkateU
+              </a>
+            ) : (
+              <div className="mt-8 w-full">
+                <WaitlistForm />
+              </div>
+            )}
           </div>
         </section>
       </main>

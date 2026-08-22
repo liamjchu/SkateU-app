@@ -1,4 +1,4 @@
-// Maps API/store exceptions into short copy a skater can actually use.
+// Maps API/store exceptions into short copy a user can actually use.
 // Keep jargon (tokens, JWT, status codes) out of the UI.
 
 export function toUserFacingError(error: unknown, fallback: string): string {
@@ -12,10 +12,24 @@ export function toUserFacingError(error: unknown, fallback: string): string {
   return sanitizeErrorMessage(raw, fallback);
 }
 
+function professionalize(text: string): string {
+  return text
+    .replace(/try again in a sec\.?/gi, 'Please try again.')
+    .replace(/hang on — still posting\.?/gi, 'Still posting. Please wait.')
+    .replace(/hang on, the map’s still loading\.?/gi, 'The map is still loading.')
+    .replace(/hang on, the map's still loading\.?/gi, 'The map is still loading.')
+    .replace(/hang on…/gi, 'Please wait…')
+    .replace(/sign in again to keep going\.?/gi, 'Please sign in again.')
+    .replace(/that took too long\. please try again\.?/gi, 'This is taking too long. Please try again.')
+    .replace(/that took too long\. try again in a sec\.?/gi, 'This is taking too long. Please try again.')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export function sanitizeErrorMessage(raw: string, fallback: string): string {
   const text = raw.trim();
   if (text.length === 0) {
-    return fallback;
+    return professionalize(fallback);
   }
 
   const lower = text.toLowerCase();
@@ -25,7 +39,7 @@ export function sanitizeErrorMessage(raw: string, fallback: string): string {
     lower.includes('invalid credentials') ||
     lower.includes('invalid email or password')
   ) {
-    return 'Email or password doesn’t match.';
+    return 'That email or password is incorrect.';
   }
 
   if (
@@ -38,9 +52,9 @@ export function sanitizeErrorMessage(raw: string, fallback: string): string {
     lower.includes('bearer')
   ) {
     if (lower.includes('expir')) {
-      return 'Your session expired. Sign in again.';
+      return 'Your session expired. Please sign in again.';
     }
-    return 'Sign in again to keep going.';
+    return 'Please sign in again.';
   }
 
   if (
@@ -53,8 +67,8 @@ export function sanitizeErrorMessage(raw: string, fallback: string): string {
   }
 
   if (/^request failed with status/i.test(text) || /\bstatus \d{3}\b/i.test(text)) {
-    return fallback;
+    return professionalize(fallback);
   }
 
-  return text;
+  return professionalize(text);
 }

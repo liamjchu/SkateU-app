@@ -1,73 +1,51 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
     BackHandler,
-    Image,
     Modal,
+    ScrollView,
     StyleSheet,
+    Text,
     View,
     useWindowDimensions,
 } from 'react-native';
-import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
-import Animated, {
-    runOnJS,
-    useAnimatedStyle,
-    useSharedValue,
-    withTiming,
-} from 'react-native-reanimated';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FeedbackPressable from './FeedbackPressable';
+import ZoomablePhoto from './zoomable-photo';
 
 type ImageLightboxProps = {
   visible: boolean;
-  uri: string;
+  uris: string[];
+  initialIndex?: number;
   onClose: () => void;
   accessibilityLabel: string;
 };
 
-const MIN_SCALE = 1;
-const MAX_SCALE = 4;
-const DISMISS_DISTANCE = 120;
-
-function clamp(value: number, min: number, max: number) {
-  'worklet';
-  return Math.min(max, Math.max(min, value));
-}
-
-const AnimatedImage = Animated.createAnimatedComponent(Image);
-
 export default function ImageLightbox({
   visible,
-  uri,
+  uris,
+  initialIndex = 0,
   onClose,
   accessibilityLabel,
 }: ImageLightboxProps) {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
-  const close = useCallback(() => {
-    onCloseRef.current();
-  }, []);
-  const scale = useSharedValue(1);
-  const savedScale = useSharedValue(1);
-  const translateX = useSharedValue(0);
-  const translateY = useSharedValue(0);
-  const savedTranslateX = useSharedValue(0);
-  const savedTranslateY = useSharedValue(0);
+  const pagerRef = useRef<ScrollView>(null);
+  const [index, setIndex] = useState(initialIndex);
+  const [zoomed, setZoomed] = useState(false);
+  const paging = uris.length > 1;
+  const safeIndex = Math.min(Math.max(initialIndex, 0), Math.max(uris.length - 1, 0));
 
   useEffect(() => {
     if (!visible) {
       return;
     }
 
-    scale.value = 1;
-    savedScale.value = 1;
-    translateX.value = 0;
-    translateY.value = 0;
-    savedTranslateX.value = 0;
-    savedTranslateY.value = 0;
-  }, [scale, savedScale, savedTranslateX, savedTranslateY, translateX, translateY, uri, visible]);
+    setIndex(safeIndex);
+    setZoomed(false);
+    pagerRef.current?.scrollTo({ x: safeIndex * width, animated: false });
+  }, [safeIndex, visible, width]);
 
   useEffect(() => {
     if (!visible) {
@@ -77,112 +55,17 @@ export default function ImageLightbox({
     const subscription = BackHandler.addEventListener(
       'hardwareBackPress',
       () => {
-        close();
+        onClose();
         return true;
       }
     );
 
     return () => subscription.remove();
-  }, [close, visible]);
+  }, [onClose, visible]);
 
-  const pinch = Gesture.Pinch()
-    .onUpdate((event) => {
-      scale.value = clamp(savedScale.value * event.scale, 0.85, MAX_SCALE);
-    })
-    .onEnd(() => {
-      if (scale.value < MIN_SCALE) {
-        savedScale.value = MIN_SCALE;
-        savedTranslateX.value = 0;
-        savedTranslateY.value = 0;
-        scale.value = withTiming(MIN_SCALE);
-        translateX.value = withTiming(0);
-        translateY.value = withTiming(0);
-        return;
-      }
-
-      savedScale.value = scale.value;
-    });
-
-  const pan = Gesture.Pan()
-    .minDistance(8)
-    .onUpdate((event) => {
-      if (scale.value > 1.02) {
-        const maxX = ((scale.value - 1) * width) / 2;
-        const maxY = ((scale.value - 1) * height) / 2;
-        translateX.value = clamp(
-          savedTranslateX.value + event.translationX,
-          -maxX,
-          maxX
-        );
-        translateY.value = clamp(
-          savedTranslateY.value + event.translationY,
-          -maxY,
-          maxY
-        );
-        return;
-      }
-
-      translateX.value = event.translationX * 0.2;
-      translateY.value = event.translationY;
-    })
-    .onEnd((event) => {
-      if (scale.value <= 1.02) {
-        if (event.translationY > DISMISS_DISTANCE || event.velocityY > 900) {
-          runOnJS(close)();
-          return;
-        }
-
-        translateX.value = withTiming(0);
-        translateY.value = withTiming(0);
-        return;
-      }
-
-      savedTranslateX.value = translateX.value;
-      savedTranslateY.value = translateY.value;
-    })
-    .onFinalize((_event, success) => {
-      if (success) {
-        return;
-      }
-
-      translateX.value = withTiming(0);
-      translateY.value = withTiming(0);
-    });
-
-  const doubleTap = Gesture.Tap()
-    .numberOfTaps(2)
-    .onEnd(() => {
-      if (scale.value > 1.1) {
-        savedScale.value = MIN_SCALE;
-        savedTranslateX.value = 0;
-        savedTranslateY.value = 0;
-        scale.value = withTiming(MIN_SCALE);
-        translateX.value = withTiming(0);
-        translateY.value = withTiming(0);
-        return;
-      }
-
-      scale.value = withTiming(2.5);
-      savedScale.value = 2.5;
-    });
-
-  const gesture = Gesture.Simultaneous(pinch, pan, doubleTap);
-
-  const imageStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: translateX.value },
-      { translateY: translateY.value },
-      { scale: scale.value },
-    ],
-  }));
-
-  const backdropStyle = useAnimatedStyle(() => {
-    const dragged =
-      scale.value <= 1.02 ? Math.min(Math.abs(translateY.value) / 280, 1) : 0;
-    return {
-      opacity: 1 - dragged * 0.45,
-    };
-  });
+  if (!visible || uris.length === 0) {
+    return null;
+  }
 
   return (
     <Modal
@@ -191,36 +74,62 @@ export default function ImageLightbox({
       animationType="fade"
       statusBarTranslucent
       presentationStyle="overFullScreen"
-      onRequestClose={close}
+      onRequestClose={onClose}
     >
       <GestureHandlerRootView style={styles.root}>
-        <Animated.View
-          style={[styles.backdrop, backdropStyle]}
-          accessibilityElementsHidden
-        />
-        <GestureDetector gesture={gesture}>
-          <Animated.View
-            style={styles.stage}
-            accessibilityLabel={accessibilityLabel}
-            accessibilityRole="image"
+        {paging ? <View style={styles.backdrop} /> : null}
+        {paging ? (
+          <ScrollView
+            ref={pagerRef}
+            horizontal
+            pagingEnabled
+            scrollEnabled={!zoomed}
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={(event) => {
+              const next = Math.round(event.nativeEvent.contentOffset.x / width);
+              if (next >= 0 && next < uris.length) {
+                setIndex(next);
+              }
+            }}
           >
-            {uri.length > 0 ? (
-              <AnimatedImage
-                source={{ uri }}
-                resizeMode="contain"
-                style={[{ width, height }, imageStyle]}
-                accessible={false}
+            {uris.map((uri, photoIndex) => (
+              <ZoomablePhoto
+                key={`${uri}-${photoIndex}`}
+                uri={uri}
+                width={width}
+                height={height}
+                paging
+                onClose={onClose}
+                onZoomChange={setZoomed}
+                accessibilityLabel={accessibilityLabel}
               />
-            ) : null}
-          </Animated.View>
-        </GestureDetector>
+            ))}
+          </ScrollView>
+        ) : (
+          <ZoomablePhoto
+            uri={uris[0] ?? ''}
+            width={width}
+            height={height}
+            paging={false}
+            onClose={onClose}
+            onZoomChange={setZoomed}
+            accessibilityLabel={accessibilityLabel}
+          />
+        )}
         <View
           pointerEvents="box-none"
           style={[styles.closeWrap, { top: Math.max(insets.top, 12) }]}
         >
+          {paging ? (
+            <Text className="font-outfit-bold text-[15px] text-white">
+              {index + 1} / {uris.length}
+            </Text>
+          ) : (
+            <View />
+          )}
           <FeedbackPressable
             haptic="selection"
-            onPress={close}
+            onPress={onClose}
             className="h-11 w-11 items-center justify-center rounded-full bg-black/50"
             accessibilityRole="button"
             accessibilityLabel="Close photo"
@@ -241,14 +150,13 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: '#000000',
   },
-  stage: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   closeWrap: {
     position: 'absolute',
+    left: 16,
     right: 16,
     zIndex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
 });

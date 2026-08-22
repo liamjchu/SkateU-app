@@ -37,20 +37,28 @@ describe("ConfirmPage", () => {
     );
 
     expect(container.textContent).toContain("Your email is confirmed.");
-    expect(container.textContent).toContain("Thanks for joining the SkateU waitlist.");
+    expect(container.textContent).toContain("You’re on the SkateU waitlist.");
+    expect(
+      container.querySelector('form[aria-label="Join the SkateU waitlist"]')
+    ).toBeNull();
     const backLink = [...container.querySelectorAll("a")].find((link) =>
       link.textContent?.includes("Back to SkateU")
     );
     expect(backLink?.getAttribute("href")).toBe("/");
   });
 
-  it("renders the invalid confirmation message", async () => {
+  it("lets the user request a new confirmation email when the link is invalid", async () => {
     confirmSubscription.mockResolvedValue(false);
     const container = render(
       await ConfirmPage({ searchParams: Promise.resolve({}) })
     );
 
-    expect(container.textContent).toContain("This confirmation link is invalid or expired.");
+    expect(container.textContent).toContain(
+      "This confirmation link is invalid or expired."
+    );
     expect(container.textContent).toContain("Request a new confirmation email");
+    expect(
+      container.querySelector('form[aria-label="Join the SkateU waitlist"]')
+    ).not.toBeNull();
   });
 });

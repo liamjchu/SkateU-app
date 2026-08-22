@@ -5,23 +5,26 @@
   },
   "build": {
     "development": {
-      "node": "20.19.0",
+      "node": "22.19.0",
       "developmentClient": true,
       "distribution": "internal",
+      "environment": "preview",
       "android": {
         "buildType": "apk"
       }
     },
     "preview": {
-      "node": "20.19.0",
+      "node": "22.19.0",
       "distribution": "internal",
+      "environment": "preview",
       "android": {
         "buildType": "apk"
       }
     },
     "production": {
-      "node": "20.19.0",
-      "autoIncrement": true
+      "node": "22.19.0",
+      "autoIncrement": true,
+      "environment": "production"
     }
   },
   "submit": {

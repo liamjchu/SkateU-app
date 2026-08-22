@@ -1,5 +1,4 @@
-import { createHash, randomUUID } from 'crypto';
-
+import { createRandomId, sha256Hex } from '../../lib/webCrypto';
 import {
     AUTH_REQUEST_TIMEOUT_MS,
     getSupabaseConfig,
@@ -59,8 +58,8 @@ function hasRecentOtpAuthentication(accessToken: string): boolean {
   }
 }
 
-function hashProof(proof: string): string {
-  return createHash('sha256').update(proof).digest('hex');
+async function hashProof(proof: string): Promise<string> {
+  return sha256Hex(proof);
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -95,7 +94,7 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  const proof = randomUUID();
+  const proof = createRandomId();
   const expiresAt = new Date(Date.now() + DELETION_PROOF_TTL_MS).toISOString();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), AUTH_REQUEST_TIMEOUT_MS);
@@ -113,7 +112,7 @@ export async function POST(request: Request): Promise<Response> {
       },
       body: JSON.stringify({
         user_id: auth.userId,
-        proof_hash: hashProof(proof),
+        proof_hash: await hashProof(proof),
         expires_at: expiresAt,
       }),
       signal: controller.signal,

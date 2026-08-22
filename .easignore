@@ -1,0 +1,55 @@
+# EAS uses this file instead of .gitignore when present.
+# Keep client secrets and generated/native folders off the builder.
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files — never upload secrets in the project archive
+.env
+.env*.local
+
+# typescript
+*.tsbuildinfo
+
+# test coverage
+coverage/
+
+app-example
+
+# generated native folders (EAS prebuilds these)
+/ios
+/android
+
+# Separate Next.js site and its build cache
+/apps
+
+# School seed archives and generated CSVs (not needed to compile the app)
+/data/school_sources
+/all_us_schools.csv

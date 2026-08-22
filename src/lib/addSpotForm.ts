@@ -6,6 +6,8 @@ export const SPOT_NAME_MIN = 1;
 export const SPOT_NAME_MAX = 100;
 export const SPOT_DESCRIPTION_MIN = 1;
 export const SPOT_DESCRIPTION_MAX = 1000;
+export const SPOT_IMAGE_MIN = 1;
+export const SPOT_IMAGE_MAX = 3;
 
 export type SpotFormErrors = {
   image?: string;
@@ -14,7 +16,7 @@ export type SpotFormErrors = {
 };
 
 export function getSpotFormErrors(
-  imageUri: string | undefined,
+  photoCount: number,
   name: string,
   description: string
 ): SpotFormErrors {
@@ -22,31 +24,33 @@ export function getSpotFormErrors(
   const nameLength = name.trim().length;
   const descriptionLength = description.trim().length;
 
-  if (!imageUri) {
+  if (photoCount < SPOT_IMAGE_MIN) {
     errors.image = 'Still needs a photo.';
+  } else if (photoCount > SPOT_IMAGE_MAX) {
+    errors.image = `You can add up to ${SPOT_IMAGE_MAX} photos.`;
   }
 
   if (nameLength < SPOT_NAME_MIN) {
     errors.name = 'Still needs a name.';
   } else if (nameLength > SPOT_NAME_MAX) {
-    errors.name = 'That name’s a bit long.';
+    errors.name = 'That name is too long.';
   }
 
   if (descriptionLength < SPOT_DESCRIPTION_MIN) {
     errors.description = 'Still needs a description.';
   } else if (descriptionLength > SPOT_DESCRIPTION_MAX) {
-    errors.description = 'That description’s a bit long.';
+    errors.description = 'That description is too long.';
   }
 
   return errors;
 }
 
 export function isAddSpotFormValid(
-  imageUri: string | undefined,
+  photoCount: number,
   name: string,
   description: string
 ): boolean {
-  return Object.keys(getSpotFormErrors(imageUri, name, description)).length === 0;
+  return Object.keys(getSpotFormErrors(photoCount, name, description)).length === 0;
 }
 
 function joinCasualList(items: string[]): string {
@@ -66,11 +70,11 @@ function joinWithArticles(items: string[]): string {
 }
 
 export function getSpotFormMissingSummary(
-  imageUri: string | undefined,
+  photoCount: number,
   name: string,
   description: string
 ): string | null {
-  const errors = getSpotFormErrors(imageUri, name, description);
+  const errors = getSpotFormErrors(photoCount, name, description);
   const messages = [errors.name, errors.image, errors.description].filter(
     (message): message is string => Boolean(message)
   );
@@ -86,7 +90,7 @@ export function getSpotFormMissingSummary(
   if (errors.name && name.trim().length < SPOT_NAME_MIN) {
     missing.push('name');
   }
-  if (errors.image) {
+  if (errors.image && photoCount < SPOT_IMAGE_MIN) {
     missing.push('photo');
   }
   if (errors.description && description.trim().length < SPOT_DESCRIPTION_MIN) {
@@ -108,10 +112,10 @@ export function getSpotFormMissingSummary(
     return `Still needs ${joinWithArticles(missing)}.`;
   }
   if (missing.length === 0 && tooLong.length === 1) {
-    return `That ${tooLong[0]}’s a bit long.`;
+    return `That ${tooLong[0]} is too long.`;
   }
   if (missing.length === 0 && tooLong.length > 1) {
-    return `That ${joinCasualList(tooLong)} are a bit long.`;
+    return `Those ${joinCasualList(tooLong)} are too long.`;
   }
 
   return messages.join(' ');

@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Text, TextInput, View } from 'react-native';
 import { USERNAME_MAX, validateUsername } from '../lib/username';
 import { colors } from '../constants/colors';
@@ -23,6 +23,9 @@ type UsernameFormProps = {
   submitLabel: string;
   submittingLabel: string;
   showWelcomeOnSave?: boolean;
+  submitEnabled?: boolean;
+  footer?: ReactNode;
+  onBeforeSubmit?: () => Promise<void>;
   onSaved: () => void;
 };
 
@@ -32,6 +35,9 @@ export function UsernameForm({
   submitLabel,
   submittingLabel,
   showWelcomeOnSave = false,
+  submitEnabled = true,
+  footer,
+  onBeforeSubmit,
   onSaved,
 }: UsernameFormProps) {
   const userId = useAuthStore((state) => state.user?.id);
@@ -90,7 +96,8 @@ export function UsernameForm({
     status === 'available' &&
     Boolean(accessToken) &&
     !submitting &&
-    !unchanged;
+    !unchanged &&
+    submitEnabled;
 
   const handleSubmit = async () => {
     if (!accessToken || !canSubmit) {
@@ -101,6 +108,7 @@ export function UsernameForm({
     setSubmitError('');
 
     try {
+      await onBeforeSubmit?.();
       const result = await claimUsername(
         accessToken,
         value,
@@ -115,7 +123,6 @@ export function UsernameForm({
 
       onSaved();
     } catch (error) {
-      setStatus('error');
       setSubmitError(
         toUserFacingError(error, 'Could not save the username. Try again.')
       );
@@ -185,6 +192,8 @@ export function UsernameForm({
           </Text>
         ) : null}
       </View>
+
+      {footer ? <View className="mt-6">{footer}</View> : null}
 
       <FeedbackPressable
         haptic="light"

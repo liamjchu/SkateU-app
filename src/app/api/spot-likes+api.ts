@@ -1,5 +1,7 @@
 import {
+    applyVisibleSpotFilter,
     getSupabaseConfig,
+    isRemovedSpotStatus,
     mapSpot,
     resolveUserId,
     authUserMessage,
@@ -7,12 +9,13 @@ import {
     validateSpotId,
     type DatabaseSpot,
 } from './spots+api';
+import { fetchBlockedUserIds } from './blockedUsers';
 
 type SupabaseConfig = { url: string; apiKey: string };
 
 type LikeRow = { spot_id: string; created_at: string };
 
-type LikeCountRow = { likes_count: number };
+type LikeCountRow = { likes_count: number; status?: string };
 
 const POSTGREST_IN_FILTER_BATCH_SIZE = 100;
 
@@ -56,10 +59,10 @@ async function requireUser(
 async function readSpotLikeCount(
   config: SupabaseConfig,
   spotId: string
-): Promise<number | null> {
+): Promise<LikeCountRow | null> {
   const query = new URL(`${config.url}/rest/v1/spots`);
   query.searchParams.set('id', `eq.${spotId}`);
-  query.searchParams.set('select', 'likes_count');
+  query.searchParams.set('select', 'likes_count,status');
 
   const response = await fetch(query.toString(), {
     headers: { apikey: config.apiKey, Authorization: `Bearer ${config.apiKey}` },
@@ -67,7 +70,7 @@ async function readSpotLikeCount(
   if (!response.ok) throw new Error(await response.text());
 
   const rows = (await response.json()) as LikeCountRow[];
-  return rows[0] ? rows[0].likes_count : null;
+  return rows[0] ?? null;
 }
 
 async function fetchLikedSpotIds(
@@ -114,6 +117,7 @@ async function getLikedSpots(
       const query = new URL(`${config.url}/rest/v1/spots`);
       query.searchParams.set('id', `in.(${batch.join(',')})`);
       query.searchParams.set('select', SPOT_SELECT_COLUMNS);
+      applyVisibleSpotFilter(query);
 
       const response = await fetch(query.toString(), {
         headers: { apikey: config.apiKey, Authorization: `Bearer ${config.apiKey}` },
@@ -124,7 +128,19 @@ async function getLikedSpots(
     })
   );
   const rows = rowsByBatch.flat();
-  const byId = new Map(rows.map((row) => [row.id, row]));
+  let blockedIds: string[] = [];
+  try {
+    blockedIds = await fetchBlockedUserIds(config, userId);
+  } catch (error) {
+    console.error('Loading blocked users failed:', error);
+  }
+  const blocked = new Set(blockedIds);
+  const visibleRows = rows.filter(
+    (row) =>
+      typeof row.created_by_user_id !== 'string' ||
+      !blocked.has(row.created_by_user_id)
+  );
+  const byId = new Map(visibleRows.map((row) => [row.id, row]));
   return Response.json({
     spots: likedIds
       .map((id) => byId.get(id))
@@ -163,8 +179,8 @@ async function changeLike(request: Request, shouldLike: boolean): Promise<Respon
 
   try {
     const spotId = idValidation.value;
-    const existingCount = await readSpotLikeCount(config, spotId);
-    if (existingCount === null) {
+    const existing = await readSpotLikeCount(config, spotId);
+    if (existing === null || isRemovedSpotStatus(existing.status)) {
       return Response.json({ error: 'That spot no longer exists.' }, { status: 404 });
     }
 
@@ -191,7 +207,10 @@ async function changeLike(request: Request, shouldLike: boolean): Promise<Respon
     if (!response.ok) throw new Error(await response.text());
 
     const likeCount = await readSpotLikeCount(config, spotId);
-    return Response.json({ likeCount: likeCount ?? 0, likedByUser: shouldLike });
+    return Response.json({
+      likeCount: likeCount?.likes_count ?? 0,
+      likedByUser: shouldLike,
+    });
   } catch (error) {
     console.error(`${shouldLike ? 'Adding' : 'Removing'} spot like failed:`, error);
     return Response.json(

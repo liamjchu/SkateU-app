@@ -3,10 +3,15 @@ import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import ChangePasswordForm from '../components/ChangePasswordForm';
 import ScreenHeader from '../components/screen-header';
 import { useAuthStore } from '../store/authStore';
+import { userCanSignInWithPassword } from '../lib/authAccount';
 
 export default function ChangePasswordScreen() {
   const router = useRouter();
   const email = useAuthStore((state) => state.user?.email ?? '');
+  const canSignInWithPassword = useAuthStore((state) =>
+    userCanSignInWithPassword(state.user)
+  );
+  const isSetMode = !canSignInWithPassword;
 
   const goBack = () => {
     if (router.canGoBack()) {
@@ -19,7 +24,7 @@ export default function ChangePasswordScreen() {
 
   return (
     <View className="flex-1 bg-surface">
-      <ScreenHeader title="Change password" onBack={goBack} />
+      <ScreenHeader title={isSetMode ? 'Set a password' : 'Change password'} onBack={goBack} />
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -32,7 +37,7 @@ export default function ChangePasswordScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View className="flex-1 self-center w-full max-w-[640px] px-6 pt-8 pb-8">
-            <ChangePasswordForm email={email} />
+            <ChangePasswordForm email={email} mode={isSetMode ? 'set' : 'change'} />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

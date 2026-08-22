@@ -4,6 +4,7 @@ import {
     isAddSpotFormValid,
     SPOT_DESCRIPTION_MAX,
     SPOT_DESCRIPTION_MIN,
+    SPOT_IMAGE_MAX,
     SPOT_NAME_MAX,
     SPOT_NAME_MIN,
 } from '../../lib/addSpotForm';
@@ -11,15 +12,15 @@ import {
 // Reference predicate expressed independently of the implementation so the
 // property compares behaviour, not code.
 function expectedValid(
-  imageUri: string | undefined,
+  photoCount: number,
   name: string,
   description: string
 ): boolean {
-  const hasImage = typeof imageUri === 'string' && imageUri.length > 0;
   const nameLen = name.trim().length;
   const descLen = description.trim().length;
   return (
-    hasImage &&
+    photoCount >= 1 &&
+    photoCount <= SPOT_IMAGE_MAX &&
     nameLen >= SPOT_NAME_MIN &&
     nameLen <= SPOT_NAME_MAX &&
     descLen >= SPOT_DESCRIPTION_MIN &&
@@ -47,27 +48,24 @@ function boundaryTextArb(max: number): fc.Arbitrary<string> {
   );
 }
 
-// Image presence/absence, including empty-string "selected" (treated as none).
-const imageArb: fc.Arbitrary<string | undefined> = fc.oneof(
-  fc.constant(undefined),
-  fc.constant(''),
-  fc.webUrl(),
-  fc.string({ minLength: 1 })
-);
+const photoCountArb: fc.Arbitrary<number> = fc.integer({
+  min: 0,
+  max: SPOT_IMAGE_MAX + 2,
+});
 
 describe('add-spot save enablement', () => {
   // Feature: global-spots, Property 9: add-spot save enablement matches the
   // validity predicate
   // Validates: Requirements 10.1, 10.2
-  it('is enabled iff image selected AND trimmed name in [1,100] AND trimmed description in [1,1000]', () => {
+  it('is enabled iff at least one photo AND trimmed name in [1,100] AND trimmed description in [1,1000]', () => {
     fc.assert(
       fc.property(
-        imageArb,
+        photoCountArb,
         boundaryTextArb(SPOT_NAME_MAX),
         boundaryTextArb(SPOT_DESCRIPTION_MAX),
-        (imageUri, name, description) => {
-          expect(isAddSpotFormValid(imageUri, name, description)).toBe(
-            expectedValid(imageUri, name, description)
+        (photoCount, name, description) => {
+          expect(isAddSpotFormValid(photoCount, name, description)).toBe(
+            expectedValid(photoCount, name, description)
           );
         }
       ),
@@ -76,7 +74,6 @@ describe('add-spot save enablement', () => {
   });
 
   it('accepts exact boundary lengths and rejects just-over-length values', () => {
-    const img = 'file:///spot.jpg';
     const name1 = 'a';
     const name100 = 'a'.repeat(SPOT_NAME_MAX);
     const name101 = 'a'.repeat(SPOT_NAME_MAX + 1);
@@ -84,45 +81,59 @@ describe('add-spot save enablement', () => {
     const desc1000 = 'b'.repeat(SPOT_DESCRIPTION_MAX);
     const desc1001 = 'b'.repeat(SPOT_DESCRIPTION_MAX + 1);
 
-    expect(isAddSpotFormValid(img, name1, desc1)).toBe(true);
-    expect(isAddSpotFormValid(img, name100, desc1000)).toBe(true);
-    expect(isAddSpotFormValid(img, name101, desc1000)).toBe(false);
-    expect(isAddSpotFormValid(img, name100, desc1001)).toBe(false);
+    expect(isAddSpotFormValid(1, name1, desc1)).toBe(true);
+    expect(isAddSpotFormValid(1, name100, desc1000)).toBe(true);
+    expect(isAddSpotFormValid(SPOT_IMAGE_MAX, name100, desc1000)).toBe(true);
+    expect(isAddSpotFormValid(1, name101, desc1000)).toBe(false);
+    expect(isAddSpotFormValid(1, name100, desc1001)).toBe(false);
+    expect(isAddSpotFormValid(SPOT_IMAGE_MAX + 1, name100, desc1000)).toBe(false);
   });
 
-  it('rejects when no image is selected or fields are whitespace-only', () => {
-    expect(isAddSpotFormValid(undefined, 'Ledge', 'Nice ledge')).toBe(false);
-    expect(isAddSpotFormValid('', 'Ledge', 'Nice ledge')).toBe(false);
-    expect(isAddSpotFormValid('file:///x.jpg', '   ', 'Nice ledge')).toBe(false);
-    expect(isAddSpotFormValid('file:///x.jpg', 'Ledge', '   ')).toBe(false);
+  it('rejects when no photo is selected or fields are whitespace-only', () => {
+    expect(isAddSpotFormValid(0, 'Ledge', 'Nice ledge')).toBe(false);
+    expect(isAddSpotFormValid(1, '   ', 'Nice ledge')).toBe(false);
+    expect(isAddSpotFormValid(1, 'Ledge', '   ')).toBe(false);
   });
 });
 
 describe('add-spot missing summary', () => {
   it('names only the fields that are actually wrong', () => {
-    expect(getSpotFormMissingSummary('file:///x.jpg', '', 'Nice ledge')).toBe(
+    expect(getSpotFormMissingSummary(1, '', 'Nice ledge')).toBe(
       'Still needs a name.'
     );
-    expect(getSpotFormMissingSummary('file:///x.jpg', 'Ledge', '')).toBe(
+    expect(getSpotFormMissingSummary(1, 'Ledge', '')).toBe(
       'Still needs a description.'
     );
-    expect(getSpotFormMissingSummary(undefined, 'Ledge', 'Nice ledge')).toBe(
+    expect(getSpotFormMissingSummary(0, 'Ledge', 'Nice ledge')).toBe(
       'Still needs a photo.'
     );
-    expect(getSpotFormMissingSummary(undefined, '', 'Nice ledge')).toBe(
+    expect(getSpotFormMissingSummary(0, '', 'Nice ledge')).toBe(
       'Still needs a name and a photo.'
     );
-    expect(getSpotFormMissingSummary(undefined, '', '')).toBe(
+    expect(getSpotFormMissingSummary(0, '', '')).toBe(
       'Still needs a name, a photo, and a description.'
     );
-    expect(getSpotFormMissingSummary('file:///x.jpg', '', '')).toBe(
+    expect(getSpotFormMissingSummary(1, '', '')).toBe(
       'Still needs a name and a description.'
     );
     expect(
-      getSpotFormMissingSummary('file:///x.jpg', 'a'.repeat(SPOT_NAME_MAX + 1), 'Nice ledge')
-    ).toBe('That name’s a bit long.');
-    expect(getSpotFormMissingSummary('file:///x.jpg', 'Ledge', 'Nice ledge')).toBe(
+      getSpotFormMissingSummary(1, 'a'.repeat(SPOT_NAME_MAX + 1), 'Nice ledge')
+    ).toBe('That name is too long.');
+    expect(
+      getSpotFormMissingSummary(SPOT_IMAGE_MAX + 1, 'Ledge', 'Nice ledge')
+    ).toBe(`You can add up to ${SPOT_IMAGE_MAX} photos.`);
+    expect(getSpotFormMissingSummary(1, 'Ledge', 'Nice ledge')).toBe(
       null
     );
+    expect(
+      getSpotFormMissingSummary(
+        1,
+        'a'.repeat(SPOT_NAME_MAX + 1),
+        'b'.repeat(SPOT_DESCRIPTION_MAX + 1)
+      )
+    ).toBe('Those name and description are too long.');
+    expect(
+      getSpotFormMissingSummary(1, 'Ledge', 'b'.repeat(SPOT_DESCRIPTION_MAX + 1))
+    ).toBe('That description is too long.');
   });
 });

@@ -47,6 +47,17 @@ export function SiteShell({ children }: { children: ReactNode }) {
       <footer className="relative z-10 border-t border-white/40 bg-brand text-white">
         <div className="mx-auto flex w-full max-w-7xl flex-col items-center gap-3 px-5 py-5 text-center text-[11px] font-bold uppercase tracking-[0.12em] sm:flex-row sm:justify-between sm:px-10 sm:text-left sm:tracking-[0.16em] lg:px-16">
           <span>© 2026 SkateU</span>
+          <nav
+            className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 normal-case tracking-normal"
+            aria-label="Legal"
+          >
+            <a
+              href="/privacy"
+              className="text-white/90 underline-offset-2 transition-colors hover:text-white hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand"
+            >
+              Privacy Policy
+            </a>
+          </nav>
           <div className="flex items-center gap-2" aria-label="Follow SkateU on social media">
             <a
               href="https://www.instagram.com/skateu.app/"

@@ -9,6 +9,9 @@
 --   1. Adds a trigger that increments/decrements numspots on spot insert/delete
 --      (and moves the count when a spot's school_id changes), and
 --   2. Backfills numspots for every school to match the real number of spots.
+--
+-- After `spot_removal_requests_setup.sql` is applied, this function is replaced
+-- so spots with status `removed` are excluded from the count.
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------

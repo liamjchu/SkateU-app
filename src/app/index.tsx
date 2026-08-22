@@ -1,6 +1,6 @@
 ﻿import { Feather, Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -21,6 +21,7 @@ import HomeRailCard, { HomeFeedRail } from '../components/home-rail-card';
 import HomeSchoolStories from '../components/home-school-stories';
 import HomeSpotPost from '../components/home-spot-post';
 import LoginRequiredModal from '../components/LoginRequiredModal';
+import SpotFullscreenViewer from '../components/spot-fullscreen-viewer';
 import NoticeBanner from '../components/NoticeBanner';
 import PopularSchoolCard, {
     SchoolSpotCount,
@@ -34,8 +35,20 @@ import { colors } from '../constants/colors';
 import { getApiUrl } from '../lib/api';
 import { triggerHaptic } from '../lib/haptics';
 import { HOME_RAIL_PAGE_SIZE } from '../lib/homeFeed';
+import {
+    getHomeLogoTapAction,
+    getHomeLogoTapHint,
+    isHomeFeedScrolled,
+} from '../lib/homeLogoTap';
+import { MIN_SEARCH_LENGTH, schoolMatchesQuery } from '../lib/schoolSearch';
 import { toUserFacingError } from '../lib/userFacingError';
+import { guardedNavigate } from '../lib/navigationGuard';
+import {
+    formatGuestBrowseMessage,
+    GUEST_BROWSE_TITLE,
+} from '../lib/guestBrowseCopy';
 import { useAuthStore } from '../store/authStore';
+import { useCommentsStore } from '../store/commentsStore';
 import { useFavorites } from '../store/favoritesStore';
 import { useSchools } from '../store/schoolsStore';
 import { useSpotsStore } from '../store/spotsStore';
@@ -88,20 +101,6 @@ function getSchoolSearchCopy(filter: SchoolTypeFilter): {
   }
 }
 
-function schoolMatchesQuery(school: School, query: string) {
-  const trimmedQuery = query.trim().toLowerCase();
-
-  if (trimmedQuery.length === 0) {
-    return true;
-  }
-
-  return (
-    school.name.toLowerCase().includes(trimmedQuery) ||
-    school.city.toLowerCase().includes(trimmedQuery) ||
-    school.state.toLowerCase().includes(trimmedQuery)
-  );
-}
-
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -109,6 +108,7 @@ export default function HomeScreen() {
   const session = useAuthStore((state) => state.session);
   const authInitializing = useAuthStore((state) => state.initializing);
   const toggleSpotLike = useSpotsStore((state) => state.toggleSpotLike);
+  const commentCounts = useCommentsStore((state) => state.commentCounts);
   const {
     favoriteSchoolIds,
     favoriteSchools: storedFavoriteSchools,
@@ -118,6 +118,9 @@ export default function HomeScreen() {
   } = useFavorites();
 
   const searchInputRef = useRef<TextInput>(null);
+  const feedScrollRef = useRef<ScrollView>(null);
+  const feedScrollOffsetRef = useRef(0);
+  const [isFeedScrolled, setIsFeedScrolled] = useState(false);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [activeFilter, setActiveFilter] = useState<SchoolTypeFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -142,6 +145,11 @@ export default function HomeScreen() {
   const [isHydratingFavoriteSchools, setIsHydratingFavoriteSchools] =
     useState(true);
   const [showLoginRequired, setShowLoginRequired] = useState(false);
+  const [fullscreenSpotId, setFullscreenSpotId] = useState<string | null>(
+    null
+  );
+  const [fullscreenPhotoIndex, setFullscreenPhotoIndex] = useState(0);
+  const [commentsCoveringViewer, setCommentsCoveringViewer] = useState(false);
   const [likingSpotId, setLikingSpotId] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const wasNearBottomRef = useRef(false);
@@ -342,6 +350,12 @@ export default function HomeScreen() {
       upsertFavoriteSchool,
       upsertSchool,
     ])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      setCommentsCoveringViewer(false);
+    }, [])
   );
 
   // Load the most-spotted schools for the popular feed. Re-runs when the
@@ -648,7 +662,7 @@ export default function HomeScreen() {
   useEffect(() => {
     const trimmedQuery = searchQuery.trim();
 
-    if (activeFilter === 'saved' || trimmedQuery.length < 3) {
+    if (activeFilter === 'saved' || trimmedQuery.length < MIN_SEARCH_LENGTH) {
       setSearchResults([]);
       setIsSearching(false);
       setSearchError('');
@@ -691,7 +705,6 @@ export default function HomeScreen() {
           return;
         }
 
-        setSearchResults([]);
         setSearchError(toUserFacingError(error, 'Couldn’t search schools right now.'));
       } finally {
         setIsSearching(false);
@@ -722,17 +735,19 @@ export default function HomeScreen() {
   };
 
   const navigateToSchoolMap = (school: School) => {
-    router.push({
-      pathname: '/map',
-      params: {
-        lat: school.lat.toString(),
-        lng: school.lng.toString(),
-        schoolName: school.name,
-        schoolId: school.id,
-        schoolCity: school.city,
-        schoolState: school.state,
-        schoolNumSpots: school.numSpots.toString(),
-      },
+    guardedNavigate(`map:${school.id}`, () => {
+      router.push({
+        pathname: '/map',
+        params: {
+          lat: school.lat.toString(),
+          lng: school.lng.toString(),
+          schoolName: school.name,
+          schoolId: school.id,
+          schoolCity: school.city,
+          schoolState: school.state,
+          schoolNumSpots: school.numSpots.toString(),
+        },
+      });
     });
   };
 
@@ -746,23 +761,25 @@ export default function HomeScreen() {
     if (!spot.schoolId) {
       Alert.alert(
         'Campus map unavailable',
-        'This spot isn’t tied to a campus, so there’s no map to open.'
+        'This spot is not tied to a campus, so there is no map to open.'
       );
       return;
     }
 
     Keyboard.dismiss();
-    router.push({
-      pathname: '/map',
-      params: {
-        lat: spot.latitude.toString(),
-        lng: spot.longitude.toString(),
-        schoolId: spot.schoolId,
-        schoolName: spot.schoolName || 'Campus map',
-        schoolCity: spot.city,
-        schoolState: spot.state,
-        spotId: spot.id,
-      },
+    guardedNavigate(`map-spot:${spot.id}`, () => {
+      router.push({
+        pathname: '/map',
+        params: {
+          lat: spot.latitude.toString(),
+          lng: spot.longitude.toString(),
+          schoolId: spot.schoolId,
+          schoolName: spot.schoolName || 'Campus map',
+          schoolCity: spot.city,
+          schoolState: spot.state,
+          spotId: spot.id,
+        },
+      });
     });
   };
 
@@ -799,12 +816,44 @@ export default function HomeScreen() {
     } catch (error) {
       Alert.alert(
         'Couldn’t update that like',
-        toUserFacingError(error, 'Try again in a sec.')
+        toUserFacingError(error, 'Please try again.')
       );
     } finally {
       setLikingSpotId(null);
     }
   };
+
+  const handleOpenComments = (spot: Spot) => {
+    if (fullscreenSpotId !== null) {
+      setCommentsCoveringViewer(true);
+    }
+    guardedNavigate(`comments:${spot.id}`, () => {
+      router.push({
+        pathname: '/spot-comments',
+        params: { spotId: spot.id, spotName: spot.name },
+      });
+    });
+  };
+
+  const handleOpenFullscreen = (spot: Spot, photoIndex = 0) => {
+    Keyboard.dismiss();
+    setFullscreenPhotoIndex(photoIndex);
+    setFullscreenSpotId(spot.id);
+  };
+
+  const handleViewMapFromFullscreen = (spot: Spot) => {
+    setFullscreenSpotId(null);
+    handleRecentSpotPress(spot);
+  };
+
+  const feedViewerSpots = useMemo(
+    () =>
+      recentSpots.map((spot) => ({
+        ...spot,
+        commentCount: commentCounts[spot.id] ?? spot.commentCount,
+      })),
+    [commentCounts, recentSpots]
+  );
 
   const handleFavoritePress = (school: School) => {
     upsertSchool(school);
@@ -813,11 +862,15 @@ export default function HomeScreen() {
 
   const handleProfilePress = () => {
     if (session) {
-      router.push('/profile');
+      guardedNavigate('profile', () => {
+        router.push('/profile');
+      });
       return;
     }
 
-    router.push('/login');
+    guardedNavigate('login', () => {
+      router.push('/login');
+    });
   };
 
   const handleRefresh = () => {
@@ -834,6 +887,36 @@ export default function HomeScreen() {
     setRecentRetryNonce((nonce) => nonce + 1);
   };
 
+  const homeLogoTapAction = getHomeLogoTapAction({
+    isSearchMode,
+    isScrolled: isFeedScrolled,
+  });
+
+  const handleHomeLogoPress = () => {
+    const action = getHomeLogoTapAction({
+      isSearchMode,
+      isScrolled: isHomeFeedScrolled(feedScrollOffsetRef.current),
+    });
+
+    if (action === 'exit-search') {
+      exitSearchMode();
+      return;
+    }
+
+    if (action === 'scroll-to-top') {
+      feedScrollRef.current?.scrollTo({ y: 0, animated: true });
+      feedScrollOffsetRef.current = 0;
+      setIsFeedScrolled(false);
+      return;
+    }
+
+    if (isRefreshing) {
+      return;
+    }
+
+    handleRefresh();
+  };
+
   useEffect(() => {
     if (!isRefreshing) {
       return;
@@ -846,7 +929,7 @@ export default function HomeScreen() {
 
   const trimmedSearch = searchQuery.trim();
   const showRemoteSearchResults =
-    activeFilter !== 'saved' && trimmedSearch.length >= 3;
+    activeFilter !== 'saved' && trimmedSearch.length >= MIN_SEARCH_LENGTH;
   const searchStatusText = isSearching
     ? 'Searching…'
     : `${sortedSearchResults.length} ${
@@ -864,15 +947,25 @@ export default function HomeScreen() {
           }}
         >
         <View className="h-11 flex-row items-center justify-between">
-          <Image
-            source={IMAGES.brandLockup}
-            style={{
-              width: HEADER_LOGO_WIDTH,
-              height: HEADER_LOGO_HEIGHT,
-            }}
-            resizeMode="contain"
+          <FeedbackPressable
+            haptic="light"
+            disablePressScale
+            onPress={handleHomeLogoPress}
+            className="h-11 justify-center"
+            accessibilityRole="button"
             accessibilityLabel="SkateU"
-          />
+            accessibilityHint={getHomeLogoTapHint(homeLogoTapAction)}
+          >
+            <Image
+              source={IMAGES.brandLockup}
+              style={{
+                width: HEADER_LOGO_WIDTH,
+                height: HEADER_LOGO_HEIGHT,
+              }}
+              resizeMode="contain"
+              accessible={false}
+            />
+          </FeedbackPressable>
 
           <FeedbackPressable
             haptic="light"
@@ -904,7 +997,7 @@ export default function HomeScreen() {
                   accessibilityHint={
                     activeFilter === 'saved'
                       ? 'Filters your saved schools by name, city, or state'
-                      : 'Type at least three characters to find a school'
+                      : 'Type a school, city, or 2-letter state'
                   }
                   numberOfLines={1}
                   multiline={false}
@@ -963,17 +1056,22 @@ export default function HomeScreen() {
 
           {!session && !authInitializing ? (
             <NoticeBanner
-              id="guest-browse"
+              id="guest-browse-v2"
               collapsed={isSearchMode}
               icon="eye-outline"
-              title="Browsing as a guest"
-              message="Browse campuses and spots freely. Sign in to like spots or add your own."
+              title={GUEST_BROWSE_TITLE}
+              message={formatGuestBrowseMessage()}
               actionLabel="Sign in"
-              onAction={() => router.push('/login')}
+              onAction={() =>
+                guardedNavigate('login', () => {
+                  router.push('/login');
+                })
+              }
             />
           ) : null}
 
           <ScrollView
+            ref={feedScrollRef}
             className="min-h-0 flex-1"
             contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
             keyboardShouldPersistTaps="handled"
@@ -991,12 +1089,18 @@ export default function HomeScreen() {
             }
             scrollEventThrottle={16}
             onScroll={(event) => {
+              const { contentOffset, layoutMeasurement, contentSize } =
+                event.nativeEvent;
+              feedScrollOffsetRef.current = contentOffset.y;
+              const scrolled = isHomeFeedScrolled(contentOffset.y);
+              if (scrolled !== isFeedScrolled) {
+                setIsFeedScrolled(scrolled);
+              }
+
               if (activeFilter === 'saved' || isSearchMode) {
                 return;
               }
 
-              const { contentOffset, layoutMeasurement, contentSize } =
-                event.nativeEvent;
               const remaining =
                 contentSize.height -
                 (contentOffset.y + layoutMeasurement.height);
@@ -1088,7 +1192,7 @@ export default function HomeScreen() {
                 </Text>
 
                 {searchError ? (
-                  <View className="flex-row items-center rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2.5">
+                  <View className="mb-4 flex-row items-center rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2.5">
                     <Text
                       accessibilityRole="alert"
                       accessibilityLiveRegion="polite"
@@ -1105,7 +1209,9 @@ export default function HomeScreen() {
                       <Text className="font-outfit-bold text-sm text-brand">Retry</Text>
                     </FeedbackPressable>
                   </View>
-                ) : isSearching ? (
+                ) : null}
+
+                {isSearching && sortedSearchResults.length === 0 ? (
                   <View accessibilityLabel="Searching schools">
                     {[0, 1, 2].map((placeholder) => (
                       <View
@@ -1114,16 +1220,7 @@ export default function HomeScreen() {
                       />
                     ))}
                   </View>
-                ) : sortedSearchResults.length === 0 ? (
-                  <View className="items-center rounded-2xl bg-field px-6 py-8">
-                    <Text className="text-lg text-ink font-outfit-bold">
-                      No schools found
-                    </Text>
-                    <Text className="mt-1 text-center text-base leading-5 text-muted font-outfit-medium">
-                      Try a school name, city, or state.
-                    </Text>
-                  </View>
-                ) : (
+                ) : sortedSearchResults.length > 0 ? (
                   sortedSearchResults.map((school: School) => (
                     <PopularSchoolCard
                       key={school.id}
@@ -1133,6 +1230,15 @@ export default function HomeScreen() {
                       onToggleSave={handleFavoritePress}
                     />
                   ))
+                ) : searchError ? null : (
+                  <View className="items-center rounded-2xl bg-field px-6 py-8">
+                    <Text className="text-lg text-ink font-outfit-bold">
+                      No schools found
+                    </Text>
+                    <Text className="mt-1 text-center text-base leading-5 text-muted font-outfit-medium">
+                      Try a school name, city, or state.
+                    </Text>
+                  </View>
                 )}
               </View>
             ) : isSearchFocused && trimmedSearch.length > 0 ? (
@@ -1141,7 +1247,7 @@ export default function HomeScreen() {
                   Keep typing…
                 </Text>
                 <Text className="mt-1 text-center text-base leading-5 text-muted font-outfit-medium">
-                  Type at least three characters to find a school.
+                  Type a school, city, or 2-letter state.
                 </Text>
               </View>
             ) : (
@@ -1149,6 +1255,7 @@ export default function HomeScreen() {
                 <HomeSchoolStories
                   schools={favoriteSchools}
                   onPress={handleSchoolPress}
+                  onToggleSave={handleFavoritePress}
                 />
 
                 <HomeFeedRail
@@ -1278,10 +1385,16 @@ export default function HomeScreen() {
                       {recentSpots.map((spot) => (
                         <HomeSpotPost
                           key={spot.id}
-                          spot={spot}
+                          spot={{
+                            ...spot,
+                            commentCount:
+                              commentCounts[spot.id] ?? spot.commentCount,
+                          }}
                           isLiking={likingSpotId === spot.id}
                           onLike={handleLikeSpot}
                           onViewMap={handleRecentSpotPress}
+                          onOpenComments={handleOpenComments}
+                          onOpenFullscreen={handleOpenFullscreen}
                         />
                       ))}
                       {recentError ? (
@@ -1317,6 +1430,19 @@ export default function HomeScreen() {
         </View>
       </KeyboardAvoidingView>
 
+      <SpotFullscreenViewer
+        visible={fullscreenSpotId !== null && !commentsCoveringViewer}
+        spots={feedViewerSpots}
+        initialSpotId={fullscreenSpotId ?? ''}
+        initialPhotoIndex={fullscreenPhotoIndex}
+        variant="feed"
+        onClose={() => setFullscreenSpotId(null)}
+        onLike={handleLikeSpot}
+        onOpenComments={handleOpenComments}
+        onViewMap={handleViewMapFromFullscreen}
+        onNearEnd={loadMoreRecentSpots}
+        likingSpotId={likingSpotId}
+      />
       <LoginRequiredModal
         visible={showLoginRequired}
         onCancel={() => setShowLoginRequired(false)}

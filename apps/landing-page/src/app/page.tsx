@@ -30,7 +30,7 @@ export default function Home() {
               <span className="mt-2 block text-accent sm:mt-3">Now you do too</span>
             </h1>
             <p className="mx-auto mt-7 max-w-xl text-pretty text-base leading-7 text-muted sm:mt-8 sm:text-lg">
-              The all-in-one app for finding, rating, and sharing the spots worth skating at your school.
+              The all-in-one app for finding, liking, and sharing the spots worth skating at your school.
             </p>
 
             <WaitlistForm />
