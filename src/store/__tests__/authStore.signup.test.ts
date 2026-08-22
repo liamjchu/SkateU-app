@@ -32,7 +32,7 @@ jest.mock('../../store/ageEligibilityStore', () => ({
 
 process.env.EXPO_PUBLIC_API_URL = 'http://localhost:8081';
 
-import { GOOGLE_ACCOUNT_EXISTS_MESSAGE } from '../../lib/authAccount';
+import { ACCOUNT_EXISTS_MESSAGE } from '../../lib/authAccount';
 import { useAuthStore } from '../authStore';
 
 const fetchMock = jest.fn();
@@ -53,44 +53,38 @@ describe('signUp existing accounts', () => {
       data: { user: { id: 'fake', identities: [] }, session: null },
       error: null,
     });
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: async () => ({ hint: 'exists' }),
-    });
 
     await expect(
       useAuthStore.getState().signUp('skater@example.com', 'Password1!')
-    ).rejects.toThrow('An account already exists with this email. Please sign in instead.');
+    ).rejects.toThrow(ACCOUNT_EXISTS_MESSAGE);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('tells Google-only accounts to continue with Google', async () => {
+  it('shows a generic account-exists message on a registered-email conflict', async () => {
     mockSignUp.mockResolvedValue({
-      data: { user: { id: 'fake', identities: [] }, session: null },
-      error: null,
-    });
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: async () => ({ hint: 'google' }),
+      data: { user: null, session: null },
+      error: { message: 'User already registered', code: 'user_already_exists' },
     });
 
     await expect(
       useAuthStore.getState().signUp('skater@example.com', 'Password1!')
-    ).rejects.toThrow(GOOGLE_ACCOUNT_EXISTS_MESSAGE);
+    ).rejects.toThrow(ACCOUNT_EXISTS_MESSAGE);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 
-describe('signIn existing Google accounts', () => {
-  it('does not claim a missing password account merely failed credentials', async () => {
+describe('signIn invalid credentials', () => {
+  it('surfaces the standard invalid-credentials error without an account lookup', async () => {
     mockSignInWithPassword.mockResolvedValue({
       error: { message: 'Invalid login credentials', code: 'invalid_credentials' },
-    });
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: async () => ({ hint: 'google' }),
     });
 
     await expect(
       useAuthStore.getState().signIn('skater@example.com', 'Password1!')
-    ).rejects.toThrow(GOOGLE_ACCOUNT_EXISTS_MESSAGE);
+    ).rejects.toMatchObject({
+      message: 'Invalid login credentials',
+      code: 'invalid_credentials',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

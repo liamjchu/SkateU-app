@@ -1,32 +1,13 @@
 import type { User } from '@supabase/supabase-js';
 
-export type AuthAccountHint = 'google' | 'apple' | 'password' | 'exists' | 'unknown';
-
 export const ACCOUNT_EXISTS_MESSAGE =
   'An account already exists with this email. Please sign in instead.';
-export const GOOGLE_ACCOUNT_EXISTS_MESSAGE =
-  'This email is already connected to Google. Please continue with Google to sign in.';
-export const APPLE_ACCOUNT_EXISTS_MESSAGE =
-  'This email is already connected to Apple. Please continue with Apple to sign in.';
 
 export class AccountExistsError extends Error {
-  readonly hint: AuthAccountHint;
-
-  constructor(hint: AuthAccountHint) {
-    super(messageForAccountHint(hint));
+  constructor() {
+    super(ACCOUNT_EXISTS_MESSAGE);
     this.name = 'AccountExistsError';
-    this.hint = hint;
   }
-}
-
-export function messageForAccountHint(hint: AuthAccountHint): string {
-  if (hint === 'google') {
-    return GOOGLE_ACCOUNT_EXISTS_MESSAGE;
-  }
-  if (hint === 'apple') {
-    return APPLE_ACCOUNT_EXISTS_MESSAGE;
-  }
-  return ACCOUNT_EXISTS_MESSAGE;
 }
 
 export function isObfuscatedExistingUser(
@@ -63,48 +44,6 @@ export function providersFromAuthUser(user: {
   return (user.identities ?? [])
     .map((identity) => identity.provider)
     .filter((value): value is string => typeof value === 'string');
-}
-
-export function hintFromProviders(providers: string[]): AuthAccountHint {
-  const unique = new Set(providers.map((provider) => provider.toLowerCase()));
-  const hasPassword = unique.has('email');
-  const hasGoogle = unique.has('google');
-  const hasApple = unique.has('apple');
-
-  if (hasGoogle && !hasPassword) {
-    return 'google';
-  }
-  if (hasApple && !hasPassword) {
-    return 'apple';
-  }
-  if (hasPassword) {
-    return 'password';
-  }
-  if (hasGoogle) {
-    return 'google';
-  }
-  if (hasApple) {
-    return 'apple';
-  }
-  return 'exists';
-}
-
-export function parseAuthAccountHint(value: unknown): AuthAccountHint {
-  if (
-    value === 'google' ||
-    value === 'apple' ||
-    value === 'password' ||
-    value === 'exists' ||
-    value === 'unknown'
-  ) {
-    return value;
-  }
-  return 'unknown';
-}
-
-export function hintForSignupConflict(value: unknown): AuthAccountHint {
-  const hint = parseAuthAccountHint(value);
-  return hint === 'unknown' ? 'exists' : hint;
 }
 
 export function userCanSignInWithPassword(user: User | null | undefined): boolean {

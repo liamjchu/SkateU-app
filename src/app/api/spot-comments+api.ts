@@ -212,6 +212,66 @@ async function fetchCommentById(
   return rows[0] ?? null;
 }
 
+const MAX_VISIBLE_FILL_PAGES = 50;
+
+async function collectVisibleTopLevelComments(
+  config: SupabaseConfig,
+  spotId: string,
+  offset: number,
+  isVisible: (row: DatabaseComment) => boolean
+): Promise<{
+  rows: DatabaseComment[];
+  nextOffset: number;
+  hasMore: boolean;
+}> {
+  const visible: DatabaseComment[] = [];
+  let rawOffset = offset;
+  let hasMore = false;
+
+  for (
+    let page = 0;
+    page < MAX_VISIBLE_FILL_PAGES && visible.length < COMMENT_PAGE_SIZE;
+    page += 1
+  ) {
+    const params = new URLSearchParams();
+    params.set('spot_id', `eq.${spotId}`);
+    params.set('parent_comment_id', 'is.null');
+    params.set('select', COMMENT_SELECT_COLUMNS);
+    params.set('order', 'created_at.desc,id.desc');
+    params.set('offset', String(rawOffset));
+    params.set('limit', String(COMMENT_PAGE_SIZE));
+
+    const rawRows = await fetchCommentsByQuery(config, params);
+    if (rawRows.length === 0) {
+      hasMore = false;
+      break;
+    }
+
+    for (let index = 0; index < rawRows.length; index += 1) {
+      rawOffset += 1;
+      if (!isVisible(rawRows[index])) {
+        continue;
+      }
+
+      visible.push(rawRows[index]);
+      if (visible.length === COMMENT_PAGE_SIZE) {
+        hasMore =
+          index < rawRows.length - 1 || rawRows.length === COMMENT_PAGE_SIZE;
+        return { rows: visible, nextOffset: rawOffset, hasMore };
+      }
+    }
+
+    if (rawRows.length < COMMENT_PAGE_SIZE) {
+      hasMore = false;
+      break;
+    }
+
+    hasMore = true;
+  }
+
+  return { rows: visible, nextOffset: rawOffset, hasMore };
+}
+
 export async function GET(request: Request): Promise<Response> {
   const config = getSupabaseConfig();
   if (!config) {
@@ -262,17 +322,11 @@ export async function GET(request: Request): Promise<Response> {
       return !hiddenComments.has(row.id);
     };
 
-    const topLevelParams = new URLSearchParams();
-    topLevelParams.set('spot_id', `eq.${spotId}`);
-    topLevelParams.set('parent_comment_id', 'is.null');
-    topLevelParams.set('select', COMMENT_SELECT_COLUMNS);
-    topLevelParams.set('order', 'created_at.desc,id.desc');
-    topLevelParams.set('offset', String(offset));
-    topLevelParams.set('limit', String(COMMENT_PAGE_SIZE));
-
-    const topLevelRows = (await fetchCommentsByQuery(config, topLevelParams)).filter(
-      isVisible
-    );
+    const {
+      rows: topLevelRows,
+      nextOffset,
+      hasMore,
+    } = await collectVisibleTopLevelComments(config, spotId, offset, isVisible);
     const parentIds = topLevelRows.map((row) => row.id);
 
     let replyRows: DatabaseComment[] = [];
@@ -298,6 +352,8 @@ export async function GET(request: Request): Promise<Response> {
         mapComment(row, repliesByParent.get(row.id) ?? [])
       ),
       commentCount: spot.comments_count ?? 0,
+      nextOffset,
+      hasMore,
     });
   } catch (error) {
     console.error('Loading spot comments failed:', error);

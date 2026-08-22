@@ -5,11 +5,8 @@ import { create } from 'zustand';
 import { getApiUrl } from '../lib/api';
 import {
   AccountExistsError,
-  hintForSignupConflict,
   isAlreadyRegisteredAuthError,
   isObfuscatedExistingUser,
-  parseAuthAccountHint,
-  type AuthAccountHint,
 } from '../lib/authAccount';
 import { supabase } from '../lib/supabase';
 import { useAgeEligibilityStore } from './ageEligibilityStore';
@@ -114,33 +111,6 @@ async function fetchDeleteAccountApi(
   }
 }
 
-function isInvalidCredentialError(error: { message?: string; code?: string }): boolean {
-  const message = (error.message ?? '').toLowerCase();
-  const code = (error.code ?? '').toLowerCase();
-  return (
-    code === 'invalid_credentials' ||
-    message.includes('invalid login') ||
-    message.includes('invalid credentials') ||
-    message.includes('invalid email or password')
-  );
-}
-
-async function lookupAccountHint(email: string): Promise<AuthAccountHint> {
-  try {
-    const response = await fetch(getApiUrl('/api/auth-account-hint'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
-    });
-    const payload = (await response.json().catch(() => null)) as
-      | { hint?: unknown }
-      | null;
-    return parseAuthAccountHint(payload?.hint);
-  } catch {
-    return 'unknown';
-  }
-}
-
 async function createDeleteAccountProof(accessToken: string): Promise<string> {
   const response = await fetchDeleteAccountApi('/api/delete-account-proof', accessToken, {
     method: 'POST',
@@ -217,12 +187,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     });
 
     if (error) {
-      if (isInvalidCredentialError(error)) {
-        const hint = await lookupAccountHint(trimmedEmail);
-        if (hint === 'google' || hint === 'apple') {
-          throw new AccountExistsError(hint);
-        }
-      }
       throw error;
     }
   },
@@ -240,7 +204,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     if (error) {
       if (isAlreadyRegisteredAuthError(error)) {
-        throw new AccountExistsError(hintForSignupConflict(await lookupAccountHint(trimmedEmail)));
+        throw new AccountExistsError();
       }
       throw error;
     }
@@ -248,7 +212,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // Confirm-email projects return a fake user with no identities when the
     // address is already registered. Treat that as a conflict, not a new OTP.
     if (isObfuscatedExistingUser(data.user)) {
-      throw new AccountExistsError(hintForSignupConflict(await lookupAccountHint(trimmedEmail)));
+      throw new AccountExistsError();
     }
 
     // When email confirmation is on, Supabase returns a user but no session

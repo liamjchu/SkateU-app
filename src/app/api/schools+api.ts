@@ -267,11 +267,7 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error('School search failed:', error);
     return Response.json(
-      {
-        error: `Unable to search schools right now${
-          error instanceof Error ? `: ${error.message}` : '.'
-        }`,
-      },
+      { error: 'Unable to search schools right now.' },
       { status: 500 }
     );
   }

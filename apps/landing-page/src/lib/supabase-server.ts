@@ -11,6 +11,14 @@ type Database = {
         Args: { p_email: string };
         Returns: null;
       };
+      consume_waitlist_rate_limit: {
+        Args: {
+          p_keys: string[];
+          p_max_requests: number;
+          p_window_ms: number;
+        };
+        Returns: number;
+      };
       confirm_subscription: {
         Args: { p_token: string };
         Returns: boolean;

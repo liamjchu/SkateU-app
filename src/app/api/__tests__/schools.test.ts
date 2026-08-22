@@ -192,4 +192,41 @@ describe('GET /api/schools search', () => {
       p_limit: SEARCH_LIMIT,
     });
   });
+
+  it('returns a generic 500 when PostgREST fails and does not leak the upstream message', async () => {
+    setConfigured();
+    const sensitiveMessage =
+      'permission denied for table public.schools: policy "schools_select" using (auth.role() = \'service_role\') on project.supabase.co';
+    const fetchMock = jest.fn(async () =>
+      new Response(
+        JSON.stringify({
+          code: '42501',
+          details: 'Failed to apply RLS policy on public.schools',
+          hint: 'Check schema cache for search_schools',
+          message: sensitiveMessage,
+        }),
+        {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      )
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const response = await GET(
+      new Request('https://app.test/api/schools?search=brown')
+    );
+    const bodyText = await response.text();
+    const body = JSON.parse(bodyText) as { error: string };
+
+    expect(response.status).toBe(500);
+    expect(body).toEqual({ error: 'Unable to search schools right now.' });
+    expect(bodyText).not.toContain(sensitiveMessage);
+    expect(bodyText).not.toContain('public.schools');
+    expect(bodyText).not.toContain('service_role');
+    expect(bodyText).not.toContain('RLS');
+    expect(bodyText).not.toContain('schema cache');
+    expect(consoleError).toHaveBeenCalled();
+  });
 });

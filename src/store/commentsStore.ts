@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { COMMENT_PAGE_SIZE } from '../lib/commentForm';
 import { getApiUrl } from '../lib/api';
 import { sanitizeErrorMessage } from '../lib/userFacingError';
 import type { SpotComment } from '../types/comment';
@@ -203,6 +202,26 @@ function authHeaders(accessToken?: string): HeadersInit | undefined {
     : undefined;
 }
 
+type CommentsPagePayload = {
+  comments?: SpotComment[];
+  commentCount?: number;
+  nextOffset?: unknown;
+  hasMore?: unknown;
+};
+
+function readPagination(
+  data: CommentsPagePayload,
+  fallbackOffset: number
+): { nextOffset: number; hasMore: boolean } {
+  const nextOffset =
+    typeof data.nextOffset === 'number' &&
+    Number.isInteger(data.nextOffset) &&
+    data.nextOffset >= 0
+      ? data.nextOffset
+      : fallbackOffset;
+  return { nextOffset, hasMore: data.hasMore === true };
+}
+
 function commentsWithoutUser(
   comments: SpotComment[],
   userId: string
@@ -256,12 +275,10 @@ export const useCommentsStore = create<CommentsState>((set, get) => ({
         throw new Error(await readErrorMessage(response));
       }
 
-      const data = (await response.json()) as {
-        comments?: SpotComment[];
-        commentCount?: number;
-      };
+      const data = (await response.json()) as CommentsPagePayload;
       const comments = data.comments ?? [];
       const commentCount = data.commentCount ?? 0;
+      const pagination = readPagination(data, 0);
       applyCommentCount(spotId, commentCount);
 
       set((state) => ({
@@ -269,8 +286,8 @@ export const useCommentsStore = create<CommentsState>((set, get) => ({
           comments,
           loading: false,
           error: null,
-          hasMore: comments.length === COMMENT_PAGE_SIZE,
-          nextOffset: comments.length,
+          hasMore: pagination.hasMore,
+          nextOffset: pagination.nextOffset,
           commentCount,
         }),
         commentCounts: { ...state.commentCounts, [spotId]: commentCount },
@@ -314,12 +331,10 @@ export const useCommentsStore = create<CommentsState>((set, get) => ({
         throw new Error(await readErrorMessage(response));
       }
 
-      const data = (await response.json()) as {
-        comments?: SpotComment[];
-        commentCount?: number;
-      };
+      const data = (await response.json()) as CommentsPagePayload;
       const page = data.comments ?? [];
       const commentCount = data.commentCount ?? cache.commentCount;
+      const pagination = readPagination(data, cache.nextOffset);
       applyCommentCount(spotId, commentCount);
 
       set((state) => {
@@ -333,8 +348,8 @@ export const useCommentsStore = create<CommentsState>((set, get) => ({
           ...patchCache(state, spotId, {
             comments: merged,
             loadingMore: false,
-            hasMore: page.length === COMMENT_PAGE_SIZE,
-            nextOffset: current.nextOffset + page.length,
+            hasMore: pagination.hasMore,
+            nextOffset: pagination.nextOffset,
             commentCount,
           }),
           commentCounts: { ...state.commentCounts, [spotId]: commentCount },

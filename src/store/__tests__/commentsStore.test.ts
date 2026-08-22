@@ -75,7 +75,7 @@ describe('commentsStore', () => {
     useSpotsStore.setState({ spots: [makeSpot()] });
     const comments = [makeComment()];
     fetchMock.mockResolvedValue(
-      mockResponse({ comments, commentCount: 4 })
+      mockResponse({ comments, commentCount: 4, nextOffset: 1, hasMore: false })
     );
 
     await useCommentsStore.getState().fetchComments('spot-1');
@@ -84,6 +84,8 @@ describe('commentsStore', () => {
     expect(cache.comments).toEqual(comments);
     expect(cache.loading).toBe(false);
     expect(cache.error).toBeNull();
+    expect(cache.hasMore).toBe(false);
+    expect(cache.nextOffset).toBe(1);
     expect(cache.commentCount).toBe(4);
     expect(useCommentsStore.getState().commentCounts['spot-1']).toBe(4);
     expect(useSpotsStore.getState().spots[0].commentCount).toBe(4);
@@ -259,16 +261,89 @@ describe('commentsStore', () => {
       mockResponse({
         comments: [makeComment({ id: 'comment-2', content: 'Second' })],
         commentCount: 2,
+        nextOffset: 3,
+        hasMore: false,
       })
     );
 
     await useCommentsStore.getState().fetchMore('spot-1');
     expect(useCommentsStore.getState().bySpotId['spot-1'].comments).toHaveLength(2);
     expect(useCommentsStore.getState().bySpotId['spot-1'].hasMore).toBe(false);
+    expect(useCommentsStore.getState().bySpotId['spot-1'].nextOffset).toBe(3);
 
     fetchMock.mockClear();
     await useCommentsStore.getState().fetchMore('spot-1');
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('uses server nextOffset and hasMore instead of the visible page length', async () => {
+    fetchMock.mockResolvedValue(
+      mockResponse({
+        comments: [makeComment()],
+        commentCount: 40,
+        nextOffset: 26,
+        hasMore: true,
+      })
+    );
+
+    await useCommentsStore.getState().fetchComments('spot-1');
+
+    const first = useCommentsStore.getState().bySpotId['spot-1'];
+    expect(first.comments).toHaveLength(1);
+    expect(first.nextOffset).toBe(26);
+    expect(first.hasMore).toBe(true);
+
+    fetchMock.mockResolvedValue(
+      mockResponse({
+        comments: [makeComment({ id: 'comment-2' })],
+        commentCount: 40,
+        nextOffset: 51,
+        hasMore: true,
+      })
+    );
+
+    await useCommentsStore.getState().fetchMore('spot-1');
+
+    const cache = useCommentsStore.getState().bySpotId['spot-1'];
+    expect(fetchMock.mock.calls[1][0]).toContain('offset=26');
+    expect(cache.comments.map((comment) => comment.id)).toEqual([
+      'comment-1',
+      'comment-2',
+    ]);
+    expect(cache.nextOffset).toBe(51);
+    expect(cache.hasMore).toBe(true);
+  });
+
+  it('skips duplicate top-level comments when a page is retried', async () => {
+    const first = makeComment({ id: 'comment-1' });
+    useCommentsStore.setState({
+      bySpotId: {
+        'spot-1': {
+          comments: [first],
+          loading: false,
+          loadingMore: false,
+          submitting: false,
+          error: null,
+          hasMore: true,
+          nextOffset: 1,
+          commentCount: 3,
+        },
+      },
+    });
+    fetchMock.mockResolvedValue(
+      mockResponse({
+        comments: [first, makeComment({ id: 'comment-2' })],
+        commentCount: 3,
+        nextOffset: 3,
+        hasMore: false,
+      })
+    );
+
+    await useCommentsStore.getState().fetchMore('spot-1');
+
+    expect(useCommentsStore.getState().bySpotId['spot-1'].comments.map((comment) => comment.id)).toEqual(
+      ['comment-1', 'comment-2']
+    );
   });
 
   it('maps a 401 load failure to a sign-in message', async () => {

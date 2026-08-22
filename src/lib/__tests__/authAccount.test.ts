@@ -1,14 +1,8 @@
 import {
   ACCOUNT_EXISTS_MESSAGE,
   AccountExistsError,
-  APPLE_ACCOUNT_EXISTS_MESSAGE,
-  GOOGLE_ACCOUNT_EXISTS_MESSAGE,
-  hintForSignupConflict,
-  hintFromProviders,
   isAlreadyRegisteredAuthError,
   isObfuscatedExistingUser,
-  messageForAccountHint,
-  parseAuthAccountHint,
   primaryOAuthProvider,
   providersFromAuthUser,
   userCanSignInWithPassword,
@@ -34,21 +28,11 @@ describe('auth account conflicts', () => {
     );
   });
 
-  it('maps providers to a signup/sign-in hint without oversharing', () => {
-    expect(hintFromProviders(['google'])).toBe('google');
-    expect(hintFromProviders(['apple'])).toBe('apple');
-    expect(hintFromProviders(['email'])).toBe('password');
-    expect(hintFromProviders(['google', 'email'])).toBe('password');
-    expect(messageForAccountHint('google')).toBe(GOOGLE_ACCOUNT_EXISTS_MESSAGE);
-    expect(messageForAccountHint('apple')).toBe(APPLE_ACCOUNT_EXISTS_MESSAGE);
-    expect(messageForAccountHint('password')).toBe(ACCOUNT_EXISTS_MESSAGE);
-    expect(new AccountExistsError('google').message).toBe(
-      GOOGLE_ACCOUNT_EXISTS_MESSAGE
-    );
+  it('uses a generic conflict message that does not name a provider', () => {
+    expect(new AccountExistsError().message).toBe(ACCOUNT_EXISTS_MESSAGE);
   });
 
   it('reads providers from identities when app metadata is missing', () => {
-    expect(hintFromProviders([])).toBe('exists');
     expect(
       providersFromAuthUser({
         identities: [{ provider: 'apple' }],
@@ -66,13 +50,6 @@ describe('auth account conflicts', () => {
       } as User)
     ).toBe('apple');
     expect(userCanSignInWithPassword(null)).toBe(false);
-  });
-
-  it('treats unknown lookup results as a generic existing-account conflict', () => {
-    expect(parseAuthAccountHint('google')).toBe('google');
-    expect(parseAuthAccountHint('nope')).toBe('unknown');
-    expect(hintForSignupConflict('unknown')).toBe('exists');
-    expect(hintForSignupConflict('google')).toBe('google');
   });
 
   it('detects whether the signed-in user already has a password credential', () => {

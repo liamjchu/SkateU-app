@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  WAITLIST_RATE_LIMIT_RPC,
+  consumeRateLimitBuckets,
+  type RateLimitBucket,
+} from "../../../lib/waitlist-rate-limit";
+
 const { getSupabaseAdmin } = vi.hoisted(() => ({ getSupabaseAdmin: vi.fn() }));
 
 vi.mock("../../../lib/supabase-server", () => ({ getSupabaseAdmin }));
@@ -8,6 +14,7 @@ import { GET, POST } from "./route";
 
 const email = "skater@example.test";
 let fetchMock: ReturnType<typeof vi.fn>;
+let rateLimitStore: Map<string, RateLimitBucket>;
 
 function requestWith(
   body: string,
@@ -22,13 +29,34 @@ function requestWith(
 }
 
 function mockSupabase(result: { data?: boolean | null; error: unknown }) {
-  const rpc = vi.fn().mockResolvedValue(result);
+  const rpc = vi.fn().mockImplementation(async (name: string, args: unknown) => {
+    if (name === WAITLIST_RATE_LIMIT_RPC) {
+      const params = args as {
+        p_keys: string[];
+        p_max_requests: number;
+        p_window_ms: number;
+      };
+
+      const retryAfter = consumeRateLimitBuckets(
+        rateLimitStore,
+        params.p_keys,
+        params.p_max_requests,
+        params.p_window_ms,
+        Date.now()
+      );
+
+      return { data: retryAfter ?? 0, error: null };
+    }
+
+    return result;
+  });
   getSupabaseAdmin.mockReturnValue({ rpc } as never);
   return rpc;
 }
 
 beforeEach(() => {
   fetchMock = vi.fn();
+  rateLimitStore = new Map();
   vi.stubGlobal("fetch", fetchMock);
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://supabase.example.test");
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "test-anon-key");
@@ -133,6 +161,11 @@ describe("POST /api/subscribe", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ success: true, emailSent: true });
+    expect(rpc).toHaveBeenCalledWith(WAITLIST_RATE_LIMIT_RPC, {
+      p_keys: ["email:skater+campus@example.test", "abuse:waitlist"],
+      p_max_requests: 5,
+      p_window_ms: 60_000,
+    });
     expect(rpc).toHaveBeenCalledWith("subscribe_email", {
       p_email: "skater+campus@example.test",
     });
@@ -196,7 +229,7 @@ describe("POST /api/subscribe", () => {
 
   it("rate limits repeated requests from the same address", async () => {
     vi.stubEnv("WAITLIST_RATE_LIMIT_MAX_REQUESTS", "1");
-    mockSupabase({ data: null, error: null });
+    const rpc = mockSupabase({ data: null, error: null });
     fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
     const request = () =>
       requestWith(JSON.stringify({ email, confirmedAge13Plus: true }), "203.0.113.10");
@@ -206,6 +239,78 @@ describe("POST /api/subscribe", () => {
 
     expect(response.status).toBe(429);
     expect(response.headers.get("Retry-After")).toBe("60");
+    expect(Number(response.headers.get("Retry-After"))).toBeGreaterThan(0);
+    expect(rpc.mock.calls.filter(([name]) => name === "subscribe_email")).toHaveLength(
+      1
+    );
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("does not let forged x-forwarded-for values bypass the limiter key", async () => {
+    vi.stubEnv("WAITLIST_RATE_LIMIT_MAX_REQUESTS", "1");
+    const rpc = mockSupabase({ data: null, error: null });
+    fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
+    const body = JSON.stringify({ email, confirmedAge13Plus: true });
+
+    await POST(requestWith(body, "198.51.100.1"));
+    const blocked = await POST(requestWith(body, "203.0.113.9"));
+
+    expect(blocked.status).toBe(429);
+    expect(Number(blocked.headers.get("Retry-After"))).toBeGreaterThan(0);
+    expect(blocked.headers.get("Retry-After")).toBe("60");
+    expect(rpc.mock.calls.filter(([name]) => name === "subscribe_email")).toHaveLength(
+      1
+    );
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(
+      rpc.mock.calls.filter(([name]) => name === WAITLIST_RATE_LIMIT_RPC)
+    ).toHaveLength(2);
+    expect(rpc).toHaveBeenNthCalledWith(1, WAITLIST_RATE_LIMIT_RPC, {
+      p_keys: [`email:${email}`, "abuse:waitlist"],
+      p_max_requests: 1,
+      p_window_ms: 60_000,
+    });
+    expect(rpc).toHaveBeenNthCalledWith(3, WAITLIST_RATE_LIMIT_RPC, {
+      p_keys: [`email:${email}`, "abuse:waitlist"],
+      p_max_requests: 1,
+      p_window_ms: 60_000,
+    });
+  });
+
+  it("does not call subscribe_email or email dispatch when the limiter blocks", async () => {
+    vi.stubEnv("WAITLIST_RATE_LIMIT_MAX_REQUESTS", "1");
+    const rpc = mockSupabase({ data: null, error: null });
+    fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
+    const body = JSON.stringify({ email, confirmedAge13Plus: true });
+
+    await POST(requestWith(body, "198.51.100.8"));
+    rpc.mockClear();
+    fetchMock.mockClear();
+
+    const blocked = await POST(requestWith(body, "198.51.100.8"));
+
+    expect(blocked.status).toBe(429);
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith(WAITLIST_RATE_LIMIT_RPC, expect.any(Object));
+    expect(rpc).not.toHaveBeenCalledWith("subscribe_email", expect.anything());
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("consumes rate-limit state through a single atomic RPC per request", async () => {
+    const rpc = mockSupabase({ data: null, error: null });
+    fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
+
+    await POST(
+      requestWith(JSON.stringify({ email, confirmedAge13Plus: true }), "198.51.100.9")
+    );
+
+    const rateLimitCalls = rpc.mock.calls.filter(
+      ([name]) => name === WAITLIST_RATE_LIMIT_RPC
+    );
+
+    expect(rateLimitCalls).toHaveLength(1);
+    expect(rpc.mock.calls[0]?.[0]).toBe(WAITLIST_RATE_LIMIT_RPC);
+    expect(rpc.mock.calls[1]?.[0]).toBe("subscribe_email");
   });
 
   it("returns a generic server error for unexpected subscription errors", async () => {

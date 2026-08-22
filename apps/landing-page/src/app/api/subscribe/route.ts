@@ -3,67 +3,23 @@ import { NextResponse } from "next/server";
 import { WAITLIST_MAX_BODY_BYTES } from "../../../constants/site";
 import { getSupabaseAdmin } from "../../../lib/supabase-server";
 import {
+  WAITLIST_RATE_LIMIT_RPC,
+  defaultRateLimitMaxRequests,
+  defaultRateLimitWindowMs,
+  environmentPositiveInteger,
+  waitlistRateLimitKeys,
+} from "../../../lib/waitlist-rate-limit";
+import {
   isWaitlistEmail,
   normalizeWaitlistEmail,
 } from "../../../lib/waitlistEmail";
 
 const dispatchTimeoutMs = 15_000;
-const defaultRateLimitMaxRequests = 5;
-const defaultRateLimitWindowMs = 60_000;
-const rateLimitByIp = new Map<string, { count: number; resetAt: number }>();
 
 const failureResponse = () =>
   NextResponse.json({ error: "Unable to join the waitlist." }, { status: 500 });
 const invalidRequestResponse = () =>
   NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
-
-function environmentPositiveInteger(name: string, fallback: number): number {
-  const value = Number.parseInt(process.env[name] ?? "", 10);
-
-  return Number.isSafeInteger(value) && value > 0 ? value : fallback;
-}
-
-function clientIp(request: Request): string {
-  const forwardedFor = request.headers.get("x-forwarded-for");
-
-  return (
-    forwardedFor?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip") ||
-    "unknown"
-  );
-}
-
-function rateLimitRetryAfterSeconds(ip: string): number | null {
-  const maxRequests = environmentPositiveInteger(
-    "WAITLIST_RATE_LIMIT_MAX_REQUESTS",
-    defaultRateLimitMaxRequests
-  );
-  const windowMs = environmentPositiveInteger(
-    "WAITLIST_RATE_LIMIT_WINDOW_MS",
-    defaultRateLimitWindowMs
-  );
-  const now = Date.now();
-
-  for (const [key, limit] of rateLimitByIp) {
-    if (limit.resetAt <= now) {
-      rateLimitByIp.delete(key);
-    }
-  }
-
-  const limit = rateLimitByIp.get(ip);
-
-  if (!limit || limit.resetAt <= now) {
-    rateLimitByIp.set(ip, { count: 1, resetAt: now + windowMs });
-    return null;
-  }
-
-  if (limit.count >= maxRequests) {
-    return Math.max(1, Math.ceil((limit.resetAt - now) / 1_000));
-  }
-
-  limit.count += 1;
-  return null;
-}
 
 function rateLimitResponse(retryAfterSeconds: number): NextResponse {
   return NextResponse.json(
@@ -82,6 +38,29 @@ function requestBodyTooLarge(request: Request): boolean {
   );
 
   return Number.isSafeInteger(contentLength) && contentLength > WAITLIST_MAX_BODY_BYTES;
+}
+
+async function waitlistRateLimitRetryAfterSeconds(
+  request: Request,
+  email: string
+): Promise<number | null> {
+  const { data, error } = await getSupabaseAdmin().rpc(WAITLIST_RATE_LIMIT_RPC, {
+    p_keys: waitlistRateLimitKeys(request, email),
+    p_max_requests: environmentPositiveInteger(
+      "WAITLIST_RATE_LIMIT_MAX_REQUESTS",
+      defaultRateLimitMaxRequests
+    ),
+    p_window_ms: environmentPositiveInteger(
+      "WAITLIST_RATE_LIMIT_WINDOW_MS",
+      defaultRateLimitWindowMs
+    ),
+  });
+
+  if (error || typeof data !== "number" || !Number.isFinite(data) || data < 0) {
+    throw new Error("Waitlist rate limit unavailable.");
+  }
+
+  return data > 0 ? data : null;
 }
 
 async function dispatchConfirmationEmail(email: string): Promise<boolean> {
@@ -155,6 +134,15 @@ async function handleSubscription(request: Request): Promise<NextResponse> {
     return invalidRequestResponse();
   }
 
+  const retryAfterSeconds = await waitlistRateLimitRetryAfterSeconds(
+    request,
+    email
+  );
+
+  if (retryAfterSeconds !== null) {
+    return rateLimitResponse(retryAfterSeconds);
+  }
+
   const { error: subscribeError } = await getSupabaseAdmin().rpc(
     "subscribe_email",
     { p_email: email }
@@ -177,12 +165,6 @@ export async function GET(): Promise<NextResponse> {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
-  const retryAfterSeconds = rateLimitRetryAfterSeconds(clientIp(request));
-
-  if (retryAfterSeconds !== null) {
-    return rateLimitResponse(retryAfterSeconds);
-  }
-
   try {
     return await handleSubscription(request);
   } catch {

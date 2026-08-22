@@ -1,3 +1,4 @@
+import { COMMENT_PAGE_SIZE } from '../../../lib/commentForm';
 import {
     DELETE,
     GET,
@@ -71,6 +72,31 @@ const replyRow = {
   created_at: '2024-01-01T00:01:00.000Z',
   creator: { username: 'alex' },
 };
+
+function makeTopLevelRow(
+  index: number,
+  overrides: Partial<typeof parentRow> = {}
+): typeof parentRow {
+  return {
+    id: `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
+    spot_id: parentRow.spot_id,
+    user_id: 'user-1',
+    parent_comment_id: null,
+    content: `Comment ${index}`,
+    created_at: `2024-01-01T00:00:${String(index % 60).padStart(2, '0')}.000Z`,
+    creator: { username: 'liam' },
+    ...overrides,
+  };
+}
+
+function sliceTopLevelRows(
+  url: URL,
+  rows: Array<typeof parentRow>
+): Array<typeof parentRow> {
+  const offset = Number(url.searchParams.get('offset') ?? 0);
+  const limit = Number(url.searchParams.get('limit') ?? COMMENT_PAGE_SIZE);
+  return rows.slice(offset, offset + limit);
+}
 
 afterEach(() => {
   global.fetch = originalFetch;
@@ -161,6 +187,8 @@ describe('GET /api/spot-comments', () => {
           replies: [expect.objectContaining({ id: replyRow.id })],
         }),
       ],
+      nextOffset: 1,
+      hasMore: false,
     });
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/auth/'))).toBe(
       false
@@ -200,7 +228,164 @@ describe('GET /api/spot-comments', () => {
     await expect(response.json()).resolves.toEqual({
       commentCount: 2,
       comments: [],
+      nextOffset: 1,
+      hasMore: false,
     });
+  });
+
+  it('fills a visible page past hidden comments later in the raw result set', async () => {
+    setConfigured();
+    const hidden = makeTopLevelRow(0, {
+      user_id: 'blocked-user',
+      content: 'Hidden first',
+    });
+    const visible = Array.from({ length: COMMENT_PAGE_SIZE }, (_, index) =>
+      makeTopLevelRow(index + 1, { user_id: 'visible-user' })
+    );
+    const rawRows = [hidden, ...visible];
+
+    const fetchMock: FetchMock = jest.fn(async (input) => {
+      const url = new URL(String(input));
+      if (url.pathname.includes('/auth/v1/user')) {
+        return jsonResponse({ id: 'viewer-1' });
+      }
+      if (url.pathname.includes('/rest/v1/user_blocks')) {
+        return jsonResponse([{ blocked_id: 'blocked-user' }]);
+      }
+      if (url.pathname.includes('/rest/v1/comment_reports')) {
+        return jsonResponse([]);
+      }
+      if (url.pathname.includes('/rest/v1/spots')) {
+        return jsonResponse([{ id: parentRow.spot_id, comments_count: rawRows.length }]);
+      }
+      if (url.searchParams.get('parent_comment_id') === 'is.null') {
+        return jsonResponse(sliceTopLevelRows(url, rawRows));
+      }
+      return jsonResponse([]);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await GET(
+      new Request(
+        `https://app.test/api/spot-comments?spotId=${parentRow.spot_id}`,
+        { headers: { Authorization: 'Bearer good-token' } }
+      )
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      comments: Array<{ id: string; userId: string }>;
+      nextOffset: number;
+      hasMore: boolean;
+    };
+    expect(body.comments).toHaveLength(COMMENT_PAGE_SIZE);
+    expect(body.comments.map((comment) => comment.id)).toEqual(
+      visible.map((row) => row.id)
+    );
+    expect(body.comments.some((comment) => comment.userId === 'blocked-user')).toBe(
+      false
+    );
+    expect(body.nextOffset).toBe(COMMENT_PAGE_SIZE + 1);
+    expect(body.hasMore).toBe(false);
+  });
+
+  it('keeps scanning when hidden comments fill whole raw pages', async () => {
+    setConfigured();
+    const hiddenPage = Array.from({ length: COMMENT_PAGE_SIZE }, (_, index) =>
+      makeTopLevelRow(index, { user_id: 'blocked-user' })
+    );
+    const nextHidden = makeTopLevelRow(COMMENT_PAGE_SIZE, {
+      user_id: 'blocked-user',
+    });
+    const visibleTail = Array.from({ length: 3 }, (_, index) =>
+      makeTopLevelRow(COMMENT_PAGE_SIZE + 1 + index, { user_id: 'visible-user' })
+    );
+    const rawRows = [...hiddenPage, nextHidden, ...visibleTail];
+
+    const fetchMock: FetchMock = jest.fn(async (input) => {
+      const url = new URL(String(input));
+      if (url.pathname.includes('/auth/v1/user')) {
+        return jsonResponse({ id: 'viewer-1' });
+      }
+      if (url.pathname.includes('/rest/v1/user_blocks')) {
+        return jsonResponse([{ blocked_id: 'blocked-user' }]);
+      }
+      if (url.pathname.includes('/rest/v1/comment_reports')) {
+        return jsonResponse([]);
+      }
+      if (url.pathname.includes('/rest/v1/spots')) {
+        return jsonResponse([{ id: parentRow.spot_id, comments_count: rawRows.length }]);
+      }
+      if (url.searchParams.get('parent_comment_id') === 'is.null') {
+        return jsonResponse(sliceTopLevelRows(url, rawRows));
+      }
+      return jsonResponse([]);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await GET(
+      new Request(
+        `https://app.test/api/spot-comments?spotId=${parentRow.spot_id}`,
+        { headers: { Authorization: 'Bearer good-token' } }
+      )
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      comments: Array<{ id: string }>;
+      nextOffset: number;
+      hasMore: boolean;
+    };
+    expect(body.comments.map((comment) => comment.id)).toEqual(
+      visibleTail.map((row) => row.id)
+    );
+    expect(body.nextOffset).toBe(rawRows.length);
+    expect(body.hasMore).toBe(false);
+  });
+
+  it('returns a short terminal page with raw pagination metadata', async () => {
+    setConfigured();
+    const hidden = makeTopLevelRow(0, { user_id: 'blocked-user' });
+    const visible = Array.from({ length: 3 }, (_, index) =>
+      makeTopLevelRow(index + 1, { user_id: 'visible-user' })
+    );
+    const rawRows = [hidden, ...visible];
+
+    const fetchMock: FetchMock = jest.fn(async (input) => {
+      const url = new URL(String(input));
+      if (url.pathname.includes('/auth/v1/user')) {
+        return jsonResponse({ id: 'viewer-1' });
+      }
+      if (url.pathname.includes('/rest/v1/user_blocks')) {
+        return jsonResponse([{ blocked_id: 'blocked-user' }]);
+      }
+      if (url.pathname.includes('/rest/v1/comment_reports')) {
+        return jsonResponse([]);
+      }
+      if (url.pathname.includes('/rest/v1/spots')) {
+        return jsonResponse([{ id: parentRow.spot_id, comments_count: rawRows.length }]);
+      }
+      if (url.searchParams.get('parent_comment_id') === 'is.null') {
+        return jsonResponse(sliceTopLevelRows(url, rawRows));
+      }
+      return jsonResponse([]);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await GET(
+      new Request(
+        `https://app.test/api/spot-comments?spotId=${parentRow.spot_id}`,
+        { headers: { Authorization: 'Bearer good-token' } }
+      )
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      comments: Array<{ id: string }>;
+      nextOffset: number;
+      hasMore: boolean;
+    };
+    expect(body.comments).toHaveLength(visible.length);
+    expect(body.comments.length).toBeLessThan(COMMENT_PAGE_SIZE);
+    expect(body.nextOffset).toBe(rawRows.length);
+    expect(body.hasMore).toBe(false);
   });
 
   it('returns 400 when spotId is missing', async () => {

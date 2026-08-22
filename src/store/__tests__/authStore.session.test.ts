@@ -56,7 +56,6 @@ jest.mock('../draftSpotsStore', () => ({
 
 process.env.EXPO_PUBLIC_API_URL = 'http://localhost:8081';
 
-import { GOOGLE_ACCOUNT_EXISTS_MESSAGE } from '../../lib/authAccount';
 import { useAuthStore } from '../authStore';
 
 const fetchMock = jest.fn();
@@ -129,18 +128,18 @@ describe('authStore.signIn', () => {
     });
   });
 
-  it('points Google-only accounts at Google sign-in', async () => {
+  it('keeps invalid credentials generic without looking up the account', async () => {
     mockSignInWithPassword.mockResolvedValue({
       error: { message: 'Invalid login credentials', code: 'invalid_credentials' },
-    });
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: async () => ({ hint: 'google' }),
     });
 
     await expect(
       useAuthStore.getState().signIn('skater@example.com', 'wrong')
-    ).rejects.toThrow(GOOGLE_ACCOUNT_EXISTS_MESSAGE);
+    ).rejects.toMatchObject({
+      message: 'Invalid login credentials',
+      code: 'invalid_credentials',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 
