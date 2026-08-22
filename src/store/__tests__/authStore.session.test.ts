@@ -191,11 +191,32 @@ describe('authStore.setSessionFromUrl', () => {
 
 describe('authStore.signOut and recovery', () => {
   it('clears recovery state and age eligibility', async () => {
-    useAuthStore.setState({ passwordRecovery: true });
+    useAuthStore.setState({
+      passwordRecovery: true,
+      session: { access_token: 'token' } as never,
+      user: { id: 'user-1' } as never,
+    });
     await useAuthStore.getState().signOut();
     expect(mockSignOut).toHaveBeenCalled();
     expect(mockAgeClear).toHaveBeenCalled();
-    expect(useAuthStore.getState().passwordRecovery).toBe(false);
+    expect(useAuthStore.getState()).toMatchObject({
+      session: null,
+      user: null,
+      passwordRecovery: false,
+    });
+  });
+
+  it('clears the local session when remote sign-out fails', async () => {
+    mockSignOut.mockResolvedValue({ error: new Error('network') });
+    useAuthStore.setState({
+      session: { access_token: 'token' } as never,
+      user: { id: 'user-1' } as never,
+    });
+    await expect(useAuthStore.getState().signOut()).rejects.toThrow('network');
+    expect(useAuthStore.getState()).toMatchObject({
+      session: null,
+      user: null,
+    });
   });
 
   it('clears recovery after a completed reset', () => {

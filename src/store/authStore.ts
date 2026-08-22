@@ -343,13 +343,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   signOut: async () => {
     const { error } = await supabase.auth.signOut();
 
+    deleteAccountProof = null;
+    useAgeEligibilityStore.getState().clear();
+    // Always drop the local session so a profile-load overlay can dismiss
+    // even when the remote sign-out call fails.
+    set({ session: null, user: null, passwordRecovery: false });
+
     if (error) {
       throw error;
     }
-
-    deleteAccountProof = null;
-    useAgeEligibilityStore.getState().clear();
-    set({ passwordRecovery: false });
   },
 
   // Sends a 6-digit email OTP to the already-registered user. Unlike signUp's

@@ -58,6 +58,7 @@ function RootLayout() {
 
   const initAuth = useAuthStore((state) => state.init);
   const setSessionFromUrl = useAuthStore((state) => state.setSessionFromUrl);
+  const signOut = useAuthStore((state) => state.signOut);
 
   // --- Auth + profile state that drives the username gate ---
   const userId = useAuthStore((state) => state.user?.id ?? null);
@@ -309,7 +310,7 @@ function RootLayout() {
           />
           {userId && profileError ? (
             <View
-              className="absolute left-4 right-4 flex-row items-center rounded-2xl bg-field px-4 py-3"
+              className="absolute left-4 right-4 rounded-2xl bg-field px-4 py-3"
               style={{
                 top: insets.top + 12,
               }}
@@ -317,20 +318,34 @@ function RootLayout() {
               <Text
                 accessibilityRole="alert"
                 accessibilityLiveRegion="polite"
-                className="flex-1 pr-3 font-outfit-medium text-base text-ink"
+                className="font-outfit-medium text-base text-ink"
               >
                 {profileError}
               </Text>
-              <Pressable
-                className="rounded-xl bg-accent px-3 py-2"
-                onPress={() => fetchProfile(userId, accessToken)}
-                disabled={profileLoading}
-                accessibilityRole="button"
-                accessibilityLabel="Retry loading profile"
-                accessibilityState={{ busy: profileLoading }}
-              >
-                <Text className="font-outfit-bold text-sm text-brand">Retry</Text>
-              </Pressable>
+              <View className="mt-3 flex-row items-center justify-end gap-2">
+                <Pressable
+                  className="rounded-xl px-3 py-2"
+                  onPress={() => {
+                    void signOut().catch(() => {
+                      // Local session is cleared in signOut even if this rejects.
+                    });
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Sign out"
+                >
+                  <Text className="font-outfit-bold text-sm text-ink">Sign out</Text>
+                </Pressable>
+                <Pressable
+                  className="rounded-xl bg-accent px-3 py-2"
+                  onPress={() => fetchProfile(userId, accessToken)}
+                  disabled={profileLoading}
+                  accessibilityRole="button"
+                  accessibilityLabel="Retry loading profile"
+                  accessibilityState={{ busy: profileLoading }}
+                >
+                  <Text className="font-outfit-bold text-sm text-brand">Retry</Text>
+                </Pressable>
+              </View>
             </View>
           ) : null}
         </View>
