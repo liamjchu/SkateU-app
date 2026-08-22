@@ -19,8 +19,16 @@ module.exports = ({ config }) => {
     ]);
   }
 
+  const apiUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
+
   return {
     ...config,
     plugins,
+    extra: {
+      ...config.extra,
+      // Baked into the native manifest so standalone builds still have an API
+      // origin if Metro did not inline process.env.EXPO_PUBLIC_API_URL.
+      ...(apiUrl ? { apiUrl } : {}),
+    },
   };
 };
