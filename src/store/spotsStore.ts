@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { captureAnalyticsEvent } from '../lib/analytics';
 import { getApiUrl } from '../lib/api';
 import { buildImageOrder } from '../lib/spotMedia';
 import { sanitizeErrorMessage } from '../lib/userFacingError';
@@ -220,7 +221,7 @@ function toFetchErrorMessage(error: unknown): string {
   return LOAD_FAILED_ERROR;
 }
 
-export const useSpotsStore = create<SpotsState>()((set) => ({
+export const useSpotsStore = create<SpotsState>()((set, get) => ({
   spots: [],
   loading: false,
   error: null,
@@ -332,6 +333,11 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
     if (!data.spot) {
       throw new Error('The server did not return the created spot.');
     }
+
+    captureAnalyticsEvent('spot_created', {
+      spot_id: data.spot.id,
+      school_id: data.spot.schoolId ?? input.schoolId,
+    });
 
     return data.spot;
   },
@@ -456,6 +462,14 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
     };
     const nextLiked = data.likedByUser ?? !likedByUser;
     const nextCount = data.likeCount ?? 0;
+    const schoolId =
+      get().spots.find((spot) => spot.id === id)?.schoolId ??
+      get().mySpots.find((spot) => spot.id === id)?.schoolId ??
+      get().likedSpots.find((spot) => spot.id === id)?.schoolId;
+    captureAnalyticsEvent(nextLiked ? 'spot_liked' : 'spot_unliked', {
+      spot_id: id,
+      ...(schoolId ? { school_id: schoolId } : {}),
+    });
     spotLikeMutationVersion += 1;
 
     set((state) => {
@@ -532,6 +546,11 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
 
     const updated = data.spot;
 
+    captureAnalyticsEvent('spot_updated', {
+      spot_id: updated.id,
+      ...(updated.schoolId ? { school_id: updated.schoolId } : {}),
+    });
+
     // Reflect the change everywhere the spot may appear: the profile list and
     // the currently loaded school map.
     set((state) => ({
@@ -557,6 +576,15 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
     if (!response.ok) {
       throw new Error(await readErrorMessage(response));
     }
+
+    const schoolId =
+      get().spots.find((spot) => spot.id === id)?.schoolId ??
+      get().mySpots.find((spot) => spot.id === id)?.schoolId ??
+      get().likedSpots.find((spot) => spot.id === id)?.schoolId;
+    captureAnalyticsEvent('spot_deleted', {
+      spot_id: id,
+      ...(schoolId ? { school_id: schoolId } : {}),
+    });
 
     // Remove the spot globally so it disappears from the profile list and the
     // map immediately.
@@ -608,6 +636,11 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
     if (!response.ok) {
       throw new Error(await readErrorMessage(response));
     }
+
+    captureAnalyticsEvent('spot_removal_requested', {
+      spot_id: spotId,
+      reason,
+    });
 
     set((state) => ({
       reportedSpotIds: withReportedSpot(state.reportedSpotIds, spotId),

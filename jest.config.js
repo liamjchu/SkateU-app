@@ -43,6 +43,6 @@ module.exports = {
   // Expo/React Native ship untranspiled ESM in node_modules; allow the RN/Expo
   // toolchain packages through Babel so tests can import them.
   transformIgnorePatterns: [
-    'node_modules/(?!((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|nativewind|react-native-css))',
+    'node_modules/(?!((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|posthog-react-native|native-base|react-native-svg|nativewind|react-native-css))',
   ],
 };

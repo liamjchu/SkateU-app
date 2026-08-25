@@ -14,6 +14,7 @@ import FeedbackPressable from '../components/FeedbackPressable';
 import ScreenHeader from '../components/screen-header';
 import SupportChoiceList from '../components/SupportChoiceList';
 import { colors } from '../constants/colors';
+import { captureAnalyticsEvent } from '../lib/analytics';
 import { getApiUrl } from '../lib/api';
 import {
   COMMENT_REPORT_DETAILS_MAX,
@@ -102,6 +103,11 @@ export default function ReportCommentScreen() {
       if (!response.ok) {
         throw new Error(data?.error ?? 'Couldn’t send that report right now.');
       }
+      captureAnalyticsEvent('comment_reported', {
+        comment_id: commentId,
+        ...(spotId ? { spot_id: spotId } : {}),
+        reason,
+      });
       if (spotId) {
         hideComment(spotId, commentId);
       }

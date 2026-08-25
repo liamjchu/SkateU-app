@@ -23,6 +23,19 @@ npx eas submit --profile production --platform android
 
 Run lint, tests, and `npx tsc --noEmit` before requesting a build. Confirm the app identifiers in `app.json` (`app.skateu.mobile`) match the configured Apple and Google store records.
 
+## EAS Update (over-the-air JS)
+
+Preview and production native builds listen for EAS Update on channels of the same name. The app checks for a JS/asset update on launch and applies it on the **next cold start**. Do not expect an in-app reload prompt.
+
+OTA updates cannot land on a store or internal build until that binary includes `expo-updates`. After adding or changing native code, create a new native build, then publish JS updates to its channel:
+
+```bash
+npx eas update --channel preview --message "Describe the JS change"
+npx eas update --channel production --message "Describe the JS change"
+```
+
+`runtimeVersion` follows `app.json` `version` (`appVersion` policy). Bumping the app version requires a new native build before production OTA can target that version.
+
 ## API deployment
 
 Deploy the Expo Router server output to a runtime that supports Expo Router API routes. The deployed environment must expose the `/api/*` routes over HTTPS and provide server-only environment variables there:
@@ -39,6 +52,8 @@ MODERATION_NOTIFY_EMAIL
 Set `EXPO_PUBLIC_API_URL` in the native app build environment to that HTTPS origin, without a trailing path. The mobile client requires an absolute URL outside local Expo development. Do not include service-role, OpenAI, or Resend keys in a native build, `.env.example`, source control, or any `EXPO_PUBLIC_*` variable.
 
 Optional crash reporting: set `EXPO_PUBLIC_SENTRY_DSN` on the native build. For native symbol upload during EAS builds, also set `SENTRY_ORG`, `SENTRY_PROJECT`, and `SENTRY_AUTH_TOKEN` in the EAS environment. Leave the DSN empty to keep crash reporting off.
+
+Optional product analytics: set `EXPO_PUBLIC_POSTHOG_API_KEY` on the native build (PostHog Cloud US). `EXPO_PUBLIC_POSTHOG_HOST` defaults to `https://us.i.posthog.com`. Leave the key empty to keep analytics off. Do not send analytics from local development unless `EXPO_PUBLIC_POSTHOG_ENABLE_DEV=1`.
 
 ## Release checklist
 
@@ -73,12 +88,12 @@ These answers are product inputs, not a claim of store approval:
 - Photos: camera and photo library.
 - Location: no device GPS. Spot pins are user-placed place data.
 - Privacy policy URL: `https://skateu.app/privacy`.
-- App Privacy labels: account email; user content (photos, text); identifiers (account); crash data if Sentry is configured; not advertising tracking.
+- App Privacy labels: account email; user content (photos, text); identifiers (account); product analytics if PostHog is configured; crash data if Sentry is configured; not advertising tracking.
 
 ## Google Play Console (complete manually)
 
 - Target audience: 13–15, 16–17, and 18+ as appropriate. Do not select under-13. Do not enroll in Designed for Families as a children’s app.
 - “Is this app primarily for children?” → No, for this 13+ general-audience product.
-- Data safety: email, user-generated photos/text, account identifiers; no advertising SDK; crash reporting through Sentry when `EXPO_PUBLIC_SENTRY_DSN` is set; no collected device GPS. The website waitlist is not the Play app.
+- Data safety: email, user-generated photos/text, account identifiers; no advertising SDK; product analytics through PostHog when `EXPO_PUBLIC_POSTHOG_API_KEY` is set; crash reporting through Sentry when `EXPO_PUBLIC_SENTRY_DSN` is set; no collected device GPS. The website waitlist is not the Play app.
 - Privacy policy URL required.
 - IARC: UGC, social-ish features, skateboarding.

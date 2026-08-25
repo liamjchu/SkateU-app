@@ -4,6 +4,10 @@ import { useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { useAuthStore } from '../store/authStore';
 import { colors } from '../constants/colors';
+import {
+  captureOauthAuthCompleted,
+} from '../lib/analytics';
+import { supabase } from '../lib/supabase';
 import { toUserFacingError } from '../lib/userFacingError';
 import FeedbackPressable from './FeedbackPressable';
 
@@ -47,6 +51,8 @@ export default function GoogleSignInButton({
       // Only navigate away on a completed log in. A dismissed/cancelled OAuth
       // sheet resolves false and should just re-enable the button.
       if (signedIn) {
+        const { data } = await supabase.auth.getSession();
+        captureOauthAuthCompleted(data.session?.user.created_at, 'google');
         onSuccess?.();
       }
     } catch (error) {

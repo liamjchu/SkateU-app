@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { captureAnalyticsEvent } from '../lib/analytics';
 import { getApiUrl } from '../lib/api';
 import { sanitizeErrorMessage } from '../lib/userFacingError';
 import type { SpotComment } from '../types/comment';
@@ -408,6 +409,7 @@ export const useCommentsStore = create<CommentsState>((set, get) => ({
 
       const created: SpotComment = { ...data.comment, replies: data.comment.replies ?? [] };
       const commentCount = data.commentCount ?? cache.commentCount + 1;
+      captureAnalyticsEvent('comment_posted', { spot_id: spotId });
       applyCommentCount(spotId, commentCount);
 
       set((state) => {
@@ -447,6 +449,7 @@ export const useCommentsStore = create<CommentsState>((set, get) => ({
     }
 
     const data = (await response.json()) as { commentCount?: number };
+    captureAnalyticsEvent('comment_deleted', { spot_id: spotId });
     const current = get().bySpotId[spotId] ?? emptyCache();
     const commentCount = data.commentCount ?? Math.max(0, current.commentCount - 1);
     applyCommentCount(spotId, commentCount);

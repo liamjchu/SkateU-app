@@ -83,6 +83,9 @@ Intro with **bold** and [mail](mailto:support@skateu.app).
       'Legal acceptance records are not public and are not used for analytics.'
     );
     expect(PRIVACY_POLICY_MARKDOWN).toContain(
+      'If a product-analytics SDK is configured for the app build you are using (currently PostHog)'
+    );
+    expect(PRIVACY_POLICY_MARKDOWN).toContain(
       'We do not ask for or store your date of birth.'
     );
     expect(PRIVACY_POLICY_MARKDOWN).toContain(

@@ -1,6 +1,6 @@
 # Terms of Use
 
-Last updated: August 21, 2026
+Last updated: August 22, 2026
 
 These Terms of Use (“Terms”) are the rules for using SkateU, a campus skate-spot app. In these Terms, “SkateU,” “we,” and “us” mean Liam Jahyun Chu, a sole proprietor doing business as SkateU in Virginia. These Terms apply to the SkateU mobile app and related SkateU services, including skateu.app.
 
@@ -120,7 +120,7 @@ If you believe content in SkateU infringes your copyright, email [support@skateu
 
 ## 10. Third-party services
 
-SkateU uses third-party services to run, including sign-in providers, hosting, maps, email, content moderation, and crash reporting. Those services have their own terms and privacy practices. SkateU is not responsible for third-party services we do not control.
+SkateU uses third-party services to run, including sign-in providers, hosting, maps, email, content moderation, crash reporting, and product analytics. Those services have their own terms and privacy practices. SkateU is not responsible for third-party services we do not control.
 
 Maps may load tiles and images from map providers. Sign-in with Google or Apple is handled by those companies.
 

@@ -3,7 +3,11 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
+import {
+  captureOauthAuthCompleted,
+} from '../lib/analytics';
 import { signInWithAppleIdentityToken } from '../lib/appleAuthentication';
+import { supabase } from '../lib/supabase';
 import { colors } from '../constants/colors';
 import FeedbackPressable from './FeedbackPressable';
 
@@ -77,6 +81,8 @@ export default function AppleSignInButton({
         user: credential.user,
         nonce,
       });
+      const { data } = await supabase.auth.getSession();
+      captureOauthAuthCompleted(data.session?.user.created_at, 'apple');
       onSuccess?.();
     } catch (error) {
       if (isRequestCanceled(error)) {

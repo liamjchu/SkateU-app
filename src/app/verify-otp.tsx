@@ -4,6 +4,7 @@ import { ActivityIndicator, Text, TextInput, View } from 'react-native';
 import FeedbackPressable from '../components/FeedbackPressable';
 import ScreenHeader from '../components/screen-header';
 import { colors } from '../constants/colors';
+import { captureAuthCompleted } from '../lib/analytics';
 import { useAuthStore } from '../store/authStore';
 
 const CODE_LENGTH = 6;
@@ -119,6 +120,7 @@ function VerifyOtpContent({ email }: { email: string }) {
 
     try {
       await verifyOtp(email, value);
+      captureAuthCompleted('signup', 'email');
       router.replace('/');
     } catch (verifyError) {
       setError(

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { captureAnalyticsEvent } from '../lib/analytics';
 import { getApiUrl } from '../lib/api';
 import { sanitizeErrorMessage } from '../lib/userFacingError';
 import type { BlockedUser } from '../types/userBlock';
@@ -108,6 +109,7 @@ export const useBlocksStore = create<BlocksState>((set, get) => ({
       username: username ?? null,
     };
     hideBlockedContent(userId);
+    captureAnalyticsEvent('user_blocked', { blocked_user_id: userId });
     set((state) => ({
       users: state.users.some((user) => user.userId === userId)
         ? state.users
@@ -127,6 +129,7 @@ export const useBlocksStore = create<BlocksState>((set, get) => ({
     if (!response.ok) {
       throw new Error(await readErrorMessage(response));
     }
+    captureAnalyticsEvent('user_unblocked', { blocked_user_id: userId });
     set((state) => ({
       users: state.users.filter((user) => user.userId !== userId),
     }));

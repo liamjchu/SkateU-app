@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { canCreateAccountAtAge } from '../lib/ageEligibility';
 import { getPasswordRequirementStatus, validatePassword } from '../lib/password';
 import { colors } from '../constants/colors';
+import { captureAuthCompleted } from '../lib/analytics';
 import { toUserFacingError } from '../lib/userFacingError';
 import { useAgeEligibilityStore } from '../store/ageEligibilityStore';
 import { useAuthStore } from '../store/authStore';
@@ -126,8 +127,11 @@ export default function AuthCredentialsForm({
           });
           return;
         }
+
+        captureAuthCompleted('signup', 'email');
       } else {
         await signIn(email, password);
+        captureAuthCompleted('login', 'email');
       }
 
       finishAuth();

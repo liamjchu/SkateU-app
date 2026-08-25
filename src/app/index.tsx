@@ -32,6 +32,7 @@ import SchoolTypePills, {
 import { StickerStripe } from '../components/sticker';
 import IMAGES from '../constants/images';
 import { colors } from '../constants/colors';
+import { captureAnalyticsEvent } from '../lib/analytics';
 import { getApiUrl } from '../lib/api';
 import { triggerHaptic } from '../lib/haptics';
 import { HOME_RAIL_PAGE_SIZE } from '../lib/homeFeed';
@@ -735,6 +736,7 @@ export default function HomeScreen() {
   };
 
   const navigateToSchoolMap = (school: School) => {
+    captureAnalyticsEvent('school_opened', { school_id: school.id });
     guardedNavigate(`map:${school.id}`, () => {
       router.push({
         pathname: '/map',
@@ -767,6 +769,7 @@ export default function HomeScreen() {
     }
 
     Keyboard.dismiss();
+    captureAnalyticsEvent('school_opened', { school_id: spot.schoolId });
     guardedNavigate(`map-spot:${spot.id}`, () => {
       router.push({
         pathname: '/map',
@@ -837,6 +840,10 @@ export default function HomeScreen() {
 
   const handleOpenFullscreen = (spot: Spot, photoIndex = 0) => {
     Keyboard.dismiss();
+    captureAnalyticsEvent('spot_opened', {
+      spot_id: spot.id,
+      ...(spot.schoolId ? { school_id: spot.schoolId } : {}),
+    });
     setFullscreenPhotoIndex(photoIndex);
     setFullscreenSpotId(spot.id);
   };

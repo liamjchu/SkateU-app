@@ -58,8 +58,24 @@
           "photosPermission": "SkateU uses your photo library so you can add pictures of skate spots.",
           "cameraPermission": "SkateU uses the camera so you can take pictures of skate spots."
         }
+      ],
+      "expo-localization",
+      "expo-updates",
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "project": "react-native",
+          "organization": "skateu"
+        }
       ]
     ],
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/287facf0-3455-4006-bf2d-efa129871fa1"
+    },
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true

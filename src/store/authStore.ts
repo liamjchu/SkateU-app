@@ -2,6 +2,7 @@ import type { Session, User } from '@supabase/supabase-js';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { create } from 'zustand';
+import { captureAnalyticsEvent } from '../lib/analytics';
 import { getApiUrl } from '../lib/api';
 import {
   AccountExistsError,
@@ -418,6 +419,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         body?.error ?? 'We couldn’t delete your account right now. Please try again.'
       );
     }
+
+    // Capture before clearing the authenticated PostHog identity.
+    captureAnalyticsEvent('account_deleted');
 
     // The server has deleted the auth user; drop the local session too.
     const userId = get().user?.id ?? data.session?.user.id;

@@ -45,6 +45,7 @@ import {
     buildSelectSpotJavascript,
     getCampusMapPinScript,
 } from '../lib/campusMapPins';
+import { captureAnalyticsEvent } from '../lib/analytics';
 import { triggerHaptic } from '../lib/haptics';
 import { sortSpotsByDistanceFrom } from '../lib/spotDistance';
 import {
@@ -242,6 +243,23 @@ export default function MapScreen() {
     () => spots.find((spot) => spot.id === selectedSpotId),
     [selectedSpotId, spots]
   );
+
+  useEffect(() => {
+    if (schoolId) {
+      captureAnalyticsEvent('map_opened', { school_id: schoolId });
+    }
+  }, [schoolId]);
+
+  useEffect(() => {
+    if (!selectedSpotId) {
+      return;
+    }
+
+    captureAnalyticsEvent('spot_opened', {
+      spot_id: selectedSpotId,
+      ...(schoolId ? { school_id: schoolId } : {}),
+    });
+  }, [schoolId, selectedSpotId]);
   const selectedSpotIsOwned = Boolean(
     session?.user &&
       selectedSpot &&

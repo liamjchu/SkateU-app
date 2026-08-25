@@ -14,7 +14,7 @@ On Windows Command Prompt, use:
 copy .env.example .env.local
 ```
 
-Values beginning with `EXPO_PUBLIC_` are embedded in the client bundle and must contain only the Supabase URL and anon key.
+Values beginning with `EXPO_PUBLIC_` are embedded in the client bundle and must contain only public client values.
 
 | Variable | Where it belongs | Purpose |
 | --- | --- | --- |
@@ -22,6 +22,9 @@ Values beginning with `EXPO_PUBLIC_` are embedded in the client bundle and must 
 | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Client | Public Supabase anon key for auth. |
 | `EXPO_PUBLIC_API_URL` | Client build | Absolute HTTPS origin of deployed API routes. |
 | `EXPO_PUBLIC_SENTRY_DSN` | Client build | Optional public Sentry DSN. Crash reporting stays off when this is empty. |
+| `EXPO_PUBLIC_POSTHOG_API_KEY` | Client build | Optional public PostHog project API key. Product analytics stays off when this is empty. |
+| `EXPO_PUBLIC_POSTHOG_HOST` | Client build | Optional PostHog API host. Defaults to `https://us.i.posthog.com`. |
+| `EXPO_PUBLIC_POSTHOG_ENABLE_DEV` | Client local | Set to `1` to send analytics from development builds. Production ignores this. |
 | `SUPABASE_URL` | API server / seed terminal | Supabase project URL. |
 | `SUPABASE_SERVICE_ROLE_KEY` | API server / seed terminal | Elevated server and seed access. |
 | `OPENAI_API_KEY` | API server | Username, spot, and comment moderation, and a safety filter on Help & Support submissions. |
@@ -29,7 +32,7 @@ Values beginning with `EXPO_PUBLIC_` are embedded in the client bundle and must 
 | `RESEND_FROM_EMAIL` | API server | From address for moderation and Help & Support emails. |
 | `MODERATION_NOTIFY_EMAIL` | API server | Inbox that receives spot review emails and Help & Support submissions. |
 
-Never place `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, `RESEND_API_KEY`, `MODERATION_NOTIFY_EMAIL`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, or `SENTRY_PROJECT` in `.env.local` for a client build, an `EXPO_PUBLIC_*` value, or source control. `EXPO_PUBLIC_SENTRY_DSN` is a public client DSN and may live in the app build.
+Never place `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, `RESEND_API_KEY`, `MODERATION_NOTIFY_EMAIL`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, or `SENTRY_PROJECT` in `.env.local` for a client build, an `EXPO_PUBLIC_*` value, or source control. `EXPO_PUBLIC_SENTRY_DSN` and `EXPO_PUBLIC_POSTHOG_API_KEY` are public client values and may live in the app build.
 
 ## 2. Create the Supabase data layer
 

@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: August 21, 2026
+Last updated: August 22, 2026
 
 This Privacy Policy explains what information SkateU collects, how it is used, and the choices you have. It covers the SkateU mobile app and the SkateU website at skateu.app.
 
@@ -10,7 +10,7 @@ If you have questions, email [support@skateu.app](mailto:support@skateu.app).
 
 ## 1. Information we collect
 
-We collect the information described below. We do not collect your device’s GPS location, we do not use advertising trackers in the app, and we do not use a product-analytics SDK in the SkateU mobile app. If crash reporting is configured for your build, the app may send crash reports to a crash-reporting provider.
+We collect the information described below. We do not collect your device’s GPS location, and we do not use advertising trackers in the app. If a product-analytics SDK is configured for your build (currently PostHog), the app may send screen views and feature events. If crash reporting is configured for your build, the app may send crash reports to a crash-reporting provider.
 
 ### Account information
 
@@ -78,7 +78,17 @@ The SkateU mobile app does not currently collect:
 
 - Precise GPS
 - Advertising identifiers
-- Analytics events through a product-analytics SDK
+
+### Product analytics
+
+If a product-analytics SDK is configured for the app build you are using (currently PostHog), we may collect:
+
+- Screen names you visit in the app
+- Feature events such as signing in, opening a campus map, viewing or adding a spot, liking a spot, posting a comment, and submitting Help & Support
+- An anonymous device identifier, and your account id if you are signed in
+- App version and technical information such as platform and OS version
+
+We use this to understand how SkateU is used and to improve it. We do not use this for advertising. We do not send your email, username, message text, photos, or GPS to PostHog. Analytics can be left unconfigured in development builds.
 
 ### Crash reports
 
@@ -102,6 +112,7 @@ We use this information to:
 - Email you a confirmation or account-deletion code when you request one
 - Email our team when a spot needs review, when a comment is reported, and when you send Help & Support
 - Diagnose crashes and keep the app running
+- Understand how people use SkateU so we can improve it
 - Feature public spots, photos, descriptions, campus names, and usernames on SkateU’s Instagram, TikTok, and YouTube
 - Operate, secure, and improve SkateU
 - Communicate with you when you contact us
@@ -131,6 +142,7 @@ We share information in these limited ways:
   - OpenAI, for automated moderation of the content listed above
   - Resend, to send certain emails, including waitlist confirmation and operator notices when a spot needs review
   - Sentry, for crash reports when that SDK is configured for the app build
+  - PostHog, for product analytics when that SDK is configured for the app build
   - Map tile providers (including CARTO / OpenStreetMap and Esri) and map libraries, which receive network requests when you view maps
   - Expo, which we use to build and run the app
 - **Website analytics.** The marketing website uses Vercel Analytics. That is separate from the mobile app and is not installed in the SkateU app.

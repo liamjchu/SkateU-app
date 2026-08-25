@@ -7,10 +7,11 @@ import {
     useFonts
 } from '@expo-google-fonts/outfit';
 import * as Linking from 'expo-linking';
-import { SplashScreen, Stack, useRouter, useSegments } from 'expo-router';
+import { SplashScreen, Stack, usePathname, useRouter, useSegments } from 'expo-router';
 import { useEffect } from 'react';
 import { Image, Platform, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { PostHogErrorBoundary } from 'posthog-react-native';
 import {
     configureReanimatedLogger,
     ReanimatedLogLevel,
@@ -34,7 +35,18 @@ import { useDraftSpotsStore } from '../store/draftSpotsStore';
 import { useFavorites } from '../store/favoritesStore';
 import { useProfileStore } from '../store/profileStore';
 import { useSpotsStore } from '../store/spotsStore';
-import { initCrashReporting, wrapRoot } from '../lib/crashReporting';
+import {
+    AnalyticsProvider,
+    captureAnalyticsScreen,
+    identifyAnalyticsUser,
+    resetAnalyticsUser,
+} from '../lib/analytics';
+import {
+    clearCrashReportingUser,
+    initCrashReporting,
+    setCrashReportingUser,
+    wrapRoot,
+} from '../lib/crashReporting';
 
 initCrashReporting();
 
@@ -46,6 +58,17 @@ configureReanimatedLogger({
   level: ReanimatedLogLevel.warn,
   strict: false,
 });
+
+function RootErrorFallback() {
+  return (
+    <View
+      style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+      accessibilityRole="alert"
+    >
+      <Text>Something went wrong. Please restart the app.</Text>
+    </View>
+  );
+}
 
 function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
@@ -62,6 +85,7 @@ function RootLayout() {
 
   // --- Auth + profile state that drives the username gate ---
   const userId = useAuthStore((state) => state.user?.id ?? null);
+  const userEmail = useAuthStore((state) => state.user?.email ?? undefined);
   const accessToken = useAuthStore((state) => state.session?.access_token ?? null);
   const authInitializing = useAuthStore((state) => state.initializing);
   const passwordRecovery = useAuthStore((state) => state.passwordRecovery);
@@ -83,6 +107,7 @@ function RootLayout() {
   const clearBlocks = useBlocksStore((state) => state.clear);
 
   const router = useRouter();
+  const pathname = usePathname();
   const segments = useSegments();
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
@@ -93,6 +118,21 @@ function RootLayout() {
     // Restore any persisted Supabase session and subscribe to auth changes.
     initAuth();
   }, [initAuth]);
+
+  useEffect(() => {
+    if (userId) {
+      identifyAnalyticsUser(userId, { email: userEmail });
+      setCrashReportingUser(userId);
+      return;
+    }
+
+    resetAnalyticsUser();
+    clearCrashReportingUser();
+  }, [userEmail, userId]);
+
+  useEffect(() => {
+    captureAnalyticsScreen(pathname);
+  }, [pathname]);
 
   useEffect(() => {
     // Persistent saved schools are browser/device state, so restore them only
@@ -252,7 +292,9 @@ function RootLayout() {
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.surface }}>
+    <AnalyticsProvider>
+      <PostHogErrorBoundary fallback={RootErrorFallback}>
+        <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.surface }}>
       <Stack
         screenOptions={{
           headerShown: false,
@@ -350,7 +392,9 @@ function RootLayout() {
           ) : null}
         </View>
       ) : null}
-    </GestureHandlerRootView>
+        </GestureHandlerRootView>
+      </PostHogErrorBoundary>
+    </AnalyticsProvider>
   );
 }
 
