@@ -83,8 +83,8 @@ These answers are product inputs, not a claim of store approval:
 
 - Not Made for Kids.
 - Age: accounts are 13+. UGC/social apps often rate 12+ on Apple’s matrix; keep the in-app rule at 13+ and complete the questionnaire honestly.
-- User-generated content: yes (spots, photos, comments, usernames).
-- Social: public usernames and comments; users can report comments and block other accounts in the app. No DMs.
+- User-generated content: yes (spots, photos, comments, usernames, profile bios).
+- Social: public usernames, profile bios, and comments; users can report comments and block other accounts in the app. No DMs.
 - Photos: camera and photo library.
 - Location: when-in-use device GPS to show the user on campus maps. GPS is processed on the device and is not stored on SkateU servers. Spot pins remain user-placed place data.
 - Privacy policy URL: `https://skateu.app/privacy`.

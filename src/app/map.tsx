@@ -991,12 +991,12 @@ export default function MapScreen() {
       ? `@${target.creatorUsername}`
       : 'this account';
     Alert.alert(
-      `Hide ${label}?`,
+      `Block ${label}?`,
       'You won’t see their spots or comments. You can undo this in Settings.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Hide',
+          text: 'Block user',
           onPress: () => {
             void blockUser(blockedId, accessToken, target.creatorUsername)
               .then(() => {
@@ -1007,7 +1007,7 @@ export default function MapScreen() {
               })
               .catch((caught: unknown) => {
                 Alert.alert(
-                  'Couldn’t hide that account',
+                  'Couldn’t block that user',
                   toMutationError(caught, 'Please try again.')
                 );
               });
@@ -1385,7 +1385,7 @@ export default function MapScreen() {
             : loginRequiredReason === 'spot_problem'
               ? 'Sign in to report a problem'
               : loginRequiredReason === 'block'
-                ? 'Sign in to hide this account'
+                ? 'Sign in to block this user'
                 : undefined
         }
         message={
@@ -1394,7 +1394,7 @@ export default function MapScreen() {
             : loginRequiredReason === 'spot_problem'
               ? 'You can still browse campuses. Sign in if you want to report a problem with this spot.'
               : loginRequiredReason === 'block'
-                ? 'You can still browse campuses. Sign in if you want to hide this skater’s spots and comments.'
+                ? 'You can still browse campuses. Sign in if you want to block this user.'
                 : undefined
         }
       />

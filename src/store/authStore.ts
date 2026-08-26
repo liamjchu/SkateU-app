@@ -174,7 +174,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // one active subscription.
     authSubscription?.unsubscribe();
 
-    // Keep the store in sync with log in, sign out, and token refreshes.
+    // Keep the store in sync with sign in, sign out, and token refreshes.
     const { data } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
         deleteAccountProof = null;

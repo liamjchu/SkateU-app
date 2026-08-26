@@ -1,9 +1,14 @@
 import { Feather, Octicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { colors } from '../constants/colors';
 import { formatCompactRelativeTime } from '../lib/relativeTime';
+import { openUserProfile } from '../lib/userProfileNavigation';
+import { useAuthStore } from '../store/authStore';
 import type { Spot } from '../types/spot';
+import CreatorAttribution from './creator-attribution';
 import FeedbackPressable from './FeedbackPressable';
+import ProfileAvatar from './ProfileAvatar';
 import SpotMediaPager from './spot-media-pager';
 
 type HomeSpotPostProps = {
@@ -15,10 +20,9 @@ type HomeSpotPostProps = {
   onOpenFullscreen: (spot: Spot, photoIndex: number) => void;
 };
 
-function spotAttribution(spot: Spot): string {
-  const who = spot.creatorUsername ? `@${spot.creatorUsername}` : 'A skater';
+function spotAttributionSuffix(spot: Spot): string {
   const when = formatCompactRelativeTime(spot.createdAt);
-  return when ? `${who} · ${when}` : who;
+  return when ? ` · ${when}` : '';
 }
 
 function spotPlace(spot: Spot): string {
@@ -40,6 +44,8 @@ export default function HomeSpotPost({
 }: HomeSpotPostProps) {
   const liked = spot.likedByUser === true;
   const imageUris = spot.imageUris.filter((uri) => uri.length > 0);
+  const router = useRouter();
+  const currentUserId = useAuthStore((state) => state.user?.id ?? null);
 
   return (
     <View className="overflow-hidden rounded-2xl bg-field">
@@ -66,47 +72,67 @@ export default function HomeSpotPost({
         </FeedbackPressable>
       )}
 
-      <FeedbackPressable
-        haptic="light"
-        disablePressScale
-        onPress={() => onOpenFullscreen(spot, 0)}
-        accessibilityRole="button"
-        accessibilityLabel={`Open full screen view of ${spot.name}`}
-        className="px-4 pt-4"
-      >
+      <View className="px-4 pt-4">
         <View className="flex-row items-center">
-          <Feather name="user" size={13} color={colors.muted} />
-          <Text
+          {spot.creatorUserId ? (
+            <FeedbackPressable
+              haptic="selection"
+              onPress={() => {
+                openUserProfile(router, spot.creatorUserId as string, currentUserId);
+              }}
+              accessibilityRole="link"
+              accessibilityLabel={
+                spot.creatorUsername
+                  ? `Open @${spot.creatorUsername}'s profile`
+                  : 'Open profile'
+              }
+            >
+              <ProfileAvatar uri={spot.creatorAvatarUrl} size={16} iconSize={10} />
+            </FeedbackPressable>
+          ) : (
+            <ProfileAvatar uri={spot.creatorAvatarUrl} size={16} iconSize={10} />
+          )}
+          <CreatorAttribution
+            userId={spot.creatorUserId}
+            username={spot.creatorUsername}
+            fallback="A skater"
+            suffix={spotAttributionSuffix(spot)}
             numberOfLines={1}
             className="ml-1.5 min-w-0 flex-1 font-outfit-medium text-sm text-muted"
-          >
-            {spotAttribution(spot)}
-          </Text>
+          />
         </View>
-        <View className="mt-1 flex-row items-center">
+        <FeedbackPressable
+          haptic="light"
+          disablePressScale
+          onPress={() => onOpenFullscreen(spot, 0)}
+          accessibilityRole="button"
+          accessibilityLabel={`Open full screen view of ${spot.name}`}
+        >
+          <View className="mt-1 flex-row items-center">
+            <Text
+              numberOfLines={1}
+              className="min-w-0 flex-1 font-outfit-bold text-lg text-ink"
+            >
+              {spot.name}
+            </Text>
+            <Feather name="chevron-right" size={18} color={colors.mutedSoft} />
+          </View>
           <Text
             numberOfLines={1}
-            className="min-w-0 flex-1 font-outfit-bold text-lg text-ink"
+            className="mt-0.5 font-outfit-medium text-sm text-muted-soft"
           >
-            {spot.name}
+            {spotPlace(spot)}
           </Text>
-          <Feather name="chevron-right" size={18} color={colors.mutedSoft} />
-        </View>
-        <Text
-          numberOfLines={1}
-          className="mt-0.5 font-outfit-medium text-sm text-muted-soft"
-        >
-          {spotPlace(spot)}
-        </Text>
-        {spot.description.trim().length > 0 ? (
-          <Text
-            numberOfLines={2}
-            className="mt-2 font-outfit-medium text-sm leading-5 text-ink"
-          >
-            {spot.description.trim()}
-          </Text>
-        ) : null}
-      </FeedbackPressable>
+          {spot.description.trim().length > 0 ? (
+            <Text
+              numberOfLines={2}
+              className="mt-2 font-outfit-medium text-sm leading-5 text-ink"
+            >
+              {spot.description.trim()}
+            </Text>
+          ) : null}
+        </FeedbackPressable>
+      </View>
 
       <View className="flex-row items-center px-4 pb-4 pt-3">
         <FeedbackPressable

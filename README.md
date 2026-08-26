@@ -92,6 +92,7 @@ Follow the complete [Backend setup](docs/backend-setup.md). Before this app can 
    ```text
    supabase/schools_setup.sql
    supabase/profiles_setup.sql
+   supabase/avatars_setup.sql
    supabase/profile_legal_acceptance_setup.sql
    supabase/profile_legal_private_setup.sql
    supabase/spots_setup.sql
@@ -107,7 +108,7 @@ Follow the complete [Backend setup](docs/backend-setup.md). Before this app can 
    supabase/school_search_setup.sql
    ```
 
-5. Create a `spot-images` Storage bucket with public read enabled.
+5. Create `spot-images` and `avatars` Storage buckets with public read enabled.
 6. Optionally generate and seed school data. This requires Python 3 and temporary server credentials in the terminal that runs the seed:
 
    ```bash

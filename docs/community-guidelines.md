@@ -1,10 +1,10 @@
 # Community Guidelines
 
-Last updated: August 21, 2026
+Last updated: August 26, 2026
 
 SkateU is a campus skate-spot map. The point is to help skaters find spots, share what they know, and not wreck the session for everyone else.
 
-These guidelines apply to usernames, spots, photos, comments, replies, likes, and removal requests. They work together with the Terms of Use. If you do not want to follow them, SkateU is not the right place.
+These guidelines apply to usernames, profile bios, spots, photos, comments, replies, likes, and removal requests. They work together with the Terms of Use. If you do not want to follow them, SkateU is not the right place.
 
 SkateU accounts are for people 13 and older. Do not create an account for someone under 13. Do not use SkateU to identify or target minors.
 
@@ -40,7 +40,7 @@ Spots you post are public. SkateU may feature them, including photos, on our Ins
 
 Do not upload photos you do not have the right to share.
 
-Do not post photos or comments that expose someone else’s private personal information, such as a phone number, home address, or private document.
+Do not post photos, comments, or a profile bio that expose someone else’s private personal information, such as a phone number, home address, or private document.
 
 ## Do not spam or impersonate people
 
@@ -71,7 +71,7 @@ Do not abuse comment reports or blocking. Those tools are for keeping SkateU usa
 - **Spots:** open the spot on the map and use Request Removal. You will pick a reason and can add details.
 - **Comments:** open the comment and use Report. You will pick a reason and can add details.
 - **A skater:** use Block on their comment or spot. You will stop seeing their spots and comments. You can unblock them in Settings.
-- **Anything else,** including a photo, username, or behavior that is not covered above: email [support@skateu.app](mailto:support@skateu.app) and tell us where it is.
+- **Anything else,** including a photo, username, profile bio, or behavior that is not covered above: email [support@skateu.app](mailto:support@skateu.app) and tell us where it is.
 
 We may not be able to reply to every message, but we use reports to keep SkateU in shape.
 

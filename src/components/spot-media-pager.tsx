@@ -1,7 +1,11 @@
-import { Feather } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
-import { colors } from '../constants/colors';
+import {
+    NativeScrollEvent,
+    NativeSyntheticEvent,
+    ScrollView,
+    View,
+} from 'react-native';
+import { shouldMountPagerImage } from '../lib/spotMediaPager';
 import CachedRemoteImage from './CachedRemoteImage';
 import FeedbackPressable from './FeedbackPressable';
 
@@ -20,6 +24,7 @@ export default function SpotMediaPager({
   accessibilityName,
   imageClassName,
 }: SpotMediaPagerProps) {
+  const [width, setWidth] = useState(0);
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
@@ -32,75 +37,88 @@ export default function SpotMediaPager({
     return null;
   }
 
-  const photoIndex = Math.min(index, uris.length - 1);
-  const uri = uris[photoIndex];
-  if (!uri) {
+  const firstUri = uris[0];
+  const pageWidth = width > 0 ? width : 1;
+
+  if (!firstUri) {
     return null;
   }
 
-  function goToPhoto(next: number) {
-    if (next < 0 || next >= uris.length) {
+  function handleScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    if (pageWidth <= 1) {
       return;
     }
 
-    setIndex(next);
+    const next = Math.round(event.nativeEvent.contentOffset.x / pageWidth);
+    if (next !== index && next >= 0 && next < uris.length) {
+      setIndex(next);
+    }
   }
 
   return (
-    <View style={{ height }} className="overflow-hidden">
-      <FeedbackPressable
-        haptic="light"
-        disablePressScale
-        onPress={() => onPressIndex(photoIndex)}
-        accessibilityRole="button"
-        accessibilityLabel={
-          uris.length > 1
-            ? `Photo ${photoIndex + 1} of ${uris.length} of ${accessibilityName}`
-            : `Open full screen view of ${accessibilityName}`
-        }
-        accessibilityHint="Opens the full screen spot view. Pinch or double tap to zoom."
-      >
-        <CachedRemoteImage
-          uri={uri}
-          style={{ height }}
-          className={`w-full bg-surface-soft ${imageClassName ?? ''}`}
-          accessible={false}
-        />
-      </FeedbackPressable>
-      {uris.length > 1 ? (
-        <>
-          <FeedbackPressable
-            haptic="selection"
-            onPress={() => goToPhoto(photoIndex - 1)}
-            disabled={photoIndex === 0}
-            className="absolute left-2 top-1/2 h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45"
-            accessibilityRole="button"
-            accessibilityLabel="Previous photo"
+    <View
+      style={{ height }}
+      className="overflow-hidden"
+      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
+    >
+      {uris.length === 1 ? (
+        <FeedbackPressable
+          haptic="light"
+          disablePressScale
+          onPress={() => onPressIndex(0)}
+          accessibilityRole="button"
+          accessibilityLabel={`Open full screen view of ${accessibilityName}`}
+          accessibilityHint="Opens the full screen spot view. Pinch or double tap to zoom."
+        >
+          <CachedRemoteImage
+            uri={firstUri}
+            style={{ height }}
+            className={`w-full bg-surface-soft ${imageClassName ?? ''}`}
+            accessible={false}
+          />
+        </FeedbackPressable>
+      ) : width === 0 ? (
+        <View style={{ height }} className="bg-surface-soft" />
+      ) : (
+        <View style={{ height }}>
+          <ScrollView
+            horizontal
+            pagingEnabled
+            nestedScrollEnabled
+            directionalLockEnabled
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            onScroll={handleScroll}
+            onMomentumScrollEnd={handleScroll}
+            scrollEventThrottle={16}
           >
-            <Feather
-              name="chevron-left"
-              size={18}
-              color={photoIndex === 0 ? 'rgba(255,255,255,0.35)' : colors.white}
-            />
-          </FeedbackPressable>
-          <FeedbackPressable
-            haptic="selection"
-            onPress={() => goToPhoto(photoIndex + 1)}
-            disabled={photoIndex === uris.length - 1}
-            className="absolute right-2 top-1/2 h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45"
-            accessibilityRole="button"
-            accessibilityLabel="Next photo"
-          >
-            <Feather
-              name="chevron-right"
-              size={18}
-              color={
-                photoIndex === uris.length - 1
-                  ? 'rgba(255,255,255,0.35)'
-                  : colors.white
-              }
-            />
-          </FeedbackPressable>
+            {uris.map((uri, photoIndex) => (
+              <FeedbackPressable
+                key={`${uri}-${photoIndex}`}
+                haptic="light"
+                disablePressScale
+                onPress={() => onPressIndex(photoIndex)}
+                style={{ width: pageWidth, height }}
+                accessibilityRole="button"
+                accessibilityLabel={`Photo ${photoIndex + 1} of ${uris.length} of ${accessibilityName}`}
+                accessibilityHint="Opens the full screen spot view. Pinch or double tap to zoom."
+              >
+                {shouldMountPagerImage(photoIndex, index) ? (
+                  <CachedRemoteImage
+                    uri={uri}
+                    style={{ width: pageWidth, height }}
+                    className={`bg-surface-soft ${imageClassName ?? ''}`}
+                    accessible={false}
+                  />
+                ) : (
+                  <View
+                    style={{ width: pageWidth, height }}
+                    className="bg-surface-soft"
+                  />
+                )}
+              </FeedbackPressable>
+            ))}
+          </ScrollView>
           <View
             pointerEvents="none"
             className="absolute bottom-2.5 left-0 right-0 flex-row items-center justify-center"
@@ -109,13 +127,13 @@ export default function SpotMediaPager({
               <View
                 key={dotIndex}
                 className={`mx-0.5 h-1.5 w-1.5 rounded-full ${
-                  dotIndex === photoIndex ? 'bg-white' : 'bg-white/45'
+                  dotIndex === index ? 'bg-white' : 'bg-white/45'
                 }`}
               />
             ))}
           </View>
-        </>
-      ) : null}
+        </View>
+      )}
     </View>
   );
 }

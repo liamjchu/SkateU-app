@@ -46,6 +46,7 @@ type CommentsState = {
     accessToken: string
   ) => Promise<void>;
   hideUserComments: (userId: string) => void;
+  replaceCreatorAvatar: (userId: string, avatarUrl: string | null) => void;
   hideComment: (spotId: string, commentId: string) => void;
   resetSpot: (spotId: string) => void;
   reset: () => void;
@@ -536,6 +537,30 @@ export const useCommentsStore = create<CommentsState>()(
         bySpotId[spotId] = {
           ...cache,
           comments: commentsWithoutUser(cache.comments, userId),
+        };
+      }
+      return { bySpotId };
+    });
+  },
+
+  replaceCreatorAvatar: (userId, avatarUrl) => {
+    const replace = (comment: SpotComment): SpotComment => {
+      const next =
+        comment.userId === userId
+          ? { ...comment, creatorAvatarUrl: avatarUrl }
+          : comment;
+      return {
+        ...next,
+        replies: next.replies.map(replace),
+      };
+    };
+
+    set((state) => {
+      const bySpotId: Record<string, SpotCommentsCache> = {};
+      for (const [spotId, cache] of Object.entries(state.bySpotId)) {
+        bySpotId[spotId] = {
+          ...cache,
+          comments: cache.comments.map(replace),
         };
       }
       return { bySpotId };

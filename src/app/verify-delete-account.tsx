@@ -3,11 +3,13 @@ import { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    ScrollView,
     Text,
     TextInput,
     View,
 } from 'react-native';
 import FeedbackPressable from '../components/FeedbackPressable';
+import KeyboardShiftView from '../components/keyboard-shift-view';
 import ScreenHeader from '../components/screen-header';
 import { colors } from '../constants/colors';
 import { useAuthStore } from '../store/authStore';
@@ -141,7 +143,14 @@ export default function VerifyDeleteAccountScreen() {
     <View className="flex-1 bg-surface">
       <ScreenHeader title="Delete account" onBack={goBack} />
 
-      <View className="flex-1 self-center w-full max-w-[640px] px-6 pt-8 pb-8">
+      <KeyboardShiftView>
+        <ScrollView
+          className="flex-1"
+          contentContainerClassName="flex-grow self-center w-full max-w-[640px] px-6 pt-8 pb-8"
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets={false}
+          showsVerticalScrollIndicator={false}
+        >
         <Text className="font-outfit-black text-2xl text-ink">
           Enter your code
         </Text>
@@ -264,7 +273,8 @@ export default function VerifyDeleteAccountScreen() {
             </Text>
           </FeedbackPressable>
         </View>
-      </View>
+        </ScrollView>
+      </KeyboardShiftView>
     </View>
   );
 }

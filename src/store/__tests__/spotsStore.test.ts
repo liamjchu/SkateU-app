@@ -67,6 +67,7 @@ const spotArb: fc.Arbitrary<Spot> = fc.record({
   state: fc.string(),
   schoolName: fc.string(),
   creatorUsername: fc.option(fc.string(), { nil: null }),
+  creatorAvatarUrl: fc.option(fc.webUrl(), { nil: null }),
   createdAt: fc.date({ noInvalidDate: true }).map((d) => d.toISOString()),
   updatedAt: fc.date({ noInvalidDate: true }).map((d) => d.toISOString()),
 });
@@ -153,6 +154,7 @@ describe('spotsStore', () => {
         state: 'CO',
         schoolName: 'CU Boulder',
         creatorUsername: 'skater_jane',
+        creatorAvatarUrl: null,
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z',
       },
@@ -215,6 +217,7 @@ function makeSpot(overrides: Partial<Spot> = {}): Spot {
     state: 'TX',
     schoolName: 'UT Austin',
     creatorUsername: 'skater_jane',
+    creatorAvatarUrl: null,
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z',
     ...overrides,
@@ -320,6 +323,33 @@ describe('spotsStore.updateSpot', () => {
 
     const state = useSpotsStore.getState();
     expect(state.mySpots.find((s) => s.id === 'a')?.name).toBe('Old');
+    expect(state.reviewingSpotIds).toEqual([]);
+  });
+
+  it('marks a spot as reviewing during an update and clears it after', async () => {
+    useSpotsStore.setState({
+      mySpots: [makeSpot({ id: 'a' })],
+      spots: [makeSpot({ id: 'a' })],
+      reviewingSpotIds: [],
+    });
+    let resolveUpdate: ((value: Response) => void) | undefined;
+    fetchMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveUpdate = resolve;
+        })
+    );
+
+    const pending = useSpotsStore.getState().updateSpot(
+      'a',
+      { name: 'New', description: 'A rail', latitude: 10, longitude: 20 },
+      'token-abc'
+    );
+    expect(useSpotsStore.getState().reviewingSpotIds).toEqual(['a']);
+
+    resolveUpdate?.(mockResponse({ spot: makeSpot({ id: 'a', name: 'New' }) }));
+    await pending;
+    expect(useSpotsStore.getState().reviewingSpotIds).toEqual([]);
   });
 });
 
@@ -437,14 +467,14 @@ describe('spotsStore liked spots', () => {
   it('preserves loaded likes and exposes the server reason when loading fails', async () => {
     const existing = makeSpot({ id: 'liked', likedByUser: true });
     useSpotsStore.setState({ likedSpots: [existing] });
-    fetchMock.mockResolvedValue(mockResponse({ reason: 'Log in again.' }, { ok: false, status: 401 }));
+    fetchMock.mockResolvedValue(mockResponse({ reason: 'Sign in again.' }, { ok: false, status: 401 }));
 
     await useSpotsStore.getState().fetchLikedSpots('expired-token');
 
     expect(useSpotsStore.getState()).toMatchObject({
       likedSpots: [existing],
       likedLoading: false,
-      likedError: 'Log in again.',
+      likedError: 'Sign in again.',
     });
   });
 
@@ -658,6 +688,15 @@ describe('spotsStore mutations and session', () => {
     useSpotsStore.getState().replaceCreatorUsername('old', 'new');
     expect(useSpotsStore.getState().spots[0]?.creatorUsername).toBe('new');
 
+    useSpotsStore.getState().replaceCreatorAvatar(
+      'user-1',
+      'https://project.supabase.co/storage/v1/object/public/avatars/user-1/a.jpg'
+    );
+    expect(useSpotsStore.getState().spots[0]?.creatorAvatarUrl).toBe(
+      'https://project.supabase.co/storage/v1/object/public/avatars/user-1/a.jpg'
+    );
+    expect(useSpotsStore.getState().spots[1]?.creatorAvatarUrl).toBeNull();
+
     useSpotsStore.getState().hideCreatorSpots('user-1');
     expect(useSpotsStore.getState().spots.map((spot) => spot.id)).toEqual(['other']);
 
@@ -721,6 +760,26 @@ describe('spotsStore mutations and session', () => {
         'token-abc'
       )
     ).rejects.toThrow('too many photos');
+
+    fetchMock.mockResolvedValueOnce(
+      mockResponse(
+        { approved: false, reason: 'Let’s try a different photo for this one.' },
+        { ok: false, status: 422 }
+      )
+    );
+    await expect(
+      useSpotsStore.getState().addSpot(
+        {
+          schoolId: 'school-1',
+          name: 'Rail',
+          description: 'A rail',
+          latitude: 10,
+          longitude: 20,
+          images: [],
+        },
+        'token-abc'
+      )
+    ).rejects.toThrow('Let’s try a different photo for this one.');
 
     fetchMock.mockResolvedValueOnce(mockResponse({}, { status: 200 }));
     await expect(

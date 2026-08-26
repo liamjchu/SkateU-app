@@ -23,7 +23,7 @@ type SchoolSearchResult = {
   lng: number;
   numSpots: number;
   type: SchoolType;
-  // Present in "popular" responses: a recent spot photo for the school.
+  // Present in "popular" responses: a photo from the school's most-liked spot.
   spotImageUrl?: string | null;
 };
 
@@ -140,8 +140,8 @@ type DatabaseSpotImageRow = {
   image_urls: string[] | null;
 };
 
-// Returns the most recent spot photo per school, for popular-school cards.
-async function fetchLatestSpotImageBySchool(
+// Returns a photo from the most-liked spot per school, for school cards.
+async function fetchPopularSpotImageBySchool(
   config: { url: string; apiKey: string },
   schoolIds: string[]
 ) {
@@ -154,7 +154,7 @@ async function fetchLatestSpotImageBySchool(
   const query = new URL(`${config.url}/rest/v1/spots`);
   query.searchParams.set('select', 'school_id,image_urls');
   query.searchParams.set('school_id', `in.(${schoolIds.join(',')})`);
-  query.searchParams.set('order', 'created_at.desc');
+  query.searchParams.set('order', 'likes_count.desc,created_at.desc');
   query.searchParams.set('limit', String(SPOT_IMAGE_LOOKUP_LIMIT));
 
   const response = await fetch(query.toString(), {
@@ -224,7 +224,7 @@ export async function GET(request: Request) {
         'numspots.desc,id.asc',
         offset
       );
-      const imageBySchoolId = await fetchLatestSpotImageBySchool(
+      const imageBySchoolId = await fetchPopularSpotImageBySchool(
         config,
         schools.map((school) => school.id)
       );
@@ -243,7 +243,7 @@ export async function GET(request: Request) {
         { id: `in.(${ids.join(',')})` },
         ids.length
       );
-      const imageBySchoolId = await fetchLatestSpotImageBySchool(
+      const imageBySchoolId = await fetchPopularSpotImageBySchool(
         config,
         schools.map((school) => school.id)
       );

@@ -1,4 +1,4 @@
-import type { School } from '../types/school';
+import type { School, SchoolTypeFilter } from '../types/school';
 
 // Matches GET /api/schools and search_schools. Two characters lets "RI" work.
 export const MIN_SEARCH_LENGTH = 2;
@@ -25,4 +25,19 @@ export function schoolMatchesQuery(school: School, query: string) {
     normalizeSchoolSearchText(school.city).includes(trimmedQuery) ||
     normalizeSchoolSearchText(school.state).includes(trimmedQuery)
   );
+}
+
+export function schoolMatchesTypeFilter(
+  school: School,
+  filter: SchoolTypeFilter
+) {
+  if (filter === 'all' || filter === 'saved') {
+    return true;
+  }
+
+  if (filter === 'k12') {
+    return school.type === 'k12_public' || school.type === 'k12_private';
+  }
+
+  return school.type === 'higher_ed';
 }

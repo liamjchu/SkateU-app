@@ -36,10 +36,22 @@ jest.mock('../../lib/supabase', () => ({
 }));
 
 const mockReplaceCreatorUsername = jest.fn();
+const mockReplaceCreatorAvatar = jest.fn();
 
 jest.mock('../spotsStore', () => ({
   useSpotsStore: {
-    getState: () => ({ replaceCreatorUsername: mockReplaceCreatorUsername }),
+    getState: () => ({
+      replaceCreatorUsername: mockReplaceCreatorUsername,
+      replaceCreatorAvatar: mockReplaceCreatorAvatar,
+    }),
+  },
+}));
+
+jest.mock('../commentsStore', () => ({
+  useCommentsStore: {
+    getState: () => ({
+      replaceCreatorAvatar: mockReplaceCreatorAvatar,
+    }),
   },
 }));
 
@@ -55,6 +67,7 @@ beforeEach(() => {
   mockFrom.mockReset();
   fetchMock.mockReset();
   mockReplaceCreatorUsername.mockReset();
+  mockReplaceCreatorAvatar.mockReset();
   useProfileStore.setState({
     profile: null,
     welcomeAboardUserId: null,
@@ -80,6 +93,7 @@ describe('profileStore.fetchProfile', () => {
           id: 'user-1',
           username: 'liam',
           avatar_url: null,
+          bio: null,
           updated_at: '2026-08-21T00:00:00.000Z',
         },
         error: null,
@@ -91,6 +105,7 @@ describe('profileStore.fetchProfile', () => {
           id: 'user-1',
           username: 'liam',
           avatar_url: null,
+          bio: null,
           updated_at: '2026-08-21T00:00:00.000Z',
           legal_version: '2026-08-20',
           legal_accepted_at: '2026-08-21T00:00:00.000Z',
@@ -134,6 +149,7 @@ describe('profileStore.fetchProfile', () => {
         id: 'user-1',
         username: 'liam',
         avatar_url: null,
+        bio: null,
         updated_at: '2026-08-21T00:00:00.000Z',
         legal_version: '2026-08-20',
         legal_accepted_at: '2026-08-21T00:00:00.000Z',
@@ -164,6 +180,7 @@ describe('profileStore.fetchProfile', () => {
           id: 'user-1',
           username: 'liam',
           avatar_url: null,
+          bio: null,
           updated_at: '2026-08-21T00:00:00.000Z',
         },
         error: null,
@@ -197,6 +214,7 @@ describe('profileStore.username', () => {
         id: 'user-1',
         username: 'oldname',
         avatar_url: null,
+        bio: null,
         updated_at: null,
         legal_version: '2026-08-20',
         legal_accepted_at: '2026-08-21T00:00:00.000Z',
@@ -214,6 +232,7 @@ describe('profileStore.username', () => {
           id: 'user-1',
           username: 'newname',
           avatar_url: null,
+          bio: null,
           updated_at: '2026-08-21T00:00:00.000Z',
         },
       })
@@ -275,6 +294,7 @@ describe('profileStore.acceptLegal', () => {
           id: 'user-1',
           username: 'liam',
           avatar_url: null,
+          bio: null,
           updated_at: '2026-08-21T00:00:00.000Z',
           legal_version: '2026-08-20',
           legal_accepted_at: '2026-08-21T00:00:00.000Z',
@@ -310,6 +330,7 @@ describe('profileStore.acceptLegal', () => {
         id: 'user-1',
         username: 'liam',
         avatar_url: null,
+        bio: null,
         updated_at: null,
         legal_version: null,
         legal_accepted_at: null,
@@ -337,6 +358,7 @@ describe('profileStore.acceptLegal', () => {
           id: 'user-1',
           username: 'liam',
           avatar_url: null,
+          bio: null,
           updated_at: '2026-08-21T00:00:00.000Z',
         },
         error: null,
@@ -354,6 +376,7 @@ describe('profileStore.acceptLegal', () => {
           id: 'user-1',
           username: 'liam',
           avatar_url: null,
+          bio: null,
           updated_at: null,
           legal_version: null,
           legal_accepted_at: null,
@@ -367,5 +390,138 @@ describe('profileStore.acceptLegal', () => {
     expect(merge!(null, useProfileStore.getState()).profile).toBeNull();
     useProfileStore.getState().setHasHydrated(true);
     expect(useProfileStore.getState().hasHydrated).toBe(true);
+  });
+});
+
+describe('profileStore.updateAvatar', () => {
+  const avatarUrl =
+    'https://project.supabase.co/storage/v1/object/public/avatars/user-1/a.jpg';
+
+  it('saves an approved photo and rewrites cached spots', async () => {
+    useProfileStore.setState({
+      profile: {
+        id: 'user-1',
+        username: 'liam',
+        avatar_url: null,
+        bio: null,
+        updated_at: null,
+        legal_version: '2026-08-20',
+        legal_accepted_at: '2026-08-21T00:00:00.000Z',
+        age_attested_at: '2026-08-21T00:00:00.000Z',
+      },
+      loaded: true,
+    });
+    fetchMock.mockResolvedValue(
+      mockResponse({
+        allowed: true,
+        profile: {
+          id: 'user-1',
+          username: 'liam',
+          avatar_url: avatarUrl,
+          bio: null,
+          updated_at: '2026-08-26T00:00:00.000Z',
+        },
+      })
+    );
+
+    await expect(
+      useProfileStore.getState().updateAvatar('token', { uri: 'file://photo.jpg' })
+    ).resolves.toEqual({ ok: true });
+    expect(useProfileStore.getState().profile?.avatar_url).toBe(avatarUrl);
+    expect(mockReplaceCreatorAvatar).toHaveBeenCalledWith('user-1', avatarUrl);
+  });
+
+  it('returns a gentle reason when review rejects the photo', async () => {
+    fetchMock.mockResolvedValue(
+      mockResponse({ allowed: false, reason: 'Let’s try a different photo.' })
+    );
+    await expect(
+      useProfileStore.getState().updateAvatar('token', { uri: 'file://photo.jpg' })
+    ).resolves.toEqual({
+      ok: false,
+      message: 'Let’s try a different photo.',
+    });
+    expect(mockReplaceCreatorAvatar).not.toHaveBeenCalled();
+  });
+
+  it('clears the photo', async () => {
+    useProfileStore.setState({
+      profile: {
+        id: 'user-1',
+        username: 'liam',
+        avatar_url: avatarUrl,
+        bio: null,
+        updated_at: null,
+        legal_version: null,
+        legal_accepted_at: null,
+        age_attested_at: null,
+      },
+      loaded: true,
+    });
+    fetchMock.mockResolvedValue(
+      mockResponse({
+        profile: {
+          id: 'user-1',
+          username: 'liam',
+          avatar_url: null,
+          bio: null,
+          updated_at: '2026-08-26T00:00:00.000Z',
+        },
+      })
+    );
+
+    await useProfileStore.getState().removeAvatar('token');
+    expect(useProfileStore.getState().profile?.avatar_url).toBeNull();
+    expect(mockReplaceCreatorAvatar).toHaveBeenCalledWith('user-1', null);
+  });
+});
+
+describe('profileStore.updateBio', () => {
+  it('saves an approved bio', async () => {
+    useProfileStore.setState({
+      profile: {
+        id: 'user-1',
+        username: 'liam',
+        avatar_url: null,
+        bio: null,
+        updated_at: null,
+        legal_version: '2026-08-20',
+        legal_accepted_at: '2026-08-21T00:00:00.000Z',
+        age_attested_at: '2026-08-21T00:00:00.000Z',
+      },
+      loaded: true,
+    });
+    fetchMock.mockResolvedValue(
+      mockResponse({
+        allowed: true,
+        profile: {
+          id: 'user-1',
+          username: 'liam',
+          avatar_url: null,
+          bio: 'Skater at State',
+          updated_at: '2026-08-26T00:00:00.000Z',
+        },
+      })
+    );
+
+    await expect(
+      useProfileStore.getState().updateBio('token', 'Skater at State')
+    ).resolves.toEqual({ ok: true });
+    expect(useProfileStore.getState().profile?.bio).toBe('Skater at State');
+  });
+
+  it('returns a gentle reason when review rejects the bio', async () => {
+    fetchMock.mockResolvedValue(
+      mockResponse({
+        allowed: false,
+        reason: 'Let’s keep this one school-friendly and try again.',
+      })
+    );
+    await expect(
+      useProfileStore.getState().updateBio('token', 'nsfw')
+    ).resolves.toEqual({
+      ok: false,
+      message: 'Let’s keep this one school-friendly and try again.',
+    });
   });
 });

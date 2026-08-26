@@ -87,6 +87,53 @@ describe('draftSpotsStore', () => {
     );
   });
 
+  it('sets a draft to submitting without copying files again', async () => {
+    const draft = await useDraftSpotsStore.getState().upsertDraft(makeInput());
+    useDraftSpotsStore.getState().setDraftStatus(draft.id, 'submitting');
+
+    expect(useDraftSpotsStore.getState().getDraft(draft.id)?.status).toBe(
+      'submitting'
+    );
+    expect(
+      useDraftSpotsStore.getState().draftsForUser('user-1')
+    ).toHaveLength(0);
+  });
+
+  it('stores a submit error on the draft so it can be shown later', async () => {
+    const draft = await useDraftSpotsStore.getState().upsertDraft(makeInput());
+    useDraftSpotsStore.getState().setDraftStatus(draft.id, 'submitting');
+    useDraftSpotsStore.getState().setDraftStatus(
+      draft.id,
+      'draft',
+      'Let’s try a different photo for this one.'
+    );
+
+    expect(useDraftSpotsStore.getState().getDraft(draft.id)?.status).toBe(
+      'draft'
+    );
+    expect(useDraftSpotsStore.getState().getDraft(draft.id)?.lastError).toBe(
+      'Let’s try a different photo for this one.'
+    );
+    expect(
+      useDraftSpotsStore.getState().draftsForUser('user-1')
+    ).toHaveLength(1);
+  });
+
+  it('does not create a second draft while one is submitting on that campus', async () => {
+    const draft = await useDraftSpotsStore.getState().upsertDraft(makeInput());
+    useDraftSpotsStore.getState().setDraftStatus(draft.id, 'submitting');
+
+    const next = await useDraftSpotsStore.getState().upsertDraft(
+      makeInput({ name: 'Duplicate rail' })
+    );
+
+    expect(next.id).toBe(draft.id);
+    expect(useDraftSpotsStore.getState().drafts).toHaveLength(1);
+    expect(useDraftSpotsStore.getState().getDraft(draft.id)?.status).toBe(
+      'submitting'
+    );
+  });
+
   it('deletes a draft after a successful post', async () => {
     const draft = await useDraftSpotsStore.getState().upsertDraft(makeInput());
     await useDraftSpotsStore.getState().deleteDraft(draft.id);

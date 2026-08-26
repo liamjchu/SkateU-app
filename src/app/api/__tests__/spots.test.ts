@@ -1,6 +1,7 @@
 import fc from 'fast-check';
 
 import { IMAGE_SANITIZE_ERROR } from '../../../lib/sanitizeImage';
+import { HOME_SPOTS_PAGE_SIZE } from '../../../lib/homeFeed';
 import {
     CAMERA_MAKE,
     CAPTURE_TIME,
@@ -13,6 +14,7 @@ import {
     DatabaseSpot,
     DELETE,
     DESCRIPTION_MAX,
+    finalizePendingSpotEdit,
     finalizePendingSpotModeration,
     GET,
     isHiddenSpotStatus,
@@ -506,6 +508,7 @@ describe('GET /api/spots', () => {
           state: 'TX',
           schoolId: 'school1',
           creatorUsername: 'skater_jane',
+          creatorAvatarUrl: null,
           creatorUserId: null,
           createdAt: '2024-01-01T00:00:00.000Z',
           updatedAt: '2024-01-01T00:00:00.000Z',
@@ -561,6 +564,7 @@ describe('GET /api/spots', () => {
     expect(fetchMock).toHaveBeenCalled();
     const recentUrl = new URL(String(fetchMock.mock.calls[0][0]));
     expect(recentUrl.searchParams.get('order')).toBe('created_at.desc,id.desc');
+    expect(recentUrl.searchParams.get('limit')).toBe(String(HOME_SPOTS_PAGE_SIZE));
     expect(recentUrl.searchParams.get('status')).toBe(VISIBLE_SPOT_STATUS_FILTER);
   });
 
@@ -573,7 +577,7 @@ describe('GET /api/spots', () => {
 
     const response = await GET(
       new Request(
-        'https://app.test/api/spots?recent=1&type=k12_public&offset=24'
+        `https://app.test/api/spots?recent=1&type=k12_public&offset=${HOME_SPOTS_PAGE_SIZE}`
       )
     );
     expect(response.status).toBe(200);
@@ -581,7 +585,8 @@ describe('GET /api/spots', () => {
 
     const recentUrl = new URL(String(fetchMock.mock.calls[0][0]));
     expect(recentUrl.searchParams.get('schools.type')).toBe('in.(k12_public)');
-    expect(recentUrl.searchParams.get('offset')).toBe('24');
+    expect(recentUrl.searchParams.get('offset')).toBe(String(HOME_SPOTS_PAGE_SIZE));
+    expect(recentUrl.searchParams.get('limit')).toBe(String(HOME_SPOTS_PAGE_SIZE));
     expect(recentUrl.searchParams.get('order')).toBe('created_at.desc,id.desc');
   });
 
@@ -813,7 +818,7 @@ describe('POST /api/spots', () => {
       fetchMock.mock.calls.some((call) =>
         call[0].toString().includes('api.openai.com')
       )
-    ).toBe(false);
+    ).toBe(true);
 
     const insertCall = fetchMock.mock.calls.find(
       (call) =>
@@ -826,18 +831,73 @@ describe('POST /api/spots', () => {
     };
     expect(inserted.status).toBe(PENDING_SPOT_STATUS);
 
-    await flushDeferredSpotModeration();
-    expect(
-      fetchMock.mock.calls.some((call) =>
-        call[0].toString().includes('api.openai.com')
-      )
-    ).toBe(true);
     const statusPatch = fetchMock.mock.calls.find((call) =>
       call[0].toString().includes(`status=eq.${PENDING_SPOT_STATUS}`)
     );
     expect(statusPatch?.[1]?.method).toBe('PATCH');
     expect(JSON.parse(String(statusPatch?.[1]?.body))).toEqual({
       status: 'active',
+    });
+  });
+
+  it('returns 422 with a gentle reason when moderation rejects the spot', async () => {
+    setConfigured();
+    const createdRow: DatabaseSpot = {
+      id: 'spot1',
+      school_id: 'school1',
+      name: 'Rail',
+      description: 'A nice rail',
+      latitude: 10,
+      longitude: 20,
+      image_urls: [],
+      created_at: '2024-01-01T00:00:00.000Z',
+      updated_at: '2024-01-01T00:00:00.000Z',
+      schools: { name: 'UT Austin', city: 'Austin', state: 'TX' },
+      creator: { username: 'skater_jane' },
+    };
+    const fetchMock: FetchMock = jest.fn(async (input) => {
+      const requestUrl = input.toString();
+      if (requestUrl.includes('/auth/v1/user')) {
+        return jsonResponse({ id: 'user-1' });
+      }
+      if (requestUrl.includes('api.openai.com')) {
+        return jsonResponse({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  approved: false,
+                  flag: 'IRRELEVANT',
+                  reason: 'That photo is a meme.',
+                }),
+              },
+            },
+          ],
+        });
+      }
+      return jsonResponse([createdRow], 201);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await POST(
+      makePostRequest(validForm(), { Authorization: 'Bearer good-token' })
+    );
+    expect(response.status).toBe(422);
+    const body = (await response.json()) as {
+      approved: boolean;
+      reason: string;
+      spot?: unknown;
+    };
+    expect(body.approved).toBe(false);
+    expect(body.spot).toBeUndefined();
+    expect(body.reason).toBe(
+      'That photo’s a little hard to read as a skate spot — a clearer shot of the obstacle would help.'
+    );
+    const statusPatch = fetchMock.mock.calls.find((call) =>
+      call[0].toString().includes(`status=eq.${PENDING_SPOT_STATUS}`)
+    );
+    expect(JSON.parse(String(statusPatch?.[1]?.body))).toEqual({
+      status: 'removed',
     });
   });
 
@@ -910,7 +970,7 @@ describe('POST /api/spots', () => {
       fetchMock.mock.calls.some((call) =>
         call[0].toString().includes('api.openai.com')
       )
-    ).toBe(false);
+    ).toBe(true);
 
     const storageCall = fetchMock.mock.calls.find((call) =>
       call[0].toString().includes('/storage/v1/object/spot-images/')
@@ -921,7 +981,6 @@ describe('POST /api/spots', () => {
     expect(containsAscii(uploaded, CAPTURE_TIME)).toBe(false);
     expect(containsAscii(original, CAMERA_MAKE)).toBe(true);
 
-    await flushDeferredSpotModeration();
     const openaiCall = fetchMock.mock.calls.find((call) =>
       call[0].toString().includes('api.openai.com')
     );
@@ -1199,6 +1258,7 @@ describe('mapSpot new fields', () => {
     expect(spot.updatedAt).toBe('2024-02-02T00:00:00.000Z');
     expect(spot.schoolName).toBe('UT Austin');
     expect(spot.commentCount).toBe(0);
+    expect(spot.creatorAvatarUrl).toBeNull();
   });
 
   it('defaults schoolName and timestamps to empty string when absent', () => {
@@ -1219,7 +1279,45 @@ describe('mapSpot new fields', () => {
     expect(spot.schoolName).toBe('');
     expect(spot.updatedAt).toBe('');
     expect(spot.creatorUsername).toBeNull();
+    expect(spot.creatorAvatarUrl).toBeNull();
     expect(spot.commentCount).toBe(0);
+  });
+
+  it('maps moderated SkateU avatars and ignores OAuth photo URLs', () => {
+    const skateU =
+      'https://project.supabase.co/storage/v1/object/public/avatars/user-1/pic.jpg';
+    const withAvatar = mapSpot({
+      id: 'spot1',
+      school_id: 'school1',
+      name: 'Rail',
+      description: 'A rail',
+      latitude: 10,
+      longitude: 20,
+      image_urls: [],
+      created_at: '2024-01-01T00:00:00.000Z',
+      updated_at: '2024-01-01T00:00:00.000Z',
+      schools: { name: 'UT Austin', city: 'Austin', state: 'TX' },
+      creator: { username: 'skater_jane', avatar_url: skateU },
+    });
+    expect(withAvatar.creatorAvatarUrl).toBe(skateU);
+
+    const oauth = mapSpot({
+      id: 'spot1',
+      school_id: 'school1',
+      name: 'Rail',
+      description: 'A rail',
+      latitude: 10,
+      longitude: 20,
+      image_urls: [],
+      created_at: '2024-01-01T00:00:00.000Z',
+      updated_at: '2024-01-01T00:00:00.000Z',
+      schools: { name: 'UT Austin', city: 'Austin', state: 'TX' },
+      creator: {
+        username: 'skater_jane',
+        avatar_url: 'https://lh3.googleusercontent.com/photo.jpg',
+      },
+    });
+    expect(oauth.creatorAvatarUrl).toBeNull();
   });
 });
 
@@ -1289,6 +1387,79 @@ describe('GET /api/spots?mine=1', () => {
     expect(new URL(String(listingCall?.[0])).searchParams.get('status')).toBe(
       VISIBLE_SPOT_STATUS_FILTER
     );
+  });
+});
+
+describe('GET /api/spots?creatorUserId=', () => {
+  const creatorId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+
+  it('returns 400 for an invalid creator id', async () => {
+    setConfigured();
+    const response = await GET(
+      new Request(`https://app.test/api/spots?creatorUserId=${'x'.repeat(65)}`)
+    );
+    expect(response.status).toBe(400);
+  });
+
+  it('returns 200 with mapped public spots', async () => {
+    setConfigured();
+    const row: DatabaseSpot = {
+      id: 'spot1',
+      school_id: 'school1',
+      name: 'Rail',
+      description: 'A rail',
+      latitude: 10,
+      longitude: 20,
+      image_urls: [],
+      created_at: '2024-01-01T00:00:00.000Z',
+      updated_at: '2024-01-01T00:00:00.000Z',
+      schools: { name: 'UT Austin', city: 'Austin', state: 'TX' },
+      creator: { username: 'skater_jane' },
+    };
+    const fetchMock: FetchMock = jest.fn(async (input) => {
+      const url = String(input);
+      if (url.includes('/rest/v1/spots')) {
+        return jsonResponse([row]);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await GET(
+      new Request(`https://app.test/api/spots?creatorUserId=${creatorId}`)
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { spots: { id: string }[] };
+    expect(body.spots).toHaveLength(1);
+    expect(body.spots[0].id).toBe('spot1');
+    const listingCall = fetchMock.mock.calls.find((call) =>
+      String(call[0]).includes('/rest/v1/spots')
+    );
+    expect(String(listingCall?.[0])).toContain(`created_by_user_id=eq.${creatorId}`);
+    expect(new URL(String(listingCall?.[0])).searchParams.get('status')).toBe(
+      VISIBLE_SPOT_STATUS_FILTER
+    );
+  });
+
+  it('returns 403 when the viewer is blocked either way', async () => {
+    setConfigured();
+    global.fetch = jest.fn(async (input) => {
+      const url = String(input);
+      if (url.includes('/auth/v1/user')) {
+        return jsonResponse({ id: 'viewer-1' });
+      }
+      if (url.includes('/rest/v1/user_blocks')) {
+        return jsonResponse([{ blocked_id: creatorId }]);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as unknown as typeof fetch;
+
+    const response = await GET(
+      new Request(`https://app.test/api/spots?creatorUserId=${creatorId}`, {
+        headers: { Authorization: 'Bearer good-token' },
+      })
+    );
+    expect(response.status).toBe(403);
   });
 });
 
@@ -1450,8 +1621,20 @@ describe('PATCH /api/spots', () => {
     expect(response.status).toBe(403);
   });
 
-  it('returns 200 with the updated spot when the caller owns it', async () => {
+  it('stores pending_edit and returns the live spot without waiting on AI', async () => {
     setConfigured();
+    const live = ownedRow({
+      name: 'Old rail',
+      description: 'Before the edit',
+      image_urls: [],
+    });
+    const pending = {
+      name: 'Updated rail',
+      description: 'Now with wax',
+      latitude: 41.8,
+      longitude: -71.4,
+      image_urls: [] as string[],
+    };
     const fetchMock: FetchMock = jest.fn(async (input, init) => {
       const url = input.toString();
       if (url.includes('/auth/v1/user')) {
@@ -1461,10 +1644,21 @@ describe('PATCH /api/spots', () => {
         return openAIApprovalResponse();
       }
       if (init?.method === 'PATCH') {
-        return jsonResponse([ownedRow()]);
+        const payload = JSON.parse(String(init.body)) as {
+          pending_edit?: typeof pending;
+          name?: string;
+        };
+        if (payload.pending_edit) {
+          return jsonResponse([live]);
+        }
+        return jsonResponse([ownedRow({ name: payload.name ?? pending.name })]);
       }
-      // ownership lookup
-      return jsonResponse([{ created_by_user_id: 'user-1', school_id: 'school1' }]);
+      if (url.includes('created_by_user_id')) {
+        return jsonResponse([
+          { created_by_user_id: 'user-1', school_id: 'school1', image_urls: [] },
+        ]);
+      }
+      return jsonResponse([{ pending_edit: pending, image_urls: [] }]);
     });
     global.fetch = fetchMock as unknown as typeof fetch;
 
@@ -1477,13 +1671,55 @@ describe('PATCH /api/spots', () => {
     );
     expect(response.status).toBe(200);
     const body = (await response.json()) as { spot: { name: string } };
-    expect(body.spot.name).toBe('Updated rail');
+    expect(body.spot.name).toBe('Old rail');
+    expect(
+      fetchMock.mock.calls.some((call) =>
+        call[0].toString().includes('api.openai.com')
+      )
+    ).toBe(false);
+
+    const storeCall = fetchMock.mock.calls.find(
+      (call) => call[1]?.method === 'PATCH'
+    );
+    expect(JSON.parse(String(storeCall?.[1]?.body))).toEqual({
+      pending_edit: pending,
+    });
+
+    await flushDeferredSpotModeration();
+    expect(
+      fetchMock.mock.calls.some((call) =>
+        call[0].toString().includes('api.openai.com')
+      )
+    ).toBe(true);
+    const applyCall = fetchMock.mock.calls.find((call) => {
+      if (call[1]?.method !== 'PATCH') {
+        return false;
+      }
+      const payload = JSON.parse(String(call[1]?.body)) as { name?: string };
+      return payload.name === 'Updated rail';
+    });
+    expect(applyCall).toBeDefined();
+    expect(JSON.parse(String(applyCall?.[1]?.body))).toEqual({
+      name: pending.name,
+      description: pending.description,
+      latitude: pending.latitude,
+      longitude: pending.longitude,
+      image_urls: [],
+      pending_edit: null,
+    });
   });
 
   it('keeps existing photos and appends new ones from imageOrder', async () => {
     setConfigured();
     const existingUrl =
       'https://project.supabase.co/storage/v1/object/public/spot-images/school1/old.jpg';
+    const pending = {
+      name: 'Updated rail',
+      description: 'Now with wax',
+      latitude: 41.8,
+      longitude: -71.4,
+      image_urls: [existingUrl],
+    };
     const fetchMock: FetchMock = jest.fn(async (input, init) => {
       const url = input.toString();
       if (url.includes('/auth/v1/user')) {
@@ -1499,19 +1735,26 @@ describe('PATCH /api/spots', () => {
         return jsonResponse({});
       }
       if (init?.method === 'PATCH') {
-        const payload = JSON.parse(String(init.body)) as { image_urls: string[] };
+        const payload = JSON.parse(String(init.body)) as {
+          pending_edit?: { image_urls: string[] };
+        };
+        if (payload.pending_edit) {
+          pending.image_urls = payload.pending_edit.image_urls;
+          return jsonResponse([ownedRow({ image_urls: [existingUrl] })]);
+        }
+        return jsonResponse([ownedRow({ image_urls: pending.image_urls })]);
+      }
+      if (url.includes('created_by_user_id')) {
         return jsonResponse([
-          ownedRow({
-            image_urls: payload.image_urls,
-          }),
+          {
+            created_by_user_id: 'user-1',
+            school_id: 'school1',
+            image_urls: [existingUrl],
+          },
         ]);
       }
       return jsonResponse([
-        {
-          created_by_user_id: 'user-1',
-          school_id: 'school1',
-          image_urls: [existingUrl],
-        },
+        { pending_edit: pending, image_urls: [existingUrl] },
       ]);
     });
     global.fetch = fetchMock as unknown as typeof fetch;
@@ -1535,9 +1778,19 @@ describe('PATCH /api/spots', () => {
     );
     expect(response.status).toBe(200);
     const body = (await response.json()) as { spot: { imageUris: string[] } };
-    expect(body.spot.imageUris).toHaveLength(2);
-    expect(body.spot.imageUris[0]).toBe(existingUrl);
-    expect(body.spot.imageUris[1]).toContain('/storage/v1/object/public/spot-images/');
+    expect(body.spot.imageUris).toEqual([existingUrl]);
+
+    const storeCall = fetchMock.mock.calls.find(
+      (call) => call[1]?.method === 'PATCH'
+    );
+    const stored = JSON.parse(String(storeCall?.[1]?.body)) as {
+      pending_edit: { image_urls: string[] };
+    };
+    expect(stored.pending_edit.image_urls).toHaveLength(2);
+    expect(stored.pending_edit.image_urls[0]).toBe(existingUrl);
+    expect(stored.pending_edit.image_urls[1]).toContain(
+      '/storage/v1/object/public/spot-images/'
+    );
 
     const storageCall = fetchMock.mock.calls.find((call) =>
       call[0].toString().includes('/storage/v1/object/spot-images/')
@@ -1553,12 +1806,19 @@ describe('PATCH /api/spots', () => {
     expect(removeCall).toBeUndefined();
   });
 
-  it('deletes only photos dropped from imageOrder', async () => {
+  it('deletes dropped photos only after the pending edit is approved', async () => {
     setConfigured();
     const keepUrl =
       'https://project.supabase.co/storage/v1/object/public/spot-images/school1/keep.jpg';
     const dropUrl =
       'https://project.supabase.co/storage/v1/object/public/spot-images/school1/drop.jpg';
+    const pending = {
+      name: 'Updated rail',
+      description: 'Now with wax',
+      latitude: 41.8,
+      longitude: -71.4,
+      image_urls: [keepUrl],
+    };
     const fetchMock: FetchMock = jest.fn(async (input, init) => {
       const url = input.toString();
       if (url.includes('/auth/v1/user')) {
@@ -1571,14 +1831,19 @@ describe('PATCH /api/spots', () => {
         return jsonResponse({});
       }
       if (init?.method === 'PATCH') {
-        return jsonResponse([ownedRow({ image_urls: [keepUrl] })]);
+        return jsonResponse([ownedRow({ image_urls: [keepUrl, dropUrl] })]);
+      }
+      if (url.includes('created_by_user_id')) {
+        return jsonResponse([
+          {
+            created_by_user_id: 'user-1',
+            school_id: 'school1',
+            image_urls: [keepUrl, dropUrl],
+          },
+        ]);
       }
       return jsonResponse([
-        {
-          created_by_user_id: 'user-1',
-          school_id: 'school1',
-          image_urls: [keepUrl, dropUrl],
-        },
+        { pending_edit: pending, image_urls: [keepUrl, dropUrl] },
       ]);
     });
     global.fetch = fetchMock as unknown as typeof fetch;
@@ -1597,6 +1862,13 @@ describe('PATCH /api/spots', () => {
       })
     );
     expect(response.status).toBe(200);
+
+    const removeDuringRequest = fetchMock.mock.calls.find((call) =>
+      call[0].toString().includes('/storage/v1/object/remove')
+    );
+    expect(removeDuringRequest).toBeUndefined();
+
+    await flushDeferredSpotModeration();
 
     const removeCall = fetchMock.mock.calls.find((call) =>
       call[0].toString().includes('/storage/v1/object/remove')
@@ -1803,6 +2075,170 @@ describe('finalizePendingSpotModeration', () => {
       fetchMock.mock.calls.some((call) =>
         call[0].toString().includes('/rest/v1/spots')
       )
+    ).toBe(false);
+    expect(errorSpy).toHaveBeenCalled();
+  });
+});
+
+describe('finalizePendingSpotEdit', () => {
+  const payload = {
+    name: 'Updated rail',
+    description: 'Now with wax',
+    latitude: 41.8,
+    longitude: -71.4,
+    image_urls: [
+      'https://project.supabase.co/storage/v1/object/public/spot-images/school1/new.jpg',
+    ],
+  };
+
+  it('applies the pending fields when moderation approves', async () => {
+    setConfigured();
+    const liveUrl =
+      'https://project.supabase.co/storage/v1/object/public/spot-images/school1/old.jpg';
+    const fetchMock: FetchMock = jest.fn(async (input, init) => {
+      const url = input.toString();
+      if (url.includes('api.openai.com')) {
+        return openAIApprovalResponse();
+      }
+      if (url.includes('/storage/v1/object/remove')) {
+        return jsonResponse({});
+      }
+      if (init?.method === 'PATCH') {
+        return jsonResponse({}, 200);
+      }
+      return jsonResponse([
+        { pending_edit: payload, image_urls: [liveUrl] },
+      ]);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await finalizePendingSpotEdit(
+      { url: 'https://project.supabase.co', apiKey: 'service-role-secret-key' },
+      'spot1',
+      payload
+    );
+
+    const applyCall = fetchMock.mock.calls.find(
+      (call) => call[1]?.method === 'PATCH'
+    );
+    expect(JSON.parse(String(applyCall?.[1]?.body))).toEqual({
+      ...payload,
+      pending_edit: null,
+    });
+    const removeCall = fetchMock.mock.calls.find((call) =>
+      call[0].toString().includes('/storage/v1/object/remove')
+    );
+    expect(JSON.parse(String(removeCall?.[1]?.body))).toEqual({
+      prefixes: ['school1/old.jpg'],
+    });
+  });
+
+  it('discards the pending edit and unused images when moderation rejects', async () => {
+    setConfigured();
+    const liveUrl =
+      'https://project.supabase.co/storage/v1/object/public/spot-images/school1/old.jpg';
+    const fetchMock: FetchMock = jest.fn(async (input, init) => {
+      const url = input.toString();
+      if (url.includes('api.openai.com')) {
+        return jsonResponse({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  approved: false,
+                  flag: 'IRRELEVANT',
+                  reason: 'That photo is a meme.',
+                }),
+              },
+            },
+          ],
+        });
+      }
+      if (url.includes('/storage/v1/object/remove')) {
+        return jsonResponse({});
+      }
+      if (init?.method === 'PATCH') {
+        return jsonResponse({}, 200);
+      }
+      return jsonResponse([
+        { pending_edit: payload, image_urls: [liveUrl] },
+      ]);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await finalizePendingSpotEdit(
+      { url: 'https://project.supabase.co', apiKey: 'service-role-secret-key' },
+      'spot1',
+      payload
+    );
+
+    const clearCall = fetchMock.mock.calls.find(
+      (call) => call[1]?.method === 'PATCH'
+    );
+    expect(JSON.parse(String(clearCall?.[1]?.body))).toEqual({
+      pending_edit: null,
+    });
+    const removeCall = fetchMock.mock.calls.find((call) =>
+      call[0].toString().includes('/storage/v1/object/remove')
+    );
+    expect(JSON.parse(String(removeCall?.[1]?.body))).toEqual({
+      prefixes: ['school1/new.jpg'],
+    });
+  });
+
+  it('skips apply when a newer pending edit superseded this payload', async () => {
+    setConfigured();
+    const fetchMock: FetchMock = jest.fn(async (input) => {
+      if (input.toString().includes('api.openai.com')) {
+        return openAIApprovalResponse();
+      }
+      return jsonResponse([
+        {
+          pending_edit: { ...payload, name: 'Newer edit' },
+          image_urls: [],
+        },
+      ]);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await finalizePendingSpotEdit(
+      { url: 'https://project.supabase.co', apiKey: 'service-role-secret-key' },
+      'spot1',
+      payload
+    );
+
+    expect(
+      fetchMock.mock.calls.some((call) => call[1]?.method === 'PATCH')
+    ).toBe(false);
+    expect(
+      fetchMock.mock.calls.some((call) =>
+        call[0].toString().includes('api.openai.com')
+      )
+    ).toBe(false);
+  });
+
+  it('leaves the pending edit when moderation fails twice', async () => {
+    setConfigured();
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    const fetchMock: FetchMock = jest.fn(async (input, init) => {
+      if (init?.method === 'PATCH') {
+        return jsonResponse({}, 200);
+      }
+      if (input.toString().includes('/rest/v1/spots')) {
+        return jsonResponse([{ pending_edit: payload, image_urls: [] }]);
+      }
+      return new Response('down', { status: 500 });
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await finalizePendingSpotEdit(
+      { url: 'https://project.supabase.co', apiKey: 'service-role-secret-key' },
+      'spot1',
+      payload
+    );
+
+    expect(
+      fetchMock.mock.calls.some((call) => call[1]?.method === 'PATCH')
     ).toBe(false);
     expect(errorSpy).toHaveBeenCalled();
   });

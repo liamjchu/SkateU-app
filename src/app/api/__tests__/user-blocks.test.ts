@@ -139,6 +139,9 @@ describe('POST /api/user-blocks', () => {
       if (init?.method === 'POST' && url.includes('/rest/v1/user_blocks')) {
         return jsonResponse(null, 201);
       }
+      if (init?.method === 'DELETE' && url.includes('/rest/v1/user_follows')) {
+        return jsonResponse(null, 200);
+      }
       if (url.includes('/rest/v1/profiles')) {
         return jsonResponse([{ id: blockedId, username: 'blocked_skater' }]);
       }
@@ -170,6 +173,9 @@ describe('POST /api/user-blocks', () => {
         return new Response('duplicate key value violates unique constraint 23505', {
           status: 409,
         });
+      }
+      if (init?.method === 'DELETE' && url.includes('/rest/v1/user_follows')) {
+        return jsonResponse(null, 200);
       }
       if (url.includes('/rest/v1/user_blocks')) {
         return jsonResponse([

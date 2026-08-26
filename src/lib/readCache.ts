@@ -156,6 +156,10 @@ export function parseSpot(value: unknown): Spot | null {
   const schoolId = readString(value.schoolId);
   const creatorUsername =
     value.creatorUsername === null ? null : readString(value.creatorUsername);
+  const creatorAvatarUrl =
+    value.creatorAvatarUrl === null
+      ? null
+      : readString(value.creatorAvatarUrl);
   const creatorUserId =
     value.creatorUserId === null
       ? null
@@ -176,6 +180,7 @@ export function parseSpot(value: unknown): Spot | null {
     createdAt,
     updatedAt,
     creatorUsername,
+    creatorAvatarUrl: creatorAvatarUrl ?? null,
     ...(schoolId ? { schoolId } : {}),
     ...(creatorUserId !== undefined ? { creatorUserId } : {}),
     ...(likeCount !== null ? { likeCount } : {}),
@@ -228,6 +233,10 @@ function parseComment(value: unknown): SpotComment | null {
       value.parentCommentId === null ? null : readString(value.parentCommentId),
     creatorUsername:
       value.creatorUsername === null ? null : readString(value.creatorUsername),
+    creatorAvatarUrl:
+      value.creatorAvatarUrl === null
+        ? null
+        : readString(value.creatorAvatarUrl) ?? null,
     replies,
   };
 }
@@ -280,6 +289,7 @@ export function parseProfile(value: unknown): Profile | null {
     id,
     username: value.username === null ? null : readString(value.username),
     avatar_url: value.avatar_url === null ? null : readString(value.avatar_url),
+    bio: value.bio === null || value.bio === undefined ? null : readString(value.bio),
     updated_at: value.updated_at === null ? null : readString(value.updated_at),
     legal_version:
       value.legal_version === null ? null : readString(value.legal_version),

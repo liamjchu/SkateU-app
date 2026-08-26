@@ -24,14 +24,16 @@ If you create an account, we collect:
 
 We do not ask for or store your date of birth. Legal acceptance records are not public and are not used for analytics.
 
-If you sign in with Google or Apple, those companies share information they are authorized to share with us, which may include your email and a name or profile image URL. SkateU stores an optional avatar URL from that sign-in data. The app does not currently display profile photos.
+If you sign in with Google or Apple, those companies share information they are authorized to share with us, which may include your email and a name or profile image URL. SkateU may store that sign-in image URL, but the app only displays a profile photo after you upload one in SkateU and it passes review.
 
-Your email is not shown publicly. Your username is public and may appear on spots and comments.
+Your email is not shown publicly. Your username, profile photo, and profile bio are public and may appear on spots, comments, and profiles.
 
 ### Content you submit
 
 If you use account features, we store:
 
+- A profile photo, if you upload one
+- A public profile bio, if you write one
 - Skate spots you add, including name, description, map pin coordinates, and photos
 - Comments and replies
 - Likes
@@ -42,7 +44,7 @@ If you use account features, we store:
 
 Help & Support screenshots are stored privately so our team can see them. They are not shown to other people in the app.
 
-Photos are stored so other people can see the spot. When you upload a new spot photo, SkateU processes the file on our servers before it is stored and before it is sent to the moderation provider. We remove extra information commonly stored in image files, including GPS coordinates, camera or device details, and capture timestamps. We keep the photo itself and preserve orientation so it still displays correctly. The public photo is this processed file. Photos uploaded before August 21, 2026 may still contain that extra information.
+Spot photos and profile photos are stored so other people can see them. When you upload a new spot photo or profile photo, SkateU processes the file on our servers before it is stored and before it is sent to the moderation provider. We remove extra information commonly stored in image files, including GPS coordinates, camera or device details, and capture timestamps. We keep the photo itself and preserve orientation so it still displays correctly. The public photo is this processed file. Spot photos uploaded before August 21, 2026 may still contain that extra information.
 
 ### Location
 
@@ -61,7 +63,7 @@ The app stores some information on your device, including:
 
 - Your sign-in session
 - Schools you mark as favorites, which are saved on that device and are not synced to your SkateU account
-- Unpublished spot drafts, including the name, description, map pin, and photos you started adding. Drafts stay on that device until you post or delete them. They are not uploaded to SkateU until you post. Logging out does not necessarily delete them. You can delete a draft from Profile. Deleting your account clears drafts for that account on that device. Removing the app from a device also removes local drafts.
+- Unpublished spot drafts, including the name, description, map pin, and photos you started adding. Drafts stay on that device until you post or delete them. They are not uploaded to SkateU until you post. Signing out does not necessarily delete them. You can delete a draft from Profile. Deleting your account clears drafts for that account on that device. Removing the app from a device also removes local drafts.
 - On iOS, a stored Apple user identifier used only to check whether Apple Sign In is still authorized.
 
 ### Website Android beta requests
@@ -110,7 +112,7 @@ We use this information to:
 - Show your location on campus maps on your device when you allow location access
 - Let you add, edit, like, comment on, request removal of spots, report comments, and block other accounts
 - Hide spots and comments from people you blocked
-- Moderate usernames, spots, photos, comments, and Help & Support submissions
+- Moderate usernames, profile photos, profile bios, spots, photos, comments, and Help & Support submissions
 - Email you a confirmation or account-deletion code when you request one
 - Email our team when a spot needs review, when a comment is reported, and when you send Help & Support
 - Diagnose crashes and keep the app running
@@ -125,6 +127,8 @@ We use this information to:
 Before certain content is posted or delivered, SkateU may send it to a third-party automated moderation provider (currently OpenAI) to check whether it appears to violate our rules. That can include:
 
 - Usernames
+- Profile photos
+- Profile bios
 - Spot names and descriptions
 - Spot photos
 - Comments
@@ -136,7 +140,7 @@ We do this to help keep SkateU usable for a campus community. Help & Support mes
 
 We share information in these limited ways:
 
-- **Public in the app.** Usernames, spots, photos, comments, like counts, and school information are visible to people using SkateU, including people who are not signed in. Your 13+ confirmation and Terms acceptance are not public.
+- **Public in the app.** Usernames, profile photos, profile bios, spots, photos, comments, like counts, and school information are visible to people using SkateU, including people who are not signed in. Your 13+ confirmation and Terms acceptance are not public.
 - **SkateU social accounts.** We may post public spots, photos, descriptions, campus names, and usernames on Instagram, TikTok, and YouTube. Those platforms receive whatever we post and have their own terms. This is featuring content you already made public in the app. It is not selling your information and it is not advertising targeting.
 - **Service providers.** We use companies that help us run SkateU. They receive information needed to provide their service:
   - Supabase, for accounts, database storage, and photo storage
@@ -175,11 +179,11 @@ You can:
 - Delete comments you posted
 - Report comments and block other accounts
 - Unlike spots you liked
-- Change your username
-- Log out
+- Change your username, profile photo, or profile bio
+- Sign out
 - Delete your account from Settings in the app
 
-Deleting your account permanently removes your login, profile, likes, spot removal requests, comment reports, and account blocks. Spots you added stay in SkateU and are no longer linked to you. Comments you posted stay in SkateU and are shown without your username. Unpublished spot drafts for that account are deleted from the device.
+Deleting your account permanently removes your sign-in, profile, likes, spot removal requests, comment reports, and account blocks. Spots you added stay in SkateU and are no longer linked to you. Comments you posted stay in SkateU and are shown without your username. Unpublished spot drafts for that account are deleted from the device.
 
 School favorites saved on your device are not part of your account. Removing the app from a device removes that local data.
 

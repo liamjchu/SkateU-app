@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
-import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import ScreenHeader from '../components/screen-header';
+import KeyboardShiftView from '../components/keyboard-shift-view';
 import { UsernameForm } from '../components/username-form';
 import { useProfileStore } from '../store/profileStore';
 
@@ -21,14 +22,12 @@ export default function ChangeUsernameScreen() {
     <View className="flex-1 bg-surface">
       <ScreenHeader title="Username" onBack={goBack} />
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <KeyboardShiftView>
         <ScrollView
           className="flex-1"
           contentContainerClassName="flex-grow self-center w-full max-w-[640px] px-6 pt-8 pb-8"
           keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets={false}
           showsVerticalScrollIndicator={false}
         >
           <Text className="font-outfit-black text-2xl text-ink">
@@ -45,7 +44,7 @@ export default function ChangeUsernameScreen() {
             onSaved={goBack}
           />
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardShiftView>
     </View>
   );
 }

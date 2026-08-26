@@ -114,6 +114,7 @@ describe('mapComment', () => {
       parentCommentId: null,
       content: 'This spot is sick',
       creatorUsername: 'liam',
+      creatorAvatarUrl: null,
       createdAt: '2024-01-01T00:00:00.000Z',
       replies: [
         expect.objectContaining({

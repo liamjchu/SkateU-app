@@ -1,14 +1,13 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-    KeyboardAvoidingView,
-    Platform,
     ScrollView,
     Text,
     TextInput,
     View,
 } from 'react-native';
 import FeedbackPressable from '../components/FeedbackPressable';
+import KeyboardShiftView from '../components/keyboard-shift-view';
 import ScreenHeader from '../components/screen-header';
 import { requestPasswordResetEmail } from '../lib/password-reset';
 import { colors } from '../constants/colors';
@@ -80,14 +79,12 @@ export default function ForgotPasswordScreen() {
         backAccessibilityLabel="Back to sign in"
       />
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <KeyboardShiftView>
         <ScrollView
           className="flex-1"
           contentContainerClassName="flex-grow"
           keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets={false}
           showsVerticalScrollIndicator={false}
         >
           <View className="flex-1 self-center w-full max-w-[640px] px-6 pt-8 pb-8">
@@ -184,7 +181,7 @@ export default function ForgotPasswordScreen() {
             </View>
           </View>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardShiftView>
     </View>
   );
 }

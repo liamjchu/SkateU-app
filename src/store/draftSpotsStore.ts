@@ -13,13 +13,18 @@ import {
   copyDraftImages,
   deleteDraftFiles,
 } from '../lib/spotDraftFiles';
-import type { SpotDraft, SpotDraftInput } from '../types/spotDraft';
+import type { SpotDraft, SpotDraftInput, SpotDraftStatus } from '../types/spotDraft';
 
 type DraftSpotsState = {
   drafts: SpotDraft[];
   hasHydrated: boolean;
   setHasHydrated: (hasHydrated: boolean) => void;
   upsertDraft: (input: SpotDraftInput) => Promise<SpotDraft>;
+  setDraftStatus: (
+    id: string,
+    status: SpotDraftStatus,
+    lastError?: string | null
+  ) => void;
   deleteDraft: (id: string) => Promise<void>;
   getDraft: (id: string) => SpotDraft | undefined;
   draftsForUser: (userId: string) => SpotDraft[];
@@ -37,12 +42,23 @@ export const useDraftSpotsStore = create<DraftSpotsState>()(
       upsertDraft: async (input) => {
         const existing = input.id
           ? get().drafts.find((draft) => draft.id === input.id)
-          : undefined;
+          : get().drafts.find(
+              (draft) =>
+                draft.userId === input.userId &&
+                draft.schoolId === input.schoolId &&
+                draft.status === 'submitting'
+            );
+        if (existing?.status === 'submitting' && input.status !== 'draft') {
+          return existing;
+        }
         const now = new Date().toISOString();
         const draftId = input.id ?? existing?.id ?? createDraftId();
         const copiedImages = await copyDraftImages(draftId, input.images);
         const latestExisting =
           get().drafts.find((draft) => draft.id === draftId) ?? existing;
+        if (latestExisting?.status === 'submitting' && input.status !== 'draft') {
+          return latestExisting;
+        }
         const draft = buildSpotDraft(
           { ...input, id: draftId, images: copiedImages },
           latestExisting,
@@ -60,6 +76,19 @@ export const useDraftSpotsStore = create<DraftSpotsState>()(
         await Promise.all(removed.map((item) => deleteDraftFiles(item.id)));
         set({ drafts: kept });
         return draft;
+      },
+      setDraftStatus: (id, status, lastError) => {
+        set((state) => ({
+          drafts: state.drafts.map((draft) =>
+            draft.id === id
+              ? {
+                  ...draft,
+                  status,
+                  ...(lastError !== undefined ? { lastError } : {}),
+                }
+              : draft
+          ),
+        }));
       },
       deleteDraft: async (id) => {
         await deleteDraftFiles(id);

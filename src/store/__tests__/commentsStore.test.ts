@@ -34,6 +34,7 @@ function makeComment(overrides: Partial<SpotComment> = {}): SpotComment {
     parentCommentId: null,
     content: 'This ledge is perfect',
     creatorUsername: 'liam',
+    creatorAvatarUrl: null,
     createdAt: '2024-01-01T00:00:00.000Z',
     replies: [],
     ...overrides,
@@ -52,6 +53,7 @@ function makeSpot(overrides: Partial<Spot> = {}): Spot {
     state: 'TX',
     schoolName: 'UT Austin',
     creatorUsername: 'skater_jane',
+    creatorAvatarUrl: null,
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z',
     commentCount: 0,
@@ -518,5 +520,41 @@ describe('commentsStore', () => {
     expect(useCommentsStore.getState().bySpotId['spot-1'].comments[0].replies).toHaveLength(
       1
     );
+  });
+
+  it('rewrites cached avatars for a user and their replies', () => {
+    const avatarUrl =
+      'https://project.supabase.co/storage/v1/object/public/avatars/user-1/a.jpg';
+    useCommentsStore.setState({
+      bySpotId: {
+        'spot-1': {
+          comments: [
+            makeComment({
+              replies: [
+                makeComment({
+                  id: 'reply-1',
+                  userId: 'user-1',
+                  parentCommentId: 'comment-1',
+                }),
+              ],
+            }),
+            makeComment({ id: 'comment-2', userId: 'user-2' }),
+          ],
+          loading: false,
+          loadingMore: false,
+          submitting: false,
+          error: null,
+          hasMore: false,
+          nextOffset: 1,
+          commentCount: 3,
+        },
+      },
+    });
+
+    useCommentsStore.getState().replaceCreatorAvatar('user-1', avatarUrl);
+    const comments = useCommentsStore.getState().bySpotId['spot-1'].comments;
+    expect(comments[0]?.creatorAvatarUrl).toBe(avatarUrl);
+    expect(comments[0]?.replies[0]?.creatorAvatarUrl).toBe(avatarUrl);
+    expect(comments[1]?.creatorAvatarUrl).toBeNull();
   });
 });

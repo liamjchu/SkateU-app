@@ -5,10 +5,9 @@ import {
     ActivityIndicator,
     Alert,
     BackHandler,
+    FlatList,
     Image,
     Keyboard,
-    KeyboardAvoidingView,
-    Platform,
     RefreshControl,
     ScrollView,
     Text,
@@ -17,6 +16,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FeedbackPressable from '../components/FeedbackPressable';
+import KeyboardShiftView from '../components/keyboard-shift-view';
+import ProfileAvatar from '../components/ProfileAvatar';
 import HomeRailCard, { HomeFeedRail } from '../components/home-rail-card';
 import HomeSchoolStories from '../components/home-school-stories';
 import HomeSpotPost from '../components/home-spot-post';
@@ -36,13 +37,17 @@ import { colors } from '../constants/colors';
 import { captureAnalyticsEvent } from '../lib/analytics';
 import { getApiUrl } from '../lib/api';
 import { triggerHaptic } from '../lib/haptics';
-import { HOME_RAIL_PAGE_SIZE } from '../lib/homeFeed';
+import { HOME_RAIL_PAGE_SIZE, HOME_SPOTS_PAGE_SIZE } from '../lib/homeFeed';
 import {
     getHomeLogoTapAction,
     getHomeLogoTapHint,
     isHomeFeedScrolled,
 } from '../lib/homeLogoTap';
-import { MIN_SEARCH_LENGTH, schoolMatchesQuery } from '../lib/schoolSearch';
+import {
+    MIN_SEARCH_LENGTH,
+    schoolMatchesQuery,
+    schoolMatchesTypeFilter,
+} from '../lib/schoolSearch';
 import { toMutationError, toUserFacingError } from '../lib/userFacingError';
 import { guardedNavigate } from '../lib/navigationGuard';
 import {
@@ -54,6 +59,7 @@ import {
     GUEST_BROWSE_TITLE,
 } from '../lib/guestBrowseCopy';
 import { useAuthStore } from '../store/authStore';
+import { useProfileStore } from '../store/profileStore';
 import { useCommentsStore } from '../store/commentsStore';
 import { useFavorites } from '../store/favoritesStore';
 import { useSchools } from '../store/schoolsStore';
@@ -113,6 +119,7 @@ export default function HomeScreen() {
   const { schools, upsertSchool, popularSchools: cachedPopularSchools, popularFilter, setPopularFeed } = useSchools();
   const session = useAuthStore((state) => state.session);
   const authInitializing = useAuthStore((state) => state.initializing);
+  const avatarUrl = useProfileStore((state) => state.profile?.avatar_url ?? null);
   const toggleSpotLike = useSpotsStore((state) => state.toggleSpotLike);
   const cachedRecentSpots = useSpotsStore((state) => state.recentSpots);
   const recentFilter = useSpotsStore((state) => state.recentFilter);
@@ -128,6 +135,7 @@ export default function HomeScreen() {
 
   const searchInputRef = useRef<TextInput>(null);
   const feedScrollRef = useRef<ScrollView>(null);
+  const feedListRef = useRef<FlatList<Spot>>(null);
   const feedScrollOffsetRef = useRef(0);
   const [isFeedScrolled, setIsFeedScrolled] = useState(false);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -159,7 +167,6 @@ export default function HomeScreen() {
   const [commentsCoveringViewer, setCommentsCoveringViewer] = useState(false);
   const [likingSpotId, setLikingSpotId] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const wasNearBottomRef = useRef(false);
   const popularFilterRef = useRef(activeFilter);
   const recentFilterRef = useRef(activeFilter);
 
@@ -204,6 +211,10 @@ export default function HomeScreen() {
       return school;
     })
     .filter((school): school is School => !!school);
+
+  const displayedFavoriteSchools = favoriteSchools.filter((school) =>
+    schoolMatchesTypeFilter(school, activeFilter)
+  );
 
   const displayedSearchResults = searchResults.map((searchResult) => {
     const school =
@@ -488,7 +499,7 @@ export default function HomeScreen() {
 
         if (!controller.signal.aborted) {
           setRecentFeed(activeFilter, page);
-          setRecentHasMore(page.length === HOME_RAIL_PAGE_SIZE);
+          setRecentHasMore(page.length === HOME_SPOTS_PAGE_SIZE);
           setRecentError('');
         }
       } catch (error) {
@@ -625,7 +636,7 @@ export default function HomeScreen() {
           ...current,
           ...page.filter((spot) => !seen.has(spot.id)),
         ]);
-        setRecentHasMore(page.length === HOME_RAIL_PAGE_SIZE);
+        setRecentHasMore(page.length === HOME_SPOTS_PAGE_SIZE);
         setRecentError('');
       }
     } catch (error) {
@@ -737,7 +748,7 @@ export default function HomeScreen() {
     setSearchRetryNonce((nonce) => nonce + 1);
   };
 
-  const navigateToSchoolMap = (school: School) => {
+  const navigateToSchoolMap = useCallback((school: School) => {
     captureAnalyticsEvent('school_opened', { school_id: school.id });
     guardedNavigate(`map:${school.id}`, () => {
       router.push({
@@ -753,13 +764,13 @@ export default function HomeScreen() {
         },
       });
     });
-  };
+  }, [router]);
 
-  const handleSchoolPress = (school: School) => {
+  const handleSchoolPress = useCallback((school: School) => {
     upsertSchool(school);
     Keyboard.dismiss();
     navigateToSchoolMap(school);
-  };
+  }, [navigateToSchoolMap, upsertSchool]);
 
   const handleRecentSpotPress = (spot: Spot) => {
     if (!spot.schoolId) {
@@ -853,10 +864,10 @@ export default function HomeScreen() {
     [commentCounts, recentSpots]
   );
 
-  const handleFavoritePress = (school: School) => {
+  const handleFavoritePress = useCallback((school: School) => {
     upsertSchool(school);
     toggleFavoriteSchool(school);
-  };
+  }, [toggleFavoriteSchool, upsertSchool]);
 
   const handleProfilePress = () => {
     if (session) {
@@ -902,7 +913,11 @@ export default function HomeScreen() {
     }
 
     if (action === 'scroll-to-top') {
-      feedScrollRef.current?.scrollTo({ y: 0, animated: true });
+      if (!isSearchMode && activeFilter !== 'saved') {
+        feedListRef.current?.scrollToOffset({ offset: 0, animated: true });
+      } else {
+        feedScrollRef.current?.scrollTo({ y: 0, animated: true });
+      }
       feedScrollOffsetRef.current = 0;
       setIsFeedScrolled(false);
       return;
@@ -934,6 +949,178 @@ export default function HomeScreen() {
         sortedSearchResults.length === 1 ? 'school' : 'schools'
       }`;
   const schoolSearchCopy = getSchoolSearchCopy(activeFilter);
+  const showHomeFeedList = activeFilter !== 'saved' && !isSearchMode;
+  const feedRefreshControl = (
+    <RefreshControl
+      refreshing={activeFilter === 'saved' ? false : isRefreshing}
+      onRefresh={handleRefresh}
+      tintColor={colors.accent}
+      colors={[colors.accent]}
+    />
+  );
+
+  const trackFeedScroll = (offsetY: number) => {
+    feedScrollOffsetRef.current = offsetY;
+    const scrolled = isHomeFeedScrolled(offsetY);
+    if (scrolled !== isFeedScrolled) {
+      setIsFeedScrolled(scrolled);
+    }
+  };
+
+  const homeFeedListHeader = useMemo(
+    () => (
+      <View className="gap-8">
+        <HomeSchoolStories
+          schools={displayedFavoriteSchools}
+          onPress={handleSchoolPress}
+          onToggleSave={handleFavoritePress}
+        />
+
+        <HomeFeedRail
+          title="Popular schools"
+          subtitle="Tap a campus to open its map"
+          isLoading={isLoadingPopular && popularSchools.length === 0}
+          loadingAccessibilityLabel="Loading popular schools"
+          error={
+            popularError && popularSchools.length > 0
+              ? STALE_SCHOOLS_MESSAGE
+              : popularError
+          }
+          onRetry={() => {
+            setPopularError('');
+            setPopularRetryNonce((nonce) => nonce + 1);
+          }}
+          retryAccessibilityLabel="Retry loading popular schools"
+          isEmpty={popularSchools.length === 0}
+          onEndReached={loadMorePopularSchools}
+          isLoadingMore={isLoadingMorePopular}
+          empty={
+            <View className="items-center rounded-2xl bg-field px-6 py-8">
+              <View className="h-14 w-14 items-center justify-center rounded-2xl bg-accent">
+                <Feather name="trending-up" size={26} color={colors.brand} />
+              </View>
+              <Text className="mt-3 text-lg text-ink font-outfit-bold">
+                No popular schools yet
+              </Text>
+              <Text className="mt-1 text-center text-base leading-5 text-muted font-outfit-medium">
+                Schools with the most skate spots will show up here.
+              </Text>
+            </View>
+          }
+        >
+          {popularSchools.map((school: School) => {
+            const isSaved = favoriteSchoolIds.includes(school.id);
+
+            return (
+              <HomeRailCard
+                key={school.id}
+                imageUrl={school.spotImageUrl}
+                title={school.name}
+                subtitle={`${school.city}, ${school.state}`}
+                meta={
+                  <SchoolSpotCount
+                    count={school.numSpots}
+                    type={school.type}
+                  />
+                }
+                onPress={() => handleSchoolPress(school)}
+                accessibilityLabel={`Open ${school.name} campus map`}
+                accessory={
+                  <FeedbackPressable
+                    haptic="selection"
+                    onPress={() => handleFavoritePress(school)}
+                    className={`h-9 w-9 items-center justify-center rounded-full ${
+                      isSaved ? 'bg-accent' : 'bg-white'
+                    }`}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${isSaved ? 'Remove' : 'Add'} ${school.name} ${isSaved ? 'from' : 'to'} saved schools`}
+                    accessibilityState={{ selected: isSaved }}
+                  >
+                    <Ionicons
+                      name={isSaved ? 'bookmark' : 'bookmark-outline'}
+                      size={16}
+                      color={isSaved ? colors.brand : colors.ink}
+                    />
+                  </FeedbackPressable>
+                }
+              />
+            );
+          })}
+        </HomeFeedRail>
+
+        <View>
+          <View className="mb-4">
+            <Text className="font-outfit-bold text-base text-ink">
+              Latest spots
+            </Text>
+            <Text className="mt-0.5 font-outfit-medium text-sm text-muted">
+              Like a spot here, or open it on the map
+            </Text>
+          </View>
+
+          {isLoadingRecent && recentSpots.length === 0 ? (
+            <View
+              accessibilityLabel="Loading latest spots"
+              className="gap-4"
+            >
+              {[0, 1].map((placeholder) => (
+                <View
+                  key={placeholder}
+                  className="h-80 rounded-2xl bg-field"
+                />
+              ))}
+            </View>
+          ) : recentError && recentSpots.length === 0 ? (
+            <View className="flex-row items-center rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2.5">
+              <Text className="flex-1 pr-2 font-outfit-medium text-sm text-errorText">
+                {recentError}
+              </Text>
+              <FeedbackPressable
+                onPress={() => {
+                  setRecentError('');
+                  setRecentRetryNonce((nonce) => nonce + 1);
+                }}
+                className="rounded-xl bg-accent px-3 py-1.5"
+                accessibilityRole="button"
+                accessibilityLabel="Retry loading latest spots"
+              >
+                <Text className="font-outfit-bold text-sm text-brand">
+                  Retry
+                </Text>
+              </FeedbackPressable>
+            </View>
+          ) : recentSpots.length === 0 ? (
+            <View className="items-center rounded-2xl bg-field px-6 py-8">
+              <View className="h-14 w-14 items-center justify-center rounded-2xl bg-accent">
+                <Feather name="map-pin" size={26} color={colors.brand} />
+              </View>
+              <Text className="mt-3 text-lg text-ink font-outfit-bold">
+                No spots yet
+              </Text>
+              <Text className="mt-1 text-center text-base leading-5 text-muted font-outfit-medium">
+                When someone adds a spot, it’ll show up here to like or
+                open on the map.
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      </View>
+    ),
+    [
+      displayedFavoriteSchools,
+      favoriteSchoolIds,
+      handleFavoritePress,
+      handleSchoolPress,
+      isLoadingPopular,
+      isLoadingRecent,
+      loadMorePopularSchools,
+      popularError,
+      popularSchools,
+      recentError,
+      recentSpots.length,
+      isLoadingMorePopular,
+    ]
+  );
 
   return (
     <View className="flex-1 bg-surface">
@@ -968,11 +1155,22 @@ export default function HomeScreen() {
           <FeedbackPressable
             haptic="light"
             onPress={handleProfilePress}
-            className="ml-3 h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white"
+            className="ml-3 shrink-0 items-center justify-center bg-white"
+            style={{
+              width: PROFILE_BUTTON_SIZE,
+              height: PROFILE_BUTTON_SIZE,
+              borderRadius: PROFILE_BUTTON_SIZE / 2,
+              overflow: 'hidden',
+            }}
             accessibilityLabel="Open profile"
             accessibilityRole="button"
           >
-            <Feather name="user" size={20} color={colors.brand} />
+            <ProfileAvatar
+              uri={avatarUrl}
+              size={PROFILE_BUTTON_SIZE}
+              iconSize={20}
+              tone="onLight"
+            />
           </FeedbackPressable>
         </View>
 
@@ -1039,11 +1237,7 @@ export default function HomeScreen() {
         <StickerStripe />
       </View>
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' && isSearchMode ? 'padding' : undefined}
-        keyboardVerticalOffset={0}
-      >
+      <KeyboardShiftView closedBottomPadding={insets.bottom + 32}>
         <View className="w-full max-w-[760px] flex-1 self-center px-6">
           <View className="pt-3 pb-5">
             <SchoolTypePills
@@ -1068,45 +1262,82 @@ export default function HomeScreen() {
             />
           ) : null}
 
+          {showHomeFeedList ? (
+            <FlatList
+              ref={feedListRef}
+              className="min-h-0 flex-1"
+              data={recentSpots}
+              keyExtractor={(spot) => spot.id}
+              extraData={{
+                likingSpotId,
+                commentCounts,
+                isLoadingMoreRecent,
+                recentError,
+              }}
+              renderItem={({ item }) => (
+                <HomeSpotPost
+                  spot={{
+                    ...item,
+                    commentCount:
+                      commentCounts[item.id] ?? item.commentCount,
+                  }}
+                  isLiking={likingSpotId === item.id}
+                  onLike={handleLikeSpot}
+                  onViewMap={handleRecentSpotPress}
+                  onOpenComments={handleOpenComments}
+                  onOpenFullscreen={handleOpenFullscreen}
+                />
+              )}
+              ListHeaderComponent={homeFeedListHeader}
+              ListFooterComponent={
+                recentSpots.length === 0 ? null : recentError ? (
+                  <StaleCacheBanner
+                    message={STALE_SPOTS_MESSAGE}
+                    onRetry={() => {
+                      setRecentError('');
+                      setRecentRetryNonce((nonce) => nonce + 1);
+                    }}
+                    retryAccessibilityLabel="Retry loading latest spots"
+                  />
+                ) : isLoadingMoreRecent ? (
+                  <View className="items-center py-4">
+                    <ActivityIndicator color={colors.accent} />
+                  </View>
+                ) : null
+              }
+              ItemSeparatorComponent={() => <View className="h-4" />}
+              contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              automaticallyAdjustKeyboardInsets={false}
+              showsVerticalScrollIndicator={false}
+              refreshControl={feedRefreshControl}
+              scrollEventThrottle={16}
+              onScroll={(event) => {
+                trackFeedScroll(event.nativeEvent.contentOffset.y);
+              }}
+              onEndReached={() => {
+                void loadMoreRecentSpots();
+              }}
+              onEndReachedThreshold={0.6}
+              initialNumToRender={3}
+              maxToRenderPerBatch={3}
+              windowSize={5}
+              removeClippedSubviews
+            />
+          ) : (
           <ScrollView
             ref={feedScrollRef}
             className="min-h-0 flex-1"
             contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
+            automaticallyAdjustKeyboardInsets={false}
             showsVerticalScrollIndicator={false}
-            refreshControl={
-              <RefreshControl
-                refreshing={
-                  activeFilter === 'saved' ? false : isRefreshing
-                }
-                onRefresh={handleRefresh}
-                tintColor={colors.accent}
-                colors={[colors.accent]}
-              />
-            }
+            refreshControl={feedRefreshControl}
             scrollEventThrottle={16}
             onScroll={(event) => {
-              const { contentOffset, layoutMeasurement, contentSize } =
-                event.nativeEvent;
-              feedScrollOffsetRef.current = contentOffset.y;
-              const scrolled = isHomeFeedScrolled(contentOffset.y);
-              if (scrolled !== isFeedScrolled) {
-                setIsFeedScrolled(scrolled);
-              }
-
-              if (activeFilter === 'saved' || isSearchMode) {
-                return;
-              }
-
-              const remaining =
-                contentSize.height -
-                (contentOffset.y + layoutMeasurement.height);
-              const isNearBottom = remaining < 240;
-              if (isNearBottom && !wasNearBottomRef.current) {
-                void loadMoreRecentSpots();
-              }
-              wasNearBottomRef.current = isNearBottom;
+              trackFeedScroll(event.nativeEvent.contentOffset.y);
             }}
           >
             {activeFilter === 'saved' ? (
@@ -1245,179 +1476,11 @@ export default function HomeScreen() {
                   Type a school, city, or 2-letter state.
                 </Text>
               </View>
-            ) : (
-              <View className="gap-8">
-                <HomeSchoolStories
-                  schools={favoriteSchools}
-                  onPress={handleSchoolPress}
-                  onToggleSave={handleFavoritePress}
-                />
-
-                <HomeFeedRail
-                  title="Popular schools"
-                  subtitle="Tap a campus to open its map"
-                  isLoading={isLoadingPopular && popularSchools.length === 0}
-                  loadingAccessibilityLabel="Loading popular schools"
-                  error={
-                    popularError && popularSchools.length > 0
-                      ? STALE_SCHOOLS_MESSAGE
-                      : popularError
-                  }
-                  onRetry={() => {
-                    setPopularError('');
-                    setPopularRetryNonce((nonce) => nonce + 1);
-                  }}
-                  retryAccessibilityLabel="Retry loading popular schools"
-                  isEmpty={popularSchools.length === 0}
-                  onEndReached={loadMorePopularSchools}
-                  isLoadingMore={isLoadingMorePopular}
-                  empty={
-                    <View className="items-center rounded-2xl bg-field px-6 py-8">
-                      <View className="h-14 w-14 items-center justify-center rounded-2xl bg-accent">
-                        <Feather name="trending-up" size={26} color={colors.brand} />
-                      </View>
-                      <Text className="mt-3 text-lg text-ink font-outfit-bold">
-                        No popular schools yet
-                      </Text>
-                      <Text className="mt-1 text-center text-base leading-5 text-muted font-outfit-medium">
-                        Schools with the most skate spots will show up here.
-                      </Text>
-                    </View>
-                  }
-                >
-                  {popularSchools.map((school: School) => {
-                    const isSaved = favoriteSchoolIds.includes(school.id);
-
-                    return (
-                      <HomeRailCard
-                        key={school.id}
-                        imageUrl={school.spotImageUrl}
-                        title={school.name}
-                        subtitle={`${school.city}, ${school.state}`}
-                        meta={
-                          <SchoolSpotCount
-                            count={school.numSpots}
-                            type={school.type}
-                          />
-                        }
-                        onPress={() => handleSchoolPress(school)}
-                        accessibilityLabel={`Open ${school.name} campus map`}
-                        accessory={
-                          <FeedbackPressable
-                            haptic="selection"
-                            onPress={() => handleFavoritePress(school)}
-                            className={`h-9 w-9 items-center justify-center rounded-full ${
-                              isSaved ? 'bg-accent' : 'bg-white'
-                            }`}
-                            accessibilityRole="button"
-                            accessibilityLabel={`${isSaved ? 'Remove' : 'Add'} ${school.name} ${isSaved ? 'from' : 'to'} saved schools`}
-                            accessibilityState={{ selected: isSaved }}
-                          >
-                            <Ionicons
-                              name={isSaved ? 'bookmark' : 'bookmark-outline'}
-                              size={16}
-                              color={isSaved ? colors.brand : colors.ink}
-                            />
-                          </FeedbackPressable>
-                        }
-                      />
-                    );
-                  })}
-                </HomeFeedRail>
-
-                <View>
-                  <View className="mb-4">
-                    <Text className="font-outfit-bold text-base text-ink">
-                      Latest spots
-                    </Text>
-                    <Text className="mt-0.5 font-outfit-medium text-sm text-muted">
-                      Like a spot here, or open it on the map
-                    </Text>
-                  </View>
-
-                  {isLoadingRecent && recentSpots.length === 0 ? (
-                    <View
-                      accessibilityLabel="Loading latest spots"
-                      className="gap-4"
-                    >
-                      {[0, 1].map((placeholder) => (
-                        <View
-                          key={placeholder}
-                          className="h-80 rounded-2xl bg-field"
-                        />
-                      ))}
-                    </View>
-                  ) : recentError && recentSpots.length === 0 ? (
-                    <View className="flex-row items-center rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2.5">
-                      <Text className="flex-1 pr-2 font-outfit-medium text-sm text-errorText">
-                        {recentError}
-                      </Text>
-                      <FeedbackPressable
-                        onPress={() => {
-                          setRecentError('');
-                          setRecentRetryNonce((nonce) => nonce + 1);
-                        }}
-                        className="rounded-xl bg-accent px-3 py-1.5"
-                        accessibilityRole="button"
-                        accessibilityLabel="Retry loading latest spots"
-                      >
-                        <Text className="font-outfit-bold text-sm text-brand">
-                          Retry
-                        </Text>
-                      </FeedbackPressable>
-                    </View>
-                  ) : recentSpots.length === 0 ? (
-                    <View className="items-center rounded-2xl bg-field px-6 py-8">
-                      <View className="h-14 w-14 items-center justify-center rounded-2xl bg-accent">
-                        <Feather name="map-pin" size={26} color={colors.brand} />
-                      </View>
-                      <Text className="mt-3 text-lg text-ink font-outfit-bold">
-                        No spots yet
-                      </Text>
-                      <Text className="mt-1 text-center text-base leading-5 text-muted font-outfit-medium">
-                        When someone adds a spot, it’ll show up here to like or
-                        open on the map.
-                      </Text>
-                    </View>
-                  ) : (
-                    <View className="gap-4">
-                      {recentSpots.map((spot) => (
-                        <HomeSpotPost
-                          key={spot.id}
-                          spot={{
-                            ...spot,
-                            commentCount:
-                              commentCounts[spot.id] ?? spot.commentCount,
-                          }}
-                          isLiking={likingSpotId === spot.id}
-                          onLike={handleLikeSpot}
-                          onViewMap={handleRecentSpotPress}
-                          onOpenComments={handleOpenComments}
-                          onOpenFullscreen={handleOpenFullscreen}
-                        />
-                      ))}
-                      {recentError ? (
-                        <StaleCacheBanner
-                          message={STALE_SPOTS_MESSAGE}
-                          onRetry={() => {
-                            setRecentError('');
-                            setRecentRetryNonce((nonce) => nonce + 1);
-                          }}
-                          retryAccessibilityLabel="Retry loading latest spots"
-                        />
-                      ) : isLoadingMoreRecent ? (
-                        <View className="items-center py-4">
-                          <ActivityIndicator color={colors.accent} />
-                        </View>
-                      ) : null}
-                    </View>
-                  )}
-                </View>
-              </View>
-            )}
+            ) : null}
           </ScrollView>
+          )}
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardShiftView>
 
       <SpotFullscreenViewer
         visible={fullscreenSpotId !== null && !commentsCoveringViewer}

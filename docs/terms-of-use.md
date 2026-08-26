@@ -1,6 +1,6 @@
 # Terms of Use
 
-Last updated: August 25, 2026
+Last updated: August 26, 2026
 
 These Terms of Use (“Terms”) are the rules for using SkateU, a campus skate-spot app. In these Terms, “SkateU,” “we,” and “us” mean Liam Jahyun Chu, a sole proprietor doing business as SkateU in Virginia. These Terms apply to the SkateU mobile app and related SkateU services, including skateu.app.
 
@@ -41,6 +41,7 @@ We may refuse, suspend, or close an account that violates these Terms or the Com
 SkateU is built from what skaters share. If you have an account, you may submit:
 
 - Skate spots, including a name, description, map pin, and photos
+- A public profile bio
 - Comments and replies on spots
 - Likes
 - Requests to remove a spot, with a reason and optional details
@@ -102,7 +103,7 @@ Follow the Community Guidelines. If those guidelines are stricter than this list
 
 ## 8. Moderation
 
-SkateU may review, refuse, hide, or remove content, and may suspend or close accounts, when we believe it is needed to protect the community or the service. We may use automated tools, including a third-party moderation service, to check usernames, spots, photos, comments, and Help & Support messages before they are posted or delivered.
+SkateU may review, refuse, hide, or remove content, and may suspend or close accounts, when we believe it is needed to protect the community or the service. We may use automated tools, including a third-party moderation service, to check usernames, spots, photos, comments, profile bios, and Help & Support messages before they are posted or delivered.
 
 We do not promise to review everything, and we do not promise that harmful content will never appear.
 

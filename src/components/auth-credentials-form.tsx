@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import {
-  KeyboardAvoidingView,
   Platform,
   ScrollView,
   Text,
@@ -20,6 +19,7 @@ import { useAuthStore } from '../store/authStore';
 import AppleSignInButton from './AppleSignInButton';
 import FeedbackPressable from './FeedbackPressable';
 import GoogleSignInButton from './GoogleSignInButton';
+import KeyboardShiftView from './keyboard-shift-view';
 import LegalAuthNotice from './LegalAuthNotice';
 import ScreenHeader from './screen-header';
 import SocialLinks from './social-links';
@@ -354,10 +354,7 @@ export default function AuthCredentialsForm({
     <View className="flex-1 bg-surface">
       <ScreenHeader title={isSignup ? 'Sign up' : 'Sign in'} onBack={goBack} />
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <KeyboardShiftView closedBottomPadding={Math.max(insets.bottom, 24)}>
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={{
@@ -365,13 +362,14 @@ export default function AuthCredentialsForm({
             paddingBottom: Math.max(insets.bottom, 24),
           }}
           keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets={false}
           showsVerticalScrollIndicator={false}
           bounces={false}
           alwaysBounceVertical={false}
         >
           {form}
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardShiftView>
     </View>
   );
 }

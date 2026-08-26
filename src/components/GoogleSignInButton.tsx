@@ -17,9 +17,9 @@ import FeedbackPressable from './FeedbackPressable';
 WebBrowser.maybeCompleteAuthSession();
 
 type GoogleSignInButtonProps = {
-  // Called after a successful log in so the screen can navigate away.
+  // Called after a successful sign in so the screen can navigate away.
   onSuccess?: () => void;
-  // Called with a friendly message when log in fails.
+  // Called with a friendly message when sign in fails.
   onError?: (message: string) => void;
   // Lets a parent disable the button (e.g. while an email login is running).
   disabled?: boolean;
@@ -50,7 +50,7 @@ export default function GoogleSignInButton({
 
     try {
       const signedIn = await signInWithGoogle();
-      // Only navigate away on a completed log in. A dismissed/cancelled OAuth
+      // Only navigate away on a completed sign in. A dismissed/cancelled OAuth
       // sheet resolves false and should just re-enable the button.
       if (!signedIn) {
         return;

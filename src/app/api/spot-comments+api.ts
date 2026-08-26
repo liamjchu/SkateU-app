@@ -9,6 +9,7 @@ import {
     softenCommentModerationReason,
     type CommentModerationVerdict,
 } from '../../lib/commentModeration';
+import { displayableAvatarUrl } from '../../lib/avatarUrl';
 import type { SpotComment } from '../../types/comment';
 import {
     authUserMessage,
@@ -31,13 +32,13 @@ type DatabaseComment = {
   parent_comment_id: string | null;
   content: string;
   created_at: string;
-  creator: { username: string | null } | null;
+  creator: { username: string | null; avatar_url?: string | null } | null;
 };
 
 type SpotCountRow = { id: string; comments_count?: number; status?: string };
 
 export const COMMENT_SELECT_COLUMNS =
-  'id,spot_id,user_id,parent_comment_id,content,created_at,creator:profiles(username)';
+  'id,spot_id,user_id,parent_comment_id,content,created_at,creator:profiles(username,avatar_url)';
 
 function readBearerToken(request: Request): string | null {
   const header =
@@ -83,6 +84,7 @@ export function mapComment(
     parentCommentId: row.parent_comment_id,
     content: row.content,
     creatorUsername: row.creator?.username ?? null,
+    creatorAvatarUrl: displayableAvatarUrl(row.creator?.avatar_url ?? null),
     createdAt: row.created_at ?? '',
     replies,
   };

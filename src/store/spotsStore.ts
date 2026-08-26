@@ -3,7 +3,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { captureAnalyticsEvent } from '../lib/analytics';
 import { getApiUrl } from '../lib/api';
 import { getClientStorage } from '../lib/clientStorage';
-import { HOME_RAIL_PAGE_SIZE } from '../lib/homeFeed';
+import { HOME_SPOTS_PAGE_SIZE } from '../lib/homeFeed';
 import {
   capNewest,
   parseSchoolFilter,
@@ -41,6 +41,7 @@ type SpotsState = {
   recentSpots: Spot[];
   recentFilter: SchoolTypeFilter | null;
   reportedSpotIds: string[];
+  reviewingSpotIds: string[];
   setHasHydrated: (hasHydrated: boolean) => void;
   setSessionUserId: (userId: string | null) => void;
   setRecentFeed: (filter: SchoolTypeFilter, spots: Spot[]) => void;
@@ -70,6 +71,7 @@ type SpotsState = {
     accessToken: string
   ) => Promise<void>;
   replaceCreatorUsername: (previousUsername: string, username: string) => void;
+  replaceCreatorAvatar: (userId: string, avatarUrl: string | null) => void;
   setSpotCommentCount: (spotId: string, commentCount: number) => void;
   hideCreatorSpots: (userId: string) => void;
   clearMySpots: () => void;
@@ -261,6 +263,7 @@ export const useSpotsStore = create<SpotsState>()(
   recentSpots: [],
   recentFilter: null,
   reportedSpotIds: [],
+  reviewingSpotIds: [],
   setHasHydrated: (hasHydrated) => set({ hasHydrated }),
   setSessionUserId: (userId) => {
     const currentUserId = get().sessionUserId;
@@ -282,6 +285,7 @@ export const useSpotsStore = create<SpotsState>()(
         likedLoading: false,
         likedError: null,
         reportedSpotIds: [],
+        reviewingSpotIds: [],
         spots: state.spots.map((spot) => ({ ...spot, likedByUser: false })),
       }));
       return;
@@ -603,6 +607,13 @@ export const useSpotsStore = create<SpotsState>()(
   },
 
   updateSpot: async (id: string, input: UpdateSpotInput, accessToken: string) => {
+    set((state) => ({
+      reviewingSpotIds: state.reviewingSpotIds.includes(id)
+        ? state.reviewingSpotIds
+        : [...state.reviewingSpotIds, id],
+    }));
+
+    try {
     const form = new FormData();
     form.append('name', input.name);
     form.append('description', input.description);
@@ -662,6 +673,11 @@ export const useSpotsStore = create<SpotsState>()(
     }));
 
     return updated;
+    } finally {
+      set((state) => ({
+        reviewingSpotIds: state.reviewingSpotIds.filter((spotId) => spotId !== id),
+      }));
+    }
   },
 
   deleteSpot: async (id: string, accessToken: string) => {
@@ -781,6 +797,20 @@ export const useSpotsStore = create<SpotsState>()(
     }));
   },
 
+  replaceCreatorAvatar: (userId, avatarUrl) => {
+    const replace = (spot: Spot): Spot =>
+      spot.creatorUserId === userId
+        ? { ...spot, creatorAvatarUrl: avatarUrl }
+        : spot;
+
+    set((state) => ({
+      spots: state.spots.map(replace),
+      mySpots: state.mySpots.map(replace),
+      likedSpots: state.likedSpots.map(replace),
+      recentSpots: state.recentSpots.map(replace),
+    }));
+  },
+
   hideCreatorSpots: (userId) => {
     const keep = (spot: Spot): boolean => spot.creatorUserId !== userId;
     set((state) => ({
@@ -837,6 +867,7 @@ export const useSpotsStore = create<SpotsState>()(
       recentSpots: [],
       recentFilter: null,
       reportedSpotIds: [],
+      reviewingSpotIds: [],
     });
   },
     }),
@@ -854,7 +885,7 @@ export const useSpotsStore = create<SpotsState>()(
         mySpots: state.mySpots,
         mySpotsOwnerId: state.mySpotsOwnerId,
         likedSpots: state.likedSpots,
-        recentSpots: capNewest(state.recentSpots, HOME_RAIL_PAGE_SIZE),
+        recentSpots: capNewest(state.recentSpots, HOME_SPOTS_PAGE_SIZE),
         recentFilter: state.recentFilter,
       }),
       merge: (persistedState, currentState) => {
@@ -884,7 +915,7 @@ export const useSpotsStore = create<SpotsState>()(
           likedSpots: parseSpots(persisted.likedSpots),
           recentSpots: capNewest(
             parseSpots(persisted.recentSpots),
-            HOME_RAIL_PAGE_SIZE
+            HOME_SPOTS_PAGE_SIZE
           ),
           recentFilter: parseSchoolFilter(persisted.recentFilter),
         };

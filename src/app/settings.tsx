@@ -97,9 +97,9 @@ export default function SettingsScreen() {
       await signOut();
       router.replace('/');
     } catch (error) {
-      console.warn('Failed to log out', error);
+      console.warn('Failed to sign out', error);
       Alert.alert(
-        'Couldn’t log out',
+        'Couldn’t sign out',
         toUserFacingError(error, 'Please try again.')
       );
       setLoggingOut(false);
@@ -107,9 +107,9 @@ export default function SettingsScreen() {
   };
 
   const handleLogout = () => {
-    Alert.alert('Log out?', 'You can sign back in anytime.', [
+    Alert.alert('Sign out?', 'You can sign back in anytime.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Log out', style: 'destructive', onPress: performLogout },
+      { text: 'Sign out', style: 'destructive', onPress: performLogout },
     ]);
   };
 
@@ -181,6 +181,14 @@ export default function SettingsScreen() {
           />
           <View className="ml-16 h-px bg-border-soft" />
           <SettingsRow
+            icon="edit-3"
+            label="Edit bio"
+            showChevron
+            onPress={() => router.push('/edit-bio')}
+            accessibilityHint="Opens the profile bio editor"
+          />
+          <View className="ml-16 h-px bg-border-soft" />
+          <SettingsRow
             icon="lock"
             label={canSignInWithPassword ? 'Change password' : 'Set a password'}
             showChevron
@@ -246,7 +254,7 @@ export default function SettingsScreen() {
         <View className="mt-6 overflow-hidden rounded-2xl bg-field">
           <SettingsRow
             icon="log-out"
-            label={loggingOut ? 'Logging out...' : 'Log out'}
+            label={loggingOut ? 'Signing out...' : 'Sign out'}
             disabled={loggingOut}
             busy={loggingOut}
             onPress={handleLogout}

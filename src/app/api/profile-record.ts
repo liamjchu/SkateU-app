@@ -4,6 +4,7 @@ import { mapProfile } from '../../types/profile';
 import {
   PROFILE_LEGAL_TABLE_COLUMNS,
   PROFILE_PUBLIC_SELECT_COLUMNS,
+  PROFILE_PUBLIC_SELECT_COLUMNS_WITHOUT_BIO,
 } from '../../lib/legalAcceptance';
 import { getSupabaseConfig } from './spots+api';
 
@@ -13,6 +14,7 @@ type PublicProfileRow = {
   id: string;
   username?: string | null;
   avatar_url?: string | null;
+  bio?: string | null;
   updated_at?: string | null;
 };
 
@@ -51,6 +53,10 @@ function supabaseRestHeaders(config: SupabaseConfig): HeadersInit {
   };
 }
 
+function isMissingBioColumn(status: number, body: string): boolean {
+  return status === 400 && body.includes('profiles.bio does not exist');
+}
+
 async function fetchLegalRowFromProfiles(
   config: SupabaseConfig,
   userId: string,
@@ -77,12 +83,13 @@ async function fetchLegalRowFromProfiles(
   throw new Error(`Legal lookup failed: ${response.status}`);
 }
 
-export async function fetchPublicProfile(
+async function fetchPublicProfileWithSelect(
   config: SupabaseConfig,
   userId: string,
+  selectColumns: string,
   signal?: AbortSignal
-): Promise<PublicProfileRow | null> {
-  const select = encodeURIComponent(PROFILE_PUBLIC_SELECT_COLUMNS);
+): Promise<{ ok: true; row: PublicProfileRow | null } | { ok: false; status: number; body: string }> {
+  const select = encodeURIComponent(selectColumns);
   const response = await fetch(
     `${config.url}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=${select}`,
     {
@@ -92,12 +99,46 @@ export async function fetchPublicProfile(
   );
 
   if (!response.ok) {
-    throw new Error(`Profile lookup failed: ${response.status}`);
+    const body = await response.text().catch(() => '');
+    return { ok: false, status: response.status, body };
   }
 
   const rows = (await response.json()) as unknown;
   const row = firstRow(rows);
-  return isPublicProfileRow(row) ? row : null;
+  return { ok: true, row: isPublicProfileRow(row) ? row : null };
+}
+
+export async function fetchPublicProfile(
+  config: SupabaseConfig,
+  userId: string,
+  signal?: AbortSignal
+): Promise<PublicProfileRow | null> {
+  const primary = await fetchPublicProfileWithSelect(
+    config,
+    userId,
+    PROFILE_PUBLIC_SELECT_COLUMNS,
+    signal
+  );
+
+  if (primary.ok) {
+    return primary.row;
+  }
+
+  if (isMissingBioColumn(primary.status, primary.body)) {
+    const fallback = await fetchPublicProfileWithSelect(
+      config,
+      userId,
+      PROFILE_PUBLIC_SELECT_COLUMNS_WITHOUT_BIO,
+      signal
+    );
+    if (fallback.ok) {
+      return fallback.row;
+    }
+
+    throw new Error(`Profile lookup failed: ${fallback.status}`);
+  }
+
+  throw new Error(`Profile lookup failed: ${primary.status}`);
 }
 
 export async function fetchLegalRow(
@@ -133,6 +174,7 @@ export function mergeProfileRecord(
     id: profile.id,
     username: profile.username,
     avatar_url: profile.avatar_url,
+    bio: profile.bio,
     updated_at: profile.updated_at,
     legal_version: legal?.legal_version ?? null,
     legal_accepted_at: legal?.legal_accepted_at ?? null,

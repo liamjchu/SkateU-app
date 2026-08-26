@@ -7,6 +7,9 @@ export type SpotComment = {
   // The author's public username, or null when the profile has no username
   // yet or the author's account was deleted.
   creatorUsername: string | null
+  // Moderated SkateU avatar URL, or null when the author has none or the
+  // account was deleted.
+  creatorAvatarUrl: string | null
   createdAt: string
   replies: SpotComment[]
 }

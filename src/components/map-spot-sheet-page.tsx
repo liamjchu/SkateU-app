@@ -1,9 +1,14 @@
 import { Feather, Octicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { colors } from '../constants/colors';
 import { formatRelativeTime } from '../lib/relativeTime';
+import { openUserProfile } from '../lib/userProfileNavigation';
+import { useAuthStore } from '../store/authStore';
 import type { Spot } from '../types/spot';
+import CreatorAttribution from './creator-attribution';
 import FeedbackPressable from './FeedbackPressable';
+import ProfileAvatar from './ProfileAvatar';
 import SpotMediaPager from './spot-media-pager';
 
 type MapSpotSheetPageProps = {
@@ -66,6 +71,8 @@ export default function MapSpotSheetPage({
   const isLiking = likingSpotId === spot.id;
   const imageUris = spot.imageUris.filter((uri) => uri.length > 0);
   const timeLabel = spotTimeLabel(spot);
+  const router = useRouter();
+  const currentUserId = useAuthStore((state) => state.user?.id ?? null);
   const body = (
     <MapSpotSheetBody
       spot={spot}
@@ -87,36 +94,65 @@ export default function MapSpotSheetPage({
   return (
     <View style={{ width }} className={fill ? 'flex-1' : undefined}>
       <View className="flex-row items-start px-5">
-        <FeedbackPressable
-          haptic="light"
-          disablePressScale
-          onPress={() => onOpenFullscreen(0)}
-          className="min-w-0 flex-1 pr-3"
-          accessibilityRole="button"
-          accessibilityLabel={`Open full screen view of ${spot.name}`}
-        >
-          <View className="flex-row items-center">
-            <Text
-              numberOfLines={1}
-              className="min-w-0 flex-1 font-outfit-bold text-xl text-ink"
-            >
-              {spot.name}
-            </Text>
-            <Feather name="chevron-right" size={18} color={colors.mutedSoft} />
-          </View>
+        <View className="min-w-0 flex-1 pr-3">
+          <FeedbackPressable
+            haptic="light"
+            disablePressScale
+            onPress={() => onOpenFullscreen(0)}
+            accessibilityRole="button"
+            accessibilityLabel={`Open full screen view of ${spot.name}`}
+          >
+            <View className="flex-row items-center">
+              <Text
+                numberOfLines={1}
+                className="min-w-0 flex-1 font-outfit-bold text-xl text-ink"
+              >
+                {spot.name}
+              </Text>
+              <Feather name="chevron-right" size={18} color={colors.mutedSoft} />
+            </View>
+          </FeedbackPressable>
           <View className="mt-1 flex-row items-center">
-            <Feather name="user" size={13} color={colors.muted} />
-            <Text
+            {spot.creatorUserId ? (
+              <FeedbackPressable
+                haptic="selection"
+                onPress={() => {
+                  openUserProfile(
+                    router,
+                    spot.creatorUserId as string,
+                    currentUserId
+                  );
+                }}
+                accessibilityRole="link"
+                accessibilityLabel={
+                  spot.creatorUsername
+                    ? `Open @${spot.creatorUsername}'s profile`
+                    : 'Open profile'
+                }
+              >
+                <ProfileAvatar
+                  uri={spot.creatorAvatarUrl}
+                  size={16}
+                  iconSize={10}
+                />
+              </FeedbackPressable>
+            ) : (
+              <ProfileAvatar
+                uri={spot.creatorAvatarUrl}
+                size={16}
+                iconSize={10}
+              />
+            )}
+            <CreatorAttribution
+              userId={spot.creatorUserId}
+              username={spot.creatorUsername}
+              fallback="Deleted User"
+              suffix={timeLabel ? ` · ${timeLabel}` : ''}
               numberOfLines={1}
               className="ml-1.5 min-w-0 flex-1 font-outfit-medium text-sm text-muted"
-            >
-              {spot.creatorUsername
-                ? `@${spot.creatorUsername}`
-                : 'Deleted User'}
-              {timeLabel ? ` · ${timeLabel}` : ''}
-            </Text>
+            />
           </View>
-        </FeedbackPressable>
+        </View>
         <FeedbackPressable
           onPress={onLike}
           disabled={isLiking}
@@ -284,14 +320,7 @@ function MapSpotSheetBody({
             </FeedbackPressable>
           </View>
         ) : canShowRemoval ? (
-          <View
-            className="mt-3 flex-row items-start gap-2"
-            onLayout={(event) => {
-              // #region agent log
-              fetch('http://127.0.0.1:7351/ingest/84fce2ac-fe06-4f93-b099-74e58132bea2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'663eb7'},body:JSON.stringify({sessionId:'663eb7',runId:'post-fix-2',hypothesisId:'C',location:'map-spot-sheet-page.tsx:moderationRow',message:'spot moderation row layout',data:{height:Math.round(event.nativeEvent.layout.height),width:Math.round(event.nativeEvent.layout.width),hasHide:Boolean(onBlockCreator&&spot.creatorUserId),wasReported},timestamp:Date.now()})}).catch(()=>{});
-              // #endregion
-            }}
-          >
+          <View className="mt-3 flex-row items-start gap-2">
             <View className="min-w-0 flex-1 items-center">
               <FeedbackPressable
                 haptic="selection"
@@ -347,8 +376,8 @@ function MapSpotSheetBody({
                   accessibilityRole="button"
                   accessibilityLabel={
                     spot.creatorUsername
-                      ? `Hide spots from @${spot.creatorUsername}`
-                      : 'Hide spots from this account'
+                      ? `Block user @${spot.creatorUsername}`
+                      : 'Block this user'
                   }
                 >
                   <Feather name="eye-off" size={16} color={colors.ink} />
@@ -357,7 +386,7 @@ function MapSpotSheetBody({
                   numberOfLines={1}
                   className="mt-1 font-outfit-semibold text-[11px] text-ink"
                 >
-                  Hide
+                  Block user
                 </Text>
               </View>
             ) : null}

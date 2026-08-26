@@ -1,5 +1,6 @@
 import { validateBlockUserBody } from '../../lib/userBlocks';
 import type { BlockedUser } from '../../types/userBlock';
+import { deleteFollowsBothWays } from './followGraph';
 import {
   authUserMessage,
   getSupabaseConfig,
@@ -177,6 +178,11 @@ export async function POST(request: Request): Promise<Response> {
     if (!response.ok) {
       const message = await response.text();
       if (isUniqueViolation(response.status, message)) {
+        try {
+          await deleteFollowsBothWays(config, user.userId, blockedId);
+        } catch (error) {
+          console.error('Clearing follows after block failed:', error);
+        }
         const users = await listBlocks(config, user.userId);
         const existing = users.find((blocked) => blocked.userId === blockedId);
         return Response.json({
@@ -184,6 +190,12 @@ export async function POST(request: Request): Promise<Response> {
         });
       }
       throw new Error(message);
+    }
+
+    try {
+      await deleteFollowsBothWays(config, user.userId, blockedId);
+    } catch (error) {
+      console.error('Clearing follows after block failed:', error);
     }
 
     const usernames = await fetchUsernames(config, [blockedId]);

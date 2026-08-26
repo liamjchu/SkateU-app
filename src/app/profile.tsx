@@ -1,5 +1,6 @@
 import { Feather, Octicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
@@ -16,19 +17,27 @@ import Animated, {
     useSharedValue,
     withTiming
 } from 'react-native-reanimated';
-import CachedRemoteImage from '../components/CachedRemoteImage';
-import ExpandableText from '../components/expandable-text';
 import FeedbackPressable from '../components/FeedbackPressable';
+import ProfileAvatar from '../components/ProfileAvatar';
+import ProfileBioText from '../components/ProfileBioText';
+import ProfileFollowStats from '../components/profile-follow-stats';
+import ProfileSpotRow from '../components/profile-spot-row';
 import ScreenHeader from '../components/screen-header';
 import StaleCacheBanner from '../components/StaleCacheBanner';
 import SocialLinks from '../components/social-links';
 import { colors } from '../constants/colors';
+import { displayableAvatarUrl } from '../lib/avatarUrl';
 import { triggerHaptic } from '../lib/haptics';
 import { formatRelativeTime } from '../lib/relativeTime';
-import { draftsForUser, getDraftStatusHint } from '../lib/spotDraft';
+import {
+    draftsForUser,
+    getDraftStatusHint,
+    submittingDraftsForUser,
+} from '../lib/spotDraft';
 import { STALE_SPOTS_MESSAGE } from '../lib/readCache';
-import { toMutationError } from '../lib/userFacingError';
+import { toMutationError, toUserFacingError } from '../lib/userFacingError';
 import { guardedNavigate } from '../lib/navigationGuard';
+import { fetchPublicProfileView } from '../lib/publicProfile';
 import { useAuthStore } from '../store/authStore';
 import { useDraftSpotsStore } from '../store/draftSpotsStore';
 import { useProfileStore } from '../store/profileStore';
@@ -38,6 +47,50 @@ import type { SpotDraft } from '../types/spotDraft';
 
 type ProfileSpotTab = 'created' | 'liked' | 'drafts';
 const PROFILE_TAB_COUNT = 3;
+type AvatarSource = 'camera' | 'gallery';
+
+function chooseAvatarSource(
+  hasPhoto: boolean
+): Promise<AvatarSource | 'remove' | undefined> {
+  return new Promise((resolve) => {
+    let resolved = false;
+    const finish = (source?: AvatarSource | 'remove') => {
+      if (resolved) return;
+      resolved = true;
+      resolve(source);
+    };
+
+    Alert.alert(
+      'Profile photo',
+      'Camera or camera roll?',
+      [
+        {
+          text: 'Take photo',
+          onPress: () => finish('camera'),
+        },
+        {
+          text: 'Choose from gallery',
+          onPress: () => finish('gallery'),
+        },
+        ...(hasPhoto
+          ? [
+              {
+                text: 'Remove photo',
+                style: 'destructive' as const,
+                onPress: () => finish('remove'),
+              },
+            ]
+          : []),
+        {
+          text: 'Cancel',
+          style: 'cancel' as const,
+          onPress: () => finish(),
+        },
+      ],
+      { cancelable: true, onDismiss: () => finish() }
+    );
+  });
+}
 
 function firstParam(value: string | string[] | undefined): string | undefined {
   if (Array.isArray(value)) {
@@ -60,6 +113,10 @@ export default function ProfileScreen() {
   const user = useAuthStore((state) => state.user);
   const session = useAuthStore((state) => state.session);
   const username = useProfileStore((state) => state.profile?.username ?? '');
+  const avatarUrl = useProfileStore((state) => state.profile?.avatar_url ?? null);
+  const bio = useProfileStore((state) => state.profile?.bio ?? null);
+  const updateAvatar = useProfileStore((state) => state.updateAvatar);
+  const removeAvatar = useProfileStore((state) => state.removeAvatar);
 
   const mySpots = useSpotsStore((state) => state.mySpots);
   const myLoading = useSpotsStore((state) => state.myLoading);
@@ -71,11 +128,16 @@ export default function ProfileScreen() {
   const fetchLikedSpots = useSpotsStore((state) => state.fetchLikedSpots);
   const deleteSpot = useSpotsStore((state) => state.deleteSpot);
   const toggleSpotLike = useSpotsStore((state) => state.toggleSpotLike);
+  const reviewingSpotIds = useSpotsStore((state) => state.reviewingSpotIds);
   const allDrafts = useDraftSpotsStore((state) => state.drafts);
   const hasHydratedDrafts = useDraftSpotsStore((state) => state.hasHydrated);
   const deleteDraft = useDraftSpotsStore((state) => state.deleteDraft);
   const drafts = useMemo(
     () => (user?.id ? draftsForUser(allDrafts, user.id) : []),
+    [allDrafts, user?.id]
+  );
+  const submittingDrafts = useMemo(
+    () => (user?.id ? submittingDraftsForUser(allDrafts, user.id) : []),
     [allDrafts, user?.id]
   );
 
@@ -84,6 +146,9 @@ export default function ProfileScreen() {
   );
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [likingId, setLikingId] = useState<string | null>(null);
+  const [updatingAvatar, setUpdatingAvatar] = useState(false);
+  const [followerCount, setFollowerCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
   const spotToggleWidth = useSharedValue(0);
   const showingLikedSpots = spotTab === 'liked';
   const showingDrafts = spotTab === 'drafts';
@@ -118,11 +183,20 @@ export default function ProfileScreen() {
   useFocusEffect(
     useCallback(() => {
       const accessToken = session?.access_token;
+      const userId = user?.id;
       if (accessToken) {
         fetchMySpots(accessToken);
         fetchLikedSpots(accessToken);
       }
-    }, [fetchLikedSpots, fetchMySpots, session?.access_token])
+      if (userId) {
+        void fetchPublicProfileView(userId, accessToken).then((view) => {
+          setFollowerCount(view.followerCount);
+          setFollowingCount(view.followingCount);
+        }).catch(() => {
+          // Keep last known counts if the network call fails.
+        });
+      }
+    }, [fetchLikedSpots, fetchMySpots, session?.access_token, user?.id])
   );
 
   const displayedSpots = showingLikedSpots ? likedSpots : mySpots;
@@ -136,6 +210,93 @@ export default function ProfileScreen() {
 
     setSpotTab(tab);
     triggerHaptic('selection');
+  };
+
+  const handleAvatarPress = async () => {
+    if (updatingAvatar) {
+      return;
+    }
+
+    const accessToken = session?.access_token;
+    if (!accessToken) {
+      Alert.alert('Sign in required', 'Sign in again to update your photo.');
+      return;
+    }
+
+    const hasPhoto = displayableAvatarUrl(avatarUrl) !== null;
+    const source = await chooseAvatarSource(hasPhoto);
+    if (!source) {
+      return;
+    }
+
+    if (source === 'remove') {
+      setUpdatingAvatar(true);
+      try {
+        await removeAvatar(accessToken);
+      } catch (error) {
+        Alert.alert(
+          'Couldn’t remove that photo',
+          toUserFacingError(error, 'Try again in a sec.')
+        );
+      } finally {
+        setUpdatingAvatar(false);
+      }
+      return;
+    }
+
+    const permission =
+      source === 'camera'
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      Alert.alert(
+        source === 'camera' ? 'Camera access needed' : 'Photo library access needed',
+        source === 'camera'
+          ? 'Need camera access for that.'
+          : 'Need photo library access for that.'
+      );
+      return;
+    }
+
+    const result =
+      source === 'camera'
+        ? await ImagePicker.launchCameraAsync({
+            mediaTypes: ['images'],
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.7,
+          })
+        : await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.7,
+          });
+
+    if (result.canceled || result.assets.length === 0) {
+      return;
+    }
+
+    const picked = result.assets[0];
+    setUpdatingAvatar(true);
+    try {
+      const outcome = await updateAvatar(accessToken, {
+        uri: picked.uri,
+        fileName: picked.fileName ?? 'avatar.jpg',
+        mimeType: picked.mimeType ?? 'image/jpeg',
+      });
+      if (!outcome.ok) {
+        Alert.alert('Let’s try another photo', outcome.message);
+      }
+    } catch (error) {
+      Alert.alert(
+        'Couldn’t update that photo',
+        toUserFacingError(error, 'Try again in a sec.')
+      );
+    } finally {
+      setUpdatingAvatar(false);
+    }
   };
 
   const handleDraftPress = (draft: SpotDraft) => {
@@ -306,9 +467,54 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View className="items-center rounded-2xl bg-field p-6">
-          <View className="mb-4 h-24 w-24 items-center justify-center rounded-full bg-accent">
-            <Feather name="user" size={40} color={colors.brand} />
-          </View>
+          <FeedbackPressable
+            haptic="selection"
+            onPress={() => {
+              void handleAvatarPress();
+            }}
+            disabled={updatingAvatar}
+            className="mb-4"
+            accessibilityRole="button"
+            accessibilityLabel={
+              displayableAvatarUrl(avatarUrl)
+                ? 'Change profile photo'
+                : 'Add profile photo'
+            }
+            accessibilityState={{ busy: updatingAvatar, disabled: updatingAvatar }}
+          >
+            <View className="h-24 w-24">
+              <ProfileAvatar uri={avatarUrl} size={96} iconSize={40} />
+              {updatingAvatar ? (
+                <View
+                  pointerEvents="none"
+                  className="items-center justify-center rounded-full bg-black/40"
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: 96,
+                    height: 96,
+                  }}
+                >
+                  <ActivityIndicator color={colors.white} size="small" />
+                </View>
+              ) : (
+                <View
+                  className="absolute items-center justify-center bg-brand"
+                  style={{
+                    bottom: 0,
+                    right: 0,
+                    width: 32,
+                    height: 32,
+                    borderRadius: 16,
+                    overflow: 'hidden',
+                  }}
+                >
+                  <Feather name="camera" size={14} color={colors.white} />
+                </View>
+              )}
+            </View>
+          </FeedbackPressable>
 
           <Text
             className="max-w-full px-4 text-center font-outfit-black text-2xl text-ink"
@@ -317,6 +523,24 @@ export default function ProfileScreen() {
           >
             {username ? `@${username}` : 'Your Profile'}
           </Text>
+
+          {bio ? (
+            <View className="mt-3 w-full px-2">
+              <ProfileBioText bio={bio} />
+            </View>
+          ) : (
+            <FeedbackPressable
+              haptic="selection"
+              onPress={() => router.push('/edit-bio')}
+              className="mt-3"
+              accessibilityRole="button"
+              accessibilityLabel="Add a bio"
+            >
+              <Text className="text-center font-outfit-medium text-sm text-muted">
+                Add a bio
+              </Text>
+            </FeedbackPressable>
+          )}
 
           {email ? (
             <Text
@@ -328,6 +552,37 @@ export default function ProfileScreen() {
               {email}
             </Text>
           ) : null}
+
+          <ProfileFollowStats
+            followerCount={followerCount}
+            followingCount={followingCount}
+            onFollowersPress={() => {
+              if (!user?.id) {
+                return;
+              }
+              router.push({
+                pathname: '/follow-list',
+                params: {
+                  userId: user.id,
+                  tab: 'followers',
+                  ...(username ? { username } : {}),
+                },
+              });
+            }}
+            onFollowingPress={() => {
+              if (!user?.id) {
+                return;
+              }
+              router.push({
+                pathname: '/follow-list',
+                params: {
+                  userId: user.id,
+                  tab: 'following',
+                  ...(username ? { username } : {}),
+                },
+              });
+            }}
+          />
         </View>
 
         <View
@@ -384,7 +639,11 @@ export default function ProfileScreen() {
             onPress={() => handleSpotTab('drafts')}
             className="z-10 min-h-12 flex-1 items-center justify-center rounded-xl py-3"
             accessibilityRole="tab"
-            accessibilityLabel={`Drafts${drafts.length > 0 ? `, ${drafts.length}` : ''}`}
+            accessibilityLabel={`Drafts${
+              drafts.length + submittingDrafts.length > 0
+                ? `, ${drafts.length + submittingDrafts.length}`
+                : ''
+            }`}
             accessibilityState={{ selected: showingDrafts }}
           >
             <Text
@@ -393,7 +652,10 @@ export default function ProfileScreen() {
               }`}
               numberOfLines={1}
             >
-              Drafts {drafts.length > 0 ? `(${drafts.length})` : ''}
+              Drafts{' '}
+              {drafts.length + submittingDrafts.length > 0
+                ? `(${drafts.length + submittingDrafts.length})`
+                : ''}
             </Text>
           </FeedbackPressable>
         </View>
@@ -411,7 +673,7 @@ export default function ProfileScreen() {
                 Loading drafts…
               </Text>
             </View>
-          ) : drafts.length === 0 ? (
+          ) : drafts.length === 0 && submittingDrafts.length === 0 ? (
             <View className="mt-4 rounded-2xl bg-field p-6">
               <Text className="font-outfit-medium text-center text-sm text-muted">
                 Drafts live on this phone until you post them. Hit + on a campus
@@ -420,6 +682,60 @@ export default function ProfileScreen() {
             </View>
           ) : (
             <View className="mt-3">
+              {submittingDrafts.map((draft) => {
+                const title = draft.name.trim() || 'Untitled spot';
+                const coverUri = draft.images[0]?.uri;
+
+                return (
+                  <View
+                    key={draft.id}
+                    className="mb-4 flex-row items-center rounded-2xl bg-field p-4"
+                    accessible
+                    accessibilityRole="progressbar"
+                    accessibilityLabel={`${title} is submitting`}
+                    accessibilityState={{ busy: true }}
+                  >
+                    {coverUri ? (
+                      <Image
+                        source={{ uri: coverUri }}
+                        className="h-16 w-16 rounded-xl"
+                        resizeMode="cover"
+                        accessible={false}
+                      />
+                    ) : (
+                      <View
+                        accessible={false}
+                        importantForAccessibility="no-hide-descendants"
+                        className="h-16 w-16 items-center justify-center rounded-xl bg-surface-soft"
+                      >
+                        <Feather name="edit-3" size={20} color={colors.muted} />
+                      </View>
+                    )}
+
+                    <View className="ml-3 min-w-0 flex-1">
+                      <Text
+                        className="font-outfit-bold text-base text-ink"
+                        numberOfLines={1}
+                      >
+                        {title}
+                      </Text>
+                      <Text
+                        className="mt-0.5 font-outfit-semibold text-xs text-muted-soft"
+                        numberOfLines={1}
+                      >
+                        {draft.schoolName || 'Campus map'}
+                      </Text>
+                      <Text className="mt-0.5 font-outfit-medium text-sm text-muted">
+                        Submitting…
+                      </Text>
+                    </View>
+
+                    <View className="ml-2 h-12 w-12 items-center justify-center">
+                      <ActivityIndicator size="small" color={colors.ink} />
+                    </View>
+                  </View>
+                );
+              })}
               {drafts.map((draft) => {
                 const title = draft.name.trim() || 'Untitled spot';
                 const coverUri = draft.images[0]?.uri;
@@ -473,7 +789,11 @@ export default function ProfileScreen() {
                         {draft.schoolName || 'Campus map'}
                         {updatedLabel ? ` · ${updatedLabel}` : ''}
                       </Text>
-                      <Text className="mt-0.5 font-outfit-medium text-sm text-muted">
+                      <Text
+                        className={`mt-0.5 font-outfit-medium text-sm ${
+                          draft.lastError ? 'text-errorText' : 'text-muted'
+                        }`}
+                      >
                         {getDraftStatusHint(draft)}
                       </Text>
                     </FeedbackPressable>
@@ -502,7 +822,9 @@ export default function ProfileScreen() {
         ) : null}
 
         {!showingDrafts ? (
-        displayedLoading && displayedSpots.length === 0 ? (
+        displayedLoading &&
+        displayedSpots.length === 0 &&
+        (showingLikedSpots || submittingDrafts.length === 0) ? (
           <View
             accessible
             accessibilityRole="progressbar"
@@ -532,7 +854,8 @@ export default function ProfileScreen() {
               <Text className="font-outfit-bold text-xs text-brand">Retry</Text>
             </FeedbackPressable>
           </View>
-        ) : displayedSpots.length === 0 ? (
+        ) : displayedSpots.length === 0 &&
+          (showingLikedSpots || submittingDrafts.length === 0) ? (
           <View className="mt-4 rounded-2xl bg-field p-6">
             <Text className="font-outfit-medium text-center text-sm text-muted">
               {showingLikedSpots
@@ -542,124 +865,126 @@ export default function ProfileScreen() {
           </View>
         ) : (
           <View className="mt-3">
-            {displayedSpots.map((spot) => (
-              <View
-                key={spot.id}
-                className="mb-4 flex-row items-center rounded-2xl bg-field p-4"
-              >
-                <FeedbackPressable
-                  onPress={() => handleSpotPress(spot)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Open ${spot.name} on the ${spot.schoolName || 'campus'} map`}
-                  accessibilityHint="Opens the campus map and selects this spot"
-                >
-                  {spot.imageUris.length > 0 ? (
-                    <CachedRemoteImage
-                      uri={spot.imageUris[0]}
-                      className="h-16 w-16 rounded-xl"
-                      accessible={false}
-                    />
-                  ) : (
+            {!showingLikedSpots
+              ? submittingDrafts.map((draft) => {
+                  const title = draft.name.trim() || 'Untitled spot';
+                  const coverUri = draft.images[0]?.uri;
+
+                  return (
                     <View
-                      accessible={false}
-                      importantForAccessibility="no-hide-descendants"
-                      className="h-16 w-16 items-center justify-center rounded-xl bg-surface-soft"
+                      key={draft.id}
+                      className="mb-4 flex-row items-center rounded-2xl bg-field p-4"
+                      accessible
+                      accessibilityRole="progressbar"
+                      accessibilityLabel={`${title} is submitting`}
+                      accessibilityState={{ busy: true }}
                     >
-                      <Feather name="image" size={20} color={colors.muted} />
-                    </View>
-                  )}
-                </FeedbackPressable>
-
-                <View className="ml-3 min-w-0 flex-1">
-                  <ExpandableText
-                    collapsedLines={1}
-                    className="font-outfit-bold text-base text-ink"
-                    onPress={() => handleSpotPress(spot)}
-                    accessibilityLabel={`Open ${spot.name} on the ${spot.schoolName || 'campus'} map`}
-                    accessibilityHint="Opens the campus map and selects this spot"
-                  >
-                    {spot.name}
-                  </ExpandableText>
-                  <View className="mt-0.5 flex-row items-center">
-                    <Feather name="map-pin" size={11} color={colors.muted} />
-                    <View className="ml-1 min-w-0 flex-1">
-                        <ExpandableText
-                          collapsedLines={1}
-                          className="font-outfit-semibold text-xs text-muted-soft"
-                          onPress={() => handleSpotPress(spot)}
-                          accessibilityLabel={`Open ${spot.name} on the ${spot.schoolName || 'campus'} map`}
-                          accessibilityHint="Opens the campus map and selects this spot"
+                      {coverUri ? (
+                        <Image
+                          source={{ uri: coverUri }}
+                          className="h-16 w-16 rounded-xl"
+                          resizeMode="cover"
+                          accessible={false}
+                        />
+                      ) : (
+                        <View
+                          accessible={false}
+                          importantForAccessibility="no-hide-descendants"
+                          className="h-16 w-16 items-center justify-center rounded-xl bg-surface-soft"
                         >
-                          {`${spot.schoolName || 'Campus map'}${spot.city || spot.state ? ` · ${spot.city}${spot.city && spot.state ? ', ' : ''}${spot.state}` : ''}`}
-                        </ExpandableText>
-                    </View>
-                  </View>
-                  {spot.description.trim().length > 0 ? (
-                    <ExpandableText
-                      collapsedLines={2}
-                      className="font-outfit-medium mt-0.5 text-sm text-muted"
-                      onPress={() => handleSpotPress(spot)}
-                      accessibilityLabel={`Open ${spot.name} on the ${spot.schoolName || 'campus'} map`}
-                      accessibilityHint="Opens the campus map and selects this spot"
-                    >
-                      {spot.description.trim()}
-                    </ExpandableText>
-                  ) : null}
-                  <View className="mt-1 flex-row items-center">
-                    <Octicons name="heart-fill" size={12} color={colors.accent} />
-                    <Text className="font-outfit-semibold ml-1 text-xs text-muted">
-                      {spot.likeCount ?? 0}
-                    </Text>
-                  </View>
-                </View>
+                          <Feather name="image" size={20} color={colors.muted} />
+                        </View>
+                      )}
 
-                {showingLikedSpots ? (
-                  <FeedbackPressable
-                    onPress={() => handleUnlike(spot)}
-                    disabled={likingId === spot.id}
-                    className="ml-2 h-12 w-12 items-center justify-center rounded-full bg-accent"
-                    accessibilityLabel={`Unlike ${spot.name}`}
-                    accessibilityRole="button"
-                    accessibilityState={{ busy: likingId === spot.id }}
-                  >
-                    {likingId === spot.id ? (
-                      <ActivityIndicator size="small" color={colors.brand} />
-                    ) : (
-                      <Octicons name="heart-fill" size={17} color={colors.brand} />
-                    )}
-                  </FeedbackPressable>
-                ) : deletingId === spot.id ? (
-                  <View
-                    accessible
-                    accessibilityRole="progressbar"
-                    accessibilityLabel={`Deleting ${spot.name}`}
-                    className="ml-2 h-12 w-12 items-center justify-center"
-                  >
-                    <ActivityIndicator size="small" color={colors.ink} />
-                  </View>
-                ) : (
-                  <View className="ml-2 flex-row">
+                      <View className="ml-3 min-w-0 flex-1">
+                        <Text
+                          className="font-outfit-bold text-base text-ink"
+                          numberOfLines={1}
+                        >
+                          {title}
+                        </Text>
+                        <Text
+                          className="mt-0.5 font-outfit-semibold text-xs text-muted-soft"
+                          numberOfLines={1}
+                        >
+                          {draft.schoolName || 'Campus map'}
+                        </Text>
+                        <Text className="mt-0.5 font-outfit-medium text-sm text-muted">
+                          Submitting…
+                        </Text>
+                      </View>
+
+                      <View className="ml-2 h-12 w-12 items-center justify-center">
+                        <ActivityIndicator size="small" color={colors.ink} />
+                      </View>
+                    </View>
+                  );
+                })
+              : null}
+            {displayedSpots.map((spot) => {
+              const reviewing = reviewingSpotIds.includes(spot.id);
+
+              return (
+              <ProfileSpotRow
+                key={spot.id}
+                spot={spot}
+                onPress={() => handleSpotPress(spot)}
+                statusHint={reviewing ? 'Reviewing…' : undefined}
+                busy={reviewing}
+                trailing={
+                  showingLikedSpots ? (
                     <FeedbackPressable
-                      haptic="light"
-                      onPress={() => handleEdit(spot)}
-                      className="h-12 w-12 items-center justify-center rounded-full"
-                      accessibilityLabel={`Edit ${spot.name}`}
+                      onPress={() => handleUnlike(spot)}
+                      disabled={likingId === spot.id}
+                      className="ml-2 h-12 w-12 items-center justify-center rounded-full bg-accent"
+                      accessibilityLabel={`Unlike ${spot.name}`}
                       accessibilityRole="button"
+                      accessibilityState={{ busy: likingId === spot.id }}
                     >
-                      <Feather name="edit-2" size={17} color={colors.ink} />
+                      {likingId === spot.id ? (
+                        <ActivityIndicator size="small" color={colors.brand} />
+                      ) : (
+                        <Octicons name="heart-fill" size={17} color={colors.brand} />
+                      )}
                     </FeedbackPressable>
-                    <FeedbackPressable
-                      onPress={() => handleDelete(spot)}
-                      className="h-12 w-12 items-center justify-center rounded-full"
-                      accessibilityLabel={`Delete ${spot.name}`}
-                      accessibilityRole="button"
+                  ) : reviewing || deletingId === spot.id ? (
+                    <View
+                      accessible
+                      accessibilityRole="progressbar"
+                      accessibilityLabel={
+                        reviewing
+                          ? `Reviewing ${spot.name}`
+                          : `Deleting ${spot.name}`
+                      }
+                      className="ml-2 h-12 w-12 items-center justify-center"
                     >
-                      <Feather name="trash-2" size={17} color={colors.errorText} />
-                    </FeedbackPressable>
-                  </View>
-                )}
-              </View>
-            ))}
+                      <ActivityIndicator size="small" color={colors.ink} />
+                    </View>
+                  ) : (
+                    <View className="ml-2 flex-row">
+                      <FeedbackPressable
+                        haptic="light"
+                        onPress={() => handleEdit(spot)}
+                        className="h-12 w-12 items-center justify-center rounded-full"
+                        accessibilityLabel={`Edit ${spot.name}`}
+                        accessibilityRole="button"
+                      >
+                        <Feather name="edit-2" size={17} color={colors.ink} />
+                      </FeedbackPressable>
+                      <FeedbackPressable
+                        onPress={() => handleDelete(spot)}
+                        className="h-12 w-12 items-center justify-center rounded-full"
+                        accessibilityLabel={`Delete ${spot.name}`}
+                        accessibilityRole="button"
+                      >
+                        <Feather name="trash-2" size={17} color={colors.errorText} />
+                      </FeedbackPressable>
+                    </View>
+                  )
+                }
+              />
+              );
+            })}
           </View>
         )
         ) : null}

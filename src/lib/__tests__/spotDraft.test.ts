@@ -5,6 +5,7 @@ import {
     draftsForSchool,
     draftsForUser,
     draftImagesToMedia,
+    submittingDraftsForUser,
     getDraftStatusHint,
     isMeaningfulDraftContent,
     MAX_SPOT_DRAFTS,
@@ -25,6 +26,8 @@ function makeDraft(overrides: Partial<SpotDraft> = {}): SpotDraft {
     latitude: 41.82,
     longitude: -71.4,
     images: [{ uri: 'file:///cover.jpg' }],
+    status: 'draft',
+    lastError: null,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-02T00:00:00.000Z',
     ...overrides,
@@ -96,6 +99,14 @@ describe('spotDraft helpers', () => {
     expect(
       getDraftStatusHint(makeDraft({ images: [] }))
     ).toBe('Still needs a photo.');
+    expect(
+      getDraftStatusHint(makeDraft({ status: 'submitting' }))
+    ).toBe('Submitting…');
+    expect(
+      getDraftStatusHint(
+        makeDraft({ lastError: 'Let’s try a different photo for this one.' })
+      )
+    ).toBe('Let’s try a different photo for this one.');
   });
 
   it('filters drafts by user and school, newest first', () => {
@@ -131,6 +142,27 @@ describe('spotDraft helpers', () => {
       'newer',
       'older',
     ]);
+  });
+
+  it('keeps submitting spots out of the draft list', () => {
+    const drafts = [
+      makeDraft({ id: 'ready' }),
+      makeDraft({
+        id: 'in-flight',
+        status: 'submitting',
+        updatedAt: '2026-01-06T00:00:00.000Z',
+      }),
+    ];
+
+    expect(draftsForUser(drafts, 'user-1').map((draft) => draft.id)).toEqual([
+      'ready',
+    ]);
+    expect(draftsForSchool(drafts, 'user-1', 'school-1').map((draft) => draft.id)).toEqual([
+      'ready',
+    ]);
+    expect(
+      submittingDraftsForUser(drafts, 'user-1').map((draft) => draft.id)
+    ).toEqual(['in-flight']);
   });
 
   it('keeps the newest drafts per user up to the cap', () => {
@@ -184,6 +216,7 @@ describe('spotDraft helpers', () => {
 
     expect(parsed.map((draft) => draft.id)).toEqual(['draft-1', 'draft-2']);
     expect(parsed[1].images).toEqual([{ uri: 'file:///ok.jpg' }]);
+    expect(parsed[0].lastError).toBeNull();
   });
 
   it('reuses createdAt when updating a draft', () => {

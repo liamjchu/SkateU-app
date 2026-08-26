@@ -360,10 +360,13 @@ function RootLayout() {
         <Stack.Screen name="accept-legal" />
         <Stack.Screen name="legal" />
         <Stack.Screen name="profile" />
+        <Stack.Screen name="user/[userId]" />
+        <Stack.Screen name="follow-list" />
         <Stack.Screen name="settings" />
         <Stack.Screen name="blocked-accounts" />
         <Stack.Screen name="help" />
         <Stack.Screen name="change-username" />
+        <Stack.Screen name="edit-bio" />
         <Stack.Screen name="change-password" />
         <Stack.Screen
           name="login"

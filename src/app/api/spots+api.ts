@@ -1,5 +1,5 @@
 import { deferTask } from 'expo-server';
-import { HOME_RAIL_PAGE_SIZE, parseOffset } from '../../lib/homeFeed';
+import { HOME_SPOTS_PAGE_SIZE, parseOffset } from '../../lib/homeFeed';
 import {
     IMAGE_SANITIZE_ERROR,
     sanitizeSpotImage,
@@ -7,16 +7,17 @@ import {
 import { createRandomId } from '../../lib/webCrypto';
 import type { ImageOrderEntry } from '../../lib/spotMedia';
 import {
-    imageFileToDataUrl,
     moderateSpotSubmission,
     softenModerationReason,
     type SpotModerationVerdict,
 } from '../../lib/spotModeration';
+import { displayableAvatarUrl } from '../../lib/avatarUrl';
 import type { Spot } from '../../types/spot';
 import {
     applyBlockedUserFilter,
     fetchBlockedUserIds,
 } from './blockedUsers';
+import { hasBlockEitherWay } from './followGraph';
 
 // --- Configuration & constants (mirrors schools+api.ts) ---------------------
 
@@ -41,9 +42,9 @@ const IMAGE_EXTENSIONS: Record<string, string> = {
 };
 
 export const SPOT_SELECT_COLUMNS =
-  'id,school_id,created_by_user_id,name,description,latitude,longitude,image_urls,created_at,updated_at,likes_count,comments_count,schools(name,city,state),creator:profiles(username)';
+  'id,school_id,created_by_user_id,name,description,latitude,longitude,image_urls,created_at,updated_at,likes_count,comments_count,schools(name,city,state),creator:profiles(username,avatar_url)';
 const RECENT_SPOT_SELECT_COLUMNS =
-  'id,school_id,created_by_user_id,name,description,latitude,longitude,image_urls,created_at,updated_at,likes_count,comments_count,schools!inner(name,city,state,type),creator:profiles(username)';
+  'id,school_id,created_by_user_id,name,description,latitude,longitude,image_urls,created_at,updated_at,likes_count,comments_count,schools!inner(name,city,state,type),creator:profiles(username,avatar_url)';
 const VALID_SCHOOL_TYPES = ['k12_public', 'k12_private', 'higher_ed'] as const;
 
 export const PENDING_SPOT_STATUS = 'pending_moderation';
@@ -118,11 +119,221 @@ async function patchPendingSpotStatus(
   }
 }
 
+export type PendingSpotEdit = {
+  name: string;
+  description: string;
+  latitude: number;
+  longitude: number;
+  image_urls: string[];
+};
+
+export function parsePendingSpotEdit(value: unknown): PendingSpotEdit | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.name !== 'string' ||
+    typeof record.description !== 'string' ||
+    typeof record.latitude !== 'number' ||
+    typeof record.longitude !== 'number' ||
+    !Number.isFinite(record.latitude) ||
+    !Number.isFinite(record.longitude) ||
+    !Array.isArray(record.image_urls) ||
+    record.image_urls.some((url) => typeof url !== 'string')
+  ) {
+    return null;
+  }
+
+  return {
+    name: record.name,
+    description: record.description,
+    latitude: record.latitude,
+    longitude: record.longitude,
+    image_urls: record.image_urls as string[],
+  };
+}
+
+export function pendingSpotEditsEqual(
+  left: PendingSpotEdit,
+  right: PendingSpotEdit
+): boolean {
+  return (
+    left.name === right.name &&
+    left.description === right.description &&
+    left.latitude === right.latitude &&
+    left.longitude === right.longitude &&
+    left.image_urls.length === right.image_urls.length &&
+    left.image_urls.every((url, index) => url === right.image_urls[index])
+  );
+}
+
+function unusedPendingImageUrls(
+  previous: string[],
+  live: string[],
+  next: string[]
+): string[] {
+  const keep = new Set([...live, ...next]);
+  return previous.filter((url) => !keep.has(url));
+}
+
+async function fetchSpotEditState(
+  config: SupabaseConfig,
+  spotId: string
+): Promise<{ pendingEdit: PendingSpotEdit | null; imageUrls: string[] } | null> {
+  const query = new URL(`${config.url}/rest/v1/spots`);
+  query.searchParams.set('id', `eq.${spotId}`);
+  query.searchParams.set('select', 'pending_edit,image_urls');
+
+  const response = await fetch(query.toString(), {
+    headers: {
+      apikey: config.apiKey,
+      Authorization: `Bearer ${config.apiKey}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+
+  const rows = (await response.json()) as {
+    pending_edit?: unknown;
+    image_urls?: string[];
+  }[];
+
+  if (rows.length === 0) {
+    return null;
+  }
+
+  return {
+    pendingEdit: parsePendingSpotEdit(rows[0].pending_edit),
+    imageUrls: Array.isArray(rows[0].image_urls) ? rows[0].image_urls : [],
+  };
+}
+
+async function patchSpotFields(
+  config: SupabaseConfig,
+  spotId: string,
+  fields: Record<string, unknown>
+): Promise<void> {
+  const query = new URL(`${config.url}/rest/v1/spots`);
+  query.searchParams.set('id', `eq.${spotId}`);
+
+  const response = await fetch(query.toString(), {
+    method: 'PATCH',
+    headers: {
+      apikey: config.apiKey,
+      Authorization: `Bearer ${config.apiKey}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=minimal',
+    },
+    body: JSON.stringify(fields),
+  });
+
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+}
+
+export async function finalizePendingSpotEdit(
+  config: SupabaseConfig,
+  spotId: string,
+  payload: PendingSpotEdit
+): Promise<void> {
+  let state: { pendingEdit: PendingSpotEdit | null; imageUrls: string[] } | null;
+  try {
+    state = await fetchSpotEditState(config, spotId);
+  } catch (error) {
+    console.error('Loading pending spot edit failed:', error);
+    return;
+  }
+
+  if (
+    !state?.pendingEdit ||
+    !pendingSpotEditsEqual(state.pendingEdit, payload)
+  ) {
+    return;
+  }
+
+  let verdict: SpotModerationVerdict;
+  try {
+    verdict = await moderateSpotSubmission({
+      title: payload.name,
+      description: payload.description,
+      imageUrls: payload.image_urls,
+    });
+  } catch (firstError) {
+    console.error('Spot moderation failed after edit, retrying:', firstError);
+    try {
+      verdict = await moderateSpotSubmission({
+        title: payload.name,
+        description: payload.description,
+        imageUrls: payload.image_urls,
+      });
+    } catch (secondError) {
+      console.error(
+        'Spot moderation failed after edit retry; leaving pending edit:',
+        secondError
+      );
+      return;
+    }
+  }
+
+  try {
+    const latest = await fetchSpotEditState(config, spotId);
+    if (
+      !latest?.pendingEdit ||
+      !pendingSpotEditsEqual(latest.pendingEdit, payload)
+    ) {
+      return;
+    }
+
+    if (verdict.approved) {
+      await patchSpotFields(config, spotId, {
+        name: payload.name,
+        description: payload.description,
+        latitude: payload.latitude,
+        longitude: payload.longitude,
+        image_urls: payload.image_urls,
+        pending_edit: null,
+      });
+      const dropped = latest.imageUrls.filter(
+        (url) => !payload.image_urls.includes(url)
+      );
+      if (dropped.length > 0) {
+        try {
+          await deleteStorageObjects(config, dropped);
+        } catch (error) {
+          console.error('Deleting replaced spot images failed:', error);
+        }
+      }
+      return;
+    }
+
+    await patchSpotFields(config, spotId, { pending_edit: null });
+    const unused = unusedPendingImageUrls(
+      payload.image_urls,
+      latest.imageUrls,
+      latest.imageUrls
+    );
+    if (unused.length > 0) {
+      try {
+        await deleteStorageObjects(config, unused);
+      } catch (error) {
+        console.error('Deleting rejected pending spot images failed:', error);
+      }
+    }
+  } catch (error) {
+    console.error('Finalizing pending spot edit failed:', error);
+  }
+}
+
 export async function finalizePendingSpotModeration(
   config: SupabaseConfig,
   spotId: string,
   input: { title: string; description: string; imageUrls: string[] }
-): Promise<void> {
+): Promise<SpotModerationVerdict | null> {
   let verdict: SpotModerationVerdict;
   try {
     verdict = await moderateSpotSubmission(input);
@@ -135,7 +346,7 @@ export async function finalizePendingSpotModeration(
         'Spot moderation failed after create retry; leaving pending:',
         secondError
       );
-      return;
+      return null;
     }
   }
 
@@ -145,6 +356,24 @@ export async function finalizePendingSpotModeration(
   } catch (error) {
     console.error('Updating pending spot status failed:', error);
   }
+  return verdict;
+}
+
+function spotModerationRejectionResponse(
+  verdict: SpotModerationVerdict
+): Response {
+  const flag =
+    verdict.flag === 'INAPPROPRIATE' || verdict.flag === 'IRRELEVANT'
+      ? verdict.flag
+      : 'IRRELEVANT';
+  return Response.json(
+    {
+      approved: false,
+      flag,
+      reason: softenModerationReason(flag, verdict.reason),
+    },
+    { status: 422 }
+  );
 }
 
 /**
@@ -212,7 +441,7 @@ export type DatabaseSpot = {
   likes_count?: number;
   comments_count?: number;
   schools: { name: string; city: string; state: string } | null;
-  creator: { username: string | null } | null;
+  creator: { username: string | null; avatar_url?: string | null } | null;
 };
 
 export type DatabaseSpotInsert = {
@@ -244,6 +473,7 @@ export function mapSpot(row: DatabaseSpot, likedByUser = false): Spot {
     schoolId: row.school_id,
     creatorUserId: row.created_by_user_id ?? null,
     creatorUsername: row.creator?.username ?? null,
+    creatorAvatarUrl: displayableAvatarUrl(row.creator?.avatar_url ?? null),
     createdAt: row.created_at ?? '',
     updatedAt: row.updated_at ?? '',
     likeCount: row.likes_count ?? 0,
@@ -685,6 +915,7 @@ export type SpotOwnership =
       ownerId: string | null;
       schoolId: string;
       imageUrls: string[];
+      pendingEdit: PendingSpotEdit | null;
       status: SpotModerationStatus;
     };
 
@@ -699,7 +930,10 @@ export async function fetchSpotOwnership(
 ): Promise<SpotOwnership> {
   const query = new URL(`${config.url}/rest/v1/spots`);
   query.searchParams.set('id', `eq.${spotId}`);
-  query.searchParams.set('select', 'created_by_user_id,school_id,image_urls,status');
+  query.searchParams.set(
+    'select',
+    'created_by_user_id,school_id,image_urls,pending_edit,status'
+  );
 
   const response = await fetch(query.toString(), {
     headers: {
@@ -716,6 +950,7 @@ export async function fetchSpotOwnership(
     created_by_user_id: string | null;
     school_id: string;
     image_urls?: string[];
+    pending_edit?: unknown;
     status?: string;
   }[];
 
@@ -728,6 +963,7 @@ export async function fetchSpotOwnership(
     ownerId: rows[0].created_by_user_id,
     schoolId: rows[0].school_id,
     imageUrls: Array.isArray(rows[0].image_urls) ? rows[0].image_urls : [],
+    pendingEdit: parsePendingSpotEdit(rows[0].pending_edit),
     status: parseSpotStatus(rows[0].status),
   };
 }
@@ -910,6 +1146,11 @@ export async function GET(request: Request): Promise<Response> {
     return getRecentSpots(request, config);
   }
 
+  const creatorUserIdParam = url.searchParams.get('creatorUserId');
+  if (creatorUserIdParam !== null && creatorUserIdParam.length > 0) {
+    return getCreatorSpots(request, config, creatorUserIdParam);
+  }
+
   const validation = validateSchoolId(url.searchParams.get('schoolId'));
   if (!validation.ok) {
     return Response.json({ error: validation.message }, { status: 400 });
@@ -971,7 +1212,7 @@ async function getRecentSpots(
       query.searchParams.set('select', SPOT_SELECT_COLUMNS);
     }
     query.searchParams.set('order', 'created_at.desc,id.desc');
-    query.searchParams.set('limit', String(HOME_RAIL_PAGE_SIZE));
+    query.searchParams.set('limit', String(HOME_SPOTS_PAGE_SIZE));
     applyVisibleSpotFilter(query);
     applyBlockedUserFilter(query, 'created_by_user_id', viewer.blockedIds);
     const offset = parseOffset(url.searchParams.get('offset'));
@@ -1054,19 +1295,63 @@ async function getMySpots(
   }
 }
 
-function moderationRejectionResponse(moderation: SpotModerationVerdict): Response {
-  const flag =
-    moderation.flag === 'INAPPROPRIATE' || moderation.flag === 'IRRELEVANT'
-      ? moderation.flag
-      : 'IRRELEVANT';
-  return Response.json(
-    {
-      ...moderation,
-      flag,
-      reason: softenModerationReason(flag, moderation.reason),
-    },
-    { status: 422 }
-  );
+async function getCreatorSpots(
+  request: Request,
+  config: SupabaseConfig,
+  creatorUserIdParam: string
+): Promise<Response> {
+  const creatorValidation = validateSpotId(creatorUserIdParam);
+  if (!creatorValidation.ok) {
+    return Response.json({ error: 'The user id is invalid.' }, { status: 400 });
+  }
+
+  const creatorUserId = creatorValidation.value;
+
+  try {
+    const viewer = await resolveViewerAndBlocks(request, config);
+    if (viewer.userId && viewer.userId !== creatorUserId) {
+      const blocked = await hasBlockEitherWay(
+        config,
+        viewer.userId,
+        creatorUserId
+      );
+      if (blocked) {
+        return Response.json(
+          { error: 'This profile isn’t available.' },
+          { status: 403 }
+        );
+      }
+    }
+
+    const query = new URL(`${config.url}/rest/v1/spots`);
+    query.searchParams.set('created_by_user_id', `eq.${creatorUserId}`);
+    query.searchParams.set('select', SPOT_SELECT_COLUMNS);
+    query.searchParams.set('order', 'created_at.desc');
+    applyVisibleSpotFilter(query);
+    applyBlockedUserFilter(query, 'created_by_user_id', viewer.blockedIds);
+
+    const response = await fetch(query.toString(), {
+      headers: {
+        apikey: config.apiKey,
+        Authorization: `Bearer ${config.apiKey}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+
+    const rows = (await response.json()) as DatabaseSpot[];
+    return Response.json({
+      spots: await mapSpotsForUser(config, rows, viewer.userId),
+    });
+  } catch (error) {
+    console.error('Loading creator spots failed:', error);
+    return Response.json(
+      { error: 'Unable to load those spots right now.' },
+      { status: 500 }
+    );
+  }
 }
 
 // --- POST /api/spots --------------------------------------------------------
@@ -1182,13 +1467,14 @@ export async function POST(request: Request): Promise<Response> {
     const createdId = created.id;
     const title = bodyValidation.value.name;
     const description = bodyValidation.value.description;
-    scheduleAfterResponse(() =>
-      finalizePendingSpotModeration(config, createdId, {
-        title,
-        description,
-        imageUrls,
-      })
-    );
+    const verdict = await finalizePendingSpotModeration(config, createdId, {
+      title,
+      description,
+      imageUrls,
+    });
+    if (verdict && !verdict.approved) {
+      return spotModerationRejectionResponse(verdict);
+    }
 
     return Response.json({ spot: mapSpot(created) }, { status: 201 });
   } catch (error) {
@@ -1309,59 +1595,14 @@ export async function PATCH(request: Request): Promise<Response> {
     imageOrder = parsedOrder.value;
   }
 
-  try {
-    let moderationImageUrls: string[];
-    if (imageOrder) {
-      const newDataUrls = await Promise.all(
-        sanitizedImages.value.map(imageFileToDataUrl)
-      );
-      moderationImageUrls = imageOrder.map((entry) =>
-        entry.kind === 'existing' ? entry.url : newDataUrls[entry.index]
-      );
-    } else if (sanitizedImages.value.length > 0) {
-      moderationImageUrls = await Promise.all(
-        sanitizedImages.value.map(imageFileToDataUrl)
-      );
-    } else {
-      moderationImageUrls = ownership.imageUrls;
-    }
-    const moderation = await moderateSpotSubmission({
-      title: bodyValidation.value.name,
-      description: bodyValidation.value.description,
-      imageUrls: moderationImageUrls,
-    });
-
-    if (!moderation.approved) {
-      return moderationRejectionResponse(moderation);
-    }
-  } catch (error) {
-    console.error('Spot moderation failed before update:', error);
-    return Response.json(
-      { error: 'Content check is paused. Try again in a sec.' },
-      { status: 503 }
-    );
-  }
-
-  const updates: {
-    name: string;
-    description: string;
-    latitude: number;
-    longitude: number;
-    image_urls?: string[];
-  } = {
-    name: bodyValidation.value.name,
-    description: bodyValidation.value.description,
-    latitude: bodyValidation.value.latitude,
-    longitude: bodyValidation.value.longitude,
-  };
-
+  let nextImageUrls = ownership.imageUrls;
   if (imageOrder || sanitizedImages.value.length > 0) {
     try {
       const uploadedUrls =
         sanitizedImages.value.length > 0
           ? await uploadImages(config, ownership.schoolId, sanitizedImages.value)
           : [];
-      updates.image_urls = imageOrder
+      nextImageUrls = imageOrder
         ? imageOrder.map((entry) =>
             entry.kind === 'existing' ? entry.url : uploadedUrls[entry.index]
           )
@@ -1372,6 +1613,29 @@ export async function PATCH(request: Request): Promise<Response> {
         { error: 'Unable to upload the spot images right now.' },
         { status: 500 }
       );
+    }
+  }
+
+  const pendingEdit: PendingSpotEdit = {
+    name: bodyValidation.value.name,
+    description: bodyValidation.value.description,
+    latitude: bodyValidation.value.latitude,
+    longitude: bodyValidation.value.longitude,
+    image_urls: nextImageUrls,
+  };
+
+  if (ownership.pendingEdit) {
+    const orphans = unusedPendingImageUrls(
+      ownership.pendingEdit.image_urls,
+      ownership.imageUrls,
+      nextImageUrls
+    );
+    if (orphans.length > 0) {
+      try {
+        await deleteStorageObjects(config, orphans);
+      } catch (error) {
+        console.error('Deleting superseded pending spot images failed:', error);
+      }
     }
   }
 
@@ -1388,7 +1652,7 @@ export async function PATCH(request: Request): Promise<Response> {
         'Content-Type': 'application/json',
         Prefer: 'return=representation',
       },
-      body: JSON.stringify(updates),
+      body: JSON.stringify({ pending_edit: pendingEdit }),
     });
 
     if (!response.ok) {
@@ -1401,21 +1665,25 @@ export async function PATCH(request: Request): Promise<Response> {
       throw new Error('Update returned no representation.');
     }
 
-    if (updates.image_urls) {
-      const kept = new Set(updates.image_urls);
-      const removed = ownership.imageUrls.filter((url) => !kept.has(url));
-      if (removed.length > 0) {
-        try {
-          await deleteStorageObjects(config, removed);
-        } catch (error) {
-          console.error('Deleting replaced spot images failed:', error);
-        }
-      }
-    }
+    scheduleAfterResponse(() =>
+      finalizePendingSpotEdit(config, idValidation.value, pendingEdit)
+    );
 
     return Response.json({ spot: mapSpot(updated) });
   } catch (error) {
     console.error('Updating spot failed:', error);
+    const uploadedOnly = unusedPendingImageUrls(
+      nextImageUrls,
+      ownership.imageUrls,
+      ownership.imageUrls
+    );
+    if (uploadedOnly.length > 0) {
+      try {
+        await deleteStorageObjects(config, uploadedOnly);
+      } catch (cleanupError) {
+        console.error('Cleaning up uploaded pending spot images failed:', cleanupError);
+      }
+    }
     return Response.json(
       { error: 'Unable to update this spot right now.' },
       { status: 500 }
