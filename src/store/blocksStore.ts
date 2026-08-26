@@ -1,6 +1,13 @@
 import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import { captureAnalyticsEvent } from '../lib/analytics';
 import { getApiUrl } from '../lib/api';
+import { getClientStorage } from '../lib/clientStorage';
+import {
+  BLOCKS_CACHE_KEY,
+  parseBlockedUsers,
+  readPersistedRecord,
+} from '../lib/readCache';
 import { sanitizeErrorMessage } from '../lib/userFacingError';
 import type { BlockedUser } from '../types/userBlock';
 import { useCommentsStore } from './commentsStore';
@@ -10,6 +17,8 @@ type BlocksState = {
   users: BlockedUser[];
   loading: boolean;
   error: string | null;
+  hasHydrated: boolean;
+  setHasHydrated: (hasHydrated: boolean) => void;
   fetchBlocks: (accessToken: string) => Promise<void>;
   blockUser: (
     userId: string,
@@ -60,13 +69,18 @@ function hideBlockedContent(userId: string): void {
   useCommentsStore.getState().hideUserComments(userId);
 }
 
-export const useBlocksStore = create<BlocksState>((set, get) => ({
+export const useBlocksStore = create<BlocksState>()(
+  persist(
+    (set, get) => ({
   users: [],
   loading: false,
   error: null,
+  hasHydrated: false,
+  setHasHydrated: (hasHydrated) => set({ hasHydrated }),
 
   fetchBlocks: async (accessToken) => {
-    set({ loading: true, error: null });
+    const hasCache = get().users.length > 0;
+    set({ loading: !hasCache, error: null });
     try {
       const response = await fetchWithTimeout(getApiUrl('/api/user-blocks'), {
         headers: { Authorization: `Bearer ${accessToken}` },
@@ -140,4 +154,24 @@ export const useBlocksStore = create<BlocksState>((set, get) => ({
   clear: () => {
     set({ users: [], loading: false, error: null });
   },
-}));
+    }),
+    {
+      name: BLOCKS_CACHE_KEY,
+      storage: createJSONStorage(getClientStorage),
+      skipHydration: true,
+      onRehydrateStorage: () => () => {
+        useBlocksStore.getState().setHasHydrated(true);
+      },
+      partialize: (state) => ({
+        users: state.users,
+      }),
+      merge: (persistedState, currentState) => {
+        const persisted = readPersistedRecord(persistedState);
+        return {
+          ...currentState,
+          users: parseBlockedUsers(persisted.users),
+        };
+      },
+    }
+  )
+);

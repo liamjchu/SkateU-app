@@ -30,7 +30,7 @@ import {
 import { triggerHaptic } from '../lib/haptics';
 import { colors } from '../constants/colors';
 import { existingMediaItems, mediaListsEqual } from '../lib/spotMedia';
-import { toUserFacingError } from '../lib/userFacingError';
+import { toMutationError } from '../lib/userFacingError';
 import { useAuthStore } from '../store/authStore';
 import { useMapViewStore } from '../store/mapViewStore';
 import { useSpotsStore } from '../store/spotsStore';
@@ -224,7 +224,7 @@ export default function EditSpotScreen() {
       router.back();
     } catch (error) {
       setSaveError(
-        toUserFacingError(error, 'Couldn’t save that. Try again in a sec.')
+        toMutationError(error, 'Couldn’t save that. Try again in a sec.')
       );
     } finally {
       setSaving(false);

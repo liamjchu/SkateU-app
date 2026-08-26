@@ -35,7 +35,7 @@ import {
 } from '../lib/spotDraft';
 import { filterExistingDraftImages } from '../lib/spotDraftFiles';
 import { mediaListsEqual } from '../lib/spotMedia';
-import { toUserFacingError } from '../lib/userFacingError';
+import { toMutationError } from '../lib/userFacingError';
 import { useAuthStore } from '../store/authStore';
 import { useDraftSpotsStore } from '../store/draftSpotsStore';
 import { useMapViewStore } from '../store/mapViewStore';
@@ -122,6 +122,7 @@ export default function AddSpotScreen() {
   const allowRemovalRef = useRef(false);
   const postedRef = useRef(false);
   const savingRef = useRef(false);
+  const submittedRef = useRef(false);
   const draftIdRef = useRef(draftIdParam);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const persistInFlightRef = useRef<Promise<void> | null>(null);
@@ -225,7 +226,7 @@ export default function AddSpotScreen() {
   }, [draftIdParam, getDraft, hasHydratedDrafts]);
 
   const persistDraftNow = useCallback(async () => {
-    if (postedRef.current) {
+    if (postedRef.current || submittedRef.current) {
       return;
     }
 
@@ -282,7 +283,7 @@ export default function AddSpotScreen() {
   }, [upsertDraft]);
 
   useEffect(() => {
-    if (!draftReady || saving || postedRef.current) {
+    if (!draftReady || saving || postedRef.current || submittedRef.current) {
       return;
     }
 
@@ -305,6 +306,7 @@ export default function AddSpotScreen() {
     saving,
     selectedLocation.latitude,
     selectedLocation.longitude,
+    submitted,
   ]);
 
   const flushDraftAndLeave = useCallback(
@@ -332,12 +334,12 @@ export default function AddSpotScreen() {
         return;
       }
 
-      if (saving) {
-        event.preventDefault();
+      if (submittedRef.current || postedRef.current) {
         return;
       }
 
-      if (postedRef.current) {
+      if (saving) {
+        event.preventDefault();
         return;
       }
 
@@ -411,46 +413,54 @@ export default function AddSpotScreen() {
     }
 
     savingRef.current = true;
-    setSaving(true);
+    submittedRef.current = true;
+    allowRemovalRef.current = true;
+    setSubmitted(true);
     setSaveError(null);
+    triggerHaptic('success');
 
-    try {
-      await addSpot(
-        {
-          schoolId,
-          name: name.trim(),
-          description: description.trim(),
-          latitude: selectedLocation.latitude,
-          longitude: selectedLocation.longitude,
-          images: media
-            .filter((item) => item.kind === 'new')
-            .map((item) => item.asset),
-        },
-        accessToken
-      );
-      postedRef.current = true;
-      if (draftIdRef.current) {
-        try {
-          await deleteDraft(draftIdRef.current);
-        } catch (error) {
-          console.warn('Could not remove the local draft after posting.', error);
+    const payload = {
+      schoolId,
+      name: name.trim(),
+      description: description.trim(),
+      latitude: selectedLocation.latitude,
+      longitude: selectedLocation.longitude,
+      images: media
+        .filter((item) => item.kind === 'new')
+        .map((item) => item.asset),
+    };
+
+    void (async () => {
+      try {
+        await addSpot(payload, accessToken);
+        postedRef.current = true;
+        if (draftIdRef.current) {
+          try {
+            await deleteDraft(draftIdRef.current);
+          } catch (error) {
+            console.warn('Could not remove the local draft after posting.', error);
+          }
         }
+      } catch (error) {
+        if (!mountedRef.current || !submittedRef.current) {
+          return;
+        }
+        submittedRef.current = false;
+        savingRef.current = false;
+        allowRemovalRef.current = false;
+        setSubmitted(false);
+        setSaveError(
+          toMutationError(error, 'We couldn’t submit this spot. Please try again.')
+        );
       }
-      triggerHaptic('success');
-      allowRemovalRef.current = true;
-      setSubmitted(true);
-    } catch (error) {
-      setSaveError(
-        toUserFacingError(error, 'We couldn’t submit this spot. Please try again.')
-      );
-    } finally {
-      savingRef.current = postedRef.current;
-      setSaving(false);
-    }
+    })();
   };
 
+  const mountedRef = useRef(true);
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       if (interactionTimeoutRef.current) {
         clearTimeout(interactionTimeoutRef.current as unknown as number);
         interactionTimeoutRef.current = null;
@@ -476,7 +486,7 @@ export default function AddSpotScreen() {
           }
           router.back();
         }}
-        backDisabled={saving && !submitted}
+        backDisabled={saving && !submittedRef.current && !submitted}
       />
 
       {!draftReady ? (

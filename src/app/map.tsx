@@ -31,12 +31,14 @@ import Animated, {
     useSharedValue,
     withTiming,
 } from 'react-native-reanimated';
+import { useIsFocused } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import FeedbackPressable from '../components/FeedbackPressable';
 import LoginRequiredModal from '../components/LoginRequiredModal';
 import MapSpotSheetPage from '../components/map-spot-sheet-page';
 import SpotFullscreenViewer from '../components/spot-fullscreen-viewer';
+import StaleCacheBanner from '../components/StaleCacheBanner';
 import { StickerStripe } from '../components/sticker';
 import images from '../constants/images';
 import { colors } from '../constants/colors';
@@ -45,6 +47,14 @@ import {
     buildSelectSpotJavascript,
     getCampusMapPinScript,
 } from '../lib/campusMapPins';
+import { goToMyLocation } from '../lib/goToMyLocation';
+import {
+    CAMPUS_USER_LOCATION_ZOOM,
+    buildGoToUserLocationJavascript,
+    buildSetUserLocationJavascript,
+    CLEAR_USER_LOCATION_JAVASCRIPT,
+    getLeafletUserLocationScript,
+} from '../lib/leafletUserLocation';
 import { captureAnalyticsEvent } from '../lib/analytics';
 import { triggerHaptic } from '../lib/haptics';
 import { sortSpotsByDistanceFrom } from '../lib/spotDistance';
@@ -52,9 +62,11 @@ import {
     getSpotSelectionStatus,
     SPOT_LOAD_FAILED_MESSAGE,
 } from '../lib/spotAvailability';
-import { toUserFacingError } from '../lib/userFacingError';
+import { STALE_SPOTS_MESSAGE } from '../lib/readCache';
+import { toMutationError } from '../lib/userFacingError';
 import { guardedNavigate } from '../lib/navigationGuard';
 import { draftsForSchool } from '../lib/spotDraft';
+import { useUserLocation } from '../hooks/useUserLocation';
 import { useAuthStore } from '../store/authStore';
 import { useBlocksStore } from '../store/blocksStore';
 import { useCommentsStore } from '../store/commentsStore';
@@ -120,6 +132,12 @@ export default function MapScreen() {
   const [mapAttempt, setMapAttempt] = useState(0);
   const [mapStatus, setMapStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [mapError, setMapError] = useState('');
+  const isFocused = useIsFocused();
+  const {
+    coords: userLocation,
+    status: userLocationStatus,
+    requestPermission: requestUserLocationPermission,
+  } = useUserLocation(isFocused && mapStatus === 'ready');
   const [selectedSpotId, setSelectedSpotId] = useState<string | undefined>(
     undefined
   );
@@ -152,7 +170,6 @@ export default function MapScreen() {
   const [sheetOriginId, setSheetOriginId] = useState<string | undefined>(
     undefined
   );
-  const [sheetPagerEnabled, setSheetPagerEnabled] = useState(true);
   const sheetListRef = useRef<FlatList<Spot>>(null);
   const didSelectInitialSpotRef = useRef(false);
   const [likingSpotId, setLikingSpotId] = useState<string | null>(null);
@@ -358,6 +375,7 @@ export default function MapScreen() {
           zoomControl: false,
           attributionControl: false,
         }).setView(center, 15.5);
+        ${getLeafletUserLocationScript()}
         const defaultLayer = L.tileLayer(
           'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
           { attribution: '&copy; OpenStreetMap contributors &copy; CARTO' }
@@ -591,6 +609,38 @@ export default function MapScreen() {
     selectedSpotIsOwned,
     session?.access_token,
   ]);
+
+  useEffect(() => {
+    if (mapStatus !== 'ready') {
+      return;
+    }
+
+    if (!userLocation) {
+      webViewRef.current?.injectJavaScript(CLEAR_USER_LOCATION_JAVASCRIPT);
+      return;
+    }
+
+    webViewRef.current?.injectJavaScript(
+      buildSetUserLocationJavascript(
+        userLocation.latitude,
+        userLocation.longitude,
+        userLocation.accuracy
+      )
+    );
+  }, [mapStatus, userLocation]);
+
+  const handleGoToMyLocation = useCallback(() => {
+    void goToMyLocation({
+      status: userLocationStatus,
+      hasCoords: Boolean(userLocation),
+      requestPermission: requestUserLocationPermission,
+      onGoToLocation: () => {
+        webViewRef.current?.injectJavaScript(
+          buildGoToUserLocationJavascript(CAMPUS_USER_LOCATION_ZOOM)
+        );
+      },
+    });
+  }, [requestUserLocationPermission, userLocation, userLocationStatus]);
 
   useEffect(() => {
     if (mapStatus !== 'loading') {
@@ -858,7 +908,6 @@ export default function MapScreen() {
       return;
     }
 
-    setSheetPagerEnabled(true);
     sheetListRef.current?.scrollToIndex({ index, animated: true });
     selectionSourceRef.current = 'map';
     setSelectedSpotId(spot.id);
@@ -931,7 +980,7 @@ export default function MapScreen() {
     } catch (error) {
       Alert.alert(
         'Couldn’t update that like',
-        toUserFacingError(error, 'Please try again.')
+        toMutationError(error, 'Please try again.')
       );
     } finally {
       setLikingSpotId(null);
@@ -1012,15 +1061,14 @@ export default function MapScreen() {
     const accessToken = session.access_token;
     const label = target.creatorUsername
       ? `@${target.creatorUsername}`
-      : 'this skater';
+      : 'this account';
     Alert.alert(
-      `Block ${label}?`,
-      'You won’t see their spots or comments. You can unblock them in Settings.',
+      `Hide ${label}?`,
+      'You won’t see their spots or comments. You can undo this in Settings.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Block',
-          style: 'destructive',
+          text: 'Hide',
           onPress: () => {
             void blockUser(blockedId, accessToken, target.creatorUsername)
               .then(() => {
@@ -1031,8 +1079,8 @@ export default function MapScreen() {
               })
               .catch((caught: unknown) => {
                 Alert.alert(
-                  'Couldn’t block that skater',
-                  toUserFacingError(caught, 'Please try again.')
+                  'Couldn’t hide that account',
+                  toMutationError(caught, 'Please try again.')
                 );
               });
           },
@@ -1089,7 +1137,7 @@ export default function MapScreen() {
             } catch (error) {
               Alert.alert(
                 'Couldn’t delete that spot',
-                toUserFacingError(error, 'Please try again.')
+                toMutationError(error, 'Please try again.')
               );
             } finally {
               setDeletingSpotId(null);
@@ -1304,6 +1352,27 @@ export default function MapScreen() {
         >
           <Feather name="crosshair" size={26} color={colors.brand} />
         </FeedbackPressable>
+        <FeedbackPressable
+          haptic="light"
+          onPress={handleGoToMyLocation}
+          disabled={mapStatus !== 'ready'}
+          className="h-14 w-14 items-center justify-center rounded-full bg-white"
+          style={styles.mapControl}
+          accessibilityRole="button"
+          accessibilityLabel="Go to my location"
+          accessibilityHint="Moves the map to your current location"
+          accessibilityState={{
+            disabled: mapStatus !== 'ready',
+            busy:
+              userLocationStatus === 'requesting' && userLocation == null,
+          }}
+        >
+          {userLocationStatus === 'requesting' && userLocation == null ? (
+            <ActivityIndicator color={colors.brand} />
+          ) : (
+            <Ionicons name="locate" size={26} color={colors.brand} />
+          )}
+        </FeedbackPressable>
       </View>
       <View
         className="absolute right-4 z-[999] items-end"
@@ -1371,7 +1440,7 @@ export default function MapScreen() {
             : loginRequiredReason === 'spot_problem'
               ? 'Sign in to report a problem'
               : loginRequiredReason === 'block'
-                ? 'Sign in to block this skater'
+                ? 'Sign in to hide this account'
                 : undefined
         }
         message={
@@ -1534,7 +1603,18 @@ export default function MapScreen() {
         </View>
       ) : null}
 
-      {mapStatus === 'ready' && error ? (
+      {mapStatus === 'ready' && error && spots.length > 0 && loadedSchoolId === schoolId ? (
+        <View
+          className="absolute left-4 right-4 z-40"
+          style={{ top: insets.top + 88 }}
+        >
+          <StaleCacheBanner
+            message={STALE_SPOTS_MESSAGE}
+            onRetry={retrySpots}
+            retryAccessibilityLabel="Retry loading skate spots"
+          />
+        </View>
+      ) : mapStatus === 'ready' && error ? (
         <View
           className="absolute left-4 right-4 z-40 rounded-2xl border border-errorBorder bg-field px-4 py-3"
           style={{ top: insets.top + 88 }}
@@ -1749,7 +1829,6 @@ export default function MapScreen() {
             pagingEnabled
             nestedScrollEnabled
             directionalLockEnabled
-            scrollEnabled={sheetPagerEnabled}
             showsHorizontalScrollIndicator={false}
             getItemLayout={(_data, index) => ({
               length: sheetWidth,
@@ -1788,8 +1867,6 @@ export default function MapScreen() {
                 onReportProblem={() => handleReportProblemPress(item)}
                 onRequestRemoval={() => handleRequestRemovalPress(item)}
                 onBlockCreator={() => handleBlockCreatorPress(item)}
-                onPhotoZoneTouch={() => setSheetPagerEnabled(false)}
-                onDetailsZoneTouch={() => setSheetPagerEnabled(true)}
               />
             )}
           />
@@ -1832,8 +1909,6 @@ export default function MapScreen() {
                   handleRequestRemovalPress(selectedSpot)
                 }
                 onBlockCreator={() => handleBlockCreatorPress(selectedSpot)}
-                onPhotoZoneTouch={() => setSheetPagerEnabled(false)}
-                onDetailsZoneTouch={() => setSheetPagerEnabled(true)}
               />
             </ScrollView>
           )}

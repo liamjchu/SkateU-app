@@ -60,7 +60,7 @@ export function SiteShell({ children }: { children: ReactNode }) {
           </nav>
           <div className="flex items-center gap-2" aria-label="Follow SkateU on social media">
             <a
-              href="https://www.instagram.com/skateu.app/"
+              href="https://www.instagram.com/skateuapp/"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Follow SkateU on Instagram"
@@ -73,7 +73,7 @@ export function SiteShell({ children }: { children: ReactNode }) {
               </svg>
             </a>
             <a
-              href="https://www.tiktok.com/@skateu.app?is_from_webapp=1&sender_device=pc"
+              href="https://www.tiktok.com/@skateuapp"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Follow SkateU on TikTok"
@@ -84,7 +84,7 @@ export function SiteShell({ children }: { children: ReactNode }) {
               </svg>
             </a>
             <a
-              href="https://www.youtube.com/@liam_chu"
+              href="https://www.youtube.com/@skateuapp"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Follow SkateU on YouTube"

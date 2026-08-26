@@ -1,7 +1,8 @@
 import { Feather } from '@expo/vector-icons';
+import * as Sentry from '@sentry/react-native';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, ScrollView, Text, View } from 'react-native';
+import { Alert, Button, ScrollView, Text, View } from 'react-native';
 import FeedbackPressable from '../components/FeedbackPressable';
 import ScreenHeader from '../components/screen-header';
 import { LEGAL_APP_ROUTES } from '../lib/legalAcceptance';
@@ -213,6 +214,22 @@ export default function SettingsScreen() {
             accessibilityHint="Opens Help and Support"
           />
         </View>
+
+        {__DEV__ ? (
+          <>
+            <Text className="mb-2 mt-8 px-1 font-outfit-bold text-xs uppercase tracking-wide text-muted">
+              Developer
+            </Text>
+            <View className="overflow-hidden rounded-2xl bg-field px-4 py-2">
+              <Button
+                title="Try!"
+                onPress={() => {
+                  Sentry.captureException(new Error('First error'));
+                }}
+              />
+            </View>
+          </>
+        ) : null}
 
         <Text className="mb-2 mt-8 px-1 font-outfit-bold text-xs uppercase tracking-wide text-muted">
           Legal

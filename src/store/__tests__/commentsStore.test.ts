@@ -82,6 +82,7 @@ describe('commentsStore', () => {
 
     const cache = useCommentsStore.getState().bySpotId['spot-1'];
     expect(cache.comments).toEqual(comments);
+    expect(useCommentsStore.getState().recentSpotIds).toEqual(['spot-1']);
     expect(cache.loading).toBe(false);
     expect(cache.error).toBeNull();
     expect(cache.hasMore).toBe(false);

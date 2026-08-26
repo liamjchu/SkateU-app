@@ -39,8 +39,14 @@ describe('moderateSpotSubmission', () => {
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('https://api.openai.com/v1/chat/completions');
     expect(init.headers).toEqual(expect.objectContaining({ Authorization: 'Bearer test-key' }));
-    const body = JSON.parse(String(init.body)) as { response_format: { type: string }; messages: { content: unknown }[] };
+    const body = JSON.parse(String(init.body)) as { response_format: { type: string }; messages: { role: string; content: unknown }[] };
     expect(body.response_format).toEqual({ type: 'json_object' });
+    expect(body.messages[0]).toEqual(
+      expect.objectContaining({
+        role: 'system',
+        content: expect.stringContaining('Almost ignore the title and description'),
+      })
+    );
     expect(body.messages[1].content).toEqual(expect.arrayContaining([expect.objectContaining({ type: 'image_url' })]));
   });
 

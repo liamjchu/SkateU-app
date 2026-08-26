@@ -32,9 +32,9 @@ describe("Home", () => {
     expect(legalNav?.querySelector('a[href="/terms"]')).toBeNull();
     expect(legalNav?.querySelector('a[href="/community-guidelines"]')).toBeNull();
     const socialLinks = [
-      ["Instagram", "https://www.instagram.com/skateu.app/"],
-      ["TikTok", "https://www.tiktok.com/@skateu.app?is_from_webapp=1&sender_device=pc"],
-      ["YouTube", "https://www.youtube.com/@liam_chu"],
+      ["Instagram", "https://www.instagram.com/skateuapp/"],
+      ["TikTok", "https://www.tiktok.com/@skateuapp"],
+      ["YouTube", "https://www.youtube.com/@skateuapp"],
     ] as const;
 
     for (const [platform, href] of socialLinks) {

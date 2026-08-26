@@ -22,7 +22,9 @@ import {
     getCommentContentError,
 } from '../lib/commentForm';
 import { triggerHaptic } from '../lib/haptics';
-import { toUserFacingError } from '../lib/userFacingError';
+import StaleCacheBanner from '../components/StaleCacheBanner';
+import { STALE_COMMENTS_MESSAGE } from '../lib/readCache';
+import { toMutationError } from '../lib/userFacingError';
 import { useAuthStore } from '../store/authStore';
 import { useBlocksStore } from '../store/blocksStore';
 import { useCommentsStore } from '../store/commentsStore';
@@ -118,15 +120,14 @@ export default function SpotCommentsScreen() {
     }
     const label = comment.creatorUsername
       ? `@${comment.creatorUsername}`
-      : 'this skater';
+      : 'this account';
     Alert.alert(
-      `Block ${label}?`,
-      'You won’t see their spots or comments. You can unblock them in Settings.',
+      `Hide ${label}?`,
+      'You won’t see their spots or comments. You can undo this in Settings.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Block',
-          style: 'destructive',
+          text: 'Hide',
           onPress: () => {
             void blockUser(blockedId, accessToken, comment.creatorUsername)
               .then(() => {
@@ -134,8 +135,8 @@ export default function SpotCommentsScreen() {
               })
               .catch((caught: unknown) => {
                 Alert.alert(
-                  'Couldn’t block that skater',
-                  toUserFacingError(caught, 'Try again in a sec.')
+                  'Couldn’t hide that account',
+                  toMutationError(caught, 'Try again in a sec.')
                 );
               });
           },
@@ -174,7 +175,7 @@ export default function SpotCommentsScreen() {
       Keyboard.dismiss();
     } catch (caught) {
       setSubmitError(
-        toUserFacingError(caught, 'Couldn’t post that. Try again in a sec.')
+        toMutationError(caught, 'Couldn’t post that. Try again in a sec.')
       );
     }
   };
@@ -208,7 +209,7 @@ export default function SpotCommentsScreen() {
               .catch((caught: unknown) => {
                 Alert.alert(
                   'Couldn’t delete that comment',
-                  toUserFacingError(caught, 'Try again in a sec.')
+                  toMutationError(caught, 'Try again in a sec.')
                 );
               })
               .finally(() => {
@@ -307,20 +308,14 @@ export default function SpotCommentsScreen() {
         ) : null}
 
         {error && comments.length > 0 ? (
-          <View className="mx-6 mt-3 flex-row items-center rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2.5">
-            <Text className="flex-1 pr-2 font-outfit-medium text-sm text-errorText">
-              {error}
-            </Text>
-            <FeedbackPressable
-              onPress={() => {
+          <View className="mx-6 mt-3">
+            <StaleCacheBanner
+              message={STALE_COMMENTS_MESSAGE}
+              onRetry={() => {
                 void fetchComments(spotId, session?.access_token);
               }}
-              className="rounded-xl bg-accent px-3 py-1.5"
-              accessibilityRole="button"
-              accessibilityLabel="Retry loading comments"
-            >
-              <Text className="font-outfit-bold text-sm text-brand">Retry</Text>
-            </FeedbackPressable>
+              retryAccessibilityLabel="Retry loading comments"
+            />
           </View>
         ) : null}
 
@@ -453,7 +448,7 @@ export default function SpotCommentsScreen() {
         visible={showLoginRequired}
         onCancel={() => setShowLoginRequired(false)}
         title="Sign in to comment"
-        message="You can still read comments. Sign in if you want to join the conversation, report a comment, or block a skater."
+        message="You can still read comments. Sign in if you want to join the conversation, report a comment, or hide an account."
       />
     </SafeAreaView>
   );

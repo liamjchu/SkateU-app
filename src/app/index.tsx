@@ -26,6 +26,7 @@ import NoticeBanner from '../components/NoticeBanner';
 import PopularSchoolCard, {
     SchoolSpotCount,
 } from '../components/PopularSchoolCard';
+import StaleCacheBanner from '../components/StaleCacheBanner';
 import SchoolTypePills, {
     getSchoolTypesParam,
 } from '../components/SchoolTypePills';
@@ -42,8 +43,12 @@ import {
     isHomeFeedScrolled,
 } from '../lib/homeLogoTap';
 import { MIN_SEARCH_LENGTH, schoolMatchesQuery } from '../lib/schoolSearch';
-import { toUserFacingError } from '../lib/userFacingError';
+import { toMutationError, toUserFacingError } from '../lib/userFacingError';
 import { guardedNavigate } from '../lib/navigationGuard';
+import {
+    STALE_SCHOOLS_MESSAGE,
+    STALE_SPOTS_MESSAGE,
+} from '../lib/readCache';
 import {
     formatGuestBrowseMessage,
     GUEST_BROWSE_TITLE,
@@ -105,10 +110,13 @@ function getSchoolSearchCopy(filter: SchoolTypeFilter): {
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { schools, upsertSchool } = useSchools();
+  const { schools, upsertSchool, popularSchools: cachedPopularSchools, popularFilter, setPopularFeed } = useSchools();
   const session = useAuthStore((state) => state.session);
   const authInitializing = useAuthStore((state) => state.initializing);
   const toggleSpotLike = useSpotsStore((state) => state.toggleSpotLike);
+  const cachedRecentSpots = useSpotsStore((state) => state.recentSpots);
+  const recentFilter = useSpotsStore((state) => state.recentFilter);
+  const setRecentFeed = useSpotsStore((state) => state.setRecentFeed);
   const commentCounts = useCommentsStore((state) => state.commentCounts);
   const {
     favoriteSchoolIds,
@@ -129,13 +137,11 @@ export default function HomeScreen() {
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
   const [searchRetryNonce, setSearchRetryNonce] = useState(0);
-  const [popularSchools, setPopularSchools] = useState<School[]>([]);
   const [isLoadingPopular, setIsLoadingPopular] = useState(true);
   const [popularError, setPopularError] = useState('');
   const [popularRetryNonce, setPopularRetryNonce] = useState(0);
   const [isLoadingMorePopular, setIsLoadingMorePopular] = useState(false);
   const [popularHasMore, setPopularHasMore] = useState(true);
-  const [recentSpots, setRecentSpots] = useState<Spot[]>([]);
   const [isLoadingRecent, setIsLoadingRecent] = useState(true);
   const [recentError, setRecentError] = useState('');
   const [recentRetryNonce, setRecentRetryNonce] = useState(0);
@@ -172,6 +178,9 @@ export default function HomeScreen() {
   recentHasMoreRef.current = recentHasMore;
   isLoadingPopularRef.current = isLoadingPopular || isLoadingMorePopular;
   isLoadingRecentRef.current = isLoadingRecent || isLoadingMoreRecent;
+  const popularSchools =
+    popularFilter === activeFilter ? cachedPopularSchools : [];
+  const recentSpots = recentFilter === activeFilter ? cachedRecentSpots : [];
   popularSchoolsRef.current = popularSchools;
   recentSpotsRef.current = recentSpots;
 
@@ -376,11 +385,7 @@ export default function HomeScreen() {
     const controller = new AbortController();
     popularAbortRef.current = controller;
     popularLockRef.current = false;
-    const filterChanged = popularFilterRef.current !== activeFilter;
     popularFilterRef.current = activeFilter;
-    if (filterChanged || popularSchoolsRef.current.length === 0) {
-      setPopularSchools([]);
-    }
     setPopularHasMore(true);
     setIsLoadingPopular(true);
     setIsLoadingMorePopular(false);
@@ -410,7 +415,7 @@ export default function HomeScreen() {
         page.forEach(upsertSchool);
 
         if (!controller.signal.aborted) {
-          setPopularSchools(page);
+          setPopularFeed(activeFilter, page);
           setPopularHasMore(page.length === HOME_RAIL_PAGE_SIZE);
           setPopularError('');
         }
@@ -434,7 +439,7 @@ export default function HomeScreen() {
     loadPopularSchools();
 
     return () => controller.abort();
-  }, [activeFilter, popularRetryNonce, upsertSchool]);
+  }, [activeFilter, popularRetryNonce, setPopularFeed, upsertSchool]);
 
   useEffect(() => {
     recentAbortRef.current?.abort();
@@ -450,11 +455,7 @@ export default function HomeScreen() {
     const controller = new AbortController();
     recentAbortRef.current = controller;
     recentLockRef.current = false;
-    const filterChanged = recentFilterRef.current !== activeFilter;
     recentFilterRef.current = activeFilter;
-    if (filterChanged || recentSpotsRef.current.length === 0) {
-      setRecentSpots([]);
-    }
     setRecentHasMore(true);
     setIsLoadingRecent(true);
     setIsLoadingMoreRecent(false);
@@ -486,7 +487,7 @@ export default function HomeScreen() {
         const page = data.spots ?? [];
 
         if (!controller.signal.aborted) {
-          setRecentSpots(page);
+          setRecentFeed(activeFilter, page);
           setRecentHasMore(page.length === HOME_RAIL_PAGE_SIZE);
           setRecentError('');
         }
@@ -510,7 +511,7 @@ export default function HomeScreen() {
     loadRecentSpots();
 
     return () => controller.abort();
-  }, [activeFilter, recentRetryNonce, session?.access_token]);
+  }, [activeFilter, recentRetryNonce, session?.access_token, setRecentFeed]);
 
   const loadMorePopularSchools = useCallback(async () => {
     if (
@@ -549,13 +550,12 @@ export default function HomeScreen() {
       page.forEach(upsertSchool);
 
       if (!controller.signal.aborted) {
-        setPopularSchools((current) => {
-          const seen = new Set(current.map((school) => school.id));
-          return [
-            ...current,
-            ...page.filter((school) => !seen.has(school.id)),
-          ];
-        });
+        const current = popularSchoolsRef.current;
+        const seen = new Set(current.map((school) => school.id));
+        setPopularFeed(activeFilter, [
+          ...current,
+          ...page.filter((school) => !seen.has(school.id)),
+        ]);
         setPopularHasMore(page.length === HOME_RAIL_PAGE_SIZE);
         setPopularError('');
       }
@@ -578,7 +578,7 @@ export default function HomeScreen() {
         setIsLoadingMorePopular(false);
       }
     }
-  }, [activeFilter, upsertSchool]);
+  }, [activeFilter, setPopularFeed, upsertSchool]);
 
   const loadMoreRecentSpots = useCallback(async () => {
     if (
@@ -619,10 +619,12 @@ export default function HomeScreen() {
       const page = data.spots ?? [];
 
       if (!controller.signal.aborted) {
-        setRecentSpots((current) => {
-          const seen = new Set(current.map((spot) => spot.id));
-          return [...current, ...page.filter((spot) => !seen.has(spot.id))];
-        });
+        const current = recentSpotsRef.current;
+        const seen = new Set(current.map((spot) => spot.id));
+        setRecentFeed(activeFilter, [
+          ...current,
+          ...page.filter((spot) => !seen.has(spot.id)),
+        ]);
         setRecentHasMore(page.length === HOME_RAIL_PAGE_SIZE);
         setRecentError('');
       }
@@ -642,7 +644,7 @@ export default function HomeScreen() {
         setIsLoadingMoreRecent(false);
       }
     }
-  }, [activeFilter, session?.access_token]);
+  }, [activeFilter, session?.access_token, setRecentFeed]);
 
   useEffect(() => {
     if (!isSearchMode) {
@@ -799,27 +801,16 @@ export default function HomeScreen() {
 
     setLikingSpotId(spot.id);
     try {
-      const result = await toggleSpotLike(
+      await toggleSpotLike(
         spot.id,
         spot.likedByUser === true,
         accessToken
       );
       triggerHaptic('light');
-      setRecentSpots((current) =>
-        current.map((item) =>
-          item.id === spot.id
-            ? {
-                ...item,
-                likedByUser: result.likedByUser,
-                likeCount: result.likeCount,
-              }
-            : item
-        )
-      );
     } catch (error) {
       Alert.alert(
         'Couldn’t update that like',
-        toUserFacingError(error, 'Please try again.')
+        toMutationError(error, 'Please try again.')
       );
     } finally {
       setLikingSpotId(null);
@@ -1178,15 +1169,12 @@ export default function HomeScreen() {
                     </Text>
                   </View>
                 ) : (
-                  savedSearchResults.map((school: School) => (
-                    <PopularSchoolCard
-                      key={school.id}
-                      school={school}
-                      isSaved
-                      onPress={handleSchoolPress}
-                      onToggleSave={handleFavoritePress}
-                    />
-                  ))
+                  <HomeSchoolStories
+                    schools={savedSearchResults}
+                    showHeader={false}
+                    onPress={handleSchoolPress}
+                    onToggleSave={handleFavoritePress}
+                  />
                 )}
               </View>
             ) : showRemoteSearchResults ? (
@@ -1270,7 +1258,11 @@ export default function HomeScreen() {
                   subtitle="Tap a campus to open its map"
                   isLoading={isLoadingPopular && popularSchools.length === 0}
                   loadingAccessibilityLabel="Loading popular schools"
-                  error={popularError}
+                  error={
+                    popularError && popularSchools.length > 0
+                      ? STALE_SCHOOLS_MESSAGE
+                      : popularError
+                  }
                   onRetry={() => {
                     setPopularError('');
                     setPopularRetryNonce((nonce) => nonce + 1);
@@ -1405,24 +1397,14 @@ export default function HomeScreen() {
                         />
                       ))}
                       {recentError ? (
-                        <View className="flex-row items-center rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2.5">
-                          <Text className="flex-1 pr-2 font-outfit-medium text-sm text-errorText">
-                            {recentError}
-                          </Text>
-                          <FeedbackPressable
-                            onPress={() => {
-                              setRecentError('');
-                              setRecentRetryNonce((nonce) => nonce + 1);
-                            }}
-                            className="rounded-xl bg-accent px-3 py-1.5"
-                            accessibilityRole="button"
-                            accessibilityLabel="Retry loading latest spots"
-                          >
-                            <Text className="font-outfit-bold text-sm text-brand">
-                              Retry
-                            </Text>
-                          </FeedbackPressable>
-                        </View>
+                        <StaleCacheBanner
+                          message={STALE_SPOTS_MESSAGE}
+                          onRetry={() => {
+                            setRecentError('');
+                            setRecentRetryNonce((nonce) => nonce + 1);
+                          }}
+                          retryAccessibilityLabel="Retry loading latest spots"
+                        />
                       ) : isLoadingMoreRecent ? (
                         <View className="items-center py-4">
                           <ActivityIndicator color={colors.accent} />

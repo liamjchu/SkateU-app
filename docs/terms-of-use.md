@@ -1,6 +1,6 @@
 # Terms of Use
 
-Last updated: August 22, 2026
+Last updated: August 25, 2026
 
 These Terms of Use (“Terms”) are the rules for using SkateU, a campus skate-spot app. In these Terms, “SkateU,” “we,” and “us” mean Liam Jahyun Chu, a sole proprietor doing business as SkateU in Virginia. These Terms apply to the SkateU mobile app and related SkateU services, including skateu.app.
 
@@ -68,7 +68,7 @@ When you upload a new spot photo, SkateU processes the file on our servers befor
 
 ## 5. Location and maps
 
-SkateU does not collect your device’s GPS location.
+SkateU may use your device’s GPS location on the device, while you are using the app, to show you on campus maps. We do not store that GPS on our servers.
 
 Campus maps are for finding schools and skate spots. When you add or edit a spot, you choose a pin on the map. We store those coordinates so other people can find the spot.
 

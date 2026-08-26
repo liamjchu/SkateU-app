@@ -13,15 +13,12 @@
       "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "UIViewControllerBasedStatusBarAppearance": true
+        "UIViewControllerBasedStatusBarAppearance": true,
+        "NSLocationWhenInUseUsageDescription": "SkateU uses your location to show where you are on the campus map so you can place spots."
       }
     },
     "android": {
       "package": "app.skateu.mobile",
-      "blockedPermissions": [
-        "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION"
-      ],
       "adaptiveIcon": {
         "backgroundColor": "#F7F4F0",
         "backgroundImage": "./assets/images/android-icon-background.png",
@@ -59,16 +56,19 @@
           "cameraPermission": "SkateU uses the camera so you can take pictures of skate spots."
         }
       ],
-      "expo-localization",
-      "expo-updates",
       [
-        "@sentry/react-native/expo",
+        "expo-location",
         {
-          "url": "https://sentry.io/",
-          "project": "react-native",
-          "organization": "skateu"
+          "locationWhenInUsePermission": "SkateU uses your location to show where you are on the campus map so you can place spots.",
+          "locationAlwaysPermission": false,
+          "locationAlwaysAndWhenInUsePermission": false,
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": false,
+          "isAndroidForegroundServiceEnabled": false
         }
-      ]
+      ],
+      "expo-localization",
+      "expo-updates"
     ],
     "runtimeVersion": {
       "policy": "appVersion"

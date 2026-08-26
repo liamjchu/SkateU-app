@@ -538,8 +538,6 @@ type SpotPageProps = {
   onDelete?: (spot: Spot) => void;
   onReportProblem?: (spot: Spot) => void;
   onRequestRemoval?: (spot: Spot) => void;
-  onPhotoZoneTouch: () => void;
-  onDetailsZoneTouch: () => void;
 };
 
 function SpotFullscreenPage({
@@ -568,8 +566,6 @@ function SpotFullscreenPage({
   onDelete,
   onReportProblem,
   onRequestRemoval,
-  onPhotoZoneTouch,
-  onDetailsZoneTouch,
 }: SpotPageProps) {
   const imageUris = spot.imageUris.filter((uri) => uri.length > 0);
   const [photoIndex, setPhotoIndex] = useState(initialPhotoIndex);
@@ -588,7 +584,7 @@ function SpotFullscreenPage({
 
   return (
     <View style={{ width, height }}>
-      <View style={styles.fill} onTouchStart={onPhotoZoneTouch}>
+      <View style={styles.fill}>
         <SpotPhotoStage
           uris={imageUris}
           name={spot.name}
@@ -612,7 +608,7 @@ function SpotFullscreenPage({
           </View>
         ) : null}
         {zoomed ? null : (
-          <View onTouchStart={onDetailsZoneTouch} style={styles.bottomWrap}>
+          <View style={styles.bottomWrap}>
             <SpotDetailsOverlay
               spot={spot}
               spotIndex={spotIndex}
@@ -676,7 +672,6 @@ export default function SpotFullscreenViewer({
   const { width, height } = useWindowDimensions();
   const listRef = useRef<FlatList<Spot>>(null);
   const lastSpotIdRef = useRef<string | null>(null);
-  const [spotPagerEnabled, setSpotPagerEnabled] = useState(true);
   const startIndex = Math.max(
     0,
     spots.findIndex((spot) => spot.id === initialSpotId)
@@ -710,13 +705,11 @@ export default function SpotFullscreenViewer({
   useEffect(() => {
     if (!visible) {
       lastSpotIdRef.current = null;
-      setSpotPagerEnabled(true);
       return;
     }
 
     lastSpotIdRef.current = initialSpotId;
     setSpotIndex(startIndex);
-    setSpotPagerEnabled(true);
   }, [initialSpotId, startIndex, visible]);
 
   useEffect(() => {
@@ -761,7 +754,6 @@ export default function SpotFullscreenViewer({
         return;
       }
 
-      setSpotPagerEnabled(true);
       listRef.current?.scrollToIndex({ index, animated: true });
       commitSpotIndex(index);
     },
@@ -813,8 +805,6 @@ export default function SpotFullscreenViewer({
         onDelete={onDelete}
         onReportProblem={onReportProblem}
         onRequestRemoval={onRequestRemoval}
-        onPhotoZoneTouch={() => setSpotPagerEnabled(false)}
-        onDetailsZoneTouch={() => setSpotPagerEnabled(true)}
       />
     ),
     [
@@ -880,7 +870,7 @@ export default function SpotFullscreenViewer({
           pagingEnabled
           nestedScrollEnabled
           directionalLockEnabled
-          scrollEnabled={spotPagerEnabled && spots.length > 1}
+          scrollEnabled={false}
           showsHorizontalScrollIndicator={false}
           initialScrollIndex={startIndex}
           getItemLayout={getItemLayout}

@@ -1,4 +1,4 @@
-import { sanitizeErrorMessage, toUserFacingError } from '../userFacingError';
+import { sanitizeErrorMessage, toMutationError, toUserFacingError } from '../userFacingError';
 
 describe('user-facing errors', () => {
   it('turns access-token jargon into a sign-in prompt', () => {
@@ -23,5 +23,11 @@ describe('user-facing errors', () => {
     expect(
       sanitizeErrorMessage('Request failed with status 502.', 'Try again in a sec.')
     ).toBe('Please try again.');
+  });
+
+  it('tells the user a connection is required when a save fails offline', () => {
+    expect(
+      toMutationError(new Error('Network request failed'), 'Please try again.')
+    ).toBe('You need a connection to save this.');
   });
 });

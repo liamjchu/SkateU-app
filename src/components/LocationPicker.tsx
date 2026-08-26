@@ -1,4 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { useIsFocused } from '@react-navigation/native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Image,
@@ -11,6 +13,13 @@ import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import IMAGES from '../constants/images';
 import { colors } from '../constants/colors';
 import { useIsTabletLayout } from '../hooks/useIsTabletLayout';
+import { useUserLocation } from '../hooks/useUserLocation';
+import { goToMyLocation } from '../lib/goToMyLocation';
+import {
+    buildGoToUserLocationJavascript,
+    buildSetUserLocationJavascript,
+    CLEAR_USER_LOCATION_JAVASCRIPT,
+} from '../lib/leafletUserLocation';
 import { buildLocationPickerHtml } from '../lib/locationPickerMap';
 import type { MapLayer } from '../store/mapViewStore';
 import FeedbackPressable from './FeedbackPressable';
@@ -55,12 +64,18 @@ export default function LocationPicker({
   onInteractionChange,
 }: LocationPickerProps) {
   const isTabletLayout = useIsTabletLayout();
+  const isFocused = useIsFocused();
   const webViewRef = useRef<WebView>(null);
   const mapLayerRef = useRef<LayerType>(initialLayer);
   const [mapLayer, setMapLayer] = useState<LayerType>(initialLayer);
   const [webViewAttempt, setWebViewAttempt] = useState(0);
   const [mapStatus, setMapStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [mapError, setMapError] = useState('');
+  const {
+    coords: userLocation,
+    status: userLocationStatus,
+    requestPermission: requestUserLocationPermission,
+  } = useUserLocation(isFocused && mapStatus === 'ready');
 
   const initialRef = useRef({
     latitude: initialLatitude,
@@ -83,6 +98,36 @@ export default function LocationPicker({
   useEffect(() => {
     onStatusChange?.(mapStatus, mapError);
   }, [mapError, mapStatus, onStatusChange]);
+
+  useEffect(() => {
+    if (mapStatus !== 'ready') {
+      return;
+    }
+
+    if (!userLocation) {
+      webViewRef.current?.injectJavaScript(CLEAR_USER_LOCATION_JAVASCRIPT);
+      return;
+    }
+
+    webViewRef.current?.injectJavaScript(
+      buildSetUserLocationJavascript(
+        userLocation.latitude,
+        userLocation.longitude,
+        userLocation.accuracy
+      )
+    );
+  }, [mapStatus, userLocation]);
+
+  const handleGoToMyLocation = useCallback(() => {
+    void goToMyLocation({
+      status: userLocationStatus,
+      hasCoords: Boolean(userLocation),
+      requestPermission: requestUserLocationPermission,
+      onGoToLocation: () => {
+        webViewRef.current?.injectJavaScript(buildGoToUserLocationJavascript());
+      },
+    });
+  }, [requestUserLocationPermission, userLocation, userLocationStatus]);
 
   const html = useMemo(
     () => buildLocationPickerHtml(initialRef.current),
@@ -230,6 +275,27 @@ export default function LocationPicker({
               </>
             )}
           </View>
+        ) : null}
+        {mapStatus === 'ready' ? (
+          <FeedbackPressable
+            haptic="light"
+            onPress={handleGoToMyLocation}
+            className="absolute left-3 top-3 z-10 h-11 w-11 items-center justify-center rounded-full bg-white"
+            style={styles.mapControl}
+            accessibilityRole="button"
+            accessibilityLabel="Go to my location"
+            accessibilityHint="Moves the pin to your current location"
+            accessibilityState={{
+              busy:
+                userLocationStatus === 'requesting' && userLocation == null,
+            }}
+          >
+            {userLocationStatus === 'requesting' && userLocation == null ? (
+              <ActivityIndicator color={colors.brand} />
+            ) : (
+              <Ionicons name="locate" size={20} color={colors.brand} />
+            )}
+          </FeedbackPressable>
         ) : null}
         {mapStatus === 'ready' ? (
           <FeedbackPressable

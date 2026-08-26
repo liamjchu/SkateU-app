@@ -16,15 +16,18 @@ import Animated, {
     useSharedValue,
     withTiming
 } from 'react-native-reanimated';
+import CachedRemoteImage from '../components/CachedRemoteImage';
 import ExpandableText from '../components/expandable-text';
 import FeedbackPressable from '../components/FeedbackPressable';
 import ScreenHeader from '../components/screen-header';
+import StaleCacheBanner from '../components/StaleCacheBanner';
 import SocialLinks from '../components/social-links';
 import { colors } from '../constants/colors';
 import { triggerHaptic } from '../lib/haptics';
 import { formatRelativeTime } from '../lib/relativeTime';
 import { draftsForUser, getDraftStatusHint } from '../lib/spotDraft';
-import { toUserFacingError } from '../lib/userFacingError';
+import { STALE_SPOTS_MESSAGE } from '../lib/readCache';
+import { toMutationError } from '../lib/userFacingError';
 import { guardedNavigate } from '../lib/navigationGuard';
 import { useAuthStore } from '../store/authStore';
 import { useDraftSpotsStore } from '../store/draftSpotsStore';
@@ -206,7 +209,7 @@ export default function ProfileScreen() {
     } catch (error) {
       Alert.alert(
         'Couldn’t unlike that spot',
-        toUserFacingError(error, 'Try again in a sec.')
+        toMutationError(error, 'Try again in a sec.')
       );
     } finally {
       setLikingId(null);
@@ -257,7 +260,7 @@ export default function ProfileScreen() {
             } catch (error) {
               Alert.alert(
                 'Couldn’t delete that spot',
-                toUserFacingError(error, 'Try again in a sec.')
+                toMutationError(error, 'Try again in a sec.')
               );
             } finally {
               setDeletingId(null);
@@ -489,22 +492,12 @@ export default function ProfileScreen() {
             </View>
           )
         ) : displayedError && displayedSpots.length > 0 ? (
-          <View className="mt-4 flex-row items-center rounded-2xl border border-errorBorder bg-errorSurface px-4 py-3">
-            <Text
-              accessibilityRole="alert"
-              accessibilityLiveRegion="polite"
-              className="flex-1 pr-3 font-outfit-medium text-sm text-errorText"
-            >
-              {displayedError} Showing what we already had.
-            </Text>
-            <FeedbackPressable
-              onPress={handleRetryDisplayedSpots}
-              className="rounded-xl bg-accent px-3 py-2"
-              accessibilityRole="button"
-              accessibilityLabel={`Retry loading ${showingLikedSpots ? 'liked' : 'created'} spots`}
-            >
-              <Text className="font-outfit-bold text-xs text-brand">Retry</Text>
-            </FeedbackPressable>
+          <View className="mt-4">
+            <StaleCacheBanner
+              message={STALE_SPOTS_MESSAGE}
+              onRetry={handleRetryDisplayedSpots}
+              retryAccessibilityLabel={`Retry loading ${showingLikedSpots ? 'liked' : 'created'} spots`}
+            />
           </View>
         ) : null}
 
@@ -561,10 +554,9 @@ export default function ProfileScreen() {
                   accessibilityHint="Opens the campus map and selects this spot"
                 >
                   {spot.imageUris.length > 0 ? (
-                    <Image
-                      source={{ uri: spot.imageUris[0] }}
+                    <CachedRemoteImage
+                      uri={spot.imageUris[0]}
                       className="h-16 w-16 rounded-xl"
-                      resizeMode="cover"
                       accessible={false}
                     />
                   ) : (

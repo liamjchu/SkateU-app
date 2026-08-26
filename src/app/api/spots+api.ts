@@ -1,3 +1,4 @@
+import { deferTask } from 'expo-server';
 import { HOME_RAIL_PAGE_SIZE, parseOffset } from '../../lib/homeFeed';
 import {
     IMAGE_SANITIZE_ERROR,
@@ -45,24 +46,105 @@ const RECENT_SPOT_SELECT_COLUMNS =
   'id,school_id,created_by_user_id,name,description,latitude,longitude,image_urls,created_at,updated_at,likes_count,comments_count,schools!inner(name,city,state,type),creator:profiles(username)';
 const VALID_SCHOOL_TYPES = ['k12_public', 'k12_private', 'higher_ed'] as const;
 
+export const PENDING_SPOT_STATUS = 'pending_moderation';
 export const HIDDEN_SPOT_STATUS = 'removed';
-export const VISIBLE_SPOT_STATUS_FILTER = `neq.${HIDDEN_SPOT_STATUS}`;
+export const VISIBLE_SPOT_STATUSES = ['active', 'under_review'] as const;
+export const VISIBLE_SPOT_STATUS_FILTER = `in.(${VISIBLE_SPOT_STATUSES.join(',')})`;
 
-export type SpotModerationStatus = 'active' | 'under_review' | 'removed';
+export type SpotModerationStatus =
+  | 'active'
+  | 'under_review'
+  | 'pending_moderation'
+  | 'removed';
 
 export function parseSpotStatus(value: unknown): SpotModerationStatus {
-  if (value === 'under_review' || value === 'removed') {
+  if (
+    value === 'under_review' ||
+    value === 'removed' ||
+    value === 'pending_moderation'
+  ) {
     return value;
   }
   return 'active';
+}
+
+export function isPublicSpotStatus(status: unknown): boolean {
+  const parsed = parseSpotStatus(status);
+  return parsed === 'active' || parsed === 'under_review';
 }
 
 export function isRemovedSpotStatus(status: unknown): boolean {
   return parseSpotStatus(status) === 'removed';
 }
 
+export function isHiddenSpotStatus(status: unknown): boolean {
+  return !isPublicSpotStatus(status);
+}
+
 export function applyVisibleSpotFilter(query: URL): void {
   query.searchParams.set('status', VISIBLE_SPOT_STATUS_FILTER);
+}
+
+export function scheduleAfterResponse(task: () => Promise<unknown> | void): void {
+  try {
+    deferTask(task);
+  } catch {
+    void Promise.resolve().then(task);
+  }
+}
+
+async function patchPendingSpotStatus(
+  config: SupabaseConfig,
+  spotId: string,
+  status: 'active' | 'removed'
+): Promise<void> {
+  const query = new URL(`${config.url}/rest/v1/spots`);
+  query.searchParams.set('id', `eq.${spotId}`);
+  query.searchParams.set('status', `eq.${PENDING_SPOT_STATUS}`);
+
+  const response = await fetch(query.toString(), {
+    method: 'PATCH',
+    headers: {
+      apikey: config.apiKey,
+      Authorization: `Bearer ${config.apiKey}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=minimal',
+    },
+    body: JSON.stringify({ status }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+}
+
+export async function finalizePendingSpotModeration(
+  config: SupabaseConfig,
+  spotId: string,
+  input: { title: string; description: string; imageUrls: string[] }
+): Promise<void> {
+  let verdict: SpotModerationVerdict;
+  try {
+    verdict = await moderateSpotSubmission(input);
+  } catch (firstError) {
+    console.error('Spot moderation failed after create, retrying:', firstError);
+    try {
+      verdict = await moderateSpotSubmission(input);
+    } catch (secondError) {
+      console.error(
+        'Spot moderation failed after create retry; leaving pending:',
+        secondError
+      );
+      return;
+    }
+  }
+
+  const nextStatus = verdict.approved ? 'active' : 'removed';
+  try {
+    await patchPendingSpotStatus(config, spotId, nextStatus);
+  } catch (error) {
+    console.error('Updating pending spot status failed:', error);
+  }
 }
 
 /**
@@ -141,6 +223,7 @@ export type DatabaseSpotInsert = {
   latitude: number;
   longitude: number;
   image_urls: string[];
+  status: SpotModerationStatus;
 };
 
 /**
@@ -254,6 +337,7 @@ export function buildInsertRecord(
     latitude: body.latitude,
     longitude: body.longitude,
     image_urls: imageUrls,
+    status: PENDING_SPOT_STATUS,
   };
 }
 
@@ -1053,27 +1137,6 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: sanitizedImages.message }, { status: 400 });
   }
 
-  try {
-    const imageUrls = await Promise.all(
-      sanitizedImages.value.map(imageFileToDataUrl)
-    );
-    const moderation = await moderateSpotSubmission({
-      title: bodyValidation.value.name,
-      description: bodyValidation.value.description,
-      imageUrls,
-    });
-
-    if (!moderation.approved) {
-      return moderationRejectionResponse(moderation);
-    }
-  } catch (error) {
-    console.error('Spot moderation failed before create:', error);
-    return Response.json(
-      { error: 'Content check is paused. Try again in a sec.' },
-      { status: 503 }
-    );
-  }
-
   let imageUrls: string[];
   try {
     imageUrls = await uploadImages(
@@ -1115,6 +1178,17 @@ export async function POST(request: Request): Promise<Response> {
     if (!created) {
       throw new Error('Insert returned no representation.');
     }
+
+    const createdId = created.id;
+    const title = bodyValidation.value.name;
+    const description = bodyValidation.value.description;
+    scheduleAfterResponse(() =>
+      finalizePendingSpotModeration(config, createdId, {
+        title,
+        description,
+        imageUrls,
+      })
+    );
 
     return Response.json({ spot: mapSpot(created) }, { status: 201 });
   } catch (error) {
@@ -1188,7 +1262,7 @@ export async function PATCH(request: Request): Promise<Response> {
     );
   }
 
-  if (!ownership.found || ownership.status === 'removed') {
+  if (!ownership.found || isHiddenSpotStatus(ownership.status)) {
     return Response.json({ error: 'That spot no longer exists.' }, { status: 404 });
   }
   if (ownership.ownerId !== auth.userId) {
@@ -1395,7 +1469,7 @@ export async function DELETE(request: Request): Promise<Response> {
     // Already gone — treat as success so the client can drop it locally.
     return Response.json({ success: true });
   }
-  if (ownership.status === 'removed') {
+  if (isHiddenSpotStatus(ownership.status)) {
     return Response.json({ error: 'That spot no longer exists.' }, { status: 404 });
   }
   if (ownership.ownerId !== auth.userId) {

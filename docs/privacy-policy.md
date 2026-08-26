@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: August 22, 2026
+Last updated: August 25, 2026
 
 This Privacy Policy explains what information SkateU collects, how it is used, and the choices you have. It covers the SkateU mobile app and the SkateU website at skateu.app.
 
@@ -10,7 +10,7 @@ If you have questions, email [support@skateu.app](mailto:support@skateu.app).
 
 ## 1. Information we collect
 
-We collect the information described below. We do not collect your device’s GPS location, and we do not use advertising trackers in the app. If a product-analytics SDK is configured for your build (currently PostHog), the app may send screen views and feature events. If crash reporting is configured for your build, the app may send crash reports to a crash-reporting provider.
+We collect the information described below. We do not use advertising trackers in the app. If you allow it, the app may use your device’s GPS location on the device to show you on campus maps. We do not store that GPS on our servers. If a product-analytics SDK is configured for your build (currently PostHog), the app may send screen views and feature events. If crash reporting is configured for your build, the app may send crash reports to a crash-reporting provider.
 
 ### Account information
 
@@ -46,14 +46,14 @@ Photos are stored so other people can see the spot. When you upload a new spot p
 
 ### Location
 
-SkateU does not request or collect GPS from your device.
+When you open a campus map or the map used to add or edit a spot, SkateU may ask for location permission while you are using the app. If you allow it, the app uses your GPS on the device to show where you are and to move the map to you. Those coordinates stay on your device. We do not send your GPS to SkateU servers, and we do not send it to PostHog. You can deny location access and still browse maps and place spots by panning the map.
 
 We do store:
 
 - Coordinates for schools in our school directory
 - Coordinates you choose when you place a spot pin on the map
 
-Those pin coordinates are part of the public spot.
+Those pin coordinates are part of the public spot. They come from the pin you place, not from an automatic upload of your GPS.
 
 ### Information on your device
 
@@ -76,7 +76,6 @@ The website may also save the waitlist email you typed in your browser’s local
 
 The SkateU mobile app does not currently collect:
 
-- Precise GPS
 - Advertising identifiers
 
 ### Product analytics
@@ -106,6 +105,7 @@ We use this information to:
 - Create and maintain your account
 - Confirm that you are eligible to have an account
 - Show schools, maps, spots, photos, comments, and likes
+- Show your location on campus maps on your device when you allow location access
 - Let you add, edit, like, comment on, request removal of spots, report comments, and block other accounts
 - Hide spots and comments from people you blocked
 - Moderate usernames, spots, photos, comments, and Help & Support submissions

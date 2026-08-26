@@ -1,6 +1,13 @@
 import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import { getApiUrl } from '../lib/api';
+import { getClientStorage } from '../lib/clientStorage';
 import { PROFILE_PUBLIC_SELECT_COLUMNS } from '../lib/legalAcceptance';
+import {
+  parseProfile,
+  PROFILE_CACHE_KEY,
+  readPersistedRecord,
+} from '../lib/readCache';
 import { supabase } from '../lib/supabase';
 import { sanitizeErrorMessage } from '../lib/userFacingError';
 import { mapProfile, type Profile } from '../types/profile';
@@ -29,6 +36,8 @@ type ProfileState = {
   loaded: boolean;
   // A transient fetch failure is distinct from a valid missing profile.
   error: string | null;
+  hasHydrated: boolean;
+  setHasHydrated: (hasHydrated: boolean) => void;
 
   fetchProfile: (userId: string, accessToken?: string | null) => Promise<void>;
   clearProfile: () => void;
@@ -48,16 +57,29 @@ const USERNAME_MODERATION_TIMEOUT_MS = 10_000;
 
 let profileRequestVersion = 0;
 
-export const useProfileStore = create<ProfileState>((set, get) => ({
+const PROFILE_LOAD_FAILED =
+  'We couldn’t load your profile right now. Please try again.';
+
+export const useProfileStore = create<ProfileState>()(
+  persist(
+    (set, get) => ({
   profile: null,
   welcomeAboardUserId: null,
   loading: false,
   loaded: false,
   error: null,
+  hasHydrated: false,
+  setHasHydrated: (hasHydrated) => set({ hasHydrated }),
 
   fetchProfile: async (userId, accessToken) => {
     const requestVersion = ++profileRequestVersion;
-    set({ profile: null, loading: true, loaded: false, error: null });
+    const cached = get().profile?.id === userId ? get().profile : null;
+    set({
+      profile: cached,
+      loading: cached === null,
+      loaded: cached !== null,
+      error: null,
+    });
 
     const { data, error } = await supabase
       .from('profiles')
@@ -72,10 +94,10 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     if (error) {
       console.warn('Failed to load profile', error.message);
       set({
-        profile: null,
+        profile: cached,
         loading: false,
-        loaded: false,
-        error: 'We couldn’t load your profile right now. Please try again.',
+        loaded: cached !== null,
+        error: PROFILE_LOAD_FAILED,
       });
       return;
     }
@@ -131,10 +153,10 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
 
       console.warn('Failed to load legal acceptance', legalError);
       set({
-        profile: null,
+        profile: cached,
         loading: false,
-        loaded: false,
-        error: 'We couldn’t load your profile right now. Please try again.',
+        loaded: cached !== null,
+        error: PROFILE_LOAD_FAILED,
       });
     }
   },
@@ -298,4 +320,26 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
       clearTimeout(timeout);
     }
   },
-}));
+    }),
+    {
+      name: PROFILE_CACHE_KEY,
+      storage: createJSONStorage(getClientStorage),
+      skipHydration: true,
+      onRehydrateStorage: () => () => {
+        useProfileStore.getState().setHasHydrated(true);
+      },
+      partialize: (state) => ({
+        profile: state.profile,
+      }),
+      merge: (persistedState, currentState) => {
+        const persisted = readPersistedRecord(persistedState);
+        const profile = parseProfile(persisted.profile);
+        return {
+          ...currentState,
+          profile,
+          loaded: profile !== null,
+        };
+      },
+    }
+  )
+);

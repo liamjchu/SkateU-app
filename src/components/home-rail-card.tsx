@@ -1,7 +1,8 @@
 import { Feather } from '@expo/vector-icons';
 import { useRef, type ReactNode } from 'react';
-import { ActivityIndicator, Image, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { colors } from '../constants/colors';
+import CachedRemoteImage from './CachedRemoteImage';
 import FeedbackPressable from './FeedbackPressable';
 
 type HomeRailCardProps = {
@@ -33,10 +34,10 @@ export default function HomeRailCard({
           accessibilityLabel={accessibilityLabel}
         >
           {imageUrl ? (
-            <Image
-              source={{ uri: imageUrl }}
+            <CachedRemoteImage
+              uri={imageUrl}
               className="h-32 w-full bg-surface-soft"
-              resizeMode="cover"
+              style={{ height: 128, width: '100%' }}
               accessible={false}
             />
           ) : (

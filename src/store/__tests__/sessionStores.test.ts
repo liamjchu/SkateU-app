@@ -1,3 +1,7 @@
+jest.mock('@react-native-async-storage/async-storage', () =>
+  require('@react-native-async-storage/async-storage/jest/async-storage-mock')
+);
+
 import { useAgeEligibilityStore } from '../ageEligibilityStore';
 import { useMapViewStore } from '../mapViewStore';
 import { useSchools } from '../schoolsStore';
@@ -42,5 +46,13 @@ describe('schoolsStore', () => {
     useSchools.getState().upsertSchool(schoolA);
     useSchools.getState().upsertSchool(schoolAUpdated);
     expect(useSchools.getState().schools).toEqual([schoolAUpdated]);
+  });
+
+  it('keeps popular schools with the filter they were fetched for', () => {
+    useSchools.setState({ schools: [], popularSchools: [], popularFilter: null });
+    useSchools.getState().setPopularFeed('college', [schoolA]);
+    expect(useSchools.getState().popularFilter).toBe('college');
+    expect(useSchools.getState().popularSchools).toEqual([schoolA]);
+    expect(useSchools.getState().schools).toEqual([schoolA]);
   });
 });

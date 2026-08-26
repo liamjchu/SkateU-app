@@ -13,9 +13,14 @@ type LayerMock = {
 
 type MapMock = {
   activeLayers: Set<LayerMock>;
-  setView: (center: [number, number], zoom: number) => MapMock;
+  setView: (
+    center: [number, number] | { lat: number; lng: number },
+    zoom: number,
+    options?: object
+  ) => MapMock;
   removeLayer: (layer: LayerMock) => void;
   getCenter: () => { lat: number; lng: number };
+  getZoom: () => number;
   on: (event: string, handler: () => void) => void;
 };
 
@@ -24,6 +29,12 @@ type TestWindow = Window &
     L: {
       map: (elementId: string, options: object) => MapMock;
       tileLayer: (url: string) => LayerMock;
+      latLng: (lat: number, lng: number) => { lat: number; lng: number };
+      circle: (
+        latlng: { lat: number; lng: number },
+        options: { radius: number }
+      ) => unknown;
+      circleMarker: (latlng: { lat: number; lng: number }) => unknown;
       DomEvent: {
         disableClickPropagation: (element: HTMLElement) => void;
         disableScrollPropagation: (element: HTMLElement) => void;
@@ -33,6 +44,9 @@ type TestWindow = Window &
     currentLayer: LayerMock;
     setMapLayer: (layer: LocationMapLayer) => void;
     toggleLayer: () => void;
+    setUserLocation: (lat: number, lng: number, accuracy: number) => void;
+    clearUserLocation: () => void;
+    goToUserLocation: (zoom?: number) => void;
   };
 
 type Harness = {
@@ -62,6 +76,7 @@ function installMap(initialLayer: LocationMapLayer = 'default'): Harness {
       map.activeLayers.delete(layer);
     },
     getCenter: () => ({ lat: 41.8268, lng: -71.401 }),
+    getZoom: () => 15.5,
     on: () => undefined,
   };
   const messages: Harness['messages'] = [];
@@ -71,6 +86,33 @@ function installMap(initialLayer: LocationMapLayer = 'default'): Harness {
     map: () => map,
     tileLayer: (url) =>
       createLayer(url.includes('World_Imagery') ? 'satellite' : 'default'),
+    latLng: (lat: number, lng: number) => ({ lat, lng }),
+    circle: (latlng: { lat: number; lng: number }, options: { radius: number }) => {
+      const layer = {
+        id: 'default' as LocationMapLayer,
+        latlng,
+        radius: options.radius,
+        addTo: () => layer,
+        setLatLng: (next: { lat: number; lng: number }) => {
+          layer.latlng = next;
+        },
+        setRadius: (radius: number) => {
+          layer.radius = radius;
+        },
+      };
+      return layer;
+    },
+    circleMarker: (latlng: { lat: number; lng: number }) => {
+      const layer = {
+        id: 'default' as LocationMapLayer,
+        latlng,
+        addTo: () => layer,
+        setLatLng: (next: { lat: number; lng: number }) => {
+          layer.latlng = next;
+        },
+      };
+      return layer;
+    },
     DomEvent: {
       disableClickPropagation: () => undefined,
       disableScrollPropagation: () => undefined,
@@ -156,5 +198,21 @@ describe('location picker map layers', () => {
       ),
       { numRuns: 100 }
     );
+  });
+
+  it('pans to a stored user location without changing layers', () => {
+    const harness = installMap();
+    const setView = jest.fn(() => harness.map);
+    harness.map.setView = setView;
+
+    harness.testWindow.setUserLocation(41.83, -71.4, 10);
+    harness.testWindow.goToUserLocation();
+
+    expect(setView).toHaveBeenCalledWith(
+      { lat: 41.83, lng: -71.4 },
+      15.5,
+      { animate: true }
+    );
+    expectLayer(harness, 'default');
   });
 });

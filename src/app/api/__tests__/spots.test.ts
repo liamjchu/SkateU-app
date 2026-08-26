@@ -13,15 +13,19 @@ import {
     DatabaseSpot,
     DELETE,
     DESCRIPTION_MAX,
+    finalizePendingSpotModeration,
     GET,
+    isHiddenSpotStatus,
     mapSpot,
     MAX_IMAGE_BYTES,
     MAX_IMAGES,
     MAX_SCHOOL_ID_LENGTH,
     NAME_MAX,
     PATCH,
+    parseSpotStatus,
     POST,
     parseImageOrder,
+    PENDING_SPOT_STATUS,
     resolveImageOrder,
     sanitizeUploadedImages,
     SpotImageFile,
@@ -31,8 +35,24 @@ import {
     validatePatchBody,
     validatePostBody,
     validateSchoolId,
-    validateSpotId
+    validateSpotId,
+    VISIBLE_SPOT_STATUS_FILTER
 } from '../spots+api';
+
+const mockDeferredTasks: Array<() => Promise<unknown> | void> = [];
+
+jest.mock('expo-server', () => ({
+  deferTask: (fn: () => Promise<unknown> | void) => {
+    mockDeferredTasks.push(fn);
+  },
+}));
+
+async function flushDeferredSpotModeration(): Promise<void> {
+  const tasks = mockDeferredTasks.splice(0, mockDeferredTasks.length);
+  for (const task of tasks) {
+    await task();
+  }
+}
 
 // --- Test helpers -----------------------------------------------------------
 
@@ -92,6 +112,7 @@ function requestBodyBytes(body: BodyInit | null | undefined): Uint8Array {
 }
 
 afterEach(() => {
+  mockDeferredTasks.length = 0;
   global.fetch = originalFetch;
   process.env = { ...originalEnv };
   jest.restoreAllMocks();
@@ -279,6 +300,7 @@ describe('buildInsertRecord', () => {
 
           const record = buildInsertRecord(bodyWithClientId, verifiedUserId, imageUrls);
           expect(record.created_by_user_id).toBe(verifiedUserId);
+          expect(record.status).toBe(PENDING_SPOT_STATUS);
         }
       ),
       { numRuns: 100 }
@@ -409,7 +431,7 @@ describe('GET /api/spots', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ spots: [] });
     const spotsUrl = new URL(String(fetchMock.mock.calls[0][0]));
-    expect(spotsUrl.searchParams.get('status')).toBe('neq.removed');
+    expect(spotsUrl.searchParams.get('status')).toBe(VISIBLE_SPOT_STATUS_FILTER);
   });
 
   it('filters blocked creators when a bearer token is present', async () => {
@@ -539,7 +561,7 @@ describe('GET /api/spots', () => {
     expect(fetchMock).toHaveBeenCalled();
     const recentUrl = new URL(String(fetchMock.mock.calls[0][0]));
     expect(recentUrl.searchParams.get('order')).toBe('created_at.desc,id.desc');
-    expect(recentUrl.searchParams.get('status')).toBe('neq.removed');
+    expect(recentUrl.searchParams.get('status')).toBe(VISIBLE_SPOT_STATUS_FILTER);
   });
 
   it('filters recent spots by school type and includes offset', async () => {
@@ -787,6 +809,36 @@ describe('POST /api/spots', () => {
     expect(response.status).toBe(201);
     const body = (await response.json()) as { spot: { id: string } };
     expect(body.spot.id).toBe('spot1');
+    expect(
+      fetchMock.mock.calls.some((call) =>
+        call[0].toString().includes('api.openai.com')
+      )
+    ).toBe(false);
+
+    const insertCall = fetchMock.mock.calls.find(
+      (call) =>
+        call[0].toString().includes('/rest/v1/spots') &&
+        call[1]?.method === 'POST'
+    );
+    expect(insertCall).toBeDefined();
+    const inserted = JSON.parse(String(insertCall?.[1]?.body)) as {
+      status: string;
+    };
+    expect(inserted.status).toBe(PENDING_SPOT_STATUS);
+
+    await flushDeferredSpotModeration();
+    expect(
+      fetchMock.mock.calls.some((call) =>
+        call[0].toString().includes('api.openai.com')
+      )
+    ).toBe(true);
+    const statusPatch = fetchMock.mock.calls.find((call) =>
+      call[0].toString().includes(`status=eq.${PENDING_SPOT_STATUS}`)
+    );
+    expect(statusPatch?.[1]?.method).toBe('PATCH');
+    expect(JSON.parse(String(statusPatch?.[1]?.body))).toEqual({
+      status: 'active',
+    });
   });
 
   it('returns 400 and does not upload when an image cannot be sanitized', async () => {
@@ -854,6 +906,11 @@ describe('POST /api/spots', () => {
       makePostRequest(form, { Authorization: 'Bearer good-token' })
     );
     expect(response.status).toBe(201);
+    expect(
+      fetchMock.mock.calls.some((call) =>
+        call[0].toString().includes('api.openai.com')
+      )
+    ).toBe(false);
 
     const storageCall = fetchMock.mock.calls.find((call) =>
       call[0].toString().includes('/storage/v1/object/spot-images/')
@@ -864,20 +921,20 @@ describe('POST /api/spots', () => {
     expect(containsAscii(uploaded, CAPTURE_TIME)).toBe(false);
     expect(containsAscii(original, CAMERA_MAKE)).toBe(true);
 
+    await flushDeferredSpotModeration();
     const openaiCall = fetchMock.mock.calls.find((call) =>
       call[0].toString().includes('api.openai.com')
     );
     const openaiBody = JSON.parse(String(openaiCall?.[1]?.body)) as {
       messages: { content: { type: string; image_url?: { url: string } }[] }[];
     };
-    const dataUrl = openaiBody.messages[1].content.find(
+    const imageUrl = openaiBody.messages[1].content.find(
       (part) => part.type === 'image_url'
     )?.image_url?.url;
-    expect(dataUrl).toEqual(expect.stringContaining('data:image/jpeg;base64,'));
-    const encoded = dataUrl?.slice('data:image/jpeg;base64,'.length) ?? '';
-    const moderated = Uint8Array.from(Buffer.from(encoded, 'base64'));
-    expect(containsAscii(moderated, CAMERA_MAKE)).toBe(false);
-    expect(containsAscii(moderated, CAPTURE_TIME)).toBe(false);
+    expect(imageUrl).toEqual(
+      expect.stringMatching(/\/storage\/v1\/object\/public\/spot-images\/school1\/.+\.jpg$/)
+    );
+    expect(imageUrl?.startsWith('data:')).toBe(false);
   });
 
   it('never includes the service-role key in any response body', async () => {
@@ -1229,7 +1286,9 @@ describe('GET /api/spots?mine=1', () => {
       call[0].toString().includes('created_by_user_id=eq.')
     );
     expect(listingCall?.[0].toString()).toContain('created_by_user_id=eq.user-1');
-    expect(listingCall?.[0].toString()).toContain('status=neq.removed');
+    expect(new URL(String(listingCall?.[0])).searchParams.get('status')).toBe(
+      VISIBLE_SPOT_STATUS_FILTER
+    );
   });
 });
 
@@ -1335,6 +1394,30 @@ describe('PATCH /api/spots', () => {
               created_by_user_id: 'user-1',
               school_id: 'school1',
               status: 'removed',
+            },
+          ])
+    ) as unknown as typeof fetch;
+
+    const response = await PATCH(
+      new Request('https://app.test/api/spots?id=spot1', {
+        method: 'PATCH',
+        headers: { Authorization: 'Bearer good-token' },
+        body: validPatchForm(),
+      })
+    );
+    expect(response.status).toBe(404);
+  });
+
+  it('returns 404 when the spot is still pending moderation', async () => {
+    setConfigured();
+    global.fetch = jest.fn(async (input) =>
+      input.toString().includes('/auth/v1/user')
+        ? jsonResponse({ id: 'user-1' })
+        : jsonResponse([
+            {
+              created_by_user_id: 'user-1',
+              school_id: 'school1',
+              status: PENDING_SPOT_STATUS,
             },
           ])
     ) as unknown as typeof fetch;
@@ -1640,5 +1723,87 @@ describe('DELETE /api/spots', () => {
       (call) => call[1]?.method === 'DELETE'
     );
     expect(deleteCall?.[0].toString()).toContain('id=eq.spot1');
+  });
+});
+
+describe('parseSpotStatus', () => {
+  it('keeps pending_moderation distinct from active', () => {
+    expect(parseSpotStatus('pending_moderation')).toBe('pending_moderation');
+    expect(parseSpotStatus('under_review')).toBe('under_review');
+    expect(parseSpotStatus('removed')).toBe('removed');
+    expect(parseSpotStatus('active')).toBe('active');
+    expect(parseSpotStatus('unknown')).toBe('active');
+    expect(isHiddenSpotStatus('pending_moderation')).toBe(true);
+    expect(isHiddenSpotStatus('removed')).toBe(true);
+    expect(isHiddenSpotStatus('active')).toBe(false);
+    expect(isHiddenSpotStatus('under_review')).toBe(false);
+  });
+});
+
+describe('finalizePendingSpotModeration', () => {
+  it('marks a rejected pending spot as removed', async () => {
+    setConfigured();
+    const fetchMock: FetchMock = jest.fn(async (input) => {
+      if (input.toString().includes('api.openai.com')) {
+        return jsonResponse({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  approved: false,
+                  flag: 'IRRELEVANT',
+                  reason: 'That photo is a meme.',
+                }),
+              },
+            },
+          ],
+        });
+      }
+      return jsonResponse({}, 200);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const config = {
+      url: 'https://project.supabase.co',
+      apiKey: 'service-role-secret-key',
+    };
+    await finalizePendingSpotModeration(config, 'spot1', {
+      title: 'Rail',
+      description: 'A nice rail',
+      imageUrls: ['https://img/meme.jpg'],
+    });
+
+    const statusPatch = fetchMock.mock.calls.find((call) =>
+      call[0].toString().includes(`status=eq.${PENDING_SPOT_STATUS}`)
+    );
+    expect(JSON.parse(String(statusPatch?.[1]?.body))).toEqual({
+      status: 'removed',
+    });
+  });
+
+  it('leaves the spot pending when moderation fails twice', async () => {
+    setConfigured();
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    const fetchMock: FetchMock = jest.fn(async (_input) =>
+      new Response('down', { status: 500 })
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const config = {
+      url: 'https://project.supabase.co',
+      apiKey: 'service-role-secret-key',
+    };
+    await finalizePendingSpotModeration(config, 'spot1', {
+      title: 'Rail',
+      description: 'A nice rail',
+      imageUrls: [],
+    });
+
+    expect(
+      fetchMock.mock.calls.some((call) =>
+        call[0].toString().includes('/rest/v1/spots')
+      )
+    ).toBe(false);
+    expect(errorSpy).toHaveBeenCalled();
   });
 });

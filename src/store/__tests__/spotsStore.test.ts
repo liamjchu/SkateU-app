@@ -1,5 +1,5 @@
 import fc from 'fast-check';
-import type { NewSpotInput, Spot } from '../../types/spot';
+import type { Spot } from '../../types/spot';
 import { useSpotsStore } from '../spotsStore';
 
 // The AsyncStorage native module is unavailable under Jest; use the library's
@@ -186,40 +186,16 @@ describe('spotsStore', () => {
     expect(state.loading).toBe(false);
   });
 
-  it('does not persist spots to AsyncStorage on fetch or add', async () => {
+  it('persists last campus spots after a successful fetch', async () => {
     const setItemSpy = jest.spyOn(AsyncStorage, 'setItem');
 
     fetchMock.mockResolvedValue(mockResponse({ spots: [] }));
     await useSpotsStore.getState().fetchSpots('school-1');
 
-    const created: Spot = {
-      id: 'spot-1',
-      name: 'Rail',
-      description: 'Round rail',
-      latitude: 1,
-      longitude: 2,
-      imageUris: [],
-      city: 'City',
-      state: 'ST',
-      schoolName: 'Some School',
-      creatorUsername: null,
-      createdAt: '2024-01-01T00:00:00.000Z',
-      updatedAt: '2024-01-01T00:00:00.000Z',
-    };
-    fetchMock.mockResolvedValue(mockResponse({ spot: created }, { status: 201 }));
-
-    const input: NewSpotInput = {
-      schoolId: 'school-1',
-      name: 'Rail',
-      description: 'Round rail',
-      latitude: 1,
-      longitude: 2,
-      images: [],
-    };
-    const result = await useSpotsStore.getState().addSpot(input, 'token-123');
-
-    expect(result).toEqual(created);
-    expect(setItemSpy).not.toHaveBeenCalled();
+    expect(setItemSpy.mock.calls.some(([key]) => key === '@skateu:spots-cache')).toBe(
+      true
+    );
+    expect(useSpotsStore.getState().spotsFetchedAt).not.toBeNull();
   });
 });
 
@@ -493,13 +469,31 @@ describe('spotsStore liked spots', () => {
 
   it('clears likes from loaded map and profile spots on sign out', () => {
     const liked = makeSpot({ likedByUser: true });
-    useSpotsStore.setState({ spots: [liked], mySpots: [liked], likedSpots: [liked], likedLoading: true, likedError: 'old error' });
+    useSpotsStore.setState({ spots: [liked], mySpots: [liked], likedSpots: [liked], recentSpots: [liked], likedLoading: true, likedError: 'old error' });
 
     useSpotsStore.getState().clearLikedSpots();
 
     expect(useSpotsStore.getState()).toMatchObject({ likedSpots: [], likedLoading: false, likedError: null });
     expect(useSpotsStore.getState().spots[0]?.likedByUser).toBe(false);
     expect(useSpotsStore.getState().mySpots[0]?.likedByUser).toBe(false);
+    expect(useSpotsStore.getState().recentSpots[0]?.likedByUser).toBe(false);
+  });
+
+  it('clears another user’s profile lists without dropping the campus cache', () => {
+    const spot = makeSpot({ schoolId: 'school-1' });
+    useSpotsStore.setState({
+      spots: [spot],
+      schoolId: 'school-1',
+      spotsFetchedAt: '2026-08-25T00:00:00.000Z',
+      mySpots: [spot],
+      mySpotsOwnerId: 'user-1',
+    });
+    useSpotsStore.getState().setSessionUserId('user-1');
+    expect(useSpotsStore.getState().mySpots).toHaveLength(1);
+
+    useSpotsStore.getState().setSessionUserId('user-2');
+    expect(useSpotsStore.getState().mySpots).toEqual([]);
+    expect(useSpotsStore.getState().spots).toHaveLength(1);
   });
 });
 

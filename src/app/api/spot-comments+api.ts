@@ -13,7 +13,7 @@ import type { SpotComment } from '../../types/comment';
 import {
     authUserMessage,
     getSupabaseConfig,
-    isRemovedSpotStatus,
+    isHiddenSpotStatus,
     resolveUserId,
     validateSpotId,
 } from './spots+api';
@@ -292,7 +292,7 @@ export async function GET(request: Request): Promise<Response> {
 
   try {
     const spot = await readSpotCommentCount(config, spotId);
-    if (!spot || isRemovedSpotStatus(spot.status)) {
+    if (!spot || isHiddenSpotStatus(spot.status)) {
       return Response.json({ error: 'That spot no longer exists.' }, { status: 404 });
     }
 
@@ -397,7 +397,7 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     const spot = await readSpotCommentCount(config, spotId);
-    if (!spot || isRemovedSpotStatus(spot.status)) {
+    if (!spot || isHiddenSpotStatus(spot.status)) {
       return Response.json({ error: 'That spot no longer exists.' }, { status: 404 });
     }
 

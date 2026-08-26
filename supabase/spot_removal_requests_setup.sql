@@ -42,7 +42,7 @@ begin
   ) then
     alter table public.spots
       add constraint spots_status_valid
-      check (status in ('active', 'under_review', 'removed'));
+      check (status in ('active', 'under_review', 'pending_moderation', 'removed'));
   end if;
 end;
 $$;

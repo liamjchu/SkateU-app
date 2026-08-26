@@ -103,11 +103,11 @@ export default function SpotCommentRow({
             accessibilityRole="button"
             accessibilityLabel={
               comment.creatorUsername
-                ? `Block @${comment.creatorUsername}`
-                : 'Block this skater'
+                ? `Hide spots from @${comment.creatorUsername}`
+                : 'Hide spots from this account'
             }
           >
-            <Text className="font-outfit-bold text-sm text-muted">Block</Text>
+            <Text className="font-outfit-bold text-sm text-muted">Hide</Text>
           </FeedbackPressable>
         ) : null}
       </View>

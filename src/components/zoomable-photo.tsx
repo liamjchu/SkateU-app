@@ -1,5 +1,6 @@
+import { Image as ExpoImage } from 'expo-image';
 import { useCallback, useEffect, useRef } from 'react';
-import { Image, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
     runOnJS,
@@ -17,7 +18,7 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-const AnimatedImage = Animated.createAnimatedComponent(Image);
+const AnimatedImage = Animated.createAnimatedComponent(ExpoImage);
 
 export type ZoomablePhotoProps = {
   uri: string;
@@ -219,7 +220,8 @@ export default function ZoomablePhoto({
           {uri.length > 0 ? (
             <AnimatedImage
               source={{ uri }}
-              resizeMode="contain"
+              contentFit="contain"
+              cachePolicy="disk"
               style={[{ width, height }, imageStyle]}
               accessible={false}
             />

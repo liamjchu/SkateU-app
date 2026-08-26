@@ -1,4 +1,5 @@
 import { colors } from '../constants/colors';
+import { getLeafletUserLocationScript } from './leafletUserLocation';
 
 export type LocationMapLayer = 'default' | 'satellite';
 
@@ -71,6 +72,7 @@ export function buildLocationPickerHtml({
           zoomControl: false,
           attributionControl: false,
         }).setView(center, 15.5);
+        ${getLeafletUserLocationScript()}
 
         const defaultLayer = L.tileLayer(
           'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'

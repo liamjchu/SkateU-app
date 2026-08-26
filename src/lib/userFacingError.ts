@@ -1,3 +1,5 @@
+import { CONNECTION_REQUIRED_SAVE } from './readCache';
+
 // Maps API/store exceptions into short copy a user can actually use.
 // Keep jargon (tokens, JWT, status codes) out of the UI.
 
@@ -10,6 +12,14 @@ export function toUserFacingError(error: unknown, fallback: string): string {
         : '';
 
   return sanitizeErrorMessage(raw, fallback);
+}
+
+export function toMutationError(error: unknown, fallback: string): string {
+  const message = toUserFacingError(error, fallback);
+  if (message === 'Check your connection and try again.') {
+    return CONNECTION_REQUIRED_SAVE;
+  }
+  return message;
 }
 
 function professionalize(text: string): string {

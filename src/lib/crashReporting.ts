@@ -1,14 +1,7 @@
-import type { ComponentType } from 'react';
 import * as Sentry from '@sentry/react-native';
 import * as Updates from 'expo-updates';
 
-const sentryDsn = process.env.EXPO_PUBLIC_SENTRY_DSN?.trim() ?? '';
-
-function applyUpdateContext(): void {
-  if (!sentryDsn) {
-    return;
-  }
-
+export function applyCrashReportingUpdateContext(): void {
   try {
     if (!Updates.isEnabled) {
       return;
@@ -26,24 +19,8 @@ function applyUpdateContext(): void {
   }
 }
 
-export function initCrashReporting(): void {
-  if (!sentryDsn) {
-    return;
-  }
-
-  Sentry.init({
-    dsn: sentryDsn,
-    sendDefaultPii: false,
-    tracesSampleRate: 0,
-    enableAutoSessionTracking: true,
-    replaysSessionSampleRate: 0,
-    replaysOnErrorSampleRate: 0,
-  });
-  applyUpdateContext();
-}
-
 export function setCrashReportingUser(userId: string): void {
-  if (!sentryDsn || !userId) {
+  if (!userId) {
     return;
   }
 
@@ -51,17 +28,5 @@ export function setCrashReportingUser(userId: string): void {
 }
 
 export function clearCrashReportingUser(): void {
-  if (!sentryDsn) {
-    return;
-  }
-
   Sentry.setUser(null);
-}
-
-export function wrapRoot(Root: ComponentType): ComponentType {
-  if (!sentryDsn) {
-    return Root;
-  }
-
-  return Sentry.wrap(Root as ComponentType<Record<string, unknown>>);
 }

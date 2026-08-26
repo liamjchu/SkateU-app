@@ -1,3 +1,7 @@
+jest.mock('@react-native-async-storage/async-storage', () =>
+  require('@react-native-async-storage/async-storage/jest/async-storage-mock')
+);
+
 process.env.EXPO_PUBLIC_API_URL = 'http://localhost:8081';
 
 type QueryResult = { data: unknown; error: { message: string } | null };
@@ -121,6 +125,35 @@ describe('profileStore.fetchProfile', () => {
     );
     await useProfileStore.getState().fetchProfile('user-1', 'token');
     expect(useProfileStore.getState().loaded).toBe(false);
+    expect(useProfileStore.getState().error).toContain('couldn’t load your profile');
+  });
+
+  it('keeps a cached profile when a refresh fails', async () => {
+    useProfileStore.setState({
+      profile: {
+        id: 'user-1',
+        username: 'liam',
+        avatar_url: null,
+        updated_at: '2026-08-21T00:00:00.000Z',
+        legal_version: '2026-08-20',
+        legal_accepted_at: '2026-08-21T00:00:00.000Z',
+        age_attested_at: '2026-08-21T00:00:00.000Z',
+      },
+      loaded: true,
+      loading: false,
+      error: null,
+    });
+    mockFrom.mockReturnValue(
+      createQuery({ data: null, error: { message: 'permission denied' } })
+    );
+
+    await useProfileStore.getState().fetchProfile('user-1', 'token');
+
+    expect(useProfileStore.getState()).toMatchObject({
+      loaded: true,
+      loading: false,
+      profile: { id: 'user-1', username: 'liam' },
+    });
     expect(useProfileStore.getState().error).toContain('couldn’t load your profile');
   });
 
