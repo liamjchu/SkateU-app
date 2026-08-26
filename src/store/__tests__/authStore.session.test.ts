@@ -116,6 +116,31 @@ describe('authStore.init', () => {
       initializing: false,
     });
   });
+
+  it('handles a thrown restore and password-recovery events', async () => {
+    mockGetSession.mockRejectedValue(new Error('boom'));
+    let authHandler:
+      | ((event: string, session: { user: { id: string } } | null) => void)
+      | undefined;
+    mockOnAuthStateChange.mockImplementation((handler: unknown) => {
+      authHandler = handler as typeof authHandler;
+      return { data: { subscription: { unsubscribe: jest.fn() } } };
+    });
+
+    useAuthStore.getState().init();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(useAuthStore.getState().initializing).toBe(false);
+
+    authHandler?.('PASSWORD_RECOVERY', { user: { id: 'user-1' } });
+    expect(useAuthStore.getState().passwordRecovery).toBe(true);
+    authHandler?.('SIGNED_OUT', null);
+    expect(useAuthStore.getState()).toMatchObject({
+      session: null,
+      user: null,
+      passwordRecovery: false,
+    });
+  });
 });
 
 describe('authStore.signIn', () => {
@@ -174,7 +199,12 @@ describe('authStore.setSessionFromUrl', () => {
   });
 
   it('sets an implicit session from fragment tokens', async () => {
-    mockSetSession.mockResolvedValue({ error: null });
+    mockSetSession.mockResolvedValue({
+      data: {
+        session: { access_token: 'tok', user: { id: 'user-1' } },
+      },
+      error: null,
+    });
     await expect(
       useAuthStore
         .getState()
@@ -186,6 +216,64 @@ describe('authStore.setSessionFromUrl', () => {
       access_token: 'tok',
       refresh_token: 'ref',
     });
+    expect(useAuthStore.getState().user?.id).toBe('user-1');
+  });
+
+  it('exchanges a PKCE code and reuses an in-flight request', async () => {
+    let resolveExchange: ((value: {
+      data: { session: { access_token: string; user: { id: string } } };
+      error: null;
+    }) => void) | undefined;
+    mockExchangeCodeForSession.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveExchange = resolve;
+        })
+    );
+
+    const first = useAuthStore
+      .getState()
+      .setSessionFromUrl('skateu://auth/callback?code=pkce-1');
+    const second = useAuthStore
+      .getState()
+      .setSessionFromUrl('skateu://auth/callback?code=pkce-1');
+    resolveExchange?.({
+      data: { session: { access_token: 'tok', user: { id: 'user-1' } } },
+      error: null,
+    });
+    await expect(Promise.all([first, second])).resolves.toEqual([true, true]);
+    expect(mockExchangeCodeForSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to getSession when the code exchange has no session', async () => {
+    mockExchangeCodeForSession.mockResolvedValue({
+      data: { session: null },
+      error: null,
+    });
+    mockGetSession.mockResolvedValue({
+      data: { session: { access_token: 'tok', user: { id: 'user-1' } } },
+      error: null,
+    });
+    await expect(
+      useAuthStore
+        .getState()
+        .setSessionFromUrl('skateu://auth/callback?code=pkce-2')
+    ).resolves.toBe(true);
+    expect(useAuthStore.getState().user?.id).toBe('user-1');
+  });
+
+  it('throws when implicit tokens cannot create a session', async () => {
+    mockSetSession.mockResolvedValue({
+      data: { session: null },
+      error: new Error('bad tokens'),
+    });
+    await expect(
+      useAuthStore
+        .getState()
+        .setSessionFromUrl(
+          'skateu://auth/callback#access_token=bad-implicit-tok&refresh_token=ref'
+        )
+    ).rejects.toThrow('bad tokens');
   });
 });
 
@@ -248,5 +336,90 @@ describe('authStore.deleteAccount', () => {
       email: 'skater@example.com',
       options: { shouldCreateUser: false },
     });
+  });
+
+  it('verifies a delete OTP then deletes the account', async () => {
+    mockVerifyOtp.mockResolvedValue({
+      data: { session: { access_token: 'token', user: { id: 'user-1' } } },
+      error: null,
+    });
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ proof: 'proof-1' }),
+      } as unknown as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({}),
+      } as unknown as Response);
+    mockGetSession.mockResolvedValue({
+      data: { session: { access_token: 'token', user: { id: 'user-1' } } },
+    });
+    useAuthStore.setState({ user: { id: 'user-1' } as never });
+
+    await useAuthStore.getState().verifyDeleteAccountOtp(' skater@example.com ', ' 123456 ');
+    await useAuthStore.getState().deleteAccount();
+
+    expect(mockClearUserDrafts).toHaveBeenCalledWith('user-1');
+    expect(mockSignOut).toHaveBeenCalled();
+  });
+
+  it('surfaces delete OTP and API failures', async () => {
+    mockSignInWithOtp.mockResolvedValue({ error: new Error('otp failed') });
+    await expect(
+      useAuthStore.getState().sendDeleteAccountOtp('skater@example.com')
+    ).rejects.toThrow('otp failed');
+
+    mockVerifyOtp.mockResolvedValue({ data: { session: null }, error: null });
+    await expect(
+      useAuthStore.getState().verifyDeleteAccountOtp('skater@example.com', '123456')
+    ).rejects.toThrow('We couldn’t verify account deletion. Please try again.');
+  });
+
+  it('surfaces OTP, proof, and delete API failures', async () => {
+    mockVerifyOtp.mockResolvedValue({ error: new Error('bad code') });
+    await expect(
+      useAuthStore.getState().verifyOtp('skater@example.com', '000000')
+    ).rejects.toThrow('bad code');
+    mockVerifyOtp.mockResolvedValue({ error: new Error('otp failed') });
+    await expect(
+      useAuthStore.getState().verifyDeleteAccountOtp('skater@example.com', '000000')
+    ).rejects.toThrow('otp failed');
+
+    mockResend.mockResolvedValue({ error: new Error('resend failed') });
+    await expect(
+      useAuthStore.getState().resendSignUpOtp('skater@example.com')
+    ).rejects.toThrow('resend failed');
+
+    mockVerifyOtp.mockResolvedValue({
+      data: { session: { access_token: 'token', user: { id: 'user-1' } } },
+      error: null,
+    });
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({ error: 'proof down' }),
+    } as unknown as Response);
+    await expect(
+      useAuthStore.getState().verifyDeleteAccountOtp('skater@example.com', '123456')
+    ).rejects.toThrow('proof down');
+
+    mockVerifyOtp.mockResolvedValue({
+      data: { session: { access_token: 'token', user: { id: 'user-1' } } },
+      error: null,
+    });
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ proof: 'proof-1' }),
+      } as unknown as Response)
+      .mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({ error: 'delete down' }),
+      } as unknown as Response);
+    mockGetSession.mockResolvedValue({
+      data: { session: { access_token: 'token', user: { id: 'user-1' } } },
+    });
+    await useAuthStore.getState().verifyDeleteAccountOtp('skater@example.com', '123456');
+    await expect(useAuthStore.getState().deleteAccount()).rejects.toThrow('delete down');
   });
 });

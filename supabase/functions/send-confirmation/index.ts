@@ -173,9 +173,9 @@ Deno.serve(async (request) => {
       body: JSON.stringify({
         from: requiredEnvironmentValue("RESEND_FROM_EMAIL"),
         to: [subscriber.email],
-        subject: "Confirm your SkateU email",
-        html: `<p>Confirm your SkateU email address by clicking the link below.</p><p><a href="${escapeHtml(confirmationUrl.toString())}">Confirm my email</a></p>`,
-        text: `Confirm your SkateU email address: ${confirmationUrl.toString()}`,
+        subject: "Confirm your SkateU Android beta email",
+        html: `<p>Confirm this email so we can add you to the SkateU Android beta.</p><p><a href="${escapeHtml(confirmationUrl.toString())}">Confirm my email</a></p>`,
+        text: `Confirm this email so we can add you to the SkateU Android beta: ${confirmationUrl.toString()}`,
       }),
       signal: AbortSignal.timeout(10_000),
     });

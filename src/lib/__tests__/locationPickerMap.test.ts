@@ -6,47 +6,34 @@ import {
     type LocationMapLayer,
 } from '../locationPickerMap';
 
-type LayerMock = {
-  id: LocationMapLayer;
-  addTo: (map: MapMock) => LayerMock;
-};
-
 type MapMock = {
-  activeLayers: Set<LayerMock>;
-  setView: (
-    center: [number, number] | { lat: number; lng: number },
-    zoom: number,
-    options?: object
-  ) => MapMock;
-  removeLayer: (layer: LayerMock) => void;
+  listeners: Record<string, Array<() => void>>;
   getCenter: () => { lat: number; lng: number };
   getZoom: () => number;
-  on: (event: string, handler: () => void) => void;
+  getBearing: () => number;
+  loaded: () => boolean;
+  on: (event: string, handler: () => void) => MapMock;
+  once: (event: string, handler: () => void) => MapMock;
+  getSource: (id: string) => unknown;
+  addSource: jest.Mock;
+  addLayer: jest.Mock;
+  setLayoutProperty: jest.Mock;
+  easeTo: jest.Mock;
 };
 
 type TestWindow = Window &
   typeof globalThis & {
-    L: {
-      map: (elementId: string, options: object) => MapMock;
-      tileLayer: (url: string) => LayerMock;
-      latLng: (lat: number, lng: number) => { lat: number; lng: number };
-      circle: (
-        latlng: { lat: number; lng: number },
-        options: { radius: number }
-      ) => unknown;
-      circleMarker: (latlng: { lat: number; lng: number }) => unknown;
-      DomEvent: {
-        disableClickPropagation: (element: HTMLElement) => void;
-        disableScrollPropagation: (element: HTMLElement) => void;
-      };
+    maplibregl: {
+      Map: new (options: object) => MapMock;
     };
     ReactNativeWebView: { postMessage: (message: string) => void };
-    currentLayer: LayerMock;
+    currentLayer: LocationMapLayer;
     setMapLayer: (layer: LocationMapLayer) => void;
     toggleLayer: () => void;
     setUserLocation: (lat: number, lng: number, accuracy: number) => void;
     clearUserLocation: () => void;
     goToUserLocation: (zoom?: number) => void;
+    resetMapNorth: () => void;
   };
 
 type Harness = {
@@ -57,66 +44,40 @@ type Harness = {
   testWindow: TestWindow;
 };
 
-function createLayer(id: LocationMapLayer): LayerMock {
-  const layer: LayerMock = {
-    id,
-    addTo: (map) => {
-      map.activeLayers.add(layer);
-      return layer;
-    },
-  };
-  return layer;
-}
-
 function installMap(initialLayer: LocationMapLayer = 'default'): Harness {
   const map: MapMock = {
-    activeLayers: new Set(),
-    setView: () => map,
-    removeLayer: (layer) => {
-      map.activeLayers.delete(layer);
-    },
+    listeners: {},
     getCenter: () => ({ lat: 41.8268, lng: -71.401 }),
     getZoom: () => 15.5,
-    on: () => undefined,
+    getBearing: () => 0,
+    loaded: () => false,
+    on: (event, handler) => {
+      map.listeners[event] = map.listeners[event] ?? [];
+      map.listeners[event].push(handler);
+      return map;
+    },
+    once: (event, handler) => {
+      const wrapped = () => {
+        map.listeners[event] = (map.listeners[event] ?? []).filter(
+          (candidate) => candidate !== wrapped
+        );
+        handler();
+      };
+      return map.on(event, wrapped);
+    },
+    getSource: () => undefined,
+    addSource: jest.fn(),
+    addLayer: jest.fn(),
+    setLayoutProperty: jest.fn(),
+    easeTo: jest.fn(),
   };
   const messages: Harness['messages'] = [];
   const testWindow = window as TestWindow;
 
-  testWindow.L = {
-    map: () => map,
-    tileLayer: (url) =>
-      createLayer(url.includes('World_Imagery') ? 'satellite' : 'default'),
-    latLng: (lat: number, lng: number) => ({ lat, lng }),
-    circle: (latlng: { lat: number; lng: number }, options: { radius: number }) => {
-      const layer = {
-        id: 'default' as LocationMapLayer,
-        latlng,
-        radius: options.radius,
-        addTo: () => layer,
-        setLatLng: (next: { lat: number; lng: number }) => {
-          layer.latlng = next;
-        },
-        setRadius: (radius: number) => {
-          layer.radius = radius;
-        },
-      };
-      return layer;
-    },
-    circleMarker: (latlng: { lat: number; lng: number }) => {
-      const layer = {
-        id: 'default' as LocationMapLayer,
-        latlng,
-        addTo: () => layer,
-        setLatLng: (next: { lat: number; lng: number }) => {
-          layer.latlng = next;
-        },
-      };
-      return layer;
-    },
-    DomEvent: {
-      disableClickPropagation: () => undefined,
-      disableScrollPropagation: () => undefined,
-    },
+  testWindow.maplibregl = {
+    Map: function Map() {
+      return map;
+    } as unknown as new (options: object) => MapMock,
   };
   testWindow.ReactNativeWebView = {
     postMessage: (message) => {
@@ -149,9 +110,7 @@ function installMap(initialLayer: LocationMapLayer = 'default'): Harness {
 }
 
 function expectLayer(harness: Harness, expected: LocationMapLayer): void {
-  expect(harness.map.activeLayers.size).toBe(1);
-  expect([...harness.map.activeLayers][0]?.id).toBe(expected);
-  expect(harness.testWindow.currentLayer.id).toBe(expected);
+  expect(harness.testWindow.currentLayer).toBe(expected);
   expect(harness.mapElement.classList.contains('satellite')).toBe(
     expected === 'satellite'
   );
@@ -160,8 +119,19 @@ function expectLayer(harness: Harness, expected: LocationMapLayer): void {
   );
 }
 
-
 describe('location picker map layers', () => {
+  it('loads OpenFreeMap instead of CARTO raster tiles', () => {
+    const html = buildLocationPickerHtml({
+      latitude: 41.8268,
+      longitude: -71.401,
+      layer: 'default',
+    });
+    expect(html).toContain('tiles.openfreemap.org/styles/liberty');
+    expect(html).toContain('maplibre-gl');
+    expect(html).toContain('resetMapNorth');
+    expect(html).not.toContain('basemaps.cartocdn.com');
+  });
+
   it('toggles reliably for 1,000 consecutive button clicks', () => {
     const harness = installMap();
 
@@ -202,17 +172,26 @@ describe('location picker map layers', () => {
 
   it('pans to a stored user location without changing layers', () => {
     const harness = installMap();
-    const setView = jest.fn(() => harness.map);
-    harness.map.setView = setView;
 
     harness.testWindow.setUserLocation(41.83, -71.4, 10);
     harness.testWindow.goToUserLocation();
 
-    expect(setView).toHaveBeenCalledWith(
-      { lat: 41.83, lng: -71.4 },
-      15.5,
-      { animate: true }
-    );
+    expect(harness.map.easeTo).toHaveBeenCalledWith({
+      center: [-71.4, 41.83],
+      zoom: 15.5,
+    });
+    expectLayer(harness, 'default');
+  });
+
+  it('resets bearing to north without changing layers', () => {
+    const harness = installMap();
+
+    harness.testWindow.resetMapNorth();
+
+    expect(harness.map.easeTo).toHaveBeenCalledWith({
+      bearing: 0,
+      pitch: 0,
+    });
     expectLayer(harness, 'default');
   });
 });

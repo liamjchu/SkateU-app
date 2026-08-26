@@ -26,7 +26,7 @@ afterEach(() => {
 });
 
 describe("ConfirmPage", () => {
-  it("renders the confirmed waitlist message", async () => {
+  it("renders the confirmed Android beta message", async () => {
     confirmSubscription.mockResolvedValue(true);
     const container = render(
       await ConfirmPage({
@@ -37,9 +37,9 @@ describe("ConfirmPage", () => {
     );
 
     expect(container.textContent).toContain("Your email is confirmed.");
-    expect(container.textContent).toContain("You’re on the SkateU waitlist.");
+    expect(container.textContent).toContain("add you to the Android beta");
     expect(
-      container.querySelector('form[aria-label="Join the SkateU waitlist"]')
+      container.querySelector('form[aria-label="Request Android beta access"]')
     ).toBeNull();
     const backLink = [...container.querySelectorAll("a")].find((link) =>
       link.textContent?.includes("Back to SkateU")
@@ -58,7 +58,7 @@ describe("ConfirmPage", () => {
     );
     expect(container.textContent).toContain("Request a new confirmation email");
     expect(
-      container.querySelector('form[aria-label="Join the SkateU waitlist"]')
+      container.querySelector('form[aria-label="Request Android beta access"]')
     ).not.toBeNull();
   });
 });

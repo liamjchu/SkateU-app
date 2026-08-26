@@ -36,21 +36,21 @@ function getServerStoredEmail(): null {
 function statusMessage(status: SubmissionStatus): string {
   switch (status) {
     case "success":
-      return "You’re subscribed. Check your inbox and confirm your email address.";
+      return "We saved your email. Check your inbox and confirm it so we can add you.";
     case "alreadySubscribed":
-      return "You’re already subscribed. Check your inbox to confirm your email address.";
+      return "We already have this email. Check your inbox to confirm it, or resend below.";
     case "resent":
       return "Confirmation email sent. Check your inbox.";
     case "emailUnsent":
       return "You’re on the list, but the confirmation email didn’t send. Resend it below.";
     case "needsAge":
-      return "You must be at least 13 years old to join the waitlist.";
+      return "You must be at least 13 years old to request Android beta access.";
     case "tooMany":
       return "Too many tries from this network. Wait a minute and try again.";
     case "error":
-      return "We couldn’t add you to the waitlist. Please try again.";
+      return "We couldn’t save your email. Please try again.";
     default:
-      return "No spam. Just the invite when we drop. You must be 13 or older.";
+      return "We’ll email a confirmation, then add you as a Play tester. You must be 13 or older.";
   }
 }
 
@@ -175,8 +175,8 @@ export function WaitlistForm() {
   return (
     <>
       <form
-        className="mx-auto mt-8 flex w-full max-w-md flex-col gap-3"
-        aria-label="Join the SkateU waitlist"
+        className="mt-5 flex w-full flex-col gap-3"
+        aria-label="Request Android beta access"
         aria-busy={isSubmitting}
         onSubmit={handleSubmit}
       >
@@ -206,7 +206,7 @@ export function WaitlistForm() {
             className="min-h-14 rounded-xl bg-accent px-6 text-sm font-bold text-brand transition-colors hover:bg-accent-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus:ring-offset-2 focus:ring-offset-surface disabled:bg-actionDisabled disabled:text-muted motion-reduce:transition-none"
             disabled={isSubmitting}
           >
-            Get early access
+            Send my email
           </button>
         </div>
         <label className="flex cursor-pointer items-start gap-3 px-1 text-left text-xs font-medium leading-5 text-muted">

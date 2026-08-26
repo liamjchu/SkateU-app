@@ -13,6 +13,8 @@ export const CAMPUS_MAP_PIN_CSS = `
         background: none;
         border: none;
         overflow: visible;
+        width: 50px;
+        height: 50px;
       }
       .skateu-pin-shadow {
         position: absolute;
@@ -145,8 +147,16 @@ export function getCampusMapPinScript(): string {
           }
 
           function setMarkerRaised(marker, raised) {
-            if (!marker || typeof marker.setZIndexOffset !== 'function') return;
-            marker.setZIndexOffset(raised ? 1000 : 0);
+            if (!marker) return;
+            if (typeof marker.setZIndexOffset === 'function') {
+              marker.setZIndexOffset(raised ? 1000 : 0);
+            }
+            var root = typeof marker.getElement === 'function'
+              ? marker.getElement()
+              : null;
+            if (root && root.style) {
+              root.style.zIndex = raised ? '1000' : '0';
+            }
           }
 
           function unselectMarker(id) {

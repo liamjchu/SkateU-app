@@ -19,6 +19,7 @@ import {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import '../../global.css';
+import AuthNoticeBanner from '../components/AuthNoticeBanner';
 import StartupLoadingOverlay from '../components/startup-loading-overlay';
 import { colors } from '../constants/colors';
 import { checkAppleCredentialStatus } from '../lib/appleAuthentication';
@@ -29,7 +30,9 @@ import {
     legalGateRedirectPath,
 } from '../lib/legalAcceptance';
 import { shouldLeaveAuthEntryRoute } from '../lib/authNavigation';
+import { toUserFacingError } from '../lib/userFacingError';
 import { useAgeEligibilityStore } from '../store/ageEligibilityStore';
+import { useAuthNoticeStore } from '../store/authNoticeStore';
 import { useAuthStore } from '../store/authStore';
 import { useBlocksStore } from '../store/blocksStore';
 import { useCommentsStore } from '../store/commentsStore';
@@ -93,6 +96,7 @@ function RootLayout() {
   const initAuth = useAuthStore((state) => state.init);
   const setSessionFromUrl = useAuthStore((state) => state.setSessionFromUrl);
   const signOut = useAuthStore((state) => state.signOut);
+  const showAuthNotice = useAuthNoticeStore((state) => state.showAuthNotice);
 
   // --- Auth + profile state that drives the username gate ---
   const userId = useAuthStore((state) => state.user?.id ?? null);
@@ -229,13 +233,21 @@ function RootLayout() {
             router.replace('/update-password');
           }
         })
-        .catch(() => {
+        .catch((error: unknown) => {
           if (isRecoveryLink) {
             router.replace({
               pathname: '/forgot-password',
               params: { resetError: 'expired' },
             });
           }
+
+          showAuthNotice({
+            kind: 'error',
+            message: toUserFacingError(
+              error,
+              'Could not finish sign-in. Please try again.'
+            ),
+          });
         });
     };
 
@@ -246,7 +258,7 @@ function RootLayout() {
     );
 
     return () => subscription.remove();
-  }, [router, setSessionFromUrl]);
+  }, [router, setSessionFromUrl, showAuthNotice]);
 
   // The app is ready to decide on routing once fonts are loaded, the persisted
   // session has been restored, and (if signed in) the profile has resolved.
@@ -396,6 +408,7 @@ function RootLayout() {
           }}
         />
       ) : null}
+      <AuthNoticeBanner />
         </GestureHandlerRootView>
       </PostHogErrorBoundary>
     </AnalyticsProvider>

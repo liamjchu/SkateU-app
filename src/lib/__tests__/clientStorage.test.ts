@@ -17,4 +17,14 @@ describe('getClientStorage', () => {
     await storage.removeItem('k');
     await expect(storage.getItem('k')).resolves.toBeNull();
   });
+
+  it('falls back when AsyncStorage is missing methods', async () => {
+    jest.resetModules();
+    jest.doMock('@react-native-async-storage/async-storage', () => ({}));
+    const { getClientStorage } = require('../clientStorage') as typeof import('../clientStorage');
+    const storage = getClientStorage();
+    await expect(storage.getItem('k')).resolves.toBeNull();
+    await expect(storage.setItem('k', 'v')).resolves.toBeUndefined();
+    await expect(storage.removeItem('k')).resolves.toBeUndefined();
+  });
 });

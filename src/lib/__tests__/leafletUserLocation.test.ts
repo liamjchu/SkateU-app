@@ -32,11 +32,13 @@ describe('leafletUserLocation javascript helpers', () => {
     );
   });
 
-  it('includes Leaflet user-location APIs', () => {
+  it('includes MapLibre user-location APIs', () => {
     const script = getLeafletUserLocationScript();
     expect(script).toContain('window.setUserLocation');
     expect(script).toContain('window.clearUserLocation');
     expect(script).toContain('window.goToUserLocation');
+    expect(script).toContain('easeTo');
+    expect(script).toContain('user-location');
     expect(CLEAR_USER_LOCATION_JAVASCRIPT).toContain('clearUserLocation');
   });
 });

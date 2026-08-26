@@ -1,4 +1,4 @@
-import { POST } from '../comment-reports+api';
+import { mapCommentReport, POST } from '../comment-reports+api';
 
 type FetchMock = jest.Mock<Promise<Response>, [string | URL | Request, RequestInit?]>;
 
@@ -28,12 +28,60 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
+describe('mapCommentReport', () => {
+  it('falls back to other and empty strings for incomplete rows', () => {
+    expect(
+      mapCommentReport({
+        id: 'report-1',
+        comment_id: commentId,
+        reason: 'not-a-reason',
+        details: undefined as unknown as string,
+        created_at: undefined as unknown as string,
+      })
+    ).toEqual({
+      id: 'report-1',
+      commentId,
+      reason: 'other',
+      details: '',
+      createdAt: '',
+    });
+  });
+});
+
 describe('POST /api/comment-reports', () => {
   it('returns 401 when the Authorization header is absent', async () => {
     setConfigured();
     const response = await POST(
       new Request('https://app.test/api/comment-reports', {
         method: 'POST',
+        body: JSON.stringify({ commentId, reason: 'spam' }),
+      })
+    );
+    expect(response.status).toBe(401);
+  });
+
+  it('returns 500 when comment reports are not configured', async () => {
+    process.env.SUPABASE_URL = 'https://project.supabase.co';
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const response = await POST(
+      new Request('https://app.test/api/comment-reports', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer good-token' },
+        body: JSON.stringify({ commentId, reason: 'spam' }),
+      })
+    );
+    expect(response.status).toBe(500);
+  });
+
+  it('returns 401 when the access token is rejected', async () => {
+    setConfigured();
+    global.fetch = jest.fn(async () =>
+      jsonResponse({ message: 'invalid' }, 401)
+    ) as unknown as typeof fetch;
+    const response = await POST(
+      new Request('https://app.test/api/comment-reports', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer bad-token' },
         body: JSON.stringify({ commentId, reason: 'spam' }),
       })
     );
@@ -63,6 +111,38 @@ describe('POST /api/comment-reports', () => {
       })
     );
     expect(response.status).toBe(400);
+  });
+
+  it('rejects a malformed body and a missing comment', async () => {
+    setConfigured();
+    global.fetch = jest.fn(async (input) => {
+      const url = String(input);
+      if (url.includes('/auth/v1/user')) {
+        return jsonResponse({ id: viewerId });
+      }
+      if (url.includes('/rest/v1/spot_comments')) {
+        return jsonResponse([]);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as unknown as typeof fetch;
+
+    const malformed = await POST(
+      new Request('https://app.test/api/comment-reports', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer good-token' },
+        body: '{',
+      })
+    );
+    expect(malformed.status).toBe(400);
+
+    const missing = await POST(
+      new Request('https://app.test/api/comment-reports', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer good-token' },
+        body: JSON.stringify({ commentId, reason: 'spam' }),
+      })
+    );
+    expect(missing.status).toBe(404);
   });
 
   it('creates a report and emails moderation', async () => {

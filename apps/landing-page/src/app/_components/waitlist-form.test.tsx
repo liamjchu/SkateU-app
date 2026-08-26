@@ -95,11 +95,14 @@ afterEach(() => {
 });
 
 describe("WaitlistForm", () => {
-  it("renders the default waitlist prompt", () => {
+  it("renders the default Android beta prompt", () => {
     const container = render(<WaitlistForm />);
 
     expect(emailInput(container).required).toBe(true);
     expect(ageCheckbox(container).required).toBe(true);
+    expect(form(container).getAttribute("aria-label")).toBe(
+      "Request Android beta access"
+    );
     expect(container.textContent).toContain("You must be 13 or older.");
   });
 
@@ -111,7 +114,7 @@ describe("WaitlistForm", () => {
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(container.textContent).toContain(
-      "You must be at least 13 years old to join the waitlist."
+      "You must be at least 13 years old to request Android beta access."
     );
   });
 
@@ -130,7 +133,7 @@ describe("WaitlistForm", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(subscribeBody),
     });
-    await waitFor(() => expect(container.textContent).toContain("You’re subscribed."));
+    await waitFor(() => expect(container.textContent).toContain("We saved your email."));
     expect(window.localStorage.getItem(WAITLIST_EMAIL_STORAGE_KEY)).toBe(email);
     expect(input.value).toBe("");
     expect(resendButton(container).textContent).toContain("Resend confirmation email");
@@ -170,13 +173,13 @@ describe("WaitlistForm", () => {
     window.localStorage.setItem(WAITLIST_EMAIL_STORAGE_KEY, email);
     const container = render(<WaitlistForm />);
 
-    expect(container.textContent).toContain("already subscribed");
+    expect(container.textContent).toContain("We already have this email");
     expect(resendButton(container).textContent).toContain("Resend confirmation email");
     change(emailInput(container), email);
     submit(form(container));
 
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(container.textContent).toContain("already subscribed");
+    expect(container.textContent).toContain("We already have this email");
   });
 
   it("shows an error when the request fails", async () => {
@@ -187,7 +190,7 @@ describe("WaitlistForm", () => {
     checkAge(container);
     submit(form(container));
 
-    await waitFor(() => expect(container.textContent).toContain("couldn’t add you"));
+    await waitFor(() => expect(container.textContent).toContain("couldn’t save your email"));
     expect(container.textContent).not.toContain(email);
   });
 
@@ -213,7 +216,7 @@ describe("WaitlistForm", () => {
     checkAge(container);
     submit(form(container));
 
-    await waitFor(() => expect(container.textContent).toContain("You’re subscribed."));
+    await waitFor(() => expect(container.textContent).toContain("We saved your email."));
   });
 
   it("disables controls while a request is pending", async () => {

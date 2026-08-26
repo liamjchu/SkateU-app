@@ -33,6 +33,51 @@ describe('GET /api/user-blocks', () => {
     expect(response.status).toBe(401);
   });
 
+  it('returns 500 when the service-role key is missing', async () => {
+    process.env.SUPABASE_URL = 'https://project.supabase.co';
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const response = await GET(
+      new Request('https://app.test/api/user-blocks', {
+        headers: { Authorization: 'Bearer good-token' },
+      })
+    );
+    expect(response.status).toBe(500);
+  });
+
+  it('returns 401 when the access token is rejected', async () => {
+    setConfigured();
+    global.fetch = jest.fn(async () =>
+      jsonResponse({ message: 'invalid' }, 401)
+    ) as unknown as typeof fetch;
+    const response = await GET(
+      new Request('https://app.test/api/user-blocks', {
+        headers: { Authorization: 'Bearer bad-token' },
+      })
+    );
+    expect(response.status).toBe(401);
+  });
+
+  it('returns an empty list when nothing is blocked', async () => {
+    setConfigured();
+    global.fetch = jest.fn(async (input) => {
+      const url = String(input);
+      if (url.includes('/auth/v1/user')) {
+        return jsonResponse({ id: viewerId });
+      }
+      if (url.includes('/rest/v1/user_blocks')) {
+        return jsonResponse([]);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as unknown as typeof fetch;
+    const response = await GET(
+      new Request('https://app.test/api/user-blocks', {
+        headers: { Authorization: 'Bearer good-token' },
+      })
+    );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ users: [] });
+  });
+
   it('returns blocked users with usernames', async () => {
     setConfigured();
     const fetchMock: FetchMock = jest.fn(async (input) => {
@@ -113,6 +158,43 @@ describe('POST /api/user-blocks', () => {
       user: { userId: blockedId, username: 'blocked_skater' },
     });
   });
+
+  it('treats a duplicate block as success', async () => {
+    setConfigured();
+    const fetchMock: FetchMock = jest.fn(async (input, init) => {
+      const url = String(input);
+      if (url.includes('/auth/v1/user')) {
+        return jsonResponse({ id: viewerId });
+      }
+      if (init?.method === 'POST' && url.includes('/rest/v1/user_blocks')) {
+        return new Response('duplicate key value violates unique constraint 23505', {
+          status: 409,
+        });
+      }
+      if (url.includes('/rest/v1/user_blocks')) {
+        return jsonResponse([
+          { blocked_id: blockedId, created_at: '2026-08-21T00:00:00.000Z' },
+        ]);
+      }
+      if (url.includes('/rest/v1/profiles')) {
+        return jsonResponse([{ id: blockedId, username: 'blocked_skater' }]);
+      }
+      throw new Error(`Unexpected fetch: ${init?.method ?? 'GET'} ${url}`);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await POST(
+      new Request('https://app.test/api/user-blocks', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer good-token' },
+        body: JSON.stringify({ userId: blockedId }),
+      })
+    );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      user: { userId: blockedId, username: 'blocked_skater' },
+    });
+  });
 });
 
 describe('DELETE /api/user-blocks', () => {
@@ -140,5 +222,31 @@ describe('DELETE /api/user-blocks', () => {
       )
     );
     expect(response.status).toBe(200);
+  });
+
+  it('returns 400 for an invalid user id and 500 when delete fails', async () => {
+    setConfigured();
+    global.fetch = jest.fn(async (input) => {
+      if (String(input).includes('/auth/v1/user')) {
+        return jsonResponse({ id: viewerId });
+      }
+      return jsonResponse({ error: 'nope' }, 500);
+    }) as unknown as typeof fetch;
+
+    const invalid = await DELETE(
+      new Request('https://app.test/api/user-blocks?userId=', {
+        method: 'DELETE',
+        headers: { Authorization: 'Bearer good-token' },
+      })
+    );
+    expect(invalid.status).toBe(400);
+
+    const failed = await DELETE(
+      new Request(`https://app.test/api/user-blocks?userId=${blockedId}`, {
+        method: 'DELETE',
+        headers: { Authorization: 'Bearer good-token' },
+      })
+    );
+    expect(failed.status).toBe(500);
   });
 });

@@ -25,7 +25,7 @@ export default async function ConfirmPage({ searchParams }: ConfirmPageProps) {
     ? "Your email is confirmed."
     : "This confirmation link is invalid or expired.";
   const message = confirmed
-    ? "You’re on the SkateU waitlist. We’ll email you when we drop."
+    ? "You’re confirmed. We’ll use this email to add you to the Android beta."
     : "Request a new confirmation email below if you still need to confirm.";
 
   return (
@@ -41,7 +41,7 @@ export default async function ConfirmPage({ searchParams }: ConfirmPageProps) {
         >
           <div className="flex w-full flex-col items-center rounded-2xl border border-border-soft bg-field p-6 text-center sm:p-10">
             <p className="mb-5 text-xs font-bold uppercase tracking-[0.2em] text-muted sm:tracking-[0.26em]">
-              SkateU waitlist
+              SkateU beta
             </p>
             <h1
               id="confirm-title"

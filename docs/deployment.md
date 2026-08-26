@@ -94,6 +94,6 @@ These answers are product inputs, not a claim of store approval:
 
 - Target audience: 13–15, 16–17, and 18+ as appropriate. Do not select under-13. Do not enroll in Designed for Families as a children’s app.
 - “Is this app primarily for children?” → No, for this 13+ general-audience product.
-- Data safety: email, user-generated photos/text, account identifiers; approximate/precise location used on-device for map display and not collected on SkateU servers; no advertising SDK; product analytics through PostHog when `EXPO_PUBLIC_POSTHOG_API_KEY` is set; crash reporting through Sentry when `EXPO_PUBLIC_SENTRY_DSN` is set. The website waitlist is not the Play app.
+- Data safety: email, user-generated photos/text, account identifiers; approximate/precise location used on-device for map display and not collected on SkateU servers; no advertising SDK; product analytics through PostHog when `EXPO_PUBLIC_POSTHOG_API_KEY` is set; crash reporting through Sentry when `EXPO_PUBLIC_SENTRY_DSN` is set. The website Android beta email list is not the Play app.
 - Privacy policy URL required.
 - IARC: UGC, social-ish features, skateboarding.

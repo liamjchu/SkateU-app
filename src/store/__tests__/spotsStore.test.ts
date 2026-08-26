@@ -26,6 +26,9 @@ function mockResponse(
     status: init?.status ?? 200,
     json: async () => body,
     text: async () => JSON.stringify(body),
+    clone: () => ({
+      arrayBuffer: async () => new ArrayBuffer(0),
+    }),
   } as unknown as Response;
 }
 
@@ -547,5 +550,218 @@ describe('spotsStore like response compatibility', () => {
     expect(state.spots[0]).toMatchObject({ likedByUser: true, likeCount: 0 });
     expect(state.mySpots[0]).toMatchObject({ likedByUser: true, likeCount: 0 });
     expect(state.likedSpots[0]).toMatchObject({ id: 'a', likedByUser: true });
+  });
+});
+
+describe('spotsStore mutations and session', () => {
+  it('creates a spot and requires a returned record', async () => {
+    const created = makeSpot({ id: 'new-spot', schoolId: 'school-1' });
+    fetchMock.mockResolvedValueOnce(mockResponse({ spot: created }, { status: 201 }));
+
+    await expect(
+      useSpotsStore.getState().addSpot(
+        {
+          schoolId: 'school-1',
+          name: 'Rail',
+          description: 'A rail',
+          latitude: 10,
+          longitude: 20,
+          images: [{ uri: 'file:///a.jpg', fileName: 'a.jpg', mimeType: 'image/jpeg' }],
+        },
+        'token-abc'
+      )
+    ).resolves.toEqual(created);
+
+    fetchMock.mockResolvedValueOnce(mockResponse({}, { status: 201 }));
+    await expect(
+      useSpotsStore.getState().addSpot(
+        {
+          schoolId: 'school-1',
+          name: 'Rail',
+          description: 'A rail',
+          latitude: 10,
+          longitude: 20,
+          images: [],
+        },
+        'token-abc'
+      )
+    ).rejects.toThrow('The server did not return the created spot.');
+  });
+
+  it('updates media and maps a 401 save failure', async () => {
+    useSpotsStore.setState({
+      mySpots: [makeSpot({ id: 'a' })],
+      spots: [makeSpot({ id: 'a' })],
+      likedSpots: [makeSpot({ id: 'a', likedByUser: true })],
+      recentSpots: [makeSpot({ id: 'a', likedByUser: true })],
+    });
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({
+        spot: makeSpot({ id: 'a', name: 'Edited', schoolId: 'school-1' }),
+      })
+    );
+
+    await useSpotsStore.getState().updateSpot(
+      'a',
+      {
+        name: 'Edited',
+        description: 'A rail',
+        latitude: 10,
+        longitude: 20,
+        media: [
+          { kind: 'existing', uri: 'https://img/a.jpg' },
+          { kind: 'new', asset: { uri: 'file:///b.jpg' } },
+        ],
+      },
+      'token-abc'
+    );
+    expect(useSpotsStore.getState().likedSpots[0]?.name).toBe('Edited');
+
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({ error: '' }, { ok: false, status: 401 })
+    );
+    await expect(
+      useSpotsStore.getState().updateSpot(
+        'a',
+        { name: 'Edited', description: 'A rail', latitude: 10, longitude: 20 },
+        'token-abc'
+      )
+    ).rejects.toThrow('Sign in again to keep going.');
+  });
+
+  it('clears session-owned lists and rewrites creator names', () => {
+    const mine = makeSpot({
+      id: 'mine',
+      creatorUserId: 'user-1',
+      creatorUsername: 'old',
+      likedByUser: true,
+    });
+    const other = makeSpot({
+      id: 'other',
+      creatorUserId: 'user-2',
+      creatorUsername: 'keep',
+    });
+    useSpotsStore.setState({
+      spots: [mine, other],
+      mySpots: [mine],
+      likedSpots: [mine],
+      recentSpots: [mine, other],
+      sessionUserId: 'user-1',
+      mySpotsOwnerId: 'user-1',
+      reportedSpotIds: ['mine'],
+    });
+
+    useSpotsStore.getState().setSessionUserId('user-1');
+    expect(useSpotsStore.getState().mySpots).toHaveLength(1);
+
+    useSpotsStore.getState().replaceCreatorUsername('old', 'old');
+    useSpotsStore.getState().replaceCreatorUsername('old', 'new');
+    expect(useSpotsStore.getState().spots[0]?.creatorUsername).toBe('new');
+
+    useSpotsStore.getState().hideCreatorSpots('user-1');
+    expect(useSpotsStore.getState().spots.map((spot) => spot.id)).toEqual(['other']);
+
+    useSpotsStore.getState().clearMySpots();
+    useSpotsStore.getState().clearReportedSpotIds();
+    expect(useSpotsStore.getState()).toMatchObject({
+      mySpots: [],
+      reportedSpotIds: [],
+    });
+
+    useSpotsStore.getState().setSessionUserId(null);
+    expect(useSpotsStore.getState().sessionUserId).toBeNull();
+  });
+
+  it('merges persisted campus and profile lists', () => {
+    const merge = useSpotsStore.persist.getOptions().merge;
+    expect(merge).toBeDefined();
+    const persistedSpot = makeSpot({ id: 'cached', schoolId: 'school-1' });
+    const merged = merge!(
+      {
+        spots: [persistedSpot],
+        schoolId: 'school-1',
+        spotsFetchedAt: '2026-08-25T00:00:00.000Z',
+        mySpots: [persistedSpot],
+        mySpotsOwnerId: 'user-1',
+        likedSpots: [persistedSpot],
+        recentSpots: [persistedSpot],
+        recentFilter: 'college',
+      },
+      useSpotsStore.getState()
+    );
+    expect(merged.schoolId).toBe('school-1');
+    expect(merged.spots[0]?.id).toBe('cached');
+    expect(merged.recentFilter).toBe('college');
+    expect(merge!({ schoolId: '' }, useSpotsStore.getState()).schoolId).toBeNull();
+    useSpotsStore.getState().setHasHydrated(true);
+    expect(useSpotsStore.getState().hasHydrated).toBe(true);
+  });
+
+  it('returns false when no removal request exists', async () => {
+    fetchMock.mockResolvedValue(mockResponse({ request: null }));
+    await expect(
+      useSpotsStore.getState().fetchMySpotRemovalRequest('spot-1', 'token-abc')
+    ).resolves.toBe(false);
+  });
+
+  it('throws when create, update, or report requests fail', async () => {
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({ error: 'too many photos' }, { ok: false, status: 400 })
+    );
+    await expect(
+      useSpotsStore.getState().addSpot(
+        {
+          schoolId: 'school-1',
+          name: 'Rail',
+          description: 'A rail',
+          latitude: 10,
+          longitude: 20,
+          images: [],
+        },
+        'token-abc'
+      )
+    ).rejects.toThrow('too many photos');
+
+    fetchMock.mockResolvedValueOnce(mockResponse({}, { status: 200 }));
+    await expect(
+      useSpotsStore.getState().updateSpot(
+        'a',
+        { name: 'Edited', description: 'A rail', latitude: 10, longitude: 20 },
+        'token-abc'
+      )
+    ).rejects.toThrow('The server did not return the updated spot.');
+
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({ error: 'nope' }, { ok: false, status: 400 })
+    );
+    await expect(
+      useSpotsStore.getState().fetchMySpotRemovalRequest('spot-1', 'token-abc')
+    ).rejects.toThrow('nope');
+
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({ error: 'nope' }, { ok: false, status: 400 })
+    );
+    await expect(
+      useSpotsStore
+        .getState()
+        .submitSpotRemovalRequest('spot-1', 'dangerous', '', 'token-abc')
+    ).rejects.toThrow('nope');
+
+    const abort = new Error('Aborted');
+    abort.name = 'AbortError';
+    fetchMock.mockRejectedValueOnce(abort);
+    await expect(
+      useSpotsStore.getState().addSpot(
+        {
+          schoolId: 'school-1',
+          name: 'Rail',
+          description: 'A rail',
+          latitude: 10,
+          longitude: 20,
+          images: [],
+        },
+        'token-abc'
+      )
+    ).rejects.toThrow(/timed out/i);
   });
 });

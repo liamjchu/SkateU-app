@@ -36,6 +36,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import FeedbackPressable from '../components/FeedbackPressable';
 import LoginRequiredModal from '../components/LoginRequiredModal';
+import MapCompassButton from '../components/MapCompassButton';
 import MapSpotSheetPage from '../components/map-spot-sheet-page';
 import SpotFullscreenViewer from '../components/spot-fullscreen-viewer';
 import StaleCacheBanner from '../components/StaleCacheBanner';
@@ -55,6 +56,11 @@ import {
     CLEAR_USER_LOCATION_JAVASCRIPT,
     getLeafletUserLocationScript,
 } from '../lib/leafletUserLocation';
+import {
+    getCreateMapLibreMapScript,
+    getMapLibreBaseCss,
+    getMapLibreHeadTags,
+} from '../lib/openFreeMap';
 import { captureAnalyticsEvent } from '../lib/analytics';
 import { triggerHaptic } from '../lib/haptics';
 import { sortSpotsByDistanceFrom } from '../lib/spotDistance';
@@ -82,13 +88,14 @@ const COLLAPSED_SHEET_HEIGHT = 100;
 const TILE_ERROR_THRESHOLD = 3;
 
 const MAP_ATTRIBUTIONS = {
-  default: '© OpenStreetMap contributors © CARTO',
+  default:
+    '© OpenFreeMap © OpenMapTiles © OpenStreetMap contributors',
   satellite:
     'Tiles © Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
 } as const;
 
 const MAP_ATTRIBUTION_SHORT = {
-  default: '© OpenStreetMap · CARTO',
+  default: '© OpenStreetMap · OpenFreeMap',
   satellite: 'Tiles © Esri',
 } as const;
 
@@ -132,6 +139,7 @@ export default function MapScreen() {
   const [mapAttempt, setMapAttempt] = useState(0);
   const [mapStatus, setMapStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [mapError, setMapError] = useState('');
+  const [mapBearing, setMapBearing] = useState(0);
   const isFocused = useIsFocused();
   const {
     coords: userLocation,
@@ -327,23 +335,12 @@ export default function MapScreen() {
   <html>
   <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    ${getMapLibreHeadTags()}
     <style>
       /* FIXED: Changed 100vh/100vw to 100%. WebViews often collapse vh/vw units to 0 */
       html, body { margin: 0; padding: 0; background: ${colors.brand}; width: 100%; height: 100%; }
       #map { height: 100%; width: 100%; }
-      .leaflet-popup-content-wrapper { background: ${colors.brand}; color: white; border-radius: 12px; }
-      .leaflet-popup-tip { background: ${colors.brand}; }
-      .leaflet-control-attribution { display: none; }
-
-      /*brightness of the map, darken it so the pin can show*/
-      #map:not(.satellite) .leaflet-tile {
-        filter: brightness(.9);
-      }
-      #map.satellite .leaflet-tile {
-        filter: brightness(.8);
-      }
+      ${getMapLibreBaseCss()}
       ${CAMPUS_MAP_PIN_CSS}
     </style>
   </head>
@@ -362,106 +359,41 @@ export default function MapScreen() {
       };
 
       try {
-        const center = [${validLat}, ${validLng}];
         const pinSvg = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 22s7-6.4 7-12a7 7 0 1 0-14 0c0 5.6 7 12 7 12z" fill="${colors.accent}" stroke="${colors.brand}" stroke-width="1.5" stroke-linejoin="round"/><circle cx="12" cy="10" r="2.5" fill="${colors.white}"/></svg>');
-        const spotIcon = L.divIcon({
-          className: 'skateu-pin',
-          iconSize: [50, 50],
-          iconAnchor: [25, 50],
-          html: '<img class="skateu-pin-shadow" alt="" width="41" height="41" src="https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png" /><span class="skateu-pin-scale"><img class="skateu-pin-img" alt="" width="50" height="50" src="' + pinSvg + '" /></span>',
-        });
+        const pinHtml = '<img class="skateu-pin-shadow" alt="" width="41" height="41" src="https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png" /><span class="skateu-pin-scale"><img class="skateu-pin-img" alt="" width="50" height="50" src="' + pinSvg + '" /></span>';
 
-        window.map = L.map('map', {
-          zoomControl: false,
-          attributionControl: false,
-        }).setView(center, 15.5);
+        ${getCreateMapLibreMapScript({
+          latitude: validLat,
+          longitude: validLng,
+          layer: htmlMapLayer === 'satellite' ? 'satellite' : 'default',
+        })}
         ${getLeafletUserLocationScript()}
-        const defaultLayer = L.tileLayer(
-          'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-          { attribution: '&copy; OpenStreetMap contributors &copy; CARTO' }
-        );
-        const satelliteLayer = L.tileLayer(
-          'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}.png',
-          { attribution: 'Tiles &copy; Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community' }
-        );
-        const reportTileError = function () {
-          if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'TILE_ERROR',
-              message: 'Map tiles could not be loaded.'
-            }));
-          }
-        };
-        defaultLayer.on('tileerror', reportTileError);
-        satelliteLayer.on('tileerror', reportTileError);
 
-        const selectedLayer = '${htmlMapLayer}' === 'satellite'
-          ? satelliteLayer
-          : defaultLayer;
-        window.currentLayer = selectedLayer.addTo(window.map);
-        document.getElementById('map').classList.toggle(
-          'satellite',
-          '${htmlMapLayer}' === 'satellite'
-        );
-
-        const campusCenter = L.latLng(${validLat}, ${validLng});
         window.recenterMap = function () {
           if (!window.map) return;
-          window.map.setView(campusCenter, window.map.getZoom(), { animate: true });
+          window.map.easeTo({
+            center: [${validLng}, ${validLat}],
+            zoom: window.map.getZoom(),
+          });
         };
 
         window.focusLatLng = function (lat, lng, bottomPadding, topPadding) {
           if (!window.map) return;
-          const target = L.latLng(lat, lng);
           const zoom = window.map.getZoom();
-          const size = window.map.getSize();
+          const container = window.map.getContainer();
+          const height = container.clientHeight || window.innerHeight || 0;
           const top = Number(topPadding) || 0;
           const bottom = Number(bottomPadding) || 0;
-          const visibleMidY = top + Math.max(size.y - top - bottom, 0) / 2;
-          const targetPoint = window.map.project(target, zoom);
-          const desiredCenter = window.map.unproject(
-            L.point(
-              targetPoint.x,
-              targetPoint.y - (visibleMidY - size.y / 2)
-            ),
-            zoom
-          );
-          window.map.setView(desiredCenter, zoom, { animate: false });
-        };
-
-        window.setMapLayer = function (layer) {
-          if (!window.map || (layer !== 'default' && layer !== 'satellite')) return;
-
-          const center = window.map.getCenter();
-          const zoom = window.map.getZoom();
-
-          if (layer === 'satellite' && window.currentLayer === defaultLayer) {
-            window.map.removeLayer(defaultLayer);
-            satelliteLayer.addTo(window.map);
-            window.currentLayer = satelliteLayer;
-            document.getElementById('map').classList.add('satellite');
-          } else if (layer === 'default' && window.currentLayer === satelliteLayer) {
-            window.map.removeLayer(satelliteLayer);
-            defaultLayer.addTo(window.map);
-            window.currentLayer = defaultLayer;
-            document.getElementById('map').classList.remove('satellite');
-          }
-
-          window.map.setView(center, zoom, { animate: false });
-
-          if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'LAYER_TOGGLED',
-              layer: window.currentLayer === satelliteLayer ? 'satellite' : 'default',
-            }));
-          }
-        };
-
-        window.toggleLayer = function () {
-          if (!window.map) return;
-          window.setMapLayer(
-            window.currentLayer === defaultLayer ? 'satellite' : 'default'
-          );
+          const visibleMidY = top + Math.max(height - top - bottom, 0) / 2;
+          const targetPoint = window.map.project([lng, lat]);
+          const desiredCenter = window.map.unproject([
+            targetPoint.x,
+            targetPoint.y - (visibleMidY - height / 2)
+          ]);
+          window.map.jumpTo({
+            center: [desiredCenter.lng, desiredCenter.lat],
+            zoom: zoom,
+          });
         };
 
         window.sendCenter = function () {
@@ -471,22 +403,12 @@ export default function MapScreen() {
             type: 'CURRENT_CENTER',
             latitude: center.lat,
             longitude: center.lng,
-            layer: window.currentLayer === satelliteLayer ? 'satellite' : 'default',
+            layer: window.currentLayer === 'satellite' ? 'satellite' : 'default',
           }));
         };
 
         window.markers = {};
         ${getCampusMapPinScript()}
-
-        function escapeHtml(text) {
-          return String(text)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;')
-            .replace(/\\//g, '&#x2F;');
-        }
 
         window.renderSpots = function (spotsData) {
           if (window.resetPinAnimations) {
@@ -496,12 +418,18 @@ export default function MapScreen() {
           window.markers = {};
 
           spotsData.forEach(spot => {
-            const marker = L.marker([spot.latitude, spot.longitude], {
-              title: spot.name,
-              icon: spotIcon,
-            }).addTo(window.map);
+            const el = document.createElement('div');
+            el.className = 'skateu-pin';
+            el.innerHTML = pinHtml;
+            const marker = new maplibregl.Marker({
+              element: el,
+              anchor: 'bottom',
+            })
+              .setLngLat([spot.longitude, spot.latitude])
+              .addTo(window.map);
 
-            marker.on('click', () => {
+            el.addEventListener('click', function (event) {
+              event.stopPropagation();
               if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
                 window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'MARKER_PRESS', id: spot.id }));
               }
@@ -515,20 +443,20 @@ export default function MapScreen() {
           }
         };
 
-        if (${initialSpotId ? 'true' : 'false'}) {
-          window.focusLatLng(
-            ${validLat},
-            ${validLng},
-            Math.round((window.innerHeight || 0) * 0.56) + 16,
-            ${insets.top + 81}
-          );
-        }
-
-        if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'WEBVIEW_READY' }));
-        }
+        window.onMapReady(function () {
+          if (${initialSpotId ? 'true' : 'false'}) {
+            window.focusLatLng(
+              ${validLat},
+              ${validLng},
+              Math.round((window.innerHeight || 0) * 0.56) + 16,
+              ${insets.top + 81}
+            );
+          }
+          if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'WEBVIEW_READY' }));
+          }
+        });
       } catch (e) {
-        // Catch initialization errors (like 'L is not defined')
         if (window.ReactNativeWebView) {
           window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'CONSOLE_ERROR',
@@ -1157,6 +1085,7 @@ export default function MapScreen() {
         latitude?: number;
         longitude?: number;
         layer?: string;
+        bearing?: number;
       };
 
       // When the WebView finishes loading, it will notify us so we can send markers
@@ -1165,6 +1094,7 @@ export default function MapScreen() {
         webViewReadyRef.current = true;
         setMapStatus('ready');
         setMapError('');
+        setMapBearing(0);
         sendMarkers();
         return;
       }
@@ -1196,6 +1126,12 @@ export default function MapScreen() {
         const layer = data.layer === 'satellite' ? 'satellite' : 'default';
         setMapLayer(layer);
         setSharedMapLayer(layer);
+        return;
+      }
+
+      if (data.type === 'BEARING_CHANGED' && typeof data.bearing === 'number') {
+        if (!Number.isFinite(data.bearing)) return;
+        setMapBearing(((data.bearing % 360) + 360) % 360);
         return;
       }
 
@@ -1314,6 +1250,15 @@ export default function MapScreen() {
         accessibilityRole="toolbar"
         accessibilityLabel="Map navigation"
       >
+        <MapCompassButton
+          bearing={mapBearing}
+          disabled={mapStatus !== 'ready'}
+          onPress={() => {
+            webViewRef.current?.injectJavaScript(
+              `if (window.resetMapNorth) { window.resetMapNorth(); } true;`
+            );
+          }}
+        />
         <FeedbackPressable
           haptic="selection"
           onPress={() => {

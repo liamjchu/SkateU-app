@@ -239,6 +239,32 @@ describe('profileStore.username', () => {
       message: 'That username is already taken.',
     });
   });
+
+  it('throws claim failures and lookup errors', async () => {
+    fetchMock.mockResolvedValueOnce(mockResponse({ error: 'rate limited' }, false));
+    await expect(
+      useProfileStore.getState().claimUsername('token', 'liam')
+    ).rejects.toThrow('rate limited');
+
+    fetchMock.mockResolvedValueOnce(mockResponse({ allowed: true }, true));
+    await expect(
+      useProfileStore.getState().claimUsername('token', 'liam')
+    ).rejects.toThrow('Could not save the username right now. Try again.');
+
+    const abort = new Error('Aborted');
+    abort.name = 'AbortError';
+    fetchMock.mockRejectedValueOnce(abort);
+    await expect(
+      useProfileStore.getState().claimUsername('token', 'liam')
+    ).rejects.toThrow('Saving the username timed out. Please try again.');
+
+    mockFrom.mockReturnValue(
+      createQuery({ data: null, error: { message: 'lookup failed' } })
+    );
+    await expect(
+      useProfileStore.getState().isUsernameAvailable('liam')
+    ).rejects.toMatchObject({ message: 'lookup failed' });
+  });
 });
 
 describe('profileStore.acceptLegal', () => {
@@ -259,6 +285,23 @@ describe('profileStore.acceptLegal', () => {
     await useProfileStore.getState().acceptLegal('token');
     expect(useProfileStore.getState().profile?.legal_version).toBe('2026-08-20');
     expect(useProfileStore.getState().loaded).toBe(true);
+  });
+
+  it('throws when agreement cannot be saved', async () => {
+    fetchMock.mockResolvedValueOnce(mockResponse({ error: 'nope' }, false));
+    await expect(useProfileStore.getState().acceptLegal('token')).rejects.toThrow('nope');
+
+    fetchMock.mockResolvedValueOnce(mockResponse({}, true));
+    await expect(useProfileStore.getState().acceptLegal('token')).rejects.toThrow(
+      'Could not save your agreement right now. Try again.'
+    );
+
+    const abort = new Error('Aborted');
+    abort.name = 'AbortError';
+    fetchMock.mockRejectedValueOnce(abort);
+    await expect(useProfileStore.getState().acceptLegal('token')).rejects.toThrow(
+      'Saving your agreement timed out. Please try again.'
+    );
   });
 
   it('clears in-flight state', () => {
@@ -285,5 +328,44 @@ describe('profileStore.acceptLegal', () => {
       error: null,
       welcomeAboardUserId: null,
     });
+  });
+
+  it('loads a public profile without a session token and merges persisted state', async () => {
+    mockFrom.mockReturnValue(
+      createQuery({
+        data: {
+          id: 'user-1',
+          username: 'liam',
+          avatar_url: null,
+          updated_at: '2026-08-21T00:00:00.000Z',
+        },
+        error: null,
+      })
+    );
+    await useProfileStore.getState().fetchProfile('user-1');
+    expect(useProfileStore.getState().profile?.username).toBe('liam');
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    const merge = useProfileStore.persist.getOptions().merge;
+    expect(merge).toBeDefined();
+    const merged = merge!(
+      {
+        profile: {
+          id: 'user-1',
+          username: 'liam',
+          avatar_url: null,
+          updated_at: null,
+          legal_version: null,
+          legal_accepted_at: null,
+          age_attested_at: null,
+        },
+      },
+      useProfileStore.getState()
+    );
+    expect(merged.loaded).toBe(true);
+    expect(merged.profile?.id).toBe('user-1');
+    expect(merge!(null, useProfileStore.getState()).profile).toBeNull();
+    useProfileStore.getState().setHasHydrated(true);
+    expect(useProfileStore.getState().hasHydrated).toBe(true);
   });
 });

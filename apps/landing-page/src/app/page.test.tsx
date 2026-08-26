@@ -13,7 +13,7 @@ import Home from "./page";
 afterEach(cleanup);
 
 describe("Home", () => {
-  it("renders the landing-page message and waitlist form", () => {
+  it("renders the landing-page message and beta access paths", () => {
     const container = render(<Home />);
     const skipLink = container.querySelector('a[href="#main-content"]');
 
@@ -23,7 +23,16 @@ describe("Home", () => {
     expect(container.textContent).toContain("Now you do too");
     expect(container.textContent).toContain("finding, liking, and sharing");
     expect(container.textContent).not.toContain("finding, rating, and sharing");
-    expect(container.querySelector('form[aria-label="Join the SkateU waitlist"]')).not.toBeNull();
+    expect(container.textContent).toContain("Beta is open");
+    expect(container.textContent).toContain("Install with TestFlight");
+    expect(container.textContent).toContain("Send your Play email");
+    expect(
+      container.querySelector('a[href="https://testflight.apple.com/join/GPHRqSmN"]')
+        ?.textContent
+    ).toContain("Get the iOS beta");
+    expect(
+      container.querySelector('form[aria-label="Request Android beta access"]')
+    ).not.toBeNull();
     const legalNav = container.querySelector('nav[aria-label="Legal"]');
     expect(legalNav).not.toBeNull();
     expect(legalNav?.querySelectorAll("a")).toHaveLength(1);

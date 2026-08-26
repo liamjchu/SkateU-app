@@ -195,6 +195,62 @@ describe('POST /api/accept-legal', () => {
 });
 
 describe('GET /api/accept-legal', () => {
+  it('returns 401 when the Authorization header is absent', async () => {
+    setConfigured();
+    const response = await GET(getRequest());
+    expect(response.status).toBe(401);
+  });
+
+  it('returns 500 when the service-role key is missing', async () => {
+    process.env.SUPABASE_URL = 'https://project.supabase.co';
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const response = await GET(
+      getRequest({ Authorization: 'Bearer good-token' })
+    );
+    expect(response.status).toBe(500);
+  });
+
+  it('returns 401 when the access token is rejected', async () => {
+    setConfigured();
+    global.fetch = jest.fn(async () =>
+      jsonResponse({ message: 'invalid' }, 401)
+    ) as unknown as typeof fetch;
+    const response = await GET(
+      getRequest({ Authorization: 'Bearer bad-token' })
+    );
+    expect(response.status).toBe(401);
+  });
+
+  it('returns 502 when the merged profile is missing', async () => {
+    setConfigured();
+    global.fetch = jest.fn(async (input) => {
+      const url = String(input);
+      if (url.includes('/auth/v1/user')) {
+        return jsonResponse({ id: 'user-1' });
+      }
+      return jsonResponse([]);
+    }) as unknown as typeof fetch;
+    const response = await GET(
+      getRequest({ Authorization: 'Bearer good-token' })
+    );
+    expect(response.status).toBe(502);
+  });
+
+  it('maps a timed-out profile fetch', async () => {
+    setConfigured();
+    const abort = new Error('Aborted');
+    abort.name = 'AbortError';
+    global.fetch = jest.fn(async (input) => {
+      if (String(input).includes('/auth/v1/user')) {
+        return jsonResponse({ id: 'user-1' });
+      }
+      throw abort;
+    }) as unknown as typeof fetch;
+    const response = await GET(
+      getRequest({ Authorization: 'Bearer good-token' })
+    );
+    expect(response.status).toBe(504);
+  });
   it('returns the caller’s public profile merged with private legal fields', async () => {
     setConfigured();
     global.fetch = jest.fn(async (input) => {
@@ -285,6 +341,51 @@ describe('GET /api/accept-legal', () => {
     };
     expect(payload.profile.username).toBe('liam');
     expect(payload.profile.legal_version).toBe(LEGAL_VERSION);
+  });
+
+  it('returns 401 when the access token is rejected', async () => {
+    setConfigured();
+    global.fetch = jest.fn(async () =>
+      jsonResponse({ message: 'invalid' }, 401)
+    ) as unknown as typeof fetch;
+    const response = await POST(
+      postRequest({ Authorization: 'Bearer bad-token' })
+    );
+    expect(response.status).toBe(401);
+  });
+
+  it('returns 502 when the saved profile cannot be loaded', async () => {
+    setConfigured();
+    global.fetch = jest.fn(async (input, init) => {
+      const url = String(input);
+      if (url.includes('/auth/v1/user')) {
+        return jsonResponse({ id: 'user-1' });
+      }
+      if (url.includes('/rest/v1/profile_legal') && init?.method === 'POST') {
+        return jsonResponse(null, 201);
+      }
+      return jsonResponse([]);
+    }) as unknown as typeof fetch;
+    const response = await POST(
+      postRequest({ Authorization: 'Bearer good-token' })
+    );
+    expect(response.status).toBe(502);
+  });
+
+  it('maps a timed-out save', async () => {
+    setConfigured();
+    const abort = new Error('Aborted');
+    abort.name = 'AbortError';
+    global.fetch = jest.fn(async (input) => {
+      if (String(input).includes('/auth/v1/user')) {
+        return jsonResponse({ id: 'user-1' });
+      }
+      throw abort;
+    }) as unknown as typeof fetch;
+    const response = await POST(
+      postRequest({ Authorization: 'Bearer good-token' })
+    );
+    expect(response.status).toBe(504);
   });
 });
 

@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: August 25, 2026
+Last updated: August 26, 2026
 
 This Privacy Policy explains what information SkateU collects, how it is used, and the choices you have. It covers the SkateU mobile app and the SkateU website at skateu.app.
 
@@ -64,13 +64,15 @@ The app stores some information on your device, including:
 - Unpublished spot drafts, including the name, description, map pin, and photos you started adding. Drafts stay on that device until you post or delete them. They are not uploaded to SkateU until you post. Logging out does not necessarily delete them. You can delete a draft from Profile. Deleting your account clears drafts for that account on that device. Removing the app from a device also removes local drafts.
 - On iOS, a stored Apple user identifier used only to check whether Apple Sign In is still authorized.
 
-### Website waitlist
+### Website Android beta requests
 
-If you join the waitlist on skateu.app, you must be at least 13 years old. We collect your email address so we can confirm it and notify you. That waitlist is separate from a SkateU app account. We do not store your 13+ confirmation with the waitlist record.
+If you request Android beta access on skateu.app, you must be at least 13 years old. We collect your email address so we can confirm it and add you as a tester in Google Play’s closed test. That list is separate from a SkateU app account. We do not store your 13+ confirmation with the beta request record.
 
-The website may briefly use your IP address to limit waitlist signup abuse. We do not store that IP address as part of your waitlist record.
+iOS testers install through Apple TestFlight. We do not collect an email on the website for iOS. Apple collects information under Apple’s privacy policy.
 
-The website may also save the waitlist email you typed in your browser’s local storage so the form can remember it.
+The website may briefly use your IP address to limit signup abuse. We do not store that IP address as part of your beta request record.
+
+The website may also save the beta email you typed in your browser’s local storage so the form can remember it.
 
 ### Information we do not collect in the app
 
@@ -116,7 +118,7 @@ We use this information to:
 - Feature public spots, photos, descriptions, campus names, and usernames on SkateU’s Instagram, TikTok, and YouTube
 - Operate, secure, and improve SkateU
 - Communicate with you when you contact us
-- Send waitlist confirmation or related messages if you joined the website waitlist
+- Send confirmation or related messages if you requested Android beta access on the website
 
 ## 3. Moderation
 
@@ -138,12 +140,13 @@ We share information in these limited ways:
 - **SkateU social accounts.** We may post public spots, photos, descriptions, campus names, and usernames on Instagram, TikTok, and YouTube. Those platforms receive whatever we post and have their own terms. This is featuring content you already made public in the app. It is not selling your information and it is not advertising targeting.
 - **Service providers.** We use companies that help us run SkateU. They receive information needed to provide their service:
   - Supabase, for accounts, database storage, and photo storage
-  - Google and Apple, if you sign in with those services
+  - Google, if you sign in with Google or if we add your confirmed website email to a Google Play closed test
+  - Apple, if you sign in with Apple or install the iOS beta through TestFlight
   - OpenAI, for automated moderation of the content listed above
-  - Resend, to send certain emails, including waitlist confirmation and operator notices when a spot needs review
+  - Resend, to send certain emails, including Android beta confirmation and operator notices when a spot needs review
   - Sentry, for crash reports when that SDK is configured for the app build
   - PostHog, for product analytics when that SDK is configured for the app build
-  - Map tile providers (including CARTO / OpenStreetMap and Esri) and map libraries, which receive network requests when you view maps
+  - Map tile providers (including OpenFreeMap / OpenStreetMap and Esri) and map libraries, which receive network requests when you view maps
   - Expo, which we use to build and run the app
 - **Website analytics.** The marketing website uses Vercel Analytics. That is separate from the mobile app and is not installed in the SkateU app.
 - **Legal reasons.** We may disclose information if we believe it is required by law or needed to protect people, SkateU, or others.
@@ -159,7 +162,7 @@ We keep account and content information while your account is open and as needed
 - Spot removal requests associated with your account are deleted when the account is deleted
 - Comment reports and account blocks associated with your account are deleted when the account is deleted
 - Short-lived verification records used to confirm account deletion expire quickly and are then deleted
-- Waitlist confirmation links expire after a limited time
+- Android beta confirmation links expire after a limited time
 
 Hosting providers and moderation or email providers may retain logs or content according to their own practices. This policy does not control those third-party retention periods.
 

@@ -53,4 +53,45 @@ describe('favoritesStore', () => {
     useFavorites.getState().setHasHydrated(true);
     expect(useFavorites.getState().hasHydrated).toBe(true);
   });
+
+  it('merges persisted favorites and drops schools that are no longer saved', () => {
+    const merge = useFavorites.persist.getOptions().merge;
+    expect(merge).toBeDefined();
+    const current = useFavorites.getState();
+    const merged = merge!(
+      {
+        favoriteSchoolIds: ['school-1', 2, 'school-2'],
+        favoriteSchools: [
+          school,
+          {
+            id: 'school-2',
+            name: 'Other',
+            lat: 1,
+            lng: 2,
+            city: 'Austin',
+            state: 'TX',
+            numSpots: 1,
+          },
+        ],
+      },
+      current
+    );
+
+    expect(merged.favoriteSchoolIds).toEqual(['school-1', 'school-2']);
+    expect(merged.favoriteSchools.map((item) => item.id)).toEqual([
+      'school-1',
+      'school-2',
+    ]);
+
+    expect(merge!(null, current).favoriteSchoolIds).toEqual([]);
+    expect(merge!({ favoriteSchoolIds: 'nope' }, current).favoriteSchools).toEqual(
+      []
+    );
+  });
+
+  it('runs the hydration listener', () => {
+    const onRehydrate = useFavorites.persist.getOptions().onRehydrateStorage;
+    onRehydrate?.(useFavorites.getState())?.();
+    expect(useFavorites.getState().hasHydrated).toBe(true);
+  });
 });

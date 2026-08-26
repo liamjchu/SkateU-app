@@ -13,7 +13,8 @@
     "typecheck": "npx tsc --noEmit && npm run typecheck:functions",
     "typecheck:functions": "deno check supabase/functions/send-confirmation/index.ts",
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "postinstall": "node ./scripts/patch-expo-ws-tunnel.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/outfit": "^0.4.3",

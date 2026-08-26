@@ -185,7 +185,7 @@ describe("POST /api/subscribe", () => {
 
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({
-      error: "Unable to join the waitlist.",
+      error: "Unable to save your email.",
     });
     expect(fetchMock).not.toHaveBeenCalled();
   });

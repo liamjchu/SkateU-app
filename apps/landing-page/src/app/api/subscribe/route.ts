@@ -17,13 +17,13 @@ import {
 const dispatchTimeoutMs = 15_000;
 
 const failureResponse = () =>
-  NextResponse.json({ error: "Unable to join the waitlist." }, { status: 500 });
+  NextResponse.json({ error: "Unable to save your email." }, { status: 500 });
 const invalidRequestResponse = () =>
   NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
 
 function rateLimitResponse(retryAfterSeconds: number): NextResponse {
   return NextResponse.json(
-    { error: "Too many waitlist requests. Please try again later." },
+    { error: "Too many beta requests. Please try again later." },
     {
       status: 429,
       headers: { "Retry-After": retryAfterSeconds.toString() },
@@ -123,7 +123,7 @@ async function handleSubscription(request: Request): Promise<NextResponse> {
 
   if (!("confirmedAge13Plus" in payload) || payload.confirmedAge13Plus !== true) {
     return NextResponse.json(
-      { error: "You must be at least 13 years old to join the waitlist." },
+      { error: "You must be at least 13 years old to request Android beta access." },
       { status: 400 }
     );
   }
