@@ -31,12 +31,15 @@ import Animated, {
     useSharedValue,
     withTiming,
 } from 'react-native-reanimated';
+import { useIsFocused } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import FeedbackPressable from '../components/FeedbackPressable';
 import LoginRequiredModal from '../components/LoginRequiredModal';
+import MapCompassButton from '../components/MapCompassButton';
 import MapSpotSheetPage from '../components/map-spot-sheet-page';
 import SpotFullscreenViewer from '../components/spot-fullscreen-viewer';
+import StaleCacheBanner from '../components/StaleCacheBanner';
 import { StickerStripe } from '../components/sticker';
 import images from '../constants/images';
 import { colors } from '../constants/colors';
@@ -45,15 +48,31 @@ import {
     buildSelectSpotJavascript,
     getCampusMapPinScript,
 } from '../lib/campusMapPins';
+import { goToMyLocation } from '../lib/goToMyLocation';
+import {
+    CAMPUS_USER_LOCATION_ZOOM,
+    buildGoToUserLocationJavascript,
+    buildSetUserLocationJavascript,
+    CLEAR_USER_LOCATION_JAVASCRIPT,
+    getLeafletUserLocationScript,
+} from '../lib/leafletUserLocation';
+import {
+    getCreateMapLibreMapScript,
+    getMapLibreBaseCss,
+    getMapLibreHeadTags,
+} from '../lib/openFreeMap';
+import { captureAnalyticsEvent } from '../lib/analytics';
 import { triggerHaptic } from '../lib/haptics';
 import { sortSpotsByDistanceFrom } from '../lib/spotDistance';
 import {
     getSpotSelectionStatus,
     SPOT_LOAD_FAILED_MESSAGE,
 } from '../lib/spotAvailability';
-import { toUserFacingError } from '../lib/userFacingError';
+import { STALE_SPOTS_MESSAGE } from '../lib/readCache';
+import { toMutationError } from '../lib/userFacingError';
 import { guardedNavigate } from '../lib/navigationGuard';
 import { draftsForSchool } from '../lib/spotDraft';
+import { useUserLocation } from '../hooks/useUserLocation';
 import { useAuthStore } from '../store/authStore';
 import { useBlocksStore } from '../store/blocksStore';
 import { useCommentsStore } from '../store/commentsStore';
@@ -69,13 +88,14 @@ const COLLAPSED_SHEET_HEIGHT = 100;
 const TILE_ERROR_THRESHOLD = 3;
 
 const MAP_ATTRIBUTIONS = {
-  default: '© OpenStreetMap contributors © CARTO',
+  default:
+    '© OpenFreeMap © OpenMapTiles © OpenStreetMap contributors',
   satellite:
     'Tiles © Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
 } as const;
 
 const MAP_ATTRIBUTION_SHORT = {
-  default: '© OpenStreetMap · CARTO',
+  default: '© OpenStreetMap · OpenFreeMap',
   satellite: 'Tiles © Esri',
 } as const;
 
@@ -119,6 +139,13 @@ export default function MapScreen() {
   const [mapAttempt, setMapAttempt] = useState(0);
   const [mapStatus, setMapStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [mapError, setMapError] = useState('');
+  const [mapBearing, setMapBearing] = useState(0);
+  const isFocused = useIsFocused();
+  const {
+    coords: userLocation,
+    status: userLocationStatus,
+    requestPermission: requestUserLocationPermission,
+  } = useUserLocation(isFocused && mapStatus === 'ready');
   const [selectedSpotId, setSelectedSpotId] = useState<string | undefined>(
     undefined
   );
@@ -151,7 +178,6 @@ export default function MapScreen() {
   const [sheetOriginId, setSheetOriginId] = useState<string | undefined>(
     undefined
   );
-  const [sheetPagerEnabled, setSheetPagerEnabled] = useState(true);
   const sheetListRef = useRef<FlatList<Spot>>(null);
   const didSelectInitialSpotRef = useRef(false);
   const [likingSpotId, setLikingSpotId] = useState<string | null>(null);
@@ -242,6 +268,23 @@ export default function MapScreen() {
     () => spots.find((spot) => spot.id === selectedSpotId),
     [selectedSpotId, spots]
   );
+
+  useEffect(() => {
+    if (schoolId) {
+      captureAnalyticsEvent('map_opened', { school_id: schoolId });
+    }
+  }, [schoolId]);
+
+  useEffect(() => {
+    if (!selectedSpotId) {
+      return;
+    }
+
+    captureAnalyticsEvent('spot_opened', {
+      spot_id: selectedSpotId,
+      ...(schoolId ? { school_id: schoolId } : {}),
+    });
+  }, [schoolId, selectedSpotId]);
   const selectedSpotIsOwned = Boolean(
     session?.user &&
       selectedSpot &&
@@ -292,23 +335,12 @@ export default function MapScreen() {
   <html>
   <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    ${getMapLibreHeadTags()}
     <style>
       /* FIXED: Changed 100vh/100vw to 100%. WebViews often collapse vh/vw units to 0 */
       html, body { margin: 0; padding: 0; background: ${colors.brand}; width: 100%; height: 100%; }
       #map { height: 100%; width: 100%; }
-      .leaflet-popup-content-wrapper { background: ${colors.brand}; color: white; border-radius: 12px; }
-      .leaflet-popup-tip { background: ${colors.brand}; }
-      .leaflet-control-attribution { display: none; }
-
-      /*brightness of the map, darken it so the pin can show*/
-      #map:not(.satellite) .leaflet-tile {
-        filter: brightness(.9);
-      }
-      #map.satellite .leaflet-tile {
-        filter: brightness(.8);
-      }
+      ${getMapLibreBaseCss()}
       ${CAMPUS_MAP_PIN_CSS}
     </style>
   </head>
@@ -327,105 +359,41 @@ export default function MapScreen() {
       };
 
       try {
-        const center = [${validLat}, ${validLng}];
         const pinSvg = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 22s7-6.4 7-12a7 7 0 1 0-14 0c0 5.6 7 12 7 12z" fill="${colors.accent}" stroke="${colors.brand}" stroke-width="1.5" stroke-linejoin="round"/><circle cx="12" cy="10" r="2.5" fill="${colors.white}"/></svg>');
-        const spotIcon = L.divIcon({
-          className: 'skateu-pin',
-          iconSize: [50, 50],
-          iconAnchor: [25, 50],
-          html: '<img class="skateu-pin-shadow" alt="" width="41" height="41" src="https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png" /><span class="skateu-pin-scale"><img class="skateu-pin-img" alt="" width="50" height="50" src="' + pinSvg + '" /></span>',
-        });
+        const pinHtml = '<img class="skateu-pin-shadow" alt="" width="41" height="41" src="https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png" /><span class="skateu-pin-scale"><img class="skateu-pin-img" alt="" width="50" height="50" src="' + pinSvg + '" /></span>';
 
-        window.map = L.map('map', {
-          zoomControl: false,
-          attributionControl: false,
-        }).setView(center, 15.5);
-        const defaultLayer = L.tileLayer(
-          'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-          { attribution: '&copy; OpenStreetMap contributors &copy; CARTO' }
-        );
-        const satelliteLayer = L.tileLayer(
-          'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}.png',
-          { attribution: 'Tiles &copy; Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community' }
-        );
-        const reportTileError = function () {
-          if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'TILE_ERROR',
-              message: 'Map tiles could not be loaded.'
-            }));
-          }
-        };
-        defaultLayer.on('tileerror', reportTileError);
-        satelliteLayer.on('tileerror', reportTileError);
+        ${getCreateMapLibreMapScript({
+          latitude: validLat,
+          longitude: validLng,
+          layer: htmlMapLayer === 'satellite' ? 'satellite' : 'default',
+        })}
+        ${getLeafletUserLocationScript()}
 
-        const selectedLayer = '${htmlMapLayer}' === 'satellite'
-          ? satelliteLayer
-          : defaultLayer;
-        window.currentLayer = selectedLayer.addTo(window.map);
-        document.getElementById('map').classList.toggle(
-          'satellite',
-          '${htmlMapLayer}' === 'satellite'
-        );
-
-        const campusCenter = L.latLng(${validLat}, ${validLng});
         window.recenterMap = function () {
           if (!window.map) return;
-          window.map.setView(campusCenter, window.map.getZoom(), { animate: true });
+          window.map.easeTo({
+            center: [${validLng}, ${validLat}],
+            zoom: window.map.getZoom(),
+          });
         };
 
         window.focusLatLng = function (lat, lng, bottomPadding, topPadding) {
           if (!window.map) return;
-          const target = L.latLng(lat, lng);
           const zoom = window.map.getZoom();
-          const size = window.map.getSize();
+          const container = window.map.getContainer();
+          const height = container.clientHeight || window.innerHeight || 0;
           const top = Number(topPadding) || 0;
           const bottom = Number(bottomPadding) || 0;
-          const visibleMidY = top + Math.max(size.y - top - bottom, 0) / 2;
-          const targetPoint = window.map.project(target, zoom);
-          const desiredCenter = window.map.unproject(
-            L.point(
-              targetPoint.x,
-              targetPoint.y - (visibleMidY - size.y / 2)
-            ),
-            zoom
-          );
-          window.map.setView(desiredCenter, zoom, { animate: false });
-        };
-
-        window.setMapLayer = function (layer) {
-          if (!window.map || (layer !== 'default' && layer !== 'satellite')) return;
-
-          const center = window.map.getCenter();
-          const zoom = window.map.getZoom();
-
-          if (layer === 'satellite' && window.currentLayer === defaultLayer) {
-            window.map.removeLayer(defaultLayer);
-            satelliteLayer.addTo(window.map);
-            window.currentLayer = satelliteLayer;
-            document.getElementById('map').classList.add('satellite');
-          } else if (layer === 'default' && window.currentLayer === satelliteLayer) {
-            window.map.removeLayer(satelliteLayer);
-            defaultLayer.addTo(window.map);
-            window.currentLayer = defaultLayer;
-            document.getElementById('map').classList.remove('satellite');
-          }
-
-          window.map.setView(center, zoom, { animate: false });
-
-          if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'LAYER_TOGGLED',
-              layer: window.currentLayer === satelliteLayer ? 'satellite' : 'default',
-            }));
-          }
-        };
-
-        window.toggleLayer = function () {
-          if (!window.map) return;
-          window.setMapLayer(
-            window.currentLayer === defaultLayer ? 'satellite' : 'default'
-          );
+          const visibleMidY = top + Math.max(height - top - bottom, 0) / 2;
+          const targetPoint = window.map.project([lng, lat]);
+          const desiredCenter = window.map.unproject([
+            targetPoint.x,
+            targetPoint.y - (visibleMidY - height / 2)
+          ]);
+          window.map.jumpTo({
+            center: [desiredCenter.lng, desiredCenter.lat],
+            zoom: zoom,
+          });
         };
 
         window.sendCenter = function () {
@@ -435,22 +403,12 @@ export default function MapScreen() {
             type: 'CURRENT_CENTER',
             latitude: center.lat,
             longitude: center.lng,
-            layer: window.currentLayer === satelliteLayer ? 'satellite' : 'default',
+            layer: window.currentLayer === 'satellite' ? 'satellite' : 'default',
           }));
         };
 
         window.markers = {};
         ${getCampusMapPinScript()}
-
-        function escapeHtml(text) {
-          return String(text)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;')
-            .replace(/\\//g, '&#x2F;');
-        }
 
         window.renderSpots = function (spotsData) {
           if (window.resetPinAnimations) {
@@ -460,12 +418,18 @@ export default function MapScreen() {
           window.markers = {};
 
           spotsData.forEach(spot => {
-            const marker = L.marker([spot.latitude, spot.longitude], {
-              title: spot.name,
-              icon: spotIcon,
-            }).addTo(window.map);
+            const el = document.createElement('div');
+            el.className = 'skateu-pin';
+            el.innerHTML = pinHtml;
+            const marker = new maplibregl.Marker({
+              element: el,
+              anchor: 'bottom',
+            })
+              .setLngLat([spot.longitude, spot.latitude])
+              .addTo(window.map);
 
-            marker.on('click', () => {
+            el.addEventListener('click', function (event) {
+              event.stopPropagation();
               if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
                 window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'MARKER_PRESS', id: spot.id }));
               }
@@ -479,20 +443,20 @@ export default function MapScreen() {
           }
         };
 
-        if (${initialSpotId ? 'true' : 'false'}) {
-          window.focusLatLng(
-            ${validLat},
-            ${validLng},
-            Math.round((window.innerHeight || 0) * 0.56) + 16,
-            ${insets.top + 81}
-          );
-        }
-
-        if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'WEBVIEW_READY' }));
-        }
+        window.onMapReady(function () {
+          if (${initialSpotId ? 'true' : 'false'}) {
+            window.focusLatLng(
+              ${validLat},
+              ${validLng},
+              Math.round((window.innerHeight || 0) * 0.56) + 16,
+              ${insets.top + 81}
+            );
+          }
+          if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'WEBVIEW_READY' }));
+          }
+        });
       } catch (e) {
-        // Catch initialization errors (like 'L is not defined')
         if (window.ReactNativeWebView) {
           window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'CONSOLE_ERROR',
@@ -573,6 +537,38 @@ export default function MapScreen() {
     selectedSpotIsOwned,
     session?.access_token,
   ]);
+
+  useEffect(() => {
+    if (mapStatus !== 'ready') {
+      return;
+    }
+
+    if (!userLocation) {
+      webViewRef.current?.injectJavaScript(CLEAR_USER_LOCATION_JAVASCRIPT);
+      return;
+    }
+
+    webViewRef.current?.injectJavaScript(
+      buildSetUserLocationJavascript(
+        userLocation.latitude,
+        userLocation.longitude,
+        userLocation.accuracy
+      )
+    );
+  }, [mapStatus, userLocation]);
+
+  const handleGoToMyLocation = useCallback(() => {
+    void goToMyLocation({
+      status: userLocationStatus,
+      hasCoords: Boolean(userLocation),
+      requestPermission: requestUserLocationPermission,
+      onGoToLocation: () => {
+        webViewRef.current?.injectJavaScript(
+          buildGoToUserLocationJavascript(CAMPUS_USER_LOCATION_ZOOM)
+        );
+      },
+    });
+  }, [requestUserLocationPermission, userLocation, userLocationStatus]);
 
   useEffect(() => {
     if (mapStatus !== 'loading') {
@@ -840,7 +836,6 @@ export default function MapScreen() {
       return;
     }
 
-    setSheetPagerEnabled(true);
     sheetListRef.current?.scrollToIndex({ index, animated: true });
     selectionSourceRef.current = 'map';
     setSelectedSpotId(spot.id);
@@ -913,7 +908,7 @@ export default function MapScreen() {
     } catch (error) {
       Alert.alert(
         'Couldn’t update that like',
-        toUserFacingError(error, 'Please try again.')
+        toMutationError(error, 'Please try again.')
       );
     } finally {
       setLikingSpotId(null);
@@ -994,15 +989,14 @@ export default function MapScreen() {
     const accessToken = session.access_token;
     const label = target.creatorUsername
       ? `@${target.creatorUsername}`
-      : 'this skater';
+      : 'this account';
     Alert.alert(
       `Block ${label}?`,
-      'You won’t see their spots or comments. You can unblock them in Settings.',
+      'You won’t see their spots or comments. You can undo this in Settings.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Block',
-          style: 'destructive',
+          text: 'Block user',
           onPress: () => {
             void blockUser(blockedId, accessToken, target.creatorUsername)
               .then(() => {
@@ -1013,8 +1007,8 @@ export default function MapScreen() {
               })
               .catch((caught: unknown) => {
                 Alert.alert(
-                  'Couldn’t block that skater',
-                  toUserFacingError(caught, 'Please try again.')
+                  'Couldn’t block that user',
+                  toMutationError(caught, 'Please try again.')
                 );
               });
           },
@@ -1071,7 +1065,7 @@ export default function MapScreen() {
             } catch (error) {
               Alert.alert(
                 'Couldn’t delete that spot',
-                toUserFacingError(error, 'Please try again.')
+                toMutationError(error, 'Please try again.')
               );
             } finally {
               setDeletingSpotId(null);
@@ -1091,6 +1085,7 @@ export default function MapScreen() {
         latitude?: number;
         longitude?: number;
         layer?: string;
+        bearing?: number;
       };
 
       // When the WebView finishes loading, it will notify us so we can send markers
@@ -1099,6 +1094,7 @@ export default function MapScreen() {
         webViewReadyRef.current = true;
         setMapStatus('ready');
         setMapError('');
+        setMapBearing(0);
         sendMarkers();
         return;
       }
@@ -1130,6 +1126,12 @@ export default function MapScreen() {
         const layer = data.layer === 'satellite' ? 'satellite' : 'default';
         setMapLayer(layer);
         setSharedMapLayer(layer);
+        return;
+      }
+
+      if (data.type === 'BEARING_CHANGED' && typeof data.bearing === 'number') {
+        if (!Number.isFinite(data.bearing)) return;
+        setMapBearing(((data.bearing % 360) + 360) % 360);
         return;
       }
 
@@ -1248,6 +1250,15 @@ export default function MapScreen() {
         accessibilityRole="toolbar"
         accessibilityLabel="Map navigation"
       >
+        <MapCompassButton
+          bearing={mapBearing}
+          disabled={mapStatus !== 'ready'}
+          onPress={() => {
+            webViewRef.current?.injectJavaScript(
+              `if (window.resetMapNorth) { window.resetMapNorth(); } true;`
+            );
+          }}
+        />
         <FeedbackPressable
           haptic="selection"
           onPress={() => {
@@ -1285,6 +1296,27 @@ export default function MapScreen() {
           accessibilityState={{ disabled: mapStatus !== 'ready' }}
         >
           <Feather name="crosshair" size={26} color={colors.brand} />
+        </FeedbackPressable>
+        <FeedbackPressable
+          haptic="light"
+          onPress={handleGoToMyLocation}
+          disabled={mapStatus !== 'ready'}
+          className="h-14 w-14 items-center justify-center rounded-full bg-white"
+          style={styles.mapControl}
+          accessibilityRole="button"
+          accessibilityLabel="Go to my location"
+          accessibilityHint="Moves the map to your current location"
+          accessibilityState={{
+            disabled: mapStatus !== 'ready',
+            busy:
+              userLocationStatus === 'requesting' && userLocation == null,
+          }}
+        >
+          {userLocationStatus === 'requesting' && userLocation == null ? (
+            <ActivityIndicator color={colors.brand} />
+          ) : (
+            <Ionicons name="locate" size={26} color={colors.brand} />
+          )}
         </FeedbackPressable>
       </View>
       <View
@@ -1353,7 +1385,7 @@ export default function MapScreen() {
             : loginRequiredReason === 'spot_problem'
               ? 'Sign in to report a problem'
               : loginRequiredReason === 'block'
-                ? 'Sign in to block this skater'
+                ? 'Sign in to block this user'
                 : undefined
         }
         message={
@@ -1362,7 +1394,7 @@ export default function MapScreen() {
             : loginRequiredReason === 'spot_problem'
               ? 'You can still browse campuses. Sign in if you want to report a problem with this spot.'
               : loginRequiredReason === 'block'
-                ? 'You can still browse campuses. Sign in if you want to hide this skater’s spots and comments.'
+                ? 'You can still browse campuses. Sign in if you want to block this user.'
                 : undefined
         }
       />
@@ -1516,7 +1548,18 @@ export default function MapScreen() {
         </View>
       ) : null}
 
-      {mapStatus === 'ready' && error ? (
+      {mapStatus === 'ready' && error && spots.length > 0 && loadedSchoolId === schoolId ? (
+        <View
+          className="absolute left-4 right-4 z-40"
+          style={{ top: insets.top + 88 }}
+        >
+          <StaleCacheBanner
+            message={STALE_SPOTS_MESSAGE}
+            onRetry={retrySpots}
+            retryAccessibilityLabel="Retry loading skate spots"
+          />
+        </View>
+      ) : mapStatus === 'ready' && error ? (
         <View
           className="absolute left-4 right-4 z-40 rounded-2xl border border-errorBorder bg-field px-4 py-3"
           style={{ top: insets.top + 88 }}
@@ -1731,7 +1774,6 @@ export default function MapScreen() {
             pagingEnabled
             nestedScrollEnabled
             directionalLockEnabled
-            scrollEnabled={sheetPagerEnabled}
             showsHorizontalScrollIndicator={false}
             getItemLayout={(_data, index) => ({
               length: sheetWidth,
@@ -1770,8 +1812,6 @@ export default function MapScreen() {
                 onReportProblem={() => handleReportProblemPress(item)}
                 onRequestRemoval={() => handleRequestRemovalPress(item)}
                 onBlockCreator={() => handleBlockCreatorPress(item)}
-                onPhotoZoneTouch={() => setSheetPagerEnabled(false)}
-                onDetailsZoneTouch={() => setSheetPagerEnabled(true)}
               />
             )}
           />
@@ -1814,8 +1854,6 @@ export default function MapScreen() {
                   handleRequestRemovalPress(selectedSpot)
                 }
                 onBlockCreator={() => handleBlockCreatorPress(selectedSpot)}
-                onPhotoZoneTouch={() => setSheetPagerEnabled(false)}
-                onDetailsZoneTouch={() => setSheetPagerEnabled(true)}
               />
             </ScrollView>
           )}

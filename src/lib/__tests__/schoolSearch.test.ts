@@ -3,6 +3,7 @@ import {
     MIN_SEARCH_LENGTH,
     normalizeSchoolSearchText,
     schoolMatchesQuery,
+    schoolMatchesTypeFilter,
 } from '../schoolSearch';
 
 function makeSchool(overrides: Partial<School> = {}): School {
@@ -47,5 +48,44 @@ describe('schoolMatchesQuery', () => {
 
   it('rejects unrelated queries', () => {
     expect(schoolMatchesQuery(makeSchool(), 'brown')).toBe(false);
+  });
+});
+
+describe('schoolMatchesTypeFilter', () => {
+  it('keeps every saved school for all and saved', () => {
+    const k12 = makeSchool({ type: 'k12_public' });
+    const college = makeSchool({ id: 'college-1', type: 'higher_ed' });
+
+    expect(schoolMatchesTypeFilter(k12, 'all')).toBe(true);
+    expect(schoolMatchesTypeFilter(college, 'saved')).toBe(true);
+  });
+
+  it('keeps only K-12 schools for the k12 filter', () => {
+    expect(schoolMatchesTypeFilter(makeSchool({ type: 'k12_public' }), 'k12')).toBe(
+      true
+    );
+    expect(
+      schoolMatchesTypeFilter(makeSchool({ type: 'k12_private' }), 'k12')
+    ).toBe(true);
+    expect(schoolMatchesTypeFilter(makeSchool({ type: 'higher_ed' }), 'k12')).toBe(
+      false
+    );
+  });
+
+  it('keeps only colleges for the college filter', () => {
+    expect(
+      schoolMatchesTypeFilter(makeSchool({ type: 'higher_ed' }), 'college')
+    ).toBe(true);
+    expect(
+      schoolMatchesTypeFilter(makeSchool({ type: 'k12_public' }), 'college')
+    ).toBe(false);
+  });
+
+  it('hides schools with an unknown type from type pills', () => {
+    const unknownType = makeSchool({ type: undefined });
+
+    expect(schoolMatchesTypeFilter(unknownType, 'k12')).toBe(false);
+    expect(schoolMatchesTypeFilter(unknownType, 'college')).toBe(false);
+    expect(schoolMatchesTypeFilter(unknownType, 'all')).toBe(true);
   });
 });

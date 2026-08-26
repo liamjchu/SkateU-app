@@ -11,7 +11,7 @@ import {
 import {
   authUserMessage,
   getSupabaseConfig,
-  isRemovedSpotStatus,
+  isHiddenSpotStatus,
   UPLOAD_TIMEOUT_MS,
   validateImageFile,
   validateSpotId,
@@ -339,7 +339,7 @@ export async function POST(request: Request): Promise<Response> {
     let spotName: string | null = null;
     if (type === 'spot_problem' && spotId) {
       const spot = await fetchFeedbackSpot(config, spotId);
-      if (!spot || isRemovedSpotStatus(spot.status)) {
+      if (!spot || isHiddenSpotStatus(spot.status)) {
         return Response.json({ error: SPOT_GONE_ERROR }, { status: 404 });
       }
       spotName = spot.name;

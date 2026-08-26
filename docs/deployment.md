@@ -23,6 +23,19 @@ npx eas submit --profile production --platform android
 
 Run lint, tests, and `npx tsc --noEmit` before requesting a build. Confirm the app identifiers in `app.json` (`app.skateu.mobile`) match the configured Apple and Google store records.
 
+## EAS Update (over-the-air JS)
+
+Preview and production native builds listen for EAS Update on channels of the same name. The app checks for a JS/asset update on launch and applies it on the **next cold start**. Do not expect an in-app reload prompt.
+
+OTA updates cannot land on a store or internal build until that binary includes `expo-updates`. After adding or changing native code, create a new native build, then publish JS updates to its channel:
+
+```bash
+npx eas update --channel preview --message "Describe the JS change"
+npx eas update --channel production --message "Describe the JS change"
+```
+
+`runtimeVersion` follows `app.json` `version` (`appVersion` policy). Bumping the app version requires a new native build before production OTA can target that version.
+
 ## API deployment
 
 Deploy the Expo Router server output to a runtime that supports Expo Router API routes. The deployed environment must expose the `/api/*` routes over HTTPS and provide server-only environment variables there:
@@ -38,7 +51,9 @@ MODERATION_NOTIFY_EMAIL
 
 Set `EXPO_PUBLIC_API_URL` in the native app build environment to that HTTPS origin, without a trailing path. The mobile client requires an absolute URL outside local Expo development. Do not include service-role, OpenAI, or Resend keys in a native build, `.env.example`, source control, or any `EXPO_PUBLIC_*` variable.
 
-Optional crash reporting: set `EXPO_PUBLIC_SENTRY_DSN` on the native build. For native symbol upload during EAS builds, also set `SENTRY_ORG`, `SENTRY_PROJECT`, and `SENTRY_AUTH_TOKEN` in the EAS environment. Leave the DSN empty to keep crash reporting off.
+Optional crash reporting: set `EXPO_PUBLIC_SENTRY_DSN` on the native build. Native Sentry Gradle/Xcode upload is enabled only when `SENTRY_ORG`, `SENTRY_PROJECT`, and `SENTRY_AUTH_TOKEN` are all set in the EAS environment (or `SENTRY_DISABLE_AUTO_UPLOAD=true` with org and project). Preview builds can omit those secrets; missing `SENTRY_AUTH_TOKEN` previously failed Android Gradle during source-map upload. Leave the DSN empty to keep crash reporting off.
+
+Optional product analytics: set `EXPO_PUBLIC_POSTHOG_API_KEY` on the native build (PostHog Cloud US). `EXPO_PUBLIC_POSTHOG_HOST` defaults to `https://us.i.posthog.com`. Leave the key empty to keep analytics off. Do not send analytics from local development unless `EXPO_PUBLIC_POSTHOG_ENABLE_DEV=1`.
 
 ## Release checklist
 
@@ -47,7 +62,7 @@ Optional crash reporting: set `EXPO_PUBLIC_SENTRY_DSN` on the native build. For 
 3. Build a preview artifact and validate authentication, password recovery deep links, map browsing, spot creation, image uploads, edits, likes, Help & Support submissions, and account deletion.
 4. Create the production build, then submit it through EAS after store metadata and signing credentials are complete.
 5. Confirm `https://skateu.app/privacy` resolves for store forms. Terms and Community Guidelines stay in the app.
-6. Inspect the production IPA/AAB permission list before App Privacy and Data Safety. The app does not collect device GPS. Camera and photo library are used to add skate-spot pictures. Unused native map SDKs must not add location permission.
+6. Inspect the production IPA/AAB permission list before App Privacy and Data Safety. The app may request when-in-use location to show the user on campus maps. GPS is not stored on SkateU servers. Camera and photo library are used to add skate-spot pictures. Unused native map SDKs must not add background location permission.
 
 ## App icon verification
 
@@ -68,17 +83,17 @@ These answers are product inputs, not a claim of store approval:
 
 - Not Made for Kids.
 - Age: accounts are 13+. UGC/social apps often rate 12+ on Apple’s matrix; keep the in-app rule at 13+ and complete the questionnaire honestly.
-- User-generated content: yes (spots, photos, comments, usernames).
-- Social: public usernames and comments; users can report comments and block other accounts in the app. No DMs.
+- User-generated content: yes (spots, photos, comments, usernames, profile bios).
+- Social: public usernames, profile bios, and comments; users can report comments and block other accounts in the app. No DMs.
 - Photos: camera and photo library.
-- Location: no device GPS. Spot pins are user-placed place data.
+- Location: when-in-use device GPS to show the user on campus maps. GPS is processed on the device and is not stored on SkateU servers. Spot pins remain user-placed place data.
 - Privacy policy URL: `https://skateu.app/privacy`.
-- App Privacy labels: account email; user content (photos, text); identifiers (account); crash data if Sentry is configured; not advertising tracking.
+- App Privacy labels: account email; user content (photos, text); identifiers (account); coarse/precise location used on-device for maps; product analytics if PostHog is configured; crash data if Sentry is configured; not advertising tracking.
 
 ## Google Play Console (complete manually)
 
 - Target audience: 13–15, 16–17, and 18+ as appropriate. Do not select under-13. Do not enroll in Designed for Families as a children’s app.
 - “Is this app primarily for children?” → No, for this 13+ general-audience product.
-- Data safety: email, user-generated photos/text, account identifiers; no advertising SDK; crash reporting through Sentry when `EXPO_PUBLIC_SENTRY_DSN` is set; no collected device GPS. The website waitlist is not the Play app.
+- Data safety: email, user-generated photos/text, account identifiers; approximate/precise location used on-device for map display and not collected on SkateU servers; no advertising SDK; product analytics through PostHog when `EXPO_PUBLIC_POSTHOG_API_KEY` is set; crash reporting through Sentry when `EXPO_PUBLIC_SENTRY_DSN` is set. The website Android beta email list is not the Play app.
 - Privacy policy URL required.
 - IARC: UGC, social-ish features, skateboarding.

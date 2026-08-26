@@ -111,6 +111,44 @@ describe('GET /api/schools popular pagination', () => {
       String(HOME_RAIL_PAGE_SIZE)
     );
   });
+
+  it('uses the most-liked spot photo for each school card', async () => {
+    setConfigured();
+    const fetchMock = jest.fn(async (input: string | URL | Request) => {
+      const requestUrl = new URL(String(input));
+      if (requestUrl.pathname.endsWith('/rest/v1/spots')) {
+        expect(requestUrl.searchParams.get('order')).toBe(
+          'likes_count.desc,created_at.desc'
+        );
+        return jsonResponse([
+          {
+            school_id: 'school-a',
+            image_urls: ['https://cdn.test/popular.jpg'],
+          },
+          {
+            school_id: 'school-a',
+            image_urls: ['https://cdn.test/recent.jpg'],
+          },
+        ]);
+      }
+
+      return jsonResponse([makeSchool('school-a')]);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await GET(
+      new Request('https://app.test/api/schools?popular=1')
+    );
+    const body = (await response.json()) as {
+      schools: Array<{ id: string; spotImageUrl: string | null }>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.schools[0]).toMatchObject({
+      id: 'school-a',
+      spotImageUrl: 'https://cdn.test/popular.jpg',
+    });
+  });
 });
 
 describe('GET /api/schools search', () => {

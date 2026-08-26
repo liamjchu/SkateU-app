@@ -1,4 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { useIsFocused } from '@react-navigation/native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Image,
@@ -11,9 +13,17 @@ import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import IMAGES from '../constants/images';
 import { colors } from '../constants/colors';
 import { useIsTabletLayout } from '../hooks/useIsTabletLayout';
+import { useUserLocation } from '../hooks/useUserLocation';
+import { goToMyLocation } from '../lib/goToMyLocation';
+import {
+    buildGoToUserLocationJavascript,
+    buildSetUserLocationJavascript,
+    CLEAR_USER_LOCATION_JAVASCRIPT,
+} from '../lib/leafletUserLocation';
 import { buildLocationPickerHtml } from '../lib/locationPickerMap';
 import type { MapLayer } from '../store/mapViewStore';
 import FeedbackPressable from './FeedbackPressable';
+import MapCompassButton from './MapCompassButton';
 
 export type LayerType = MapLayer;
 export type LocationPickerStatus = 'loading' | 'ready' | 'error';
@@ -22,6 +32,7 @@ type LocationPickerWebViewMessage =
   | { type: 'WEBVIEW_READY' }
   | { type: 'CONSOLE_ERROR'; message?: unknown }
   | { type: 'LAYER_TOGGLED'; layer?: unknown }
+  | { type: 'BEARING_CHANGED'; bearing?: unknown }
   | { type: 'CENTER_CHANGED'; latitude?: unknown; longitude?: unknown }
   | { type: 'INTERACTION_START' }
   | { type: 'INTERACTION_END' };
@@ -55,12 +66,19 @@ export default function LocationPicker({
   onInteractionChange,
 }: LocationPickerProps) {
   const isTabletLayout = useIsTabletLayout();
+  const isFocused = useIsFocused();
   const webViewRef = useRef<WebView>(null);
   const mapLayerRef = useRef<LayerType>(initialLayer);
   const [mapLayer, setMapLayer] = useState<LayerType>(initialLayer);
   const [webViewAttempt, setWebViewAttempt] = useState(0);
   const [mapStatus, setMapStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [mapError, setMapError] = useState('');
+  const [mapBearing, setMapBearing] = useState(0);
+  const {
+    coords: userLocation,
+    status: userLocationStatus,
+    requestPermission: requestUserLocationPermission,
+  } = useUserLocation(isFocused && mapStatus === 'ready');
 
   const initialRef = useRef({
     latitude: initialLatitude,
@@ -83,6 +101,36 @@ export default function LocationPicker({
   useEffect(() => {
     onStatusChange?.(mapStatus, mapError);
   }, [mapError, mapStatus, onStatusChange]);
+
+  useEffect(() => {
+    if (mapStatus !== 'ready') {
+      return;
+    }
+
+    if (!userLocation) {
+      webViewRef.current?.injectJavaScript(CLEAR_USER_LOCATION_JAVASCRIPT);
+      return;
+    }
+
+    webViewRef.current?.injectJavaScript(
+      buildSetUserLocationJavascript(
+        userLocation.latitude,
+        userLocation.longitude,
+        userLocation.accuracy
+      )
+    );
+  }, [mapStatus, userLocation]);
+
+  const handleGoToMyLocation = useCallback(() => {
+    void goToMyLocation({
+      status: userLocationStatus,
+      hasCoords: Boolean(userLocation),
+      requestPermission: requestUserLocationPermission,
+      onGoToLocation: () => {
+        webViewRef.current?.injectJavaScript(buildGoToUserLocationJavascript());
+      },
+    });
+  }, [requestUserLocationPermission, userLocation, userLocationStatus]);
 
   const html = useMemo(
     () => buildLocationPickerHtml(initialRef.current),
@@ -117,6 +165,7 @@ export default function LocationPicker({
       if (data.type === 'WEBVIEW_READY') {
         setMapStatus('ready');
         setMapError('');
+        setMapBearing(0);
         webViewRef.current?.injectJavaScript(
           `if (window.setMapLayer) { window.setMapLayer('${mapLayerRef.current}'); } true;`
         );
@@ -136,6 +185,12 @@ export default function LocationPicker({
           data.layer === 'satellite' ? 'satellite' : 'default';
         mapLayerRef.current = layer;
         setMapLayer(layer);
+      }
+
+      if (data.type === 'BEARING_CHANGED' && typeof data.bearing === 'number') {
+        if (Number.isFinite(data.bearing)) {
+          setMapBearing(((data.bearing % 360) + 360) % 360);
+        }
       }
 
       if (
@@ -232,6 +287,38 @@ export default function LocationPicker({
           </View>
         ) : null}
         {mapStatus === 'ready' ? (
+          <View className="absolute left-3 top-3 z-10 gap-2">
+            <MapCompassButton
+              size="sm"
+              bearing={mapBearing}
+              onPress={() => {
+                webViewRef.current?.injectJavaScript(
+                  `if (window.resetMapNorth) { window.resetMapNorth(); } true;`
+                );
+              }}
+            />
+            <FeedbackPressable
+              haptic="light"
+              onPress={handleGoToMyLocation}
+              className="h-11 w-11 items-center justify-center rounded-full bg-white"
+              style={styles.mapControl}
+              accessibilityRole="button"
+              accessibilityLabel="Go to my location"
+              accessibilityHint="Moves the pin to your current location"
+              accessibilityState={{
+                busy:
+                  userLocationStatus === 'requesting' && userLocation == null,
+              }}
+            >
+              {userLocationStatus === 'requesting' && userLocation == null ? (
+                <ActivityIndicator color={colors.brand} />
+              ) : (
+                <Ionicons name="locate" size={20} color={colors.brand} />
+              )}
+            </FeedbackPressable>
+          </View>
+        ) : null}
+        {mapStatus === 'ready' ? (
           <FeedbackPressable
             haptic="selection"
             onPress={() => {
@@ -249,7 +336,7 @@ export default function LocationPicker({
             }
             accessibilityState={{ selected: mapLayer === 'satellite' }}
           >
-            <Image source={IMAGES.layers} className="h-[18px] w-[18px] tint-brand" />
+            <Image source={IMAGES.layers} style={styles.layersIcon} />
           </FeedbackPressable>
         ) : null}
         {mapStatus === 'ready' ? (
@@ -284,5 +371,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.18,
     shadowRadius: 4,
     elevation: 6,
+  },
+  layersIcon: {
+    width: 18,
+    height: 18,
+    tintColor: colors.brand,
   },
 });

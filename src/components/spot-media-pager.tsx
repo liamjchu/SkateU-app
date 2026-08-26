@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-    Image,
     NativeScrollEvent,
     NativeSyntheticEvent,
     ScrollView,
     View,
 } from 'react-native';
+import { shouldMountPagerImage } from '../lib/spotMediaPager';
+import CachedRemoteImage from './CachedRemoteImage';
 import FeedbackPressable from './FeedbackPressable';
 
 type SpotMediaPagerProps = {
@@ -26,11 +27,22 @@ export default function SpotMediaPager({
   const [width, setWidth] = useState(0);
   const [index, setIndex] = useState(0);
 
+  useEffect(() => {
+    setIndex((current) =>
+      Math.min(current, Math.max(uris.length - 1, 0))
+    );
+  }, [uris.length]);
+
   if (uris.length === 0) {
     return null;
   }
 
+  const firstUri = uris[0];
   const pageWidth = width > 0 ? width : 1;
+
+  if (!firstUri) {
+    return null;
+  }
 
   function handleScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
     if (pageWidth <= 1) {
@@ -44,7 +56,11 @@ export default function SpotMediaPager({
   }
 
   return (
-    <View onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
+    <View
+      style={{ height }}
+      className="overflow-hidden"
+      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
+    >
       {uris.length === 1 ? (
         <FeedbackPressable
           haptic="light"
@@ -54,11 +70,10 @@ export default function SpotMediaPager({
           accessibilityLabel={`Open full screen view of ${accessibilityName}`}
           accessibilityHint="Opens the full screen spot view. Pinch or double tap to zoom."
         >
-          <Image
-            source={{ uri: uris[0] }}
+          <CachedRemoteImage
+            uri={firstUri}
             style={{ height }}
             className={`w-full bg-surface-soft ${imageClassName ?? ''}`}
-            resizeMode="cover"
             accessible={false}
           />
         </FeedbackPressable>
@@ -73,6 +88,7 @@ export default function SpotMediaPager({
             directionalLockEnabled
             showsHorizontalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            onScroll={handleScroll}
             onMomentumScrollEnd={handleScroll}
             scrollEventThrottle={16}
           >
@@ -87,13 +103,19 @@ export default function SpotMediaPager({
                 accessibilityLabel={`Photo ${photoIndex + 1} of ${uris.length} of ${accessibilityName}`}
                 accessibilityHint="Opens the full screen spot view. Pinch or double tap to zoom."
               >
-                <Image
-                  source={{ uri }}
-                  style={{ width: pageWidth, height }}
-                  className={`bg-surface-soft ${imageClassName ?? ''}`}
-                  resizeMode="cover"
-                  accessible={false}
-                />
+                {shouldMountPagerImage(photoIndex, index) ? (
+                  <CachedRemoteImage
+                    uri={uri}
+                    style={{ width: pageWidth, height }}
+                    className={`bg-surface-soft ${imageClassName ?? ''}`}
+                    accessible={false}
+                  />
+                ) : (
+                  <View
+                    style={{ width: pageWidth, height }}
+                    className="bg-surface-soft"
+                  />
+                )}
               </FeedbackPressable>
             ))}
           </ScrollView>

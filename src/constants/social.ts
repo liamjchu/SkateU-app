@@ -2,19 +2,19 @@ export const SOCIAL_LINKS = [
   {
     id: 'instagram',
     label: 'Instagram',
-    url: 'https://www.instagram.com/skateu.app/',
+    url: 'https://www.instagram.com/skateuapp/',
     accessibilityLabel: 'Follow SkateU on Instagram',
   },
   {
     id: 'tiktok',
     label: 'TikTok',
-    url: 'https://www.tiktok.com/@skateu.app',
+    url: 'https://www.tiktok.com/@skateuapp',
     accessibilityLabel: 'Follow SkateU on TikTok',
   },
   {
     id: 'youtube',
     label: 'YouTube',
-    url: 'https://www.youtube.com/@liam_chu',
+    url: 'https://www.youtube.com/@skateuapp',
     accessibilityLabel: 'Follow SkateU on YouTube',
   },
 ] as const;

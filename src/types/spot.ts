@@ -15,6 +15,9 @@ export type Spot = {
   creatorUsername: string | null
   // The creator's user id, or null when the account was deleted.
   creatorUserId?: string | null
+  // Moderated SkateU avatar URL, or null when the creator has none or the
+  // account was deleted.
+  creatorAvatarUrl: string | null
   // ISO timestamp of when the spot was created. Empty string when unknown.
   createdAt: string
   // ISO timestamp of the spot's last edit. Equals createdAt until edited.

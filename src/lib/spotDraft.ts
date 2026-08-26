@@ -1,6 +1,10 @@
 import { getSpotFormMissingSummary, isAddSpotFormValid } from './addSpotForm';
 import type { SpotImageAsset, SpotMediaItem } from '../types/spot';
-import type { SpotDraft, SpotDraftInput } from '../types/spotDraft';
+import type {
+  SpotDraft,
+  SpotDraftInput,
+  SpotDraftStatus,
+} from '../types/spotDraft';
 
 export const MAX_SPOT_DRAFTS = 20;
 
@@ -36,9 +40,21 @@ export function draftImagesToMedia(images: SpotImageAsset[]): SpotMediaItem[] {
   return images.map((asset) => ({ kind: 'new', asset }));
 }
 
+export function parseDraftStatus(value: unknown): SpotDraftStatus {
+  return value === 'submitting' ? 'submitting' : 'draft';
+}
+
 export function getDraftStatusHint(
-  draft: Pick<SpotDraft, 'name' | 'description' | 'images'>
+  draft: Pick<SpotDraft, 'name' | 'description' | 'images' | 'status' | 'lastError'>
 ): string {
+  if (draft.status === 'submitting') {
+    return 'Submitting…';
+  }
+
+  if (draft.lastError) {
+    return draft.lastError;
+  }
+
   if (isAddSpotFormValid(draft.images.length, draft.name, draft.description)) {
     return 'Ready to post';
   }
@@ -63,7 +79,20 @@ export function draftsForUser(
   userId: string
 ): SpotDraft[] {
   return sortDraftsByUpdatedAt(
-    drafts.filter((draft) => draft.userId === userId)
+    drafts.filter(
+      (draft) => draft.userId === userId && draft.status !== 'submitting'
+    )
+  );
+}
+
+export function submittingDraftsForUser(
+  drafts: SpotDraft[],
+  userId: string
+): SpotDraft[] {
+  return sortDraftsByUpdatedAt(
+    drafts.filter(
+      (draft) => draft.userId === userId && draft.status === 'submitting'
+    )
   );
 }
 
@@ -156,6 +185,11 @@ export function parseSpotDraft(value: unknown): SpotDraft | null {
     latitude: value.latitude,
     longitude: value.longitude,
     images,
+    status: parseDraftStatus(value.status),
+    lastError:
+      typeof value.lastError === 'string' && value.lastError.trim().length > 0
+        ? value.lastError.trim()
+        : null,
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
   };
@@ -186,6 +220,11 @@ export function buildSpotDraft(
     latitude: input.latitude,
     longitude: input.longitude,
     images: input.images,
+    status: input.status ?? existing?.status ?? 'draft',
+    lastError:
+      input.lastError !== undefined
+        ? input.lastError
+        : existing?.lastError ?? null,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };

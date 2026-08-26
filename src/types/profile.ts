@@ -4,6 +4,7 @@ export type Profile = {
   id: string;
   username: string | null;
   avatar_url: string | null;
+  bio: string | null;
   updated_at: string | null;
   legal_version: string | null;
   legal_accepted_at: string | null;
@@ -18,6 +19,7 @@ export function mapProfile(row: {
   id: string;
   username?: string | null;
   avatar_url?: string | null;
+  bio?: string | null;
   updated_at?: string | null;
   legal_version?: string | null;
   legal_accepted_at?: string | null;
@@ -27,6 +29,7 @@ export function mapProfile(row: {
     id: row.id,
     username: readOptionalProfileText(row.username),
     avatar_url: readOptionalProfileText(row.avatar_url),
+    bio: readOptionalProfileText(row.bio),
     updated_at: readOptionalProfileText(row.updated_at),
     legal_version: readOptionalProfileText(row.legal_version),
     legal_accepted_at: readOptionalProfileText(row.legal_accepted_at),

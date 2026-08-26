@@ -5,19 +5,27 @@ function isAbsoluteUrl(url: string) {
   return /^https?:\/\//i.test(url);
 }
 
+function extraApiUrl(): string | undefined {
+  const extra = Constants.expoConfig?.extra as
+    | { apiUrl?: unknown }
+    | undefined;
+  return typeof extra?.apiUrl === 'string' ? extra.apiUrl : undefined;
+}
+
 // Resolves a relative API path ("/api/...") to a full URL that works across
 // web, Expo Go, and standalone builds.
 export function getApiUrl(path: string) {
-  const configuredUrl = process.env.EXPO_PUBLIC_API_URL;
+  const resolvedUrl =
+    process.env.EXPO_PUBLIC_API_URL?.trim() || extraApiUrl()?.trim();
 
-  if (configuredUrl) {
-    if (Platform.OS !== 'web' && !isAbsoluteUrl(configuredUrl)) {
+  if (resolvedUrl) {
+    if (Platform.OS !== 'web' && !isAbsoluteUrl(resolvedUrl)) {
       throw new Error(
         'EXPO_PUBLIC_API_URL must be an absolute URL on native platforms.'
       );
     }
 
-    return `${configuredUrl.replace(/\/$/, '')}${path}`;
+    return `${resolvedUrl.replace(/\/$/, '')}${path}`;
   }
 
   if (Platform.OS === 'web') {

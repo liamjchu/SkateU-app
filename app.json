@@ -13,15 +13,12 @@
       "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "UIViewControllerBasedStatusBarAppearance": true
+        "UIViewControllerBasedStatusBarAppearance": true,
+        "NSLocationWhenInUseUsageDescription": "SkateU uses your location to show where you are on the campus map so you can place spots."
       }
     },
     "android": {
       "package": "app.skateu.mobile",
-      "blockedPermissions": [
-        "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION"
-      ],
       "adaptiveIcon": {
         "backgroundColor": "#F7F4F0",
         "backgroundImage": "./assets/images/android-icon-background.png",
@@ -58,8 +55,27 @@
           "photosPermission": "SkateU uses your photo library so you can add pictures of skate spots.",
           "cameraPermission": "SkateU uses the camera so you can take pictures of skate spots."
         }
-      ]
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "SkateU uses your location to show where you are on the campus map so you can place spots.",
+          "locationAlwaysPermission": false,
+          "locationAlwaysAndWhenInUsePermission": false,
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": false,
+          "isAndroidForegroundServiceEnabled": false
+        }
+      ],
+      "expo-localization",
+      "expo-updates"
     ],
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/287facf0-3455-4006-bf2d-efa129871fa1"
+    },
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true

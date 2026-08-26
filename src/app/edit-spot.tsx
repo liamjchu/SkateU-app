@@ -5,8 +5,6 @@ import {
     ActivityIndicator,
     Alert,
     Keyboard,
-    KeyboardAvoidingView,
-    Platform,
     ScrollView,
     Text,
     TextInput,
@@ -14,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import FeedbackPressable from '../components/FeedbackPressable';
+import KeyboardShiftView from '../components/keyboard-shift-view';
 import LocationPicker, {
     type LocationPickerStatus,
 } from '../components/LocationPicker';
@@ -30,7 +29,7 @@ import {
 import { triggerHaptic } from '../lib/haptics';
 import { colors } from '../constants/colors';
 import { existingMediaItems, mediaListsEqual } from '../lib/spotMedia';
-import { toUserFacingError } from '../lib/userFacingError';
+import { toMutationError } from '../lib/userFacingError';
 import { useAuthStore } from '../store/authStore';
 import { useMapViewStore } from '../store/mapViewStore';
 import { useSpotsStore } from '../store/spotsStore';
@@ -85,12 +84,16 @@ export default function EditSpotScreen() {
   const [scrollEnabled, setScrollEnabled] = useState(true);
   const [locationPickerStatus, setLocationPickerStatus] =
     useState<LocationPickerStatus>('loading');
-  const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
 
   const interactionTimeoutRef = useRef<number | null>(null);
   const allowRemovalRef = useRef(false);
+  const mountedRef = useRef(true);
+  const savingRef = useRef(false);
+  const submittedRef = useRef(false);
 
   useEffect(() => {
     const accessToken = session?.access_token;
@@ -100,7 +103,7 @@ export default function EditSpotScreen() {
   }, [fetchMySpots, session?.access_token, spotId]);
 
   useEffect(() => {
-    if (!spot) {
+    if (!spot || submittedRef.current) {
       return;
     }
 
@@ -146,7 +149,11 @@ export default function EditSpotScreen() {
         return;
       }
 
-      if (saving) {
+      if (submittedRef.current) {
+        return;
+      }
+
+      if (savingRef.current) {
         event.preventDefault();
         return;
       }
@@ -175,10 +182,12 @@ export default function EditSpotScreen() {
     });
 
     return unsubscribe;
-  }, [hasUnsavedChanges, navigation, saving]);
+  }, [hasUnsavedChanges, navigation]);
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       if (interactionTimeoutRef.current) {
         clearTimeout(interactionTimeoutRef.current as unknown as number);
         interactionTimeoutRef.current = null;
@@ -186,11 +195,23 @@ export default function EditSpotScreen() {
     };
   }, []);
 
+  const handleLeaveAfterSubmit = () => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace('/');
+  };
+
   const handleSave = async () => {
+    if (savingRef.current || submitted) {
+      return;
+    }
+
     setHasSubmitted(true);
     setSaveError(null);
 
-    if (!isFormValid || locationPickerStatus !== 'ready' || saving || !spotId) {
+    if (!isFormValid || locationPickerStatus !== 'ready' || !spotId) {
       triggerHaptic('warning');
       if (isFormValid && locationPickerStatus !== 'ready') {
         setSaveError(locationError);
@@ -204,31 +225,43 @@ export default function EditSpotScreen() {
       return;
     }
 
-    setSaving(true);
+    savingRef.current = true;
+    submittedRef.current = true;
+    allowRemovalRef.current = true;
+    setSubmitted(true);
+    setReviewing(true);
     setSaveError(null);
+    triggerHaptic('success');
 
-    try {
-      await updateSpot(
-        spotId,
-        {
-          name: name.trim(),
-          description: description.trim(),
-          latitude: selectedLocation.latitude,
-          longitude: selectedLocation.longitude,
-          media: mediaChanged ? media : undefined,
-        },
-        accessToken
-      );
-      triggerHaptic('success');
-      allowRemovalRef.current = true;
-      router.back();
-    } catch (error) {
-      setSaveError(
-        toUserFacingError(error, 'Couldn’t save that. Try again in a sec.')
-      );
-    } finally {
-      setSaving(false);
-    }
+    const payload = {
+      name: name.trim(),
+      description: description.trim(),
+      latitude: selectedLocation.latitude,
+      longitude: selectedLocation.longitude,
+      media: mediaChanged ? media : undefined,
+    };
+
+    void (async () => {
+      try {
+        await updateSpot(spotId, payload, accessToken);
+        if (!mountedRef.current) {
+          return;
+        }
+        setReviewing(false);
+      } catch (error) {
+        if (!mountedRef.current || !submittedRef.current) {
+          return;
+        }
+        submittedRef.current = false;
+        savingRef.current = false;
+        allowRemovalRef.current = false;
+        setSubmitted(false);
+        setReviewing(false);
+        setSaveError(
+          toMutationError(error, 'Couldn’t save that. Try again in a sec.')
+        );
+      }
+    })();
   };
 
   return (
@@ -237,9 +270,14 @@ export default function EditSpotScreen() {
       style={{ flex: 1, backgroundColor: colors.surface }}
     >
       <ScreenHeader
-        title="Edit spot"
-        onBack={() => router.back()}
-        backDisabled={saving}
+        title={reviewing ? 'Reviewing' : submitted ? 'Submitted' : 'Edit spot'}
+        onBack={() => {
+          if (submitted) {
+            handleLeaveAfterSubmit();
+            return;
+          }
+          router.back();
+        }}
       />
 
       {!spot ? (
@@ -254,16 +292,63 @@ export default function EditSpotScreen() {
             {myLoading ? 'Loading spot…' : MISSING_SPOT_ERROR}
           </Text>
         </View>
+      ) : submitted ? (
+        <View className="flex-1 items-center justify-center px-6">
+          <View className="w-full max-w-[520px] items-center">
+            {reviewing ? (
+              <View
+                accessible
+                accessibilityRole="progressbar"
+                accessibilityLabel="Reviewing your changes"
+                accessibilityState={{ busy: true }}
+                className="items-center"
+              >
+                <ActivityIndicator size="small" color={colors.ink} />
+                <Text
+                  accessibilityRole="header"
+                  className="mt-4 text-center font-outfit-black text-2xl text-ink"
+                >
+                  Reviewing your changes.
+                </Text>
+                <Text className="mt-3 text-center font-outfit-medium text-base leading-6 text-muted">
+                  You can close this and come back later. If something’s off,
+                  you’ll be able to edit again.
+                </Text>
+              </View>
+            ) : (
+              <>
+                <Text
+                  accessibilityRole="header"
+                  className="text-center font-outfit-black text-2xl text-ink"
+                >
+                  Changes submitted for review.
+                </Text>
+                <Text className="mt-3 text-center font-outfit-medium text-base leading-6 text-muted">
+                  Your edits have been received. The map may still show the current
+                  version until review finishes.
+                </Text>
+              </>
+            )}
+            <FeedbackPressable
+              haptic="light"
+              onPress={handleLeaveAfterSubmit}
+              className="mt-8 min-h-14 w-full items-center justify-center rounded-2xl bg-accent px-5 py-4"
+              accessibilityRole="button"
+              accessibilityLabel="Come back later"
+            >
+              <Text className="font-outfit-bold text-lg text-brand">
+                Come back later
+              </Text>
+            </FeedbackPressable>
+          </View>
+        </View>
       ) : (
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={80}
-          style={{ flex: 1 }}
-        >
+        <KeyboardShiftView>
           <ScrollView
             contentContainerClassName="w-full max-w-[720px] self-center px-6 pb-10 pt-5"
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="interactive"
+            automaticallyAdjustKeyboardInsets={false}
             onScrollBeginDrag={Keyboard.dismiss}
             scrollEnabled={scrollEnabled}
             showsVerticalScrollIndicator={false}
@@ -384,29 +469,16 @@ export default function EditSpotScreen() {
           <FeedbackPressable
             haptic="light"
             onPress={handleSave}
-            disabled={saving}
-            className={`mt-6 min-h-14 items-center justify-center rounded-2xl px-5 py-4 ${
-              saving ? 'bg-actionDisabled' : 'bg-accent'
-            }`}
+            className="mt-6 min-h-14 items-center justify-center rounded-2xl bg-accent px-5 py-4"
             accessibilityRole="button"
-            accessibilityLabel={saving ? 'Saving changes' : 'Save changes'}
-            accessibilityState={{ disabled: saving, busy: saving }}
+            accessibilityLabel="Save changes"
           >
-            {saving ? (
-              <View className="flex-row items-center">
-                <ActivityIndicator color={colors.muted} />
-                <Text className="ml-2 font-outfit-bold text-lg text-muted">
-                  Saving…
-                </Text>
-              </View>
-            ) : (
-              <Text className="font-outfit-bold text-lg text-brand">
-                Save changes
-              </Text>
-            )}
+            <Text className="font-outfit-bold text-lg text-brand">
+              Save changes
+            </Text>
           </FeedbackPressable>
           </ScrollView>
-        </KeyboardAvoidingView>
+        </KeyboardShiftView>
       )}
     </SafeAreaView>
   );

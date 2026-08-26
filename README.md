@@ -64,9 +64,9 @@ Do not include a path such as `/api` or a trailing slash. Changing an `EXPO_PUBL
 
 The Next.js landing page is a separate workspace. From `apps/landing-page`, run `npm ci` and `npm run dev` for local development; use `npm run build` followed by `npm run start` to run its production build.
 
-Create `apps/landing-page/.env.local` through a secure channel with the public `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`, plus the server-only `SUPABASE_SERVICE_ROLE_KEY` and `SUBSCRIPTION_DISPATCH_SECRET`. The subscription route limits each IP to five requests per 60 seconds by default; configure `WAITLIST_RATE_LIMIT_MAX_REQUESTS` and `WAITLIST_RATE_LIMIT_WINDOW_MS` to change that per-process limit. For the deployed `send-confirmation` Edge Function, configure `APP_URL`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `SUBSCRIPTION_DISPATCH_SECRET`, and its Supabase service credentials as deployment secrets. Never expose the service-role key, dispatch secret, or Resend key to the browser.
+Create `apps/landing-page/.env.local` through a secure channel with the public `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`, plus the server-only `SUPABASE_SERVICE_ROLE_KEY` and `SUBSCRIPTION_DISPATCH_SECRET`. Set `NEXT_PUBLIC_TESTFLIGHT_URL` to your public TestFlight join URL (`https://testflight.apple.com/join/...`) so the iOS beta button appears. The subscription route limits each IP to five requests per 60 seconds by default; configure `WAITLIST_RATE_LIMIT_MAX_REQUESTS` and `WAITLIST_RATE_LIMIT_WINDOW_MS` to change that per-process limit. For the deployed `send-confirmation` Edge Function, configure `APP_URL`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `SUBSCRIPTION_DISPATCH_SECRET`, and its Supabase service credentials as deployment secrets. Never expose the service-role key, dispatch secret, or Resend key to the browser.
 
-To smoke-test confirmation email delivery, submit a test address on the landing page, check that the message arrives, open its confirmation link, and verify that the confirmation page succeeds. See the [Deployment guide](docs/deployment.md) for the Expo build and API deployment workflow.
+To smoke-test Android beta email delivery, submit a test address on the landing page, check that the message arrives, open its confirmation link, and verify that the confirmation page succeeds. See the [Deployment guide](docs/deployment.md) for the Expo build and API deployment workflow.
 
 ## Backend options
 
@@ -92,6 +92,7 @@ Follow the complete [Backend setup](docs/backend-setup.md). Before this app can 
    ```text
    supabase/schools_setup.sql
    supabase/profiles_setup.sql
+   supabase/avatars_setup.sql
    supabase/profile_legal_acceptance_setup.sql
    supabase/profile_legal_private_setup.sql
    supabase/spots_setup.sql
@@ -107,7 +108,7 @@ Follow the complete [Backend setup](docs/backend-setup.md). Before this app can 
    supabase/school_search_setup.sql
    ```
 
-5. Create a `spot-images` Storage bucket with public read enabled.
+5. Create `spot-images` and `avatars` Storage buckets with public read enabled.
 6. Optionally generate and seed school data. This requires Python 3 and temporary server credentials in the terminal that runs the seed:
 
    ```bash

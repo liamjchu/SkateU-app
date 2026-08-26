@@ -2,8 +2,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
   Text,
   TextInput,
@@ -11,9 +9,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import FeedbackPressable from '../components/FeedbackPressable';
+import KeyboardShiftView from '../components/keyboard-shift-view';
 import ScreenHeader from '../components/screen-header';
 import SupportChoiceList from '../components/SupportChoiceList';
 import { colors } from '../constants/colors';
+import { captureAnalyticsEvent } from '../lib/analytics';
 import { getApiUrl } from '../lib/api';
 import {
   COMMENT_REPORT_DETAILS_MAX,
@@ -102,6 +102,11 @@ export default function ReportCommentScreen() {
       if (!response.ok) {
         throw new Error(data?.error ?? 'Couldn’t send that report right now.');
       }
+      captureAnalyticsEvent('comment_reported', {
+        comment_id: commentId,
+        ...(spotId ? { spot_id: spotId } : {}),
+        reason,
+      });
       if (spotId) {
         hideComment(spotId, commentId);
       }
@@ -122,10 +127,7 @@ export default function ReportCommentScreen() {
       style={{ flex: 1, backgroundColor: colors.surface }}
     >
       <ScreenHeader title="Report comment" onBack={goBack} />
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1 }}
-      >
+      <KeyboardShiftView>
         {submitted ? (
           <View className="flex-1 items-center justify-center px-6">
             <Text className="text-center font-outfit-black text-2xl text-ink">
@@ -149,6 +151,7 @@ export default function ReportCommentScreen() {
             className="flex-1"
             contentContainerClassName="px-6 pb-8 pt-6"
             keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets={false}
           >
             <Text className="font-outfit-medium text-base leading-6 text-muted">
               {username
@@ -238,7 +241,7 @@ export default function ReportCommentScreen() {
             </FeedbackPressable>
           </ScrollView>
         )}
-      </KeyboardAvoidingView>
+      </KeyboardShiftView>
     </SafeAreaView>
   );
 }

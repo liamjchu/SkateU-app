@@ -13,6 +13,6 @@ export type School = {
   state: string
   numSpots: number
   type?: SchoolType
-  // A recent spot photo for the school, present on popular-school results.
+  // A photo from the school's most-liked spot, present on popular-school results.
   spotImageUrl?: string | null
 }

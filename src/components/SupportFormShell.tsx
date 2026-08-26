@@ -2,8 +2,6 @@ import { type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Keyboard,
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
   Text,
   View,
@@ -11,6 +9,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../constants/colors';
 import FeedbackPressable from './FeedbackPressable';
+import KeyboardShiftView from './keyboard-shift-view';
 import ScreenHeader from './screen-header';
 
 type SupportFormShellProps = {
@@ -49,11 +48,7 @@ export default function SupportFormShell({
     >
       <ScreenHeader title={title} onBack={onBack} backDisabled={submitting} />
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={80}
-        style={{ flex: 1 }}
-      >
+      <KeyboardShiftView>
         {submitted ? (
           <View className="flex-1 justify-center px-6">
             <View className="w-full max-w-[720px] self-center rounded-2xl bg-field p-6">
@@ -79,6 +74,7 @@ export default function SupportFormShell({
             contentContainerClassName="w-full max-w-[720px] self-center px-6 pb-10 pt-5"
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="interactive"
+            automaticallyAdjustKeyboardInsets={false}
             onScrollBeginDrag={Keyboard.dismiss}
             showsVerticalScrollIndicator={false}
           >
@@ -120,7 +116,7 @@ export default function SupportFormShell({
             </FeedbackPressable>
           </ScrollView>
         )}
-      </KeyboardAvoidingView>
+      </KeyboardShiftView>
     </SafeAreaView>
   );
 }

@@ -5,14 +5,13 @@ import {
     Alert,
     FlatList,
     Keyboard,
-    KeyboardAvoidingView,
-    Platform,
     Text,
     TextInput,
     View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import FeedbackPressable from '../components/FeedbackPressable';
+import KeyboardShiftView from '../components/keyboard-shift-view';
 import LoginRequiredModal from '../components/LoginRequiredModal';
 import ScreenHeader from '../components/screen-header';
 import SpotCommentRow from '../components/spot-comment-row';
@@ -22,7 +21,9 @@ import {
     getCommentContentError,
 } from '../lib/commentForm';
 import { triggerHaptic } from '../lib/haptics';
-import { toUserFacingError } from '../lib/userFacingError';
+import StaleCacheBanner from '../components/StaleCacheBanner';
+import { STALE_COMMENTS_MESSAGE } from '../lib/readCache';
+import { toMutationError } from '../lib/userFacingError';
 import { useAuthStore } from '../store/authStore';
 import { useBlocksStore } from '../store/blocksStore';
 import { useCommentsStore } from '../store/commentsStore';
@@ -74,6 +75,7 @@ export default function SpotCommentsScreen() {
 
   const contentError = useMemo(() => getCommentContentError(draft), [draft]);
   const canSubmit = contentError === null && !submitting;
+  const closedBottomPadding = Math.max(insets.bottom, 12);
 
   const requireAuth = (): boolean => {
     if (session?.access_token) {
@@ -118,15 +120,14 @@ export default function SpotCommentsScreen() {
     }
     const label = comment.creatorUsername
       ? `@${comment.creatorUsername}`
-      : 'this skater';
+      : 'this account';
     Alert.alert(
       `Block ${label}?`,
-      'You won’t see their spots or comments. You can unblock them in Settings.',
+      'You won’t see their spots or comments. You can undo this in Settings.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Block',
-          style: 'destructive',
+          text: 'Block user',
           onPress: () => {
             void blockUser(blockedId, accessToken, comment.creatorUsername)
               .then(() => {
@@ -134,8 +135,8 @@ export default function SpotCommentsScreen() {
               })
               .catch((caught: unknown) => {
                 Alert.alert(
-                  'Couldn’t block that skater',
-                  toUserFacingError(caught, 'Try again in a sec.')
+                  'Couldn’t block that user',
+                  toMutationError(caught, 'Try again in a sec.')
                 );
               });
           },
@@ -174,7 +175,7 @@ export default function SpotCommentsScreen() {
       Keyboard.dismiss();
     } catch (caught) {
       setSubmitError(
-        toUserFacingError(caught, 'Couldn’t post that. Try again in a sec.')
+        toMutationError(caught, 'Couldn’t post that. Try again in a sec.')
       );
     }
   };
@@ -208,7 +209,7 @@ export default function SpotCommentsScreen() {
               .catch((caught: unknown) => {
                 Alert.alert(
                   'Couldn’t delete that comment',
-                  toUserFacingError(caught, 'Try again in a sec.')
+                  toMutationError(caught, 'Try again in a sec.')
                 );
               })
               .finally(() => {
@@ -292,11 +293,7 @@ export default function SpotCommentsScreen() {
         backDisabled={submitting}
       />
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={0}
-        style={{ flex: 1 }}
-      >
+      <KeyboardShiftView closedBottomPadding={closedBottomPadding}>
         {spotName ? (
           <Text
             className="px-6 pt-3 font-outfit-semibold text-sm text-muted"
@@ -307,20 +304,14 @@ export default function SpotCommentsScreen() {
         ) : null}
 
         {error && comments.length > 0 ? (
-          <View className="mx-6 mt-3 flex-row items-center rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2.5">
-            <Text className="flex-1 pr-2 font-outfit-medium text-sm text-errorText">
-              {error}
-            </Text>
-            <FeedbackPressable
-              onPress={() => {
+          <View className="mx-6 mt-3">
+            <StaleCacheBanner
+              message={STALE_COMMENTS_MESSAGE}
+              onRetry={() => {
                 void fetchComments(spotId, session?.access_token);
               }}
-              className="rounded-xl bg-accent px-3 py-1.5"
-              accessibilityRole="button"
-              accessibilityLabel="Retry loading comments"
-            >
-              <Text className="font-outfit-bold text-sm text-brand">Retry</Text>
-            </FeedbackPressable>
+              retryAccessibilityLabel="Retry loading comments"
+            />
           </View>
         ) : null}
 
@@ -330,6 +321,7 @@ export default function SpotCommentsScreen() {
           contentContainerClassName="px-6 pb-4 pt-4"
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
+          automaticallyAdjustKeyboardInsets={false}
           onScrollBeginDrag={Keyboard.dismiss}
           showsVerticalScrollIndicator={false}
           onEndReachedThreshold={0.4}
@@ -361,7 +353,7 @@ export default function SpotCommentsScreen() {
 
         <View
           className="border-t border-border-soft bg-surface px-6 pt-3"
-          style={{ paddingBottom: Math.max(insets.bottom, 12) }}
+          style={{ paddingBottom: closedBottomPadding }}
         >
           {replyTo ? (
             <View className="mb-2 flex-row items-center">
@@ -447,13 +439,13 @@ export default function SpotCommentsScreen() {
             </Text>
           ) : null}
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardShiftView>
 
       <LoginRequiredModal
         visible={showLoginRequired}
         onCancel={() => setShowLoginRequired(false)}
         title="Sign in to comment"
-        message="You can still read comments. Sign in if you want to join the conversation, report a comment, or block a skater."
+        message="You can still read comments. Sign in if you want to join the conversation, report a comment, or block a user."
       />
     </SafeAreaView>
   );

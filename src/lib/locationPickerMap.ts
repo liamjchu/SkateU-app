@@ -1,4 +1,10 @@
 import { colors } from '../constants/colors';
+import { getLeafletUserLocationScript } from './leafletUserLocation';
+import {
+    getCreateMapLibreMapScript,
+    getMapLibreBaseCss,
+    getMapLibreHeadTags,
+} from './openFreeMap';
 
 export type LocationMapLayer = 'default' | 'satellite';
 
@@ -18,8 +24,7 @@ export function buildLocationPickerHtml({
 <html>
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+  ${getMapLibreHeadTags()}
   <style>
     html, body {
       width: 100%;
@@ -30,9 +35,7 @@ export function buildLocationPickerHtml({
       background: ${colors.brand};
     }
     #map { height: 100%; width: 100%; }
-    .leaflet-control-attribution { display: none; }
-    #map:not(.satellite) .leaflet-tile { filter: brightness(.9); }
-    #map.satellite .leaflet-tile { filter: brightness(.8); }
+    ${getMapLibreBaseCss()}
     #layer-toggle {
       display: none;
     }
@@ -53,6 +56,7 @@ export function buildLocationPickerHtml({
           window.ReactNativeWebView.postMessage(JSON.stringify(message));
         }
       }
+      window.postToNative = postMessage;
 
       window.onerror = function (message, source, lineno) {
         postMessage({
@@ -63,25 +67,12 @@ export function buildLocationPickerHtml({
       };
 
       try {
-        const center = [${latitude}, ${longitude}];
-        const mapElement = document.getElementById('map');
-        const layerToggleButton = document.getElementById('layer-toggle');
+        ${getCreateMapLibreMapScript({ latitude, longitude, layer })}
+        ${getLeafletUserLocationScript()}
 
-        window.map = L.map('map', {
-          zoomControl: false,
-          attributionControl: false,
-        }).setView(center, 15.5);
-
-        const defaultLayer = L.tileLayer(
-          'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
-        );
-        const satelliteLayer = L.tileLayer(
-          'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}.png'
-        );
-
-        function syncLayerControl(selectedLayer) {
-          const isSatellite = selectedLayer === 'satellite';
-          mapElement.classList.toggle('satellite', isSatellite);
+        var layerToggleButton = document.getElementById('layer-toggle');
+        if (layerToggleButton) {
+          var isSatellite = window.currentLayer === 'satellite';
           layerToggleButton.setAttribute('aria-pressed', String(isSatellite));
           layerToggleButton.setAttribute(
             'aria-label',
@@ -89,59 +80,16 @@ export function buildLocationPickerHtml({
               ? 'Switch location map to standard map'
               : 'Switch location map to satellite map'
           );
+          layerToggleButton.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            window.toggleLayer();
+          });
         }
 
-        const selectedLayer = '${layer}' === 'satellite'
-          ? satelliteLayer
-          : defaultLayer;
-        window.currentLayer = selectedLayer.addTo(window.map);
-        syncLayerControl('${layer}');
-
-        window.setMapLayer = function (selectedLayerName) {
-          if (
-            !window.map ||
-            (selectedLayerName !== 'default' && selectedLayerName !== 'satellite')
-          ) {
-            return;
-          }
-
-          if (
-            selectedLayerName === 'satellite' &&
-            window.currentLayer !== satelliteLayer
-          ) {
-            window.map.removeLayer(window.currentLayer);
-            window.currentLayer = satelliteLayer.addTo(window.map);
-          } else if (
-            selectedLayerName === 'default' &&
-            window.currentLayer !== defaultLayer
-          ) {
-            window.map.removeLayer(window.currentLayer);
-            window.currentLayer = defaultLayer.addTo(window.map);
-          }
-
-          const activeLayer = window.currentLayer === satelliteLayer
-            ? 'satellite'
-            : 'default';
-          syncLayerControl(activeLayer);
-          postMessage({ type: 'LAYER_TOGGLED', layer: activeLayer });
-        };
-
-        window.toggleLayer = function () {
-          window.setMapLayer(
-            window.currentLayer === defaultLayer ? 'satellite' : 'default'
-          );
-        };
-
-        L.DomEvent.disableClickPropagation(layerToggleButton);
-        L.DomEvent.disableScrollPropagation(layerToggleButton);
-        layerToggleButton.addEventListener('click', function (event) {
-          event.preventDefault();
-          event.stopPropagation();
-          window.toggleLayer();
-        });
-
         function postCenter() {
-          const currentCenter = window.map.getCenter();
+          if (!window.map) return;
+          var currentCenter = window.map.getCenter();
           postMessage({
             type: 'CENTER_CHANGED',
             latitude: currentCenter.lat,
@@ -170,8 +118,10 @@ export function buildLocationPickerHtml({
         document.addEventListener('touchstart', postInteractionStart, { passive: true });
         document.addEventListener('touchend', postInteractionEnd, { passive: true });
 
-        postMessage({ type: 'WEBVIEW_READY' });
-        postCenter();
+        window.onMapReady(function () {
+          postMessage({ type: 'WEBVIEW_READY' });
+          postCenter();
+        });
       } catch (error) {
         postMessage({
           type: 'CONSOLE_ERROR',

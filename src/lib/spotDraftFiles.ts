@@ -34,7 +34,7 @@ function extensionForImage(image: SpotImageAsset): string {
 }
 
 async function loadLegacyFileSystem() {
-  return import('expo-file-system/legacy');
+  return require('expo-file-system/legacy') as typeof import('expo-file-system/legacy');
 }
 
 export async function filterExistingDraftImages(

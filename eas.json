@@ -17,6 +17,7 @@
       "node": "22.19.0",
       "distribution": "internal",
       "environment": "preview",
+      "channel": "preview",
       "android": {
         "buildType": "apk"
       }
@@ -24,7 +25,8 @@
     "production": {
       "node": "22.19.0",
       "autoIncrement": true,
-      "environment": "production"
+      "environment": "production",
+      "channel": "production"
     }
   },
   "submit": {

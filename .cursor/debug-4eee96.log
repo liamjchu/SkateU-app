@@ -1,0 +1,2 @@
+{"sessionId":"4eee96","runId":"pre-fix","hypothesisId":"B","location":"spots+api.ts:POST","message":"spot created pending; scheduling moderation","data":{"created":true,"imageCount":1},"timestamp":1787775464935}
+{"sessionId":"4eee96","runId":"pre-fix","hypothesisId":"B","location":"spots+api.ts:finalizePendingSpotModeration","message":"moderation verdict applied","data":{"approved":true,"flag":"NONE","nextStatus":"active"},"timestamp":1787775468051}

@@ -3,8 +3,6 @@ import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Keyboard,
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
   Text,
   TextInput,
@@ -12,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import FeedbackPressable from '../components/FeedbackPressable';
+import KeyboardShiftView from '../components/keyboard-shift-view';
 import ScreenHeader from '../components/screen-header';
 import { colors } from '../constants/colors';
 import { triggerHaptic } from '../lib/haptics';
@@ -110,11 +109,7 @@ export default function RequestSpotRemovalScreen() {
         backDisabled={submitting}
       />
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={80}
-        style={{ flex: 1 }}
-      >
+      <KeyboardShiftView>
         {submitted ? (
           <View className="flex-1 justify-center px-6">
             <View className="w-full max-w-[720px] self-center rounded-2xl bg-field p-6">
@@ -140,6 +135,7 @@ export default function RequestSpotRemovalScreen() {
             contentContainerClassName="w-full max-w-[720px] self-center px-6 pb-10 pt-5"
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="interactive"
+            automaticallyAdjustKeyboardInsets={false}
             onScrollBeginDrag={Keyboard.dismiss}
             showsVerticalScrollIndicator={false}
           >
@@ -274,7 +270,7 @@ export default function RequestSpotRemovalScreen() {
             </FeedbackPressable>
           </ScrollView>
         )}
-      </KeyboardAvoidingView>
+      </KeyboardShiftView>
     </SafeAreaView>
   );
 }

@@ -18,6 +18,9 @@ function mockResponse(
     status: init?.status ?? 200,
     json: async () => body,
     text: async () => JSON.stringify(body),
+    clone: () => ({
+      arrayBuffer: async () => new ArrayBuffer(0),
+    }),
   } as unknown as Response;
 }
 
@@ -31,6 +34,7 @@ function makeComment(overrides: Partial<SpotComment> = {}): SpotComment {
     parentCommentId: null,
     content: 'This ledge is perfect',
     creatorUsername: 'liam',
+    creatorAvatarUrl: null,
     createdAt: '2024-01-01T00:00:00.000Z',
     replies: [],
     ...overrides,
@@ -49,6 +53,7 @@ function makeSpot(overrides: Partial<Spot> = {}): Spot {
     state: 'TX',
     schoolName: 'UT Austin',
     creatorUsername: 'skater_jane',
+    creatorAvatarUrl: null,
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z',
     commentCount: 0,
@@ -82,6 +87,7 @@ describe('commentsStore', () => {
 
     const cache = useCommentsStore.getState().bySpotId['spot-1'];
     expect(cache.comments).toEqual(comments);
+    expect(useCommentsStore.getState().recentSpotIds).toEqual(['spot-1']);
     expect(cache.loading).toBe(false);
     expect(cache.error).toBeNull();
     expect(cache.hasMore).toBe(false);
@@ -383,5 +389,172 @@ describe('commentsStore', () => {
     useCommentsStore.getState().resetSpot('spot-1');
     expect(useCommentsStore.getState().bySpotId['spot-1']).toBeUndefined();
     expect(useCommentsStore.getState().commentCounts['spot-1']).toBeUndefined();
+  });
+
+  it('surfaces a timeout and a generic load failure', async () => {
+    const abort = new Error('Aborted');
+    abort.name = 'AbortError';
+    fetchMock.mockRejectedValueOnce(abort);
+    await useCommentsStore.getState().fetchComments('spot-1');
+    expect(useCommentsStore.getState().bySpotId['spot-1'].error).toMatch(/timed out/i);
+
+    fetchMock.mockRejectedValueOnce('down');
+    await useCommentsStore.getState().fetchComments('spot-1');
+    expect(useCommentsStore.getState().bySpotId['spot-1'].error).toBeTruthy();
+  });
+
+  it('uses the server reason when a page request fails', async () => {
+    useCommentsStore.setState({
+      bySpotId: {
+        'spot-1': {
+          comments: [makeComment()],
+          loading: false,
+          loadingMore: false,
+          submitting: false,
+          error: null,
+          hasMore: true,
+          nextOffset: 1,
+          commentCount: 1,
+        },
+      },
+    });
+    fetchMock.mockResolvedValue(
+      mockResponse({ reason: 'Try again.' }, { ok: false, status: 400 })
+    );
+    await useCommentsStore.getState().fetchMore('spot-1');
+    expect(useCommentsStore.getState().bySpotId['spot-1'].error).toBe('Try again.');
+    expect(useCommentsStore.getState().bySpotId['spot-1'].loadingMore).toBe(false);
+  });
+
+  it('rejects a successful post that omitted the comment', async () => {
+    fetchMock.mockResolvedValue(mockResponse({ commentCount: 1 }, { status: 201 }));
+    await expect(
+      useCommentsStore.getState().addComment('spot-1', 'Nice rail', 'token')
+    ).rejects.toThrow('The server did not return the comment.');
+  });
+
+  it('merges persisted comment pages for recently viewed spots', () => {
+    const merge = useCommentsStore.persist.getOptions().merge;
+    expect(merge).toBeDefined();
+    const merged = merge!(
+      {
+        recentSpotIds: ['spot-1', 2, 'spot-missing'],
+        bySpotId: {
+          'spot-1': {
+            comments: [makeComment()],
+            hasMore: false,
+            nextOffset: 1,
+            commentCount: 1,
+          },
+        },
+      },
+      useCommentsStore.getState()
+    );
+    expect(merged.recentSpotIds).toEqual(['spot-1', 'spot-missing']);
+    expect(merged.bySpotId['spot-1']?.comments[0]?.id).toBe('comment-1');
+    expect(merged.commentCounts['spot-1']).toBe(1);
+    expect(merged.bySpotId['spot-missing']).toBeUndefined();
+    expect(merge!(null, useCommentsStore.getState()).recentSpotIds).toEqual([]);
+    useCommentsStore.getState().setHasHydrated(true);
+    expect(useCommentsStore.getState().hasHydrated).toBe(true);
+  });
+
+  it('maps server failures and a timed-out post', async () => {
+    fetchMock.mockResolvedValue(
+      mockResponse({ error: '' }, { ok: false, status: 500 })
+    );
+    await useCommentsStore.getState().fetchComments('spot-1');
+    expect(useCommentsStore.getState().bySpotId['spot-1'].error).toMatch(
+      /temporarily unavailable/i
+    );
+
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({ error: 'nope' }, { ok: false, status: 400 })
+    );
+    await expect(
+      useCommentsStore.getState().deleteComment('spot-1', 'comment-1', 'token')
+    ).rejects.toThrow('nope');
+
+    const abort = new Error('Aborted');
+    abort.name = 'AbortError';
+    fetchMock.mockRejectedValueOnce(abort);
+    await expect(
+      useCommentsStore.getState().addComment('spot-1', 'Nice rail', 'token')
+    ).rejects.toThrow(/timed out/i);
+  });
+
+  it('skips inserting a reply that is already present', async () => {
+    const parent = makeComment({
+      replies: [makeComment({ id: 'reply-1', parentCommentId: 'comment-1' })],
+    });
+    useCommentsStore.setState({
+      bySpotId: {
+        'spot-1': {
+          comments: [parent],
+          loading: false,
+          loadingMore: false,
+          submitting: false,
+          error: null,
+          hasMore: false,
+          nextOffset: 1,
+          commentCount: 2,
+        },
+      },
+    });
+    fetchMock.mockResolvedValue(
+      mockResponse(
+        {
+          comment: makeComment({
+            id: 'reply-1',
+            parentCommentId: 'comment-1',
+            content: 'Agreed',
+          }),
+          commentCount: 2,
+        },
+        { status: 201 }
+      )
+    );
+    await useCommentsStore
+      .getState()
+      .addComment('spot-1', 'Agreed', 'token', parent.id);
+    expect(useCommentsStore.getState().bySpotId['spot-1'].comments[0].replies).toHaveLength(
+      1
+    );
+  });
+
+  it('rewrites cached avatars for a user and their replies', () => {
+    const avatarUrl =
+      'https://project.supabase.co/storage/v1/object/public/avatars/user-1/a.jpg';
+    useCommentsStore.setState({
+      bySpotId: {
+        'spot-1': {
+          comments: [
+            makeComment({
+              replies: [
+                makeComment({
+                  id: 'reply-1',
+                  userId: 'user-1',
+                  parentCommentId: 'comment-1',
+                }),
+              ],
+            }),
+            makeComment({ id: 'comment-2', userId: 'user-2' }),
+          ],
+          loading: false,
+          loadingMore: false,
+          submitting: false,
+          error: null,
+          hasMore: false,
+          nextOffset: 1,
+          commentCount: 3,
+        },
+      },
+    });
+
+    useCommentsStore.getState().replaceCreatorAvatar('user-1', avatarUrl);
+    const comments = useCommentsStore.getState().bySpotId['spot-1'].comments;
+    expect(comments[0]?.creatorAvatarUrl).toBe(avatarUrl);
+    expect(comments[0]?.replies[0]?.creatorAvatarUrl).toBe(avatarUrl);
+    expect(comments[1]?.creatorAvatarUrl).toBeNull();
   });
 });

@@ -10,12 +10,14 @@ type HomeSchoolStoriesProps = {
   schools: School[];
   onPress: (school: School) => void;
   onToggleSave: (school: School) => void;
+  showHeader?: boolean;
 };
 
 export default function HomeSchoolStories({
   schools,
   onPress,
   onToggleSave,
+  showHeader = true,
 }: HomeSchoolStoriesProps) {
   if (schools.length === 0) {
     return null;
@@ -23,12 +25,14 @@ export default function HomeSchoolStories({
 
   return (
     <View>
-      <View className="mb-4">
-        <Text className="font-outfit-bold text-base text-ink">Your schools</Text>
-        <Text className="mt-0.5 font-outfit-medium text-sm text-muted">
-          Jump back to a campus you saved
-        </Text>
-      </View>
+      {showHeader ? (
+        <View className="mb-4">
+          <Text className="font-outfit-bold text-base text-ink">Your schools</Text>
+          <Text className="mt-0.5 font-outfit-medium text-sm text-muted">
+            Jump back to a campus you saved
+          </Text>
+        </View>
+      ) : null}
       <ScrollView
         horizontal
         nestedScrollEnabled

@@ -4,8 +4,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Keyboard,
-    KeyboardAvoidingView,
-    Platform,
     ScrollView,
     Text,
     TextInput,
@@ -13,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import FeedbackPressable from '../components/FeedbackPressable';
+import KeyboardShiftView from '../components/keyboard-shift-view';
 import LocationPicker, {
     type LocationPickerStatus,
 } from '../components/LocationPicker';
@@ -35,7 +34,7 @@ import {
 } from '../lib/spotDraft';
 import { filterExistingDraftImages } from '../lib/spotDraftFiles';
 import { mediaListsEqual } from '../lib/spotMedia';
-import { toUserFacingError } from '../lib/userFacingError';
+import { toMutationError } from '../lib/userFacingError';
 import { useAuthStore } from '../store/authStore';
 import { useDraftSpotsStore } from '../store/draftSpotsStore';
 import { useMapViewStore } from '../store/mapViewStore';
@@ -122,6 +121,7 @@ export default function AddSpotScreen() {
   const allowRemovalRef = useRef(false);
   const postedRef = useRef(false);
   const savingRef = useRef(false);
+  const submittedRef = useRef(false);
   const draftIdRef = useRef(draftIdParam);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const persistInFlightRef = useRef<Promise<void> | null>(null);
@@ -131,6 +131,7 @@ export default function AddSpotScreen() {
   const hasHydratedDrafts = useDraftSpotsStore((s) => s.hasHydrated);
   const getDraft = useDraftSpotsStore((s) => s.getDraft);
   const upsertDraft = useDraftSpotsStore((s) => s.upsertDraft);
+  const setDraftStatus = useDraftSpotsStore((s) => s.setDraftStatus);
   const deleteDraft = useDraftSpotsStore((s) => s.deleteDraft);
 
   const locationChanged = coordinatesDiffer(
@@ -214,6 +215,10 @@ export default function AddSpotScreen() {
       setResolvedSchoolId(draft.schoolId);
       setResolvedSchoolName(draft.schoolName);
       setActiveDraftId(draft.id);
+      if (draft.lastError) {
+        setSaveError(draft.lastError);
+        setHasSubmitted(true);
+      }
       setDraftReady(true);
     };
 
@@ -225,31 +230,42 @@ export default function AddSpotScreen() {
   }, [draftIdParam, getDraft, hasHydratedDrafts]);
 
   const persistDraftNow = useCallback(async () => {
-    if (postedRef.current) {
-      return;
-    }
-
-    const form = formRef.current;
-    const userId = form.userId;
-    const schoolId = form.resolvedSchoolId;
-    const locationMoved = coordinatesDiffer(
-      form.selectedLocation,
-      initialLocationRef.current
-    );
-    const shouldSave =
-      Boolean(draftIdRef.current) ||
-      isMeaningfulDraftContent({
-        name: form.name,
-        description: form.description,
-        imageCount: form.media.length,
-        locationChanged: locationMoved,
-      });
-
-    if (!userId || !schoolId || !shouldSave) {
-      return;
-    }
-
+    const previous = persistInFlightRef.current;
     const run = (async () => {
+      if (previous) {
+        await previous;
+      }
+      if (postedRef.current || submittedRef.current) {
+        return;
+      }
+
+      const form = formRef.current;
+      const userId = form.userId;
+      const schoolId = form.resolvedSchoolId;
+      const locationMoved = coordinatesDiffer(
+        form.selectedLocation,
+        initialLocationRef.current
+      );
+      const shouldSave =
+        Boolean(draftIdRef.current) ||
+        isMeaningfulDraftContent({
+          name: form.name,
+          description: form.description,
+          imageCount: form.media.length,
+          locationChanged: locationMoved,
+        });
+
+      if (!userId || !schoolId || !shouldSave) {
+        return;
+      }
+
+      const existingDraft = draftIdRef.current
+        ? getDraft(draftIdRef.current)
+        : undefined;
+      if (existingDraft?.status === 'submitting') {
+        return;
+      }
+
       const draft = await upsertDraft({
         id: draftIdRef.current,
         userId,
@@ -261,6 +277,20 @@ export default function AddSpotScreen() {
         longitude: form.selectedLocation.longitude,
         images: mediaToDraftImages(form.media),
       });
+
+      if (postedRef.current) {
+        await deleteDraft(draft.id);
+        return;
+      }
+      if (submittedRef.current) {
+        setDraftStatus(draft.id, 'submitting');
+        draftIdRef.current = draft.id;
+        return;
+      }
+      if (draft.status === 'submitting') {
+        return;
+      }
+
       draftIdRef.current = draft.id;
       setActiveDraftId(draft.id);
       const nextMedia = draftImagesToMedia(draft.images);
@@ -279,10 +309,10 @@ export default function AddSpotScreen() {
         persistInFlightRef.current = null;
       }
     }
-  }, [upsertDraft]);
+  }, [deleteDraft, getDraft, setDraftStatus, upsertDraft]);
 
   useEffect(() => {
-    if (!draftReady || saving || postedRef.current) {
+    if (!draftReady || saving || postedRef.current || submittedRef.current) {
       return;
     }
 
@@ -305,6 +335,7 @@ export default function AddSpotScreen() {
     saving,
     selectedLocation.latitude,
     selectedLocation.longitude,
+    submitted,
   ]);
 
   const flushDraftAndLeave = useCallback(
@@ -332,12 +363,12 @@ export default function AddSpotScreen() {
         return;
       }
 
-      if (saving) {
-        event.preventDefault();
+      if (submittedRef.current || postedRef.current) {
         return;
       }
 
-      if (postedRef.current) {
+      if (saving) {
+        event.preventDefault();
         return;
       }
 
@@ -411,46 +442,72 @@ export default function AddSpotScreen() {
     }
 
     savingRef.current = true;
-    setSaving(true);
-    setSaveError(null);
-
-    try {
-      await addSpot(
-        {
-          schoolId,
-          name: name.trim(),
-          description: description.trim(),
-          latitude: selectedLocation.latitude,
-          longitude: selectedLocation.longitude,
-          images: media
-            .filter((item) => item.kind === 'new')
-            .map((item) => item.asset),
-        },
-        accessToken
-      );
-      postedRef.current = true;
-      if (draftIdRef.current) {
-        try {
-          await deleteDraft(draftIdRef.current);
-        } catch (error) {
-          console.warn('Could not remove the local draft after posting.', error);
-        }
-      }
-      triggerHaptic('success');
-      allowRemovalRef.current = true;
-      setSubmitted(true);
-    } catch (error) {
-      setSaveError(
-        toUserFacingError(error, 'We couldn’t submit this spot. Please try again.')
-      );
-    } finally {
-      savingRef.current = postedRef.current;
-      setSaving(false);
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
     }
+    await persistInFlightRef.current;
+    await persistDraftNow();
+
+    submittedRef.current = true;
+    allowRemovalRef.current = true;
+    if (draftIdRef.current) {
+      setDraftStatus(draftIdRef.current, 'submitting', null);
+    }
+    setSubmitted(true);
+    setSaving(false);
+    setSaveError(null);
+    triggerHaptic('success');
+
+    const payload = {
+      schoolId,
+      name: name.trim(),
+      description: description.trim(),
+      latitude: selectedLocation.latitude,
+      longitude: selectedLocation.longitude,
+      images: media
+        .filter((item) => item.kind === 'new')
+        .map((item) => item.asset),
+    };
+
+    void (async () => {
+      try {
+        await addSpot(payload, accessToken);
+        postedRef.current = true;
+        if (draftIdRef.current) {
+          try {
+            await deleteDraft(draftIdRef.current);
+          } catch (error) {
+            console.warn('Could not remove the local draft after posting.', error);
+          }
+        }
+      } catch (error) {
+        const message = toMutationError(
+          error,
+          'We couldn’t submit this spot. Please try again.'
+        );
+        if (draftIdRef.current) {
+          setDraftStatus(draftIdRef.current, 'draft', message);
+        }
+        submittedRef.current = false;
+        savingRef.current = false;
+        allowRemovalRef.current = false;
+        if (!mountedRef.current) {
+          return;
+        }
+        setSubmitted(false);
+        setSaving(false);
+        setSaveError(message);
+        triggerHaptic('warning');
+      }
+    })();
   };
 
+  const mountedRef = useRef(true);
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       if (interactionTimeoutRef.current) {
         clearTimeout(interactionTimeoutRef.current as unknown as number);
         interactionTimeoutRef.current = null;
@@ -501,7 +558,8 @@ export default function AddSpotScreen() {
               Spot submitted for review.
             </Text>
             <Text className="mt-3 text-center font-outfit-medium text-base leading-6 text-muted">
-              Your spot has been received. It may not appear on the map right away.
+              You can close this and come back later. If it doesn’t post, it’ll
+              show up in Drafts with a note.
             </Text>
             <FeedbackPressable
               haptic="light"
@@ -523,15 +581,12 @@ export default function AddSpotScreen() {
           </View>
         </View>
       ) : (
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={80}
-        style={{ flex: 1 }}
-      >
+      <KeyboardShiftView>
         <ScrollView
           contentContainerClassName="w-full max-w-[720px] self-center px-6 pb-10 pt-5"
           keyboardShouldPersistTaps="never"
           keyboardDismissMode="interactive"
+          automaticallyAdjustKeyboardInsets={false}
           onScrollBeginDrag={Keyboard.dismiss}
           scrollEnabled={scrollEnabled}
           showsVerticalScrollIndicator={false}
@@ -688,7 +743,7 @@ export default function AddSpotScreen() {
             </Text>
           </FeedbackPressable>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardShiftView>
       )}
     </SafeAreaView>
   );

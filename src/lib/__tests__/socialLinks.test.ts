@@ -21,17 +21,17 @@ describe('SOCIAL_LINKS', () => {
     ).toEqual([
       [
         'Instagram',
-        'https://www.instagram.com/skateu.app/',
+        'https://www.instagram.com/skateuapp/',
         'Follow SkateU on Instagram',
       ],
       [
         'TikTok',
-        'https://www.tiktok.com/@skateu.app',
+        'https://www.tiktok.com/@skateuapp',
         'Follow SkateU on TikTok',
       ],
       [
         'YouTube',
-        'https://www.youtube.com/@liam_chu',
+        'https://www.youtube.com/@skateuapp',
         'Follow SkateU on YouTube',
       ],
     ]);
@@ -47,10 +47,10 @@ describe('openSocialUrl', () => {
   it('opens the social URL', async () => {
     mockOpenURL.mockResolvedValue(true);
 
-    await openSocialUrl('https://www.instagram.com/skateu.app/');
+    await openSocialUrl('https://www.instagram.com/skateuapp/');
 
     expect(mockOpenURL).toHaveBeenCalledWith(
-      'https://www.instagram.com/skateu.app/'
+      'https://www.instagram.com/skateuapp/'
     );
     expect(mockAlert).not.toHaveBeenCalled();
   });
@@ -58,7 +58,7 @@ describe('openSocialUrl', () => {
   it('alerts when the URL cannot be opened', async () => {
     mockOpenURL.mockRejectedValue(new Error('unsupported'));
 
-    await openSocialUrl('https://www.tiktok.com/@skateu.app');
+    await openSocialUrl('https://www.tiktok.com/@skateuapp');
 
     expect(mockAlert).toHaveBeenCalledWith(
       'Couldn’t open that link',

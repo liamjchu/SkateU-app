@@ -1,3 +1,7 @@
+jest.mock('@react-native-async-storage/async-storage', () =>
+  require('@react-native-async-storage/async-storage/jest/async-storage-mock')
+);
+
 process.env.EXPO_PUBLIC_API_URL = 'http://localhost:8081';
 
 type QueryResult = { data: unknown; error: { message: string } | null };
@@ -32,10 +36,22 @@ jest.mock('../../lib/supabase', () => ({
 }));
 
 const mockReplaceCreatorUsername = jest.fn();
+const mockReplaceCreatorAvatar = jest.fn();
 
 jest.mock('../spotsStore', () => ({
   useSpotsStore: {
-    getState: () => ({ replaceCreatorUsername: mockReplaceCreatorUsername }),
+    getState: () => ({
+      replaceCreatorUsername: mockReplaceCreatorUsername,
+      replaceCreatorAvatar: mockReplaceCreatorAvatar,
+    }),
+  },
+}));
+
+jest.mock('../commentsStore', () => ({
+  useCommentsStore: {
+    getState: () => ({
+      replaceCreatorAvatar: mockReplaceCreatorAvatar,
+    }),
   },
 }));
 
@@ -51,6 +67,7 @@ beforeEach(() => {
   mockFrom.mockReset();
   fetchMock.mockReset();
   mockReplaceCreatorUsername.mockReset();
+  mockReplaceCreatorAvatar.mockReset();
   useProfileStore.setState({
     profile: null,
     welcomeAboardUserId: null,
@@ -76,6 +93,7 @@ describe('profileStore.fetchProfile', () => {
           id: 'user-1',
           username: 'liam',
           avatar_url: null,
+          bio: null,
           updated_at: '2026-08-21T00:00:00.000Z',
         },
         error: null,
@@ -87,6 +105,7 @@ describe('profileStore.fetchProfile', () => {
           id: 'user-1',
           username: 'liam',
           avatar_url: null,
+          bio: null,
           updated_at: '2026-08-21T00:00:00.000Z',
           legal_version: '2026-08-20',
           legal_accepted_at: '2026-08-21T00:00:00.000Z',
@@ -124,6 +143,36 @@ describe('profileStore.fetchProfile', () => {
     expect(useProfileStore.getState().error).toContain('couldn’t load your profile');
   });
 
+  it('keeps a cached profile when a refresh fails', async () => {
+    useProfileStore.setState({
+      profile: {
+        id: 'user-1',
+        username: 'liam',
+        avatar_url: null,
+        bio: null,
+        updated_at: '2026-08-21T00:00:00.000Z',
+        legal_version: '2026-08-20',
+        legal_accepted_at: '2026-08-21T00:00:00.000Z',
+        age_attested_at: '2026-08-21T00:00:00.000Z',
+      },
+      loaded: true,
+      loading: false,
+      error: null,
+    });
+    mockFrom.mockReturnValue(
+      createQuery({ data: null, error: { message: 'permission denied' } })
+    );
+
+    await useProfileStore.getState().fetchProfile('user-1', 'token');
+
+    expect(useProfileStore.getState()).toMatchObject({
+      loaded: true,
+      loading: false,
+      profile: { id: 'user-1', username: 'liam' },
+    });
+    expect(useProfileStore.getState().error).toContain('couldn’t load your profile');
+  });
+
   it('surfaces a legal-acceptance request failure', async () => {
     mockFrom.mockReturnValue(
       createQuery({
@@ -131,6 +180,7 @@ describe('profileStore.fetchProfile', () => {
           id: 'user-1',
           username: 'liam',
           avatar_url: null,
+          bio: null,
           updated_at: '2026-08-21T00:00:00.000Z',
         },
         error: null,
@@ -164,6 +214,7 @@ describe('profileStore.username', () => {
         id: 'user-1',
         username: 'oldname',
         avatar_url: null,
+        bio: null,
         updated_at: null,
         legal_version: '2026-08-20',
         legal_accepted_at: '2026-08-21T00:00:00.000Z',
@@ -181,6 +232,7 @@ describe('profileStore.username', () => {
           id: 'user-1',
           username: 'newname',
           avatar_url: null,
+          bio: null,
           updated_at: '2026-08-21T00:00:00.000Z',
         },
       })
@@ -206,6 +258,32 @@ describe('profileStore.username', () => {
       message: 'That username is already taken.',
     });
   });
+
+  it('throws claim failures and lookup errors', async () => {
+    fetchMock.mockResolvedValueOnce(mockResponse({ error: 'rate limited' }, false));
+    await expect(
+      useProfileStore.getState().claimUsername('token', 'liam')
+    ).rejects.toThrow('rate limited');
+
+    fetchMock.mockResolvedValueOnce(mockResponse({ allowed: true }, true));
+    await expect(
+      useProfileStore.getState().claimUsername('token', 'liam')
+    ).rejects.toThrow('Could not save the username right now. Try again.');
+
+    const abort = new Error('Aborted');
+    abort.name = 'AbortError';
+    fetchMock.mockRejectedValueOnce(abort);
+    await expect(
+      useProfileStore.getState().claimUsername('token', 'liam')
+    ).rejects.toThrow('Saving the username timed out. Please try again.');
+
+    mockFrom.mockReturnValue(
+      createQuery({ data: null, error: { message: 'lookup failed' } })
+    );
+    await expect(
+      useProfileStore.getState().isUsernameAvailable('liam')
+    ).rejects.toMatchObject({ message: 'lookup failed' });
+  });
 });
 
 describe('profileStore.acceptLegal', () => {
@@ -216,6 +294,7 @@ describe('profileStore.acceptLegal', () => {
           id: 'user-1',
           username: 'liam',
           avatar_url: null,
+          bio: null,
           updated_at: '2026-08-21T00:00:00.000Z',
           legal_version: '2026-08-20',
           legal_accepted_at: '2026-08-21T00:00:00.000Z',
@@ -228,12 +307,30 @@ describe('profileStore.acceptLegal', () => {
     expect(useProfileStore.getState().loaded).toBe(true);
   });
 
+  it('throws when agreement cannot be saved', async () => {
+    fetchMock.mockResolvedValueOnce(mockResponse({ error: 'nope' }, false));
+    await expect(useProfileStore.getState().acceptLegal('token')).rejects.toThrow('nope');
+
+    fetchMock.mockResolvedValueOnce(mockResponse({}, true));
+    await expect(useProfileStore.getState().acceptLegal('token')).rejects.toThrow(
+      'Could not save your agreement right now. Try again.'
+    );
+
+    const abort = new Error('Aborted');
+    abort.name = 'AbortError';
+    fetchMock.mockRejectedValueOnce(abort);
+    await expect(useProfileStore.getState().acceptLegal('token')).rejects.toThrow(
+      'Saving your agreement timed out. Please try again.'
+    );
+  });
+
   it('clears in-flight state', () => {
     useProfileStore.setState({
       profile: {
         id: 'user-1',
         username: 'liam',
         avatar_url: null,
+        bio: null,
         updated_at: null,
         legal_version: null,
         legal_accepted_at: null,
@@ -251,6 +348,180 @@ describe('profileStore.acceptLegal', () => {
       loading: false,
       error: null,
       welcomeAboardUserId: null,
+    });
+  });
+
+  it('loads a public profile without a session token and merges persisted state', async () => {
+    mockFrom.mockReturnValue(
+      createQuery({
+        data: {
+          id: 'user-1',
+          username: 'liam',
+          avatar_url: null,
+          bio: null,
+          updated_at: '2026-08-21T00:00:00.000Z',
+        },
+        error: null,
+      })
+    );
+    await useProfileStore.getState().fetchProfile('user-1');
+    expect(useProfileStore.getState().profile?.username).toBe('liam');
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    const merge = useProfileStore.persist.getOptions().merge;
+    expect(merge).toBeDefined();
+    const merged = merge!(
+      {
+        profile: {
+          id: 'user-1',
+          username: 'liam',
+          avatar_url: null,
+          bio: null,
+          updated_at: null,
+          legal_version: null,
+          legal_accepted_at: null,
+          age_attested_at: null,
+        },
+      },
+      useProfileStore.getState()
+    );
+    expect(merged.loaded).toBe(true);
+    expect(merged.profile?.id).toBe('user-1');
+    expect(merge!(null, useProfileStore.getState()).profile).toBeNull();
+    useProfileStore.getState().setHasHydrated(true);
+    expect(useProfileStore.getState().hasHydrated).toBe(true);
+  });
+});
+
+describe('profileStore.updateAvatar', () => {
+  const avatarUrl =
+    'https://project.supabase.co/storage/v1/object/public/avatars/user-1/a.jpg';
+
+  it('saves an approved photo and rewrites cached spots', async () => {
+    useProfileStore.setState({
+      profile: {
+        id: 'user-1',
+        username: 'liam',
+        avatar_url: null,
+        bio: null,
+        updated_at: null,
+        legal_version: '2026-08-20',
+        legal_accepted_at: '2026-08-21T00:00:00.000Z',
+        age_attested_at: '2026-08-21T00:00:00.000Z',
+      },
+      loaded: true,
+    });
+    fetchMock.mockResolvedValue(
+      mockResponse({
+        allowed: true,
+        profile: {
+          id: 'user-1',
+          username: 'liam',
+          avatar_url: avatarUrl,
+          bio: null,
+          updated_at: '2026-08-26T00:00:00.000Z',
+        },
+      })
+    );
+
+    await expect(
+      useProfileStore.getState().updateAvatar('token', { uri: 'file://photo.jpg' })
+    ).resolves.toEqual({ ok: true });
+    expect(useProfileStore.getState().profile?.avatar_url).toBe(avatarUrl);
+    expect(mockReplaceCreatorAvatar).toHaveBeenCalledWith('user-1', avatarUrl);
+  });
+
+  it('returns a gentle reason when review rejects the photo', async () => {
+    fetchMock.mockResolvedValue(
+      mockResponse({ allowed: false, reason: 'Let’s try a different photo.' })
+    );
+    await expect(
+      useProfileStore.getState().updateAvatar('token', { uri: 'file://photo.jpg' })
+    ).resolves.toEqual({
+      ok: false,
+      message: 'Let’s try a different photo.',
+    });
+    expect(mockReplaceCreatorAvatar).not.toHaveBeenCalled();
+  });
+
+  it('clears the photo', async () => {
+    useProfileStore.setState({
+      profile: {
+        id: 'user-1',
+        username: 'liam',
+        avatar_url: avatarUrl,
+        bio: null,
+        updated_at: null,
+        legal_version: null,
+        legal_accepted_at: null,
+        age_attested_at: null,
+      },
+      loaded: true,
+    });
+    fetchMock.mockResolvedValue(
+      mockResponse({
+        profile: {
+          id: 'user-1',
+          username: 'liam',
+          avatar_url: null,
+          bio: null,
+          updated_at: '2026-08-26T00:00:00.000Z',
+        },
+      })
+    );
+
+    await useProfileStore.getState().removeAvatar('token');
+    expect(useProfileStore.getState().profile?.avatar_url).toBeNull();
+    expect(mockReplaceCreatorAvatar).toHaveBeenCalledWith('user-1', null);
+  });
+});
+
+describe('profileStore.updateBio', () => {
+  it('saves an approved bio', async () => {
+    useProfileStore.setState({
+      profile: {
+        id: 'user-1',
+        username: 'liam',
+        avatar_url: null,
+        bio: null,
+        updated_at: null,
+        legal_version: '2026-08-20',
+        legal_accepted_at: '2026-08-21T00:00:00.000Z',
+        age_attested_at: '2026-08-21T00:00:00.000Z',
+      },
+      loaded: true,
+    });
+    fetchMock.mockResolvedValue(
+      mockResponse({
+        allowed: true,
+        profile: {
+          id: 'user-1',
+          username: 'liam',
+          avatar_url: null,
+          bio: 'Skater at State',
+          updated_at: '2026-08-26T00:00:00.000Z',
+        },
+      })
+    );
+
+    await expect(
+      useProfileStore.getState().updateBio('token', 'Skater at State')
+    ).resolves.toEqual({ ok: true });
+    expect(useProfileStore.getState().profile?.bio).toBe('Skater at State');
+  });
+
+  it('returns a gentle reason when review rejects the bio', async () => {
+    fetchMock.mockResolvedValue(
+      mockResponse({
+        allowed: false,
+        reason: 'Let’s keep this one school-friendly and try again.',
+      })
+    );
+    await expect(
+      useProfileStore.getState().updateBio('token', 'nsfw')
+    ).resolves.toEqual({
+      ok: false,
+      message: 'Let’s keep this one school-friendly and try again.',
     });
   });
 });

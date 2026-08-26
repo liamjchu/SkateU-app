@@ -1,10 +1,14 @@
 import { Feather } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { colors } from '../constants/colors';
 import { formatCompactRelativeTime } from '../lib/relativeTime';
+import { openUserProfile } from '../lib/userProfileNavigation';
 import type { SpotComment } from '../types/comment';
 import ExpandableText from './expandable-text';
 import FeedbackPressable from './FeedbackPressable';
+import ProfileAvatar from './ProfileAvatar';
+import CreatorAttribution from './creator-attribution';
 
 type SpotCommentRowProps = {
   comment: SpotComment;
@@ -17,10 +21,9 @@ type SpotCommentRowProps = {
   onBlock?: (comment: SpotComment) => void;
 };
 
-function attribution(comment: SpotComment): string {
-  const who = comment.creatorUsername ? `@${comment.creatorUsername}` : 'A skater';
+function attributionSuffix(comment: SpotComment): string {
   const when = formatCompactRelativeTime(comment.createdAt);
-  return when ? `${who} · ${when}` : who;
+  return when ? ` · ${when}` : '';
 }
 
 export default function SpotCommentRow({
@@ -37,14 +40,47 @@ export default function SpotCommentRow({
   const isDeleting = deletingId === comment.id;
   const canModerateOther =
     Boolean(currentUserId) && !isOwn && Boolean(comment.userId);
+  const router = useRouter();
 
   return (
     <View className={isReply ? 'ml-6 mt-3 border-l-2 border-border-soft pl-3' : ''}>
       <View className="flex-row items-start">
+        <View className="mr-2 mt-0.5">
+          {comment.userId ? (
+            <FeedbackPressable
+              haptic="selection"
+              onPress={() => {
+                openUserProfile(router, comment.userId as string, currentUserId);
+              }}
+              accessibilityRole="link"
+              accessibilityLabel={
+                comment.creatorUsername
+                  ? `Open @${comment.creatorUsername}'s profile`
+                  : 'Open profile'
+              }
+            >
+              <ProfileAvatar
+                uri={comment.creatorAvatarUrl}
+                size={28}
+                iconSize={14}
+              />
+            </FeedbackPressable>
+          ) : (
+            <ProfileAvatar
+              uri={comment.creatorAvatarUrl}
+              size={28}
+              iconSize={14}
+            />
+          )}
+        </View>
         <View className="min-w-0 flex-1">
-          <Text className="font-outfit-semibold text-sm text-muted">
-            {attribution(comment)}
-          </Text>
+          <CreatorAttribution
+            userId={comment.userId}
+            username={comment.creatorUsername}
+            fallback="A skater"
+            suffix={attributionSuffix(comment)}
+            className="font-outfit-semibold text-sm text-muted"
+          />
           <ExpandableText
             collapsedLines={4}
             className="mt-1 font-outfit-medium text-base leading-5 text-ink"
@@ -103,11 +139,11 @@ export default function SpotCommentRow({
             accessibilityRole="button"
             accessibilityLabel={
               comment.creatorUsername
-                ? `Block @${comment.creatorUsername}`
-                : 'Block this skater'
+                ? `Block user @${comment.creatorUsername}`
+                : 'Block this user'
             }
           >
-            <Text className="font-outfit-bold text-sm text-muted">Block</Text>
+            <Text className="font-outfit-bold text-sm text-muted">Block user</Text>
           </FeedbackPressable>
         ) : null}
       </View>

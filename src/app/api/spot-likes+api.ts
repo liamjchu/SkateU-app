@@ -1,7 +1,7 @@
 import {
     applyVisibleSpotFilter,
     getSupabaseConfig,
-    isRemovedSpotStatus,
+    isHiddenSpotStatus,
     mapSpot,
     resolveUserId,
     authUserMessage,
@@ -180,7 +180,7 @@ async function changeLike(request: Request, shouldLike: boolean): Promise<Respon
   try {
     const spotId = idValidation.value;
     const existing = await readSpotLikeCount(config, spotId);
-    if (existing === null || isRemovedSpotStatus(existing.status)) {
+    if (existing === null || isHiddenSpotStatus(existing.status)) {
       return Response.json({ error: 'That spot no longer exists.' }, { status: 404 });
     }
 

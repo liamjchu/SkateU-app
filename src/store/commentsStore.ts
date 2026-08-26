@@ -1,5 +1,16 @@
 import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
+import { captureAnalyticsEvent } from '../lib/analytics';
 import { getApiUrl } from '../lib/api';
+import { getClientStorage } from '../lib/clientStorage';
+import { COMMENT_PAGE_SIZE } from '../lib/commentForm';
+import {
+  COMMENTS_CACHE_KEY,
+  COMMENTS_CACHE_SPOT_CAP,
+  parsePersistedSpotComments,
+  readPersistedRecord,
+  type PersistedSpotComments,
+} from '../lib/readCache';
 import { sanitizeErrorMessage } from '../lib/userFacingError';
 import type { SpotComment } from '../types/comment';
 import { useSpotsStore } from './spotsStore';
@@ -18,6 +29,9 @@ type SpotCommentsCache = {
 type CommentsState = {
   bySpotId: Record<string, SpotCommentsCache>;
   commentCounts: Record<string, number>;
+  recentSpotIds: string[];
+  hasHydrated: boolean;
+  setHasHydrated: (hasHydrated: boolean) => void;
   fetchComments: (spotId: string, accessToken?: string) => Promise<void>;
   fetchMore: (spotId: string, accessToken?: string) => Promise<void>;
   addComment: (
@@ -32,6 +46,7 @@ type CommentsState = {
     accessToken: string
   ) => Promise<void>;
   hideUserComments: (userId: string) => void;
+  replaceCreatorAvatar: (userId: string, avatarUrl: string | null) => void;
   hideComment: (spotId: string, commentId: string) => void;
   resetSpot: (spotId: string) => void;
   reset: () => void;
@@ -246,15 +261,49 @@ function removeComment(
     }));
 }
 
-export const useCommentsStore = create<CommentsState>((set, get) => ({
+function touchRecentSpot(recentSpotIds: string[], spotId: string): string[] {
+  return [spotId, ...recentSpotIds.filter((id) => id !== spotId)].slice(
+    0,
+    COMMENTS_CACHE_SPOT_CAP
+  );
+}
+
+function persistableBySpotId(
+  bySpotId: Record<string, SpotCommentsCache>,
+  recentSpotIds: string[]
+): Record<string, PersistedSpotComments> {
+  const persisted: Record<string, PersistedSpotComments> = {};
+  for (const spotId of recentSpotIds) {
+    const cache = bySpotId[spotId];
+    if (!cache || cache.comments.length === 0) {
+      continue;
+    }
+    persisted[spotId] = {
+      comments: cache.comments.slice(0, COMMENT_PAGE_SIZE),
+      hasMore: cache.hasMore || cache.comments.length > COMMENT_PAGE_SIZE,
+      nextOffset: Math.min(cache.nextOffset, COMMENT_PAGE_SIZE),
+      commentCount: cache.commentCount,
+    };
+  }
+  return persisted;
+}
+
+export const useCommentsStore = create<CommentsState>()(
+  persist(
+    (set, get) => ({
   bySpotId: {},
   commentCounts: {},
+  recentSpotIds: [],
+  hasHydrated: false,
+  setHasHydrated: (hasHydrated) => set({ hasHydrated }),
 
   fetchComments: async (spotId, accessToken) => {
     const version = bumpVersion(spotId);
+    const cached = get().bySpotId[spotId];
+    const hasCache = (cached?.comments.length ?? 0) > 0;
     set((state) =>
       patchCache(state, spotId, {
-        loading: true,
+        loading: !hasCache,
         error: null,
       })
     );
@@ -281,17 +330,33 @@ export const useCommentsStore = create<CommentsState>((set, get) => ({
       const pagination = readPagination(data, 0);
       applyCommentCount(spotId, commentCount);
 
-      set((state) => ({
-        ...patchCache(state, spotId, {
-          comments,
-          loading: false,
-          error: null,
-          hasMore: pagination.hasMore,
-          nextOffset: pagination.nextOffset,
-          commentCount,
-        }),
-        commentCounts: { ...state.commentCounts, [spotId]: commentCount },
-      }));
+      set((state) => {
+        const recentSpotIds = touchRecentSpot(state.recentSpotIds, spotId);
+        const nextBySpotId = {
+          ...state.bySpotId,
+          [spotId]: {
+            ...(state.bySpotId[spotId] ?? emptyCache()),
+            comments,
+            loading: false,
+            error: null,
+            hasMore: pagination.hasMore,
+            nextOffset: pagination.nextOffset,
+            commentCount,
+          },
+        };
+        for (const id of Object.keys(nextBySpotId)) {
+          if (!recentSpotIds.includes(id)) {
+            delete nextBySpotId[id];
+          }
+        }
+        const commentCounts = { ...state.commentCounts, [spotId]: commentCount };
+        for (const id of Object.keys(commentCounts)) {
+          if (!recentSpotIds.includes(id) && id !== spotId) {
+            delete commentCounts[id];
+          }
+        }
+        return { bySpotId: nextBySpotId, commentCounts, recentSpotIds };
+      });
     } catch (error) {
       if (currentVersion(spotId) !== version) {
         return;
@@ -408,6 +473,7 @@ export const useCommentsStore = create<CommentsState>((set, get) => ({
 
       const created: SpotComment = { ...data.comment, replies: data.comment.replies ?? [] };
       const commentCount = data.commentCount ?? cache.commentCount + 1;
+      captureAnalyticsEvent('comment_posted', { spot_id: spotId });
       applyCommentCount(spotId, commentCount);
 
       set((state) => {
@@ -447,6 +513,7 @@ export const useCommentsStore = create<CommentsState>((set, get) => ({
     }
 
     const data = (await response.json()) as { commentCount?: number };
+    captureAnalyticsEvent('comment_deleted', { spot_id: spotId });
     const current = get().bySpotId[spotId] ?? emptyCache();
     const commentCount = data.commentCount ?? Math.max(0, current.commentCount - 1);
     applyCommentCount(spotId, commentCount);
@@ -470,6 +537,30 @@ export const useCommentsStore = create<CommentsState>((set, get) => ({
         bySpotId[spotId] = {
           ...cache,
           comments: commentsWithoutUser(cache.comments, userId),
+        };
+      }
+      return { bySpotId };
+    });
+  },
+
+  replaceCreatorAvatar: (userId, avatarUrl) => {
+    const replace = (comment: SpotComment): SpotComment => {
+      const next =
+        comment.userId === userId
+          ? { ...comment, creatorAvatarUrl: avatarUrl }
+          : comment;
+      return {
+        ...next,
+        replies: next.replies.map(replace),
+      };
+    };
+
+    set((state) => {
+      const bySpotId: Record<string, SpotCommentsCache> = {};
+      for (const [spotId, cache] of Object.entries(state.bySpotId)) {
+        bySpotId[spotId] = {
+          ...cache,
+          comments: cache.comments.map(replace),
         };
       }
       return { bySpotId };
@@ -501,6 +592,51 @@ export const useCommentsStore = create<CommentsState>((set, get) => ({
 
   reset: () => {
     fetchVersions.clear();
-    set({ bySpotId: {}, commentCounts: {} });
+    set({ bySpotId: {}, commentCounts: {}, recentSpotIds: [] });
   },
-}));
+    }),
+    {
+      name: COMMENTS_CACHE_KEY,
+      storage: createJSONStorage(getClientStorage),
+      skipHydration: true,
+      onRehydrateStorage: () => () => {
+        useCommentsStore.getState().setHasHydrated(true);
+      },
+      partialize: (state) => ({
+        recentSpotIds: state.recentSpotIds,
+        commentCounts: state.commentCounts,
+        bySpotId: persistableBySpotId(state.bySpotId, state.recentSpotIds),
+      }),
+      merge: (persistedState, currentState) => {
+        const persisted = readPersistedRecord(persistedState);
+        const recentSpotIds = Array.isArray(persisted.recentSpotIds)
+          ? persisted.recentSpotIds.filter(
+              (id): id is string => typeof id === 'string'
+            ).slice(0, COMMENTS_CACHE_SPOT_CAP)
+          : [];
+        const persistedBySpot = readPersistedRecord(persisted.bySpotId);
+        const bySpotId: Record<string, SpotCommentsCache> = {};
+        const commentCounts: Record<string, number> = {};
+
+        for (const spotId of recentSpotIds) {
+          const parsed = parsePersistedSpotComments(persistedBySpot[spotId]);
+          if (!parsed) {
+            continue;
+          }
+          bySpotId[spotId] = {
+            ...emptyCache(),
+            ...parsed,
+          };
+          commentCounts[spotId] = parsed.commentCount;
+        }
+
+        return {
+          ...currentState,
+          bySpotId,
+          commentCounts,
+          recentSpotIds,
+        };
+      },
+    }
+  )
+);

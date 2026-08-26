@@ -1,7 +1,19 @@
 import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
+import { captureAnalyticsEvent } from '../lib/analytics';
 import { getApiUrl } from '../lib/api';
+import { getClientStorage } from '../lib/clientStorage';
+import { HOME_SPOTS_PAGE_SIZE } from '../lib/homeFeed';
+import {
+  capNewest,
+  parseSchoolFilter,
+  parseSpots,
+  readPersistedRecord,
+  SPOTS_CACHE_KEY,
+} from '../lib/readCache';
 import { buildImageOrder } from '../lib/spotMedia';
 import { sanitizeErrorMessage } from '../lib/userFacingError';
+import type { SchoolTypeFilter } from '../types/school';
 import type { NewSpotInput, Spot, UpdateSpotInput } from '../types/spot';
 import type {
   SpotRemovalReason,
@@ -14,15 +26,25 @@ type SpotsState = {
   loading: boolean;
   error: string | null;
   schoolId: string | null;
+  spotsFetchedAt: string | null;
+  hasHydrated: boolean;
+  sessionUserId: string | null;
   // The signed-in user's own spots (across all schools), for the profile page.
   mySpots: Spot[];
+  mySpotsOwnerId: string | null;
   myLoading: boolean;
   myError: string | null;
   // Spots the signed-in user has liked, for the profile page.
   likedSpots: Spot[];
   likedLoading: boolean;
   likedError: string | null;
+  recentSpots: Spot[];
+  recentFilter: SchoolTypeFilter | null;
   reportedSpotIds: string[];
+  reviewingSpotIds: string[];
+  setHasHydrated: (hasHydrated: boolean) => void;
+  setSessionUserId: (userId: string | null) => void;
+  setRecentFeed: (filter: SchoolTypeFilter, spots: Spot[]) => void;
   fetchSpots: (schoolId: string, accessToken?: string) => Promise<void>;
   addSpot: (input: NewSpotInput, accessToken: string) => Promise<Spot>;
   fetchMySpots: (accessToken: string) => Promise<void>;
@@ -49,6 +71,7 @@ type SpotsState = {
     accessToken: string
   ) => Promise<void>;
   replaceCreatorUsername: (previousUsername: string, username: string) => void;
+  replaceCreatorAvatar: (userId: string, avatarUrl: string | null) => void;
   setSpotCommentCount: (spotId: string, commentCount: number) => void;
   hideCreatorSpots: (userId: string) => void;
   clearMySpots: () => void;
@@ -220,18 +243,78 @@ function toFetchErrorMessage(error: unknown): string {
   return LOAD_FAILED_ERROR;
 }
 
-export const useSpotsStore = create<SpotsState>()((set) => ({
+export const useSpotsStore = create<SpotsState>()(
+  persist(
+    (set, get) => ({
   spots: [],
   loading: false,
   error: null,
   schoolId: null,
+  spotsFetchedAt: null,
+  hasHydrated: false,
+  sessionUserId: null,
   mySpots: [],
+  mySpotsOwnerId: null,
   myLoading: false,
   myError: null,
   likedSpots: [],
   likedLoading: false,
   likedError: null,
+  recentSpots: [],
+  recentFilter: null,
   reportedSpotIds: [],
+  reviewingSpotIds: [],
+  setHasHydrated: (hasHydrated) => set({ hasHydrated }),
+  setSessionUserId: (userId) => {
+    const currentUserId = get().sessionUserId;
+    if (currentUserId === userId) {
+      return;
+    }
+
+    if (!userId) {
+      mySpotsRequestVersion += 1;
+      likedSpotsRequestVersion += 1;
+      spotLikeMutationVersion += 1;
+      set((state) => ({
+        sessionUserId: null,
+        mySpots: [],
+        mySpotsOwnerId: null,
+        myLoading: false,
+        myError: null,
+        likedSpots: [],
+        likedLoading: false,
+        likedError: null,
+        reportedSpotIds: [],
+        reviewingSpotIds: [],
+        spots: state.spots.map((spot) => ({ ...spot, likedByUser: false })),
+      }));
+      return;
+    }
+
+    const keepMine = get().mySpotsOwnerId === userId;
+    set((state) => ({
+      sessionUserId: userId,
+      ...(keepMine
+        ? {}
+        : {
+            mySpots: [],
+            mySpotsOwnerId: null,
+            myLoading: false,
+            myError: null,
+            likedSpots: [],
+            likedLoading: false,
+            likedError: null,
+            spots: state.spots.map((spot) => ({ ...spot, likedByUser: false })),
+            recentSpots: state.recentSpots.map((spot) => ({
+              ...spot,
+              likedByUser: false,
+            })),
+          }),
+    }));
+  },
+  setRecentFeed: (filter, spots) => {
+    set({ recentSpots: spots, recentFilter: filter });
+  },
 
   fetchSpots: async (schoolId: string, accessToken?: string) => {
     const requestVersion = ++spotsRequestVersion;
@@ -247,8 +330,11 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
       return;
     }
 
+    const hasCache =
+      get().schoolId === trimmedSchoolId && get().spotsFetchedAt !== null;
+
     if (requestVersion === spotsRequestVersion) {
-      set({ loading: true, error: null });
+      set({ loading: !hasCache, error: null });
     }
 
     try {
@@ -282,6 +368,7 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
       set({
         spots: data.spots ?? [],
         schoolId: trimmedSchoolId,
+        spotsFetchedAt: new Date().toISOString(),
         loading: false,
         error: null,
       });
@@ -333,13 +420,20 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
       throw new Error('The server did not return the created spot.');
     }
 
+    captureAnalyticsEvent('spot_created', {
+      spot_id: data.spot.id,
+      school_id: data.spot.schoolId ?? input.schoolId,
+    });
+
     return data.spot;
   },
 
   fetchMySpots: async (accessToken: string) => {
     const requestVersion = ++mySpotsRequestVersion;
     const mutationVersion = spotLikeMutationVersion;
-    set({ myLoading: true, myError: null });
+    const hasCache =
+      get().mySpotsOwnerId === get().sessionUserId && get().mySpots.length > 0;
+    set({ myLoading: !hasCache, myError: null });
 
     try {
       const response = await fetchGetWithRetry(getApiUrl('/api/spots?mine=1'), {
@@ -362,7 +456,12 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
         return;
       }
 
-      set({ mySpots: data.spots ?? [], myLoading: false, myError: null });
+      set({
+        mySpots: data.spots ?? [],
+        mySpotsOwnerId: get().sessionUserId,
+        myLoading: false,
+        myError: null,
+      });
     } catch (error) {
       if (
         requestVersion !== mySpotsRequestVersion ||
@@ -388,7 +487,9 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
   fetchLikedSpots: async (accessToken: string) => {
     const requestVersion = ++likedSpotsRequestVersion;
     const mutationVersion = spotLikeMutationVersion;
-    set({ likedLoading: true, likedError: null });
+    const hasCache =
+      get().mySpotsOwnerId === get().sessionUserId && get().likedSpots.length > 0;
+    set({ likedLoading: !hasCache, likedError: null });
 
     try {
       const response = await fetchGetWithRetry(getApiUrl('/api/spot-likes'), {
@@ -456,6 +557,15 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
     };
     const nextLiked = data.likedByUser ?? !likedByUser;
     const nextCount = data.likeCount ?? 0;
+    const schoolId =
+      get().spots.find((spot) => spot.id === id)?.schoolId ??
+      get().mySpots.find((spot) => spot.id === id)?.schoolId ??
+      get().likedSpots.find((spot) => spot.id === id)?.schoolId ??
+      get().recentSpots.find((spot) => spot.id === id)?.schoolId;
+    captureAnalyticsEvent(nextLiked ? 'spot_liked' : 'spot_unliked', {
+      spot_id: id,
+      ...(schoolId ? { school_id: schoolId } : {}),
+    });
     spotLikeMutationVersion += 1;
 
     set((state) => {
@@ -466,20 +576,25 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
       const updatedSpots = state.spots.map(updateSpot);
       const updatedMySpots = state.mySpots.map(updateSpot);
       const updatedLikedSpots = state.likedSpots.map(updateSpot);
+      const updatedRecentSpots = state.recentSpots.map(updateSpot);
 
       if (!nextLiked) {
         return {
           spots: updatedSpots,
           mySpots: updatedMySpots,
           likedSpots: updatedLikedSpots.filter((spot) => spot.id !== id),
+          recentSpots: updatedRecentSpots,
         };
       }
 
-      const likedSpot = updatedSpots.find((spot) => spot.id === id);
+      const likedSpot =
+        updatedSpots.find((spot) => spot.id === id) ??
+        updatedRecentSpots.find((spot) => spot.id === id);
       return {
         spots: updatedSpots,
         mySpots: updatedMySpots,
-        likedSpots:         likedSpot
+        recentSpots: updatedRecentSpots,
+        likedSpots: likedSpot
           ? [
               likedSpot,
               ...updatedLikedSpots.filter((spot) => spot.id !== id),
@@ -492,6 +607,13 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
   },
 
   updateSpot: async (id: string, input: UpdateSpotInput, accessToken: string) => {
+    set((state) => ({
+      reviewingSpotIds: state.reviewingSpotIds.includes(id)
+        ? state.reviewingSpotIds
+        : [...state.reviewingSpotIds, id],
+    }));
+
+    try {
     const form = new FormData();
     form.append('name', input.name);
     form.append('description', input.description);
@@ -532,6 +654,11 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
 
     const updated = data.spot;
 
+    captureAnalyticsEvent('spot_updated', {
+      spot_id: updated.id,
+      ...(updated.schoolId ? { school_id: updated.schoolId } : {}),
+    });
+
     // Reflect the change everywhere the spot may appear: the profile list and
     // the currently loaded school map.
     set((state) => ({
@@ -540,9 +667,17 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
       likedSpots: state.likedSpots.map((spot) =>
         spot.id === id ? { ...updated, likedByUser: spot.likedByUser } : spot
       ),
+      recentSpots: state.recentSpots.map((spot) =>
+        spot.id === id ? { ...updated, likedByUser: spot.likedByUser } : spot
+      ),
     }));
 
     return updated;
+    } finally {
+      set((state) => ({
+        reviewingSpotIds: state.reviewingSpotIds.filter((spotId) => spotId !== id),
+      }));
+    }
   },
 
   deleteSpot: async (id: string, accessToken: string) => {
@@ -558,12 +693,22 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
       throw new Error(await readErrorMessage(response));
     }
 
+    const schoolId =
+      get().spots.find((spot) => spot.id === id)?.schoolId ??
+      get().mySpots.find((spot) => spot.id === id)?.schoolId ??
+      get().likedSpots.find((spot) => spot.id === id)?.schoolId;
+    captureAnalyticsEvent('spot_deleted', {
+      spot_id: id,
+      ...(schoolId ? { school_id: schoolId } : {}),
+    });
+
     // Remove the spot globally so it disappears from the profile list and the
     // map immediately.
     set((state) => ({
       mySpots: state.mySpots.filter((spot) => spot.id !== id),
       spots: state.spots.filter((spot) => spot.id !== id),
       likedSpots: state.likedSpots.filter((spot) => spot.id !== id),
+      recentSpots: state.recentSpots.filter((spot) => spot.id !== id),
     }));
   },
 
@@ -609,6 +754,11 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
       throw new Error(await readErrorMessage(response));
     }
 
+    captureAnalyticsEvent('spot_removal_requested', {
+      spot_id: spotId,
+      reason,
+    });
+
     set((state) => ({
       reportedSpotIds: withReportedSpot(state.reportedSpotIds, spotId),
     }));
@@ -623,6 +773,7 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
       spots: state.spots.map(updateSpot),
       mySpots: state.mySpots.map(updateSpot),
       likedSpots: state.likedSpots.map(updateSpot),
+      recentSpots: state.recentSpots.map(updateSpot),
     }));
   },
 
@@ -642,6 +793,21 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
       spots: state.spots.map(replace),
       mySpots: state.mySpots.map(replace),
       likedSpots: state.likedSpots.map(replace),
+      recentSpots: state.recentSpots.map(replace),
+    }));
+  },
+
+  replaceCreatorAvatar: (userId, avatarUrl) => {
+    const replace = (spot: Spot): Spot =>
+      spot.creatorUserId === userId
+        ? { ...spot, creatorAvatarUrl: avatarUrl }
+        : spot;
+
+    set((state) => ({
+      spots: state.spots.map(replace),
+      mySpots: state.mySpots.map(replace),
+      likedSpots: state.likedSpots.map(replace),
+      recentSpots: state.recentSpots.map(replace),
     }));
   },
 
@@ -650,12 +816,13 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
     set((state) => ({
       spots: state.spots.filter(keep),
       likedSpots: state.likedSpots.filter(keep),
+      recentSpots: state.recentSpots.filter(keep),
     }));
   },
 
   clearMySpots: () => {
     mySpotsRequestVersion += 1;
-    set({ mySpots: [], myLoading: false, myError: null });
+    set({ mySpots: [], mySpotsOwnerId: null, myLoading: false, myError: null });
   },
 
   clearLikedSpots: () => {
@@ -664,6 +831,10 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
     set((state) => ({
       spots: state.spots.map((spot) => ({ ...spot, likedByUser: false })),
       mySpots: state.mySpots.map((spot) => ({ ...spot, likedByUser: false })),
+      recentSpots: state.recentSpots.map((spot) => ({
+        ...spot,
+        likedByUser: false,
+      })),
       likedSpots: [],
       likedLoading: false,
       likedError: null,
@@ -684,13 +855,71 @@ export const useSpotsStore = create<SpotsState>()((set) => ({
       loading: false,
       error: null,
       schoolId: null,
+      spotsFetchedAt: null,
+      sessionUserId: null,
       mySpots: [],
+      mySpotsOwnerId: null,
       myLoading: false,
       myError: null,
       likedSpots: [],
       likedLoading: false,
       likedError: null,
+      recentSpots: [],
+      recentFilter: null,
       reportedSpotIds: [],
+      reviewingSpotIds: [],
     });
   },
-}));
+    }),
+    {
+      name: SPOTS_CACHE_KEY,
+      storage: createJSONStorage(getClientStorage),
+      skipHydration: true,
+      onRehydrateStorage: () => () => {
+        useSpotsStore.getState().setHasHydrated(true);
+      },
+      partialize: (state) => ({
+        spots: state.spots,
+        schoolId: state.schoolId,
+        spotsFetchedAt: state.spotsFetchedAt,
+        mySpots: state.mySpots,
+        mySpotsOwnerId: state.mySpotsOwnerId,
+        likedSpots: state.likedSpots,
+        recentSpots: capNewest(state.recentSpots, HOME_SPOTS_PAGE_SIZE),
+        recentFilter: state.recentFilter,
+      }),
+      merge: (persistedState, currentState) => {
+        const persisted = readPersistedRecord(persistedState);
+        const schoolId =
+          typeof persisted.schoolId === 'string' && persisted.schoolId.length > 0
+            ? persisted.schoolId
+            : null;
+        const spotsFetchedAt =
+          typeof persisted.spotsFetchedAt === 'string' &&
+          persisted.spotsFetchedAt.length > 0
+            ? persisted.spotsFetchedAt
+            : null;
+        const mySpotsOwnerId =
+          typeof persisted.mySpotsOwnerId === 'string' &&
+          persisted.mySpotsOwnerId.length > 0
+            ? persisted.mySpotsOwnerId
+            : null;
+
+        return {
+          ...currentState,
+          spots: parseSpots(persisted.spots),
+          schoolId,
+          spotsFetchedAt: schoolId ? spotsFetchedAt : null,
+          mySpots: parseSpots(persisted.mySpots),
+          mySpotsOwnerId,
+          likedSpots: parseSpots(persisted.likedSpots),
+          recentSpots: capNewest(
+            parseSpots(persisted.recentSpots),
+            HOME_SPOTS_PAGE_SIZE
+          ),
+          recentFilter: parseSchoolFilter(persisted.recentFilter),
+        };
+      },
+    }
+  )
+);

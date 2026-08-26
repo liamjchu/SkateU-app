@@ -2,9 +2,14 @@ import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import { useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
-import { useAuthStore } from '../store/authStore';
 import { colors } from '../constants/colors';
+import {
+  captureOauthAuthCompleted,
+} from '../lib/analytics';
+import { supabase } from '../lib/supabase';
 import { toUserFacingError } from '../lib/userFacingError';
+import { useAuthNoticeStore } from '../store/authNoticeStore';
+import { useAuthStore } from '../store/authStore';
 import FeedbackPressable from './FeedbackPressable';
 
 // Lets the in-app browser finish any pending auth session when the app is
@@ -12,9 +17,9 @@ import FeedbackPressable from './FeedbackPressable';
 WebBrowser.maybeCompleteAuthSession();
 
 type GoogleSignInButtonProps = {
-  // Called after a successful log in so the screen can navigate away.
+  // Called after a successful sign in so the screen can navigate away.
   onSuccess?: () => void;
-  // Called with a friendly message when log in fails.
+  // Called with a friendly message when sign in fails.
   onError?: (message: string) => void;
   // Lets a parent disable the button (e.g. while an email login is running).
   disabled?: boolean;
@@ -29,6 +34,7 @@ export default function GoogleSignInButton({
   compact = false,
 }: GoogleSignInButtonProps) {
   const signInWithGoogle = useAuthStore((state) => state.signInWithGoogle);
+  const showAuthNotice = useAuthNoticeStore((state) => state.showAuthNotice);
   // Local loading state keeps the button disabled while the browser sheet is
   // open, which stops users from opening multiple OAuth sessions by multi-tapping.
   const [loading, setLoading] = useState(false);
@@ -44,15 +50,30 @@ export default function GoogleSignInButton({
 
     try {
       const signedIn = await signInWithGoogle();
-      // Only navigate away on a completed log in. A dismissed/cancelled OAuth
+      // Only navigate away on a completed sign in. A dismissed/cancelled OAuth
       // sheet resolves false and should just re-enable the button.
-      if (signedIn) {
-        onSuccess?.();
+      if (!signedIn) {
+        return;
       }
+
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) {
+        const message = 'Could not sign in with Google. Please try again.';
+        showAuthNotice({ kind: 'error', message });
+        onError?.(message);
+        return;
+      }
+
+      captureOauthAuthCompleted(data.session.user.created_at, 'google');
+      showAuthNotice({ kind: 'success' });
+      onSuccess?.();
     } catch (error) {
-      onError?.(
-        toUserFacingError(error, 'Could not sign in with Google. Please try again.')
+      const message = toUserFacingError(
+        error,
+        'Could not sign in with Google. Please try again.'
       );
+      showAuthNotice({ kind: 'error', message });
+      onError?.(message);
     } finally {
       setLoading(false);
     }

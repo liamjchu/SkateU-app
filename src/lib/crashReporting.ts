@@ -1,27 +1,32 @@
-import type { ComponentType } from 'react';
 import * as Sentry from '@sentry/react-native';
+import * as Updates from 'expo-updates';
 
-const sentryDsn = process.env.EXPO_PUBLIC_SENTRY_DSN?.trim() ?? '';
+export function applyCrashReportingUpdateContext(): void {
+  try {
+    if (!Updates.isEnabled) {
+      return;
+    }
 
-export function initCrashReporting(): void {
-  if (!sentryDsn) {
+    Sentry.setTag('updateId', Updates.updateId ?? 'embedded');
+    if (Updates.channel) {
+      Sentry.setTag('channel', Updates.channel);
+    }
+    if (Updates.runtimeVersion) {
+      Sentry.setTag('runtimeVersion', Updates.runtimeVersion);
+    }
+  } catch {
+    // expo-updates is unavailable in some runtimes (web, tests, Expo Go).
+  }
+}
+
+export function setCrashReportingUser(userId: string): void {
+  if (!userId) {
     return;
   }
 
-  Sentry.init({
-    dsn: sentryDsn,
-    sendDefaultPii: false,
-    tracesSampleRate: 0,
-    enableAutoSessionTracking: false,
-    replaysSessionSampleRate: 0,
-    replaysOnErrorSampleRate: 0,
-  });
+  Sentry.setUser({ id: userId });
 }
 
-export function wrapRoot(Root: ComponentType): ComponentType {
-  if (!sentryDsn) {
-    return Root;
-  }
-
-  return Sentry.wrap(Root as ComponentType<Record<string, unknown>>);
+export function clearCrashReportingUser(): void {
+  Sentry.setUser(null);
 }

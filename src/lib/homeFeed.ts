@@ -1,4 +1,5 @@
 export const HOME_RAIL_PAGE_SIZE = 24;
+export const HOME_SPOTS_PAGE_SIZE = 6;
 export const MAX_HOME_FEED_OFFSET = HOME_RAIL_PAGE_SIZE * 50;
 
 export function parseOffset(raw: string | null): number {

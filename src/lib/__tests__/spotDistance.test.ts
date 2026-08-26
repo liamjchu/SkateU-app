@@ -21,6 +21,7 @@ function makeSpot(
     state: '',
     schoolName: '',
     creatorUsername: null,
+    creatorAvatarUrl: null,
     createdAt: '',
     updatedAt: '',
   };

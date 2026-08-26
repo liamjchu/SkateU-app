@@ -1,5 +1,6 @@
 import { Feather, Ionicons } from '@expo/vector-icons';
-import { Image, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
+import CachedRemoteImage from './CachedRemoteImage';
 import { colors } from '../constants/colors';
 import { formatSpotCount } from '../lib/formatSpotCount';
 import type { School, SchoolType } from '../types/school';
@@ -61,10 +62,10 @@ export default function PopularSchoolCard({
             accessibilityHint={`${formatSpotCount(school.numSpots)} skate spots at this school`}
           >
             {school.spotImageUrl ? (
-              <Image
-                source={{ uri: school.spotImageUrl }}
+              <CachedRemoteImage
+                uri={school.spotImageUrl}
                 className="h-[72px] w-[72px] rounded-xl bg-surface-soft"
-                resizeMode="cover"
+                style={{ height: 72, width: 72 }}
                 accessible={false}
               />
             ) : (

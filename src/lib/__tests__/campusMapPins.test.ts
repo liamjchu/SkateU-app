@@ -8,6 +8,7 @@ import {
     PIN_SCALE_SELECTED,
     PIN_UNSELECT_DURATION_MS,
     buildSelectSpotJavascript,
+    easeOutCubic,
     getCampusMapPinScript,
     samplePinScaleFrames,
 } from '../campusMapPins';
@@ -72,6 +73,19 @@ describe('campus map pin pop', () => {
     expect(samplePinScaleFrames(popFrames, 1)).toBeCloseTo(PIN_SCALE_SELECTED);
     expect(PIN_SCALE_PEAK).toBeGreaterThan(PIN_SCALE_SELECTED);
     expect(PIN_SCALE_SELECTED).toBeGreaterThan(PIN_SCALE_NORMAL);
+    expect(easeOutCubic(-1)).toBe(0);
+    expect(easeOutCubic(2)).toBe(1);
+    expect(samplePinScaleFrames([], 0.5)).toBe(PIN_SCALE_NORMAL);
+    expect(samplePinScaleFrames(popFrames, 1.5)).toBeCloseTo(PIN_SCALE_SELECTED);
+    expect(
+      samplePinScaleFrames(
+        [
+          { t: 0.4, scale: 1 },
+          { t: 0.4, scale: 2 },
+        ],
+        0.4
+      )
+    ).toBe(2);
   });
 
   it('injects selection without rebuilding the map HTML', () => {

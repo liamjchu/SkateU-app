@@ -3,8 +3,14 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
+import {
+  captureOauthAuthCompleted,
+} from '../lib/analytics';
 import { signInWithAppleIdentityToken } from '../lib/appleAuthentication';
+import { supabase } from '../lib/supabase';
+import { toUserFacingError } from '../lib/userFacingError';
 import { colors } from '../constants/colors';
+import { useAuthNoticeStore } from '../store/authNoticeStore';
 import FeedbackPressable from './FeedbackPressable';
 
 type AppleSignInButtonProps = {
@@ -38,6 +44,7 @@ export default function AppleSignInButton({
 }: AppleSignInButtonProps) {
   const [available, setAvailable] = useState(process.env.EXPO_OS === 'ios');
   const [loading, setLoading] = useState(false);
+  const showAuthNotice = useAuthNoticeStore((state) => state.showAuthNotice);
 
   useEffect(() => {
     void AppleAuthentication.isAvailableAsync()
@@ -77,17 +84,28 @@ export default function AppleSignInButton({
         user: credential.user,
         nonce,
       });
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) {
+        const message = 'Could not sign in with Apple. Please try again.';
+        showAuthNotice({ kind: 'error', message });
+        onError?.(message);
+        return;
+      }
+
+      captureOauthAuthCompleted(data.session.user.created_at, 'apple');
+      showAuthNotice({ kind: 'success' });
       onSuccess?.();
     } catch (error) {
       if (isRequestCanceled(error)) {
         return;
       }
 
-      onError?.(
-        error instanceof Error
-          ? error.message
-          : 'Could not sign in with Apple. Please try again.'
+      const message = toUserFacingError(
+        error,
+        'Could not sign in with Apple. Please try again.'
       );
+      showAuthNotice({ kind: 'error', message });
+      onError?.(message);
     } finally {
       setLoading(false);
     }

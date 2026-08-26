@@ -9,7 +9,7 @@ import {
   authUserMessage,
   fetchSpotOwnership,
   getSupabaseConfig,
-  isRemovedSpotStatus,
+  isHiddenSpotStatus,
   parseSpotStatus,
   resolveUserId,
   validateSpotId,
@@ -309,7 +309,7 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     const ownership = await fetchSpotOwnership(config, spotId);
-    if (!ownership.found || isRemovedSpotStatus(ownership.status)) {
+    if (!ownership.found || isHiddenSpotStatus(ownership.status)) {
       return Response.json({ error: SPOT_GONE_ERROR }, { status: 404 });
     }
     if (ownership.ownerId === user.userId) {

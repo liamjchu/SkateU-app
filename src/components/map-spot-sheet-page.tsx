@@ -1,9 +1,14 @@
 import { Feather, Octicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { colors } from '../constants/colors';
 import { formatRelativeTime } from '../lib/relativeTime';
+import { openUserProfile } from '../lib/userProfileNavigation';
+import { useAuthStore } from '../store/authStore';
 import type { Spot } from '../types/spot';
+import CreatorAttribution from './creator-attribution';
 import FeedbackPressable from './FeedbackPressable';
+import ProfileAvatar from './ProfileAvatar';
 import SpotMediaPager from './spot-media-pager';
 
 type MapSpotSheetPageProps = {
@@ -24,8 +29,6 @@ type MapSpotSheetPageProps = {
   onReportProblem: () => void;
   onRequestRemoval: () => void;
   onBlockCreator?: () => void;
-  onPhotoZoneTouch: () => void;
-  onDetailsZoneTouch: () => void;
 };
 
 function spotTimeLabel(spot: Spot): string | null {
@@ -63,13 +66,13 @@ export default function MapSpotSheetPage({
   onReportProblem,
   onRequestRemoval,
   onBlockCreator,
-  onPhotoZoneTouch,
-  onDetailsZoneTouch,
 }: MapSpotSheetPageProps) {
   const liked = spot.likedByUser === true;
   const isLiking = likingSpotId === spot.id;
   const imageUris = spot.imageUris.filter((uri) => uri.length > 0);
   const timeLabel = spotTimeLabel(spot);
+  const router = useRouter();
+  const currentUserId = useAuthStore((state) => state.user?.id ?? null);
   const body = (
     <MapSpotSheetBody
       spot={spot}
@@ -80,7 +83,6 @@ export default function MapSpotSheetPage({
       canShowRemoval={canShowRemoval}
       deletingSpotId={deletingSpotId}
       onOpenFullscreen={onOpenFullscreen}
-      onPhotoZoneTouch={onPhotoZoneTouch}
       onEdit={onEdit}
       onDelete={onDelete}
       onReportProblem={onReportProblem}
@@ -92,37 +94,65 @@ export default function MapSpotSheetPage({
   return (
     <View style={{ width }} className={fill ? 'flex-1' : undefined}>
       <View className="flex-row items-start px-5">
-        <FeedbackPressable
-          haptic="light"
-          disablePressScale
-          onPress={() => onOpenFullscreen(0)}
-          onPressIn={onDetailsZoneTouch}
-          className="min-w-0 flex-1 pr-3"
-          accessibilityRole="button"
-          accessibilityLabel={`Open full screen view of ${spot.name}`}
-        >
-          <View className="flex-row items-center">
-            <Text
-              numberOfLines={1}
-              className="min-w-0 flex-1 font-outfit-bold text-xl text-ink"
-            >
-              {spot.name}
-            </Text>
-            <Feather name="chevron-right" size={18} color={colors.mutedSoft} />
-          </View>
+        <View className="min-w-0 flex-1 pr-3">
+          <FeedbackPressable
+            haptic="light"
+            disablePressScale
+            onPress={() => onOpenFullscreen(0)}
+            accessibilityRole="button"
+            accessibilityLabel={`Open full screen view of ${spot.name}`}
+          >
+            <View className="flex-row items-center">
+              <Text
+                numberOfLines={1}
+                className="min-w-0 flex-1 font-outfit-bold text-xl text-ink"
+              >
+                {spot.name}
+              </Text>
+              <Feather name="chevron-right" size={18} color={colors.mutedSoft} />
+            </View>
+          </FeedbackPressable>
           <View className="mt-1 flex-row items-center">
-            <Feather name="user" size={13} color={colors.muted} />
-            <Text
+            {spot.creatorUserId ? (
+              <FeedbackPressable
+                haptic="selection"
+                onPress={() => {
+                  openUserProfile(
+                    router,
+                    spot.creatorUserId as string,
+                    currentUserId
+                  );
+                }}
+                accessibilityRole="link"
+                accessibilityLabel={
+                  spot.creatorUsername
+                    ? `Open @${spot.creatorUsername}'s profile`
+                    : 'Open profile'
+                }
+              >
+                <ProfileAvatar
+                  uri={spot.creatorAvatarUrl}
+                  size={16}
+                  iconSize={10}
+                />
+              </FeedbackPressable>
+            ) : (
+              <ProfileAvatar
+                uri={spot.creatorAvatarUrl}
+                size={16}
+                iconSize={10}
+              />
+            )}
+            <CreatorAttribution
+              userId={spot.creatorUserId}
+              username={spot.creatorUsername}
+              fallback="Deleted User"
+              suffix={timeLabel ? ` · ${timeLabel}` : ''}
               numberOfLines={1}
               className="ml-1.5 min-w-0 flex-1 font-outfit-medium text-sm text-muted"
-            >
-              {spot.creatorUsername
-                ? `@${spot.creatorUsername}`
-                : 'Deleted User'}
-              {timeLabel ? ` · ${timeLabel}` : ''}
-            </Text>
+            />
           </View>
-        </FeedbackPressable>
+        </View>
         <FeedbackPressable
           onPress={onLike}
           disabled={isLiking}
@@ -195,7 +225,6 @@ function MapSpotSheetBody({
   canShowRemoval,
   deletingSpotId,
   onOpenFullscreen,
-  onPhotoZoneTouch,
   onEdit,
   onDelete,
   onReportProblem,
@@ -210,7 +239,6 @@ function MapSpotSheetBody({
   canShowRemoval: boolean;
   deletingSpotId: string | null;
   onOpenFullscreen: (photoIndex: number) => void;
-  onPhotoZoneTouch: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onReportProblem: () => void;
@@ -220,10 +248,7 @@ function MapSpotSheetBody({
   return (
     <>
         {imageUris.length > 0 ? (
-          <View
-            className="mt-3 overflow-hidden rounded-2xl"
-            onTouchStart={onPhotoZoneTouch}
-          >
+          <View className="mt-3 overflow-hidden rounded-2xl">
             <SpotMediaPager
               uris={imageUris}
               height={photoHeight}
@@ -295,61 +320,75 @@ function MapSpotSheetBody({
             </FeedbackPressable>
           </View>
         ) : canShowRemoval ? (
-          <View className="mt-4 gap-3">
-            <FeedbackPressable
-              haptic="selection"
-              onPress={onReportProblem}
-              className="h-12 flex-row items-center justify-center rounded-2xl bg-surface-soft px-4"
-              accessibilityRole="button"
-              accessibilityLabel={`Report a problem with ${spot.name}`}
-            >
-              <Feather name="alert-circle" size={16} color={colors.ink} />
-              <Text className="ml-2 font-outfit-semibold text-sm text-ink">
-                Report a Problem
-              </Text>
-            </FeedbackPressable>
-            {wasReported ? (
-              <View
-                className="min-h-12 flex-row items-center justify-center rounded-2xl bg-surface-soft px-4"
-                accessibilityRole="text"
-                accessibilityLabel="Removal request submitted"
+          <View className="mt-3 flex-row items-start gap-2">
+            <View className="min-w-0 flex-1 items-center">
+              <FeedbackPressable
+                haptic="selection"
+                onPress={onReportProblem}
+                className="h-10 w-full items-center justify-center rounded-xl bg-surface-soft"
+                accessibilityRole="button"
+                accessibilityLabel={`Report a problem with ${spot.name}`}
               >
-                <Feather name="flag" size={16} color={colors.muted} />
-                <Text className="ml-2 font-outfit-semibold text-sm text-muted">
-                  Removal request submitted
+                <Feather name="alert-circle" size={16} color={colors.ink} />
+              </FeedbackPressable>
+              <Text
+                numberOfLines={1}
+                className="mt-1 font-outfit-semibold text-[11px] text-ink"
+              >
+                Report
+              </Text>
+            </View>
+            <View className="min-w-0 flex-1 items-center">
+              {wasReported ? (
+                <View
+                  className="h-10 w-full items-center justify-center rounded-xl bg-surface-soft"
+                  accessibilityRole="text"
+                  accessibilityLabel="Removal request submitted"
+                >
+                  <Feather name="flag" size={16} color={colors.muted} />
+                </View>
+              ) : (
+                <FeedbackPressable
+                  haptic="selection"
+                  onPress={onRequestRemoval}
+                  className="h-10 w-full items-center justify-center rounded-xl bg-surface-soft"
+                  accessibilityRole="button"
+                  accessibilityLabel={`Request removal of ${spot.name}`}
+                >
+                  <Feather name="flag" size={16} color={colors.ink} />
+                </FeedbackPressable>
+              )}
+              <Text
+                numberOfLines={1}
+                className={`mt-1 font-outfit-semibold text-[11px] ${
+                  wasReported ? 'text-muted' : 'text-ink'
+                }`}
+              >
+                {wasReported ? 'Sent' : 'Remove'}
+              </Text>
+            </View>
+            {onBlockCreator && spot.creatorUserId ? (
+              <View className="min-w-0 flex-1 items-center">
+                <FeedbackPressable
+                  haptic="selection"
+                  onPress={onBlockCreator}
+                  className="h-10 w-full items-center justify-center rounded-xl bg-surface-soft"
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    spot.creatorUsername
+                      ? `Block user @${spot.creatorUsername}`
+                      : 'Block this user'
+                  }
+                >
+                  <Feather name="eye-off" size={16} color={colors.ink} />
+                </FeedbackPressable>
+                <Text
+                  numberOfLines={1}
+                  className="mt-1 font-outfit-semibold text-[11px] text-ink"
+                >
+                  Block user
                 </Text>
               </View>
-            ) : (
-              <FeedbackPressable
-                haptic="selection"
-                onPress={onRequestRemoval}
-                className="h-12 flex-row items-center justify-center rounded-2xl bg-surface-soft px-4"
-                accessibilityRole="button"
-                accessibilityLabel={`Request removal of ${spot.name}`}
-              >
-                <Feather name="flag" size={16} color={colors.ink} />
-                <Text className="ml-2 font-outfit-semibold text-sm text-ink">
-                  Request Removal
-                </Text>
-              </FeedbackPressable>
-            )}
-            {onBlockCreator && spot.creatorUserId ? (
-              <FeedbackPressable
-                haptic="selection"
-                onPress={onBlockCreator}
-                className="h-12 flex-row items-center justify-center rounded-2xl bg-surface-soft px-4"
-                accessibilityRole="button"
-                accessibilityLabel={
-                  spot.creatorUsername
-                    ? `Block @${spot.creatorUsername}`
-                    : 'Block this skater'
-                }
-              >
-                <Feather name="slash" size={16} color={colors.ink} />
-                <Text className="ml-2 font-outfit-semibold text-sm text-ink">
-                  Block this skater
-                </Text>
-              </FeedbackPressable>
             ) : null}
           </View>
         ) : null}

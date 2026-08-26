@@ -4,6 +4,7 @@ import { canCreateAccountAtAge } from '../ageEligibility';
 import {
   LEGAL_APP_ROUTES,
   PROFILE_PUBLIC_SELECT_COLUMNS,
+  PROFILE_PUBLIC_SELECT_COLUMNS_WITHOUT_BIO,
   canAcceptLegalTerms,
   getLegalGate,
   hasCurrentLegalAcceptance,
@@ -17,6 +18,7 @@ function profile(overrides: Partial<Profile> = {}): Profile {
     id: 'user-1',
     username: 'liam',
     avatar_url: null,
+    bio: null,
     updated_at: '2026-08-20T00:00:00.000Z',
     legal_version: LEGAL_VERSION,
     legal_accepted_at: '2026-08-20T00:00:00.000Z',
@@ -41,6 +43,9 @@ describe('account acceptance', () => {
 
   it('does not let public profile selects read legal timestamps', () => {
     expect(PROFILE_PUBLIC_SELECT_COLUMNS).toBe(
+      'id, username, avatar_url, bio, updated_at'
+    );
+    expect(PROFILE_PUBLIC_SELECT_COLUMNS_WITHOUT_BIO).toBe(
       'id, username, avatar_url, updated_at'
     );
     expect(PROFILE_PUBLIC_SELECT_COLUMNS).not.toMatch(/legal_version|age_attested_at/);

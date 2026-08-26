@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: August 21, 2026
+Last updated: August 26, 2026
 
 This Privacy Policy explains what information SkateU collects, how it is used, and the choices you have. It covers the SkateU mobile app and the SkateU website at skateu.app.
 
@@ -10,7 +10,7 @@ If you have questions, email [support@skateu.app](mailto:support@skateu.app).
 
 ## 1. Information we collect
 
-We collect the information described below. We do not collect your device’s GPS location, we do not use advertising trackers in the app, and we do not use a product-analytics SDK in the SkateU mobile app. If crash reporting is configured for your build, the app may send crash reports to a crash-reporting provider.
+We collect the information described below. We do not use advertising trackers in the app. If you allow it, the app may use your device’s GPS location on the device to show you on campus maps. We do not store that GPS on our servers. If a product-analytics SDK is configured for your build (currently PostHog), the app may send screen views and feature events. If crash reporting is configured for your build, the app may send crash reports to a crash-reporting provider.
 
 ### Account information
 
@@ -24,14 +24,16 @@ If you create an account, we collect:
 
 We do not ask for or store your date of birth. Legal acceptance records are not public and are not used for analytics.
 
-If you sign in with Google or Apple, those companies share information they are authorized to share with us, which may include your email and a name or profile image URL. SkateU stores an optional avatar URL from that sign-in data. The app does not currently display profile photos.
+If you sign in with Google or Apple, those companies share information they are authorized to share with us, which may include your email and a name or profile image URL. SkateU may store that sign-in image URL, but the app only displays a profile photo after you upload one in SkateU and it passes review.
 
-Your email is not shown publicly. Your username is public and may appear on spots and comments.
+Your email is not shown publicly. Your username, profile photo, and profile bio are public and may appear on spots, comments, and profiles.
 
 ### Content you submit
 
 If you use account features, we store:
 
+- A profile photo, if you upload one
+- A public profile bio, if you write one
 - Skate spots you add, including name, description, map pin coordinates, and photos
 - Comments and replies
 - Likes
@@ -42,18 +44,18 @@ If you use account features, we store:
 
 Help & Support screenshots are stored privately so our team can see them. They are not shown to other people in the app.
 
-Photos are stored so other people can see the spot. When you upload a new spot photo, SkateU processes the file on our servers before it is stored and before it is sent to the moderation provider. We remove extra information commonly stored in image files, including GPS coordinates, camera or device details, and capture timestamps. We keep the photo itself and preserve orientation so it still displays correctly. The public photo is this processed file. Photos uploaded before August 21, 2026 may still contain that extra information.
+Spot photos and profile photos are stored so other people can see them. When you upload a new spot photo or profile photo, SkateU processes the file on our servers before it is stored and before it is sent to the moderation provider. We remove extra information commonly stored in image files, including GPS coordinates, camera or device details, and capture timestamps. We keep the photo itself and preserve orientation so it still displays correctly. The public photo is this processed file. Spot photos uploaded before August 21, 2026 may still contain that extra information.
 
 ### Location
 
-SkateU does not request or collect GPS from your device.
+When you open a campus map or the map used to add or edit a spot, SkateU may ask for location permission while you are using the app. If you allow it, the app uses your GPS on the device to show where you are and to move the map to you. Those coordinates stay on your device. We do not send your GPS to SkateU servers, and we do not send it to PostHog. You can deny location access and still browse maps and place spots by panning the map.
 
 We do store:
 
 - Coordinates for schools in our school directory
 - Coordinates you choose when you place a spot pin on the map
 
-Those pin coordinates are part of the public spot.
+Those pin coordinates are part of the public spot. They come from the pin you place, not from an automatic upload of your GPS.
 
 ### Information on your device
 
@@ -61,24 +63,35 @@ The app stores some information on your device, including:
 
 - Your sign-in session
 - Schools you mark as favorites, which are saved on that device and are not synced to your SkateU account
-- Unpublished spot drafts, including the name, description, map pin, and photos you started adding. Drafts stay on that device until you post or delete them. They are not uploaded to SkateU until you post. Logging out does not necessarily delete them. You can delete a draft from Profile. Deleting your account clears drafts for that account on that device. Removing the app from a device also removes local drafts.
+- Unpublished spot drafts, including the name, description, map pin, and photos you started adding. Drafts stay on that device until you post or delete them. They are not uploaded to SkateU until you post. Signing out does not necessarily delete them. You can delete a draft from Profile. Deleting your account clears drafts for that account on that device. Removing the app from a device also removes local drafts.
 - On iOS, a stored Apple user identifier used only to check whether Apple Sign In is still authorized.
 
-### Website waitlist
+### Website Android beta requests
 
-If you join the waitlist on skateu.app, you must be at least 13 years old. We collect your email address so we can confirm it and notify you. That waitlist is separate from a SkateU app account. We do not store your 13+ confirmation with the waitlist record.
+If you request Android beta access on skateu.app, you must be at least 13 years old. We collect your email address so we can confirm it and add you as a tester in Google Play’s closed test. That list is separate from a SkateU app account. We do not store your 13+ confirmation with the beta request record.
 
-The website may briefly use your IP address to limit waitlist signup abuse. We do not store that IP address as part of your waitlist record.
+iOS testers install through Apple TestFlight. We do not collect an email on the website for iOS. Apple collects information under Apple’s privacy policy.
 
-The website may also save the waitlist email you typed in your browser’s local storage so the form can remember it.
+The website may briefly use your IP address to limit signup abuse. We do not store that IP address as part of your beta request record.
+
+The website may also save the beta email you typed in your browser’s local storage so the form can remember it.
 
 ### Information we do not collect in the app
 
 The SkateU mobile app does not currently collect:
 
-- Precise GPS
 - Advertising identifiers
-- Analytics events through a product-analytics SDK
+
+### Product analytics
+
+If a product-analytics SDK is configured for the app build you are using (currently PostHog), we may collect:
+
+- Screen names you visit in the app
+- Feature events such as signing in, opening a campus map, viewing or adding a spot, liking a spot, posting a comment, and submitting Help & Support
+- An anonymous device identifier, and your account id if you are signed in
+- App version and technical information such as platform and OS version
+
+We use this to understand how SkateU is used and to improve it. We do not use this for advertising. We do not send your email, username, message text, photos, or GPS to PostHog. Analytics can be left unconfigured in development builds.
 
 ### Crash reports
 
@@ -96,22 +109,26 @@ We use this information to:
 - Create and maintain your account
 - Confirm that you are eligible to have an account
 - Show schools, maps, spots, photos, comments, and likes
+- Show your location on campus maps on your device when you allow location access
 - Let you add, edit, like, comment on, request removal of spots, report comments, and block other accounts
 - Hide spots and comments from people you blocked
-- Moderate usernames, spots, photos, comments, and Help & Support submissions
+- Moderate usernames, profile photos, profile bios, spots, photos, comments, and Help & Support submissions
 - Email you a confirmation or account-deletion code when you request one
 - Email our team when a spot needs review, when a comment is reported, and when you send Help & Support
 - Diagnose crashes and keep the app running
+- Understand how people use SkateU so we can improve it
 - Feature public spots, photos, descriptions, campus names, and usernames on SkateU’s Instagram, TikTok, and YouTube
 - Operate, secure, and improve SkateU
 - Communicate with you when you contact us
-- Send waitlist confirmation or related messages if you joined the website waitlist
+- Send confirmation or related messages if you requested Android beta access on the website
 
 ## 3. Moderation
 
 Before certain content is posted or delivered, SkateU may send it to a third-party automated moderation provider (currently OpenAI) to check whether it appears to violate our rules. That can include:
 
 - Usernames
+- Profile photos
+- Profile bios
 - Spot names and descriptions
 - Spot photos
 - Comments
@@ -123,15 +140,17 @@ We do this to help keep SkateU usable for a campus community. Help & Support mes
 
 We share information in these limited ways:
 
-- **Public in the app.** Usernames, spots, photos, comments, like counts, and school information are visible to people using SkateU, including people who are not signed in. Your 13+ confirmation and Terms acceptance are not public.
+- **Public in the app.** Usernames, profile photos, profile bios, spots, photos, comments, like counts, and school information are visible to people using SkateU, including people who are not signed in. Your 13+ confirmation and Terms acceptance are not public.
 - **SkateU social accounts.** We may post public spots, photos, descriptions, campus names, and usernames on Instagram, TikTok, and YouTube. Those platforms receive whatever we post and have their own terms. This is featuring content you already made public in the app. It is not selling your information and it is not advertising targeting.
 - **Service providers.** We use companies that help us run SkateU. They receive information needed to provide their service:
   - Supabase, for accounts, database storage, and photo storage
-  - Google and Apple, if you sign in with those services
+  - Google, if you sign in with Google or if we add your confirmed website email to a Google Play closed test
+  - Apple, if you sign in with Apple or install the iOS beta through TestFlight
   - OpenAI, for automated moderation of the content listed above
-  - Resend, to send certain emails, including waitlist confirmation and operator notices when a spot needs review
+  - Resend, to send certain emails, including Android beta confirmation and operator notices when a spot needs review
   - Sentry, for crash reports when that SDK is configured for the app build
-  - Map tile providers (including CARTO / OpenStreetMap and Esri) and map libraries, which receive network requests when you view maps
+  - PostHog, for product analytics when that SDK is configured for the app build
+  - Map tile providers (including OpenFreeMap / OpenStreetMap and Esri) and map libraries, which receive network requests when you view maps
   - Expo, which we use to build and run the app
 - **Website analytics.** The marketing website uses Vercel Analytics. That is separate from the mobile app and is not installed in the SkateU app.
 - **Legal reasons.** We may disclose information if we believe it is required by law or needed to protect people, SkateU, or others.
@@ -147,7 +166,7 @@ We keep account and content information while your account is open and as needed
 - Spot removal requests associated with your account are deleted when the account is deleted
 - Comment reports and account blocks associated with your account are deleted when the account is deleted
 - Short-lived verification records used to confirm account deletion expire quickly and are then deleted
-- Waitlist confirmation links expire after a limited time
+- Android beta confirmation links expire after a limited time
 
 Hosting providers and moderation or email providers may retain logs or content according to their own practices. This policy does not control those third-party retention periods.
 
@@ -160,11 +179,11 @@ You can:
 - Delete comments you posted
 - Report comments and block other accounts
 - Unlike spots you liked
-- Change your username
-- Log out
+- Change your username, profile photo, or profile bio
+- Sign out
 - Delete your account from Settings in the app
 
-Deleting your account permanently removes your login, profile, likes, spot removal requests, comment reports, and account blocks. Spots you added stay in SkateU and are no longer linked to you. Comments you posted stay in SkateU and are shown without your username. Unpublished spot drafts for that account are deleted from the device.
+Deleting your account permanently removes your sign-in, profile, likes, spot removal requests, comment reports, and account blocks. Spots you added stay in SkateU and are no longer linked to you. Comments you posted stay in SkateU and are shown without your username. Unpublished spot drafts for that account are deleted from the device.
 
 School favorites saved on your device are not part of your account. Removing the app from a device removes that local data.
 

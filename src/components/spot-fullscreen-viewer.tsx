@@ -1,4 +1,5 @@
 import { Feather, Ionicons, Octicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     AccessibilityInfo,
@@ -26,8 +27,12 @@ import {
     formatDistanceFromMeters,
     metersBetween,
 } from '../lib/spotDistance';
+import { openUserProfile } from '../lib/userProfileNavigation';
+import { useAuthStore } from '../store/authStore';
 import type { Spot } from '../types/spot';
+import CreatorAttribution from './creator-attribution';
 import FeedbackPressable from './FeedbackPressable';
+import ProfileAvatar from './ProfileAvatar';
 import ZoomablePhoto from './zoomable-photo';
 
 export type SpotFullscreenVariant = 'feed' | 'map';
@@ -57,13 +62,11 @@ type SpotFullscreenViewerProps = {
   onRequestRemoval?: (spot: Spot) => void;
 };
 
-function spotAttribution(spot: Spot, variant: SpotFullscreenVariant): string {
-  const who = spot.creatorUsername
-    ? `@${spot.creatorUsername}`
-    : variant === 'map'
-      ? 'Deleted User'
-      : 'A skater';
+function creatorFallback(variant: SpotFullscreenVariant): string {
+  return variant === 'map' ? 'Deleted User' : 'A skater';
+}
 
+function attributionSuffix(spot: Spot, variant: SpotFullscreenVariant): string {
   if (variant === 'map') {
     const createdMs = Date.parse(spot.createdAt);
     const updatedMs = Date.parse(spot.updatedAt);
@@ -75,14 +78,14 @@ function spotAttribution(spot: Spot, variant: SpotFullscreenVariant): string {
       wasEdited ? spot.updatedAt : spot.createdAt
     );
     if (!relative) {
-      return who;
+      return '';
     }
 
-    return `${who} · ${wasEdited ? 'edited' : 'added'} ${relative}`;
+    return ` · ${wasEdited ? 'edited' : 'added'} ${relative}`;
   }
 
   const when = formatCompactRelativeTime(spot.createdAt);
-  return when ? `${who} · ${when}` : who;
+  return when ? ` · ${when}` : '';
 }
 
 type PhotoStageProps = {
@@ -314,6 +317,8 @@ function SpotDetailsOverlay({
   const liked = spot.likedByUser === true;
   const isLiking = likingSpotId === spot.id;
   const description = spot.description.trim();
+  const router = useRouter();
+  const currentUserId = useAuthStore((state) => state.user?.id ?? null);
 
   return (
     <View
@@ -391,9 +396,48 @@ function SpotDetailsOverlay({
       >
         {spot.name}
       </Text>
-      <Text className="mt-1 font-outfit-medium text-sm text-white/75">
-        {spotAttribution(spot, variant)}
-      </Text>
+      <View className="mt-1 flex-row items-center">
+        {spot.creatorUserId ? (
+          <FeedbackPressable
+            haptic="selection"
+            onPress={() => {
+              openUserProfile(
+                router,
+                spot.creatorUserId as string,
+                currentUserId
+              );
+            }}
+            accessibilityRole="link"
+            accessibilityLabel={
+              spot.creatorUsername
+                ? `Open @${spot.creatorUsername}'s profile`
+                : 'Open profile'
+            }
+          >
+            <ProfileAvatar
+              uri={spot.creatorAvatarUrl}
+              size={18}
+              iconSize={11}
+              tone="onDark"
+            />
+          </FeedbackPressable>
+        ) : (
+          <ProfileAvatar
+            uri={spot.creatorAvatarUrl}
+            size={18}
+            iconSize={11}
+            tone="onDark"
+          />
+        )}
+        <CreatorAttribution
+          userId={spot.creatorUserId}
+          username={spot.creatorUsername}
+          fallback={creatorFallback(variant)}
+          suffix={attributionSuffix(spot, variant)}
+          numberOfLines={1}
+          className="ml-1.5 min-w-0 flex-1 font-outfit-medium text-sm text-white/75"
+        />
+      </View>
 
       {description.length > 0 ? (
         <Text
@@ -538,8 +582,6 @@ type SpotPageProps = {
   onDelete?: (spot: Spot) => void;
   onReportProblem?: (spot: Spot) => void;
   onRequestRemoval?: (spot: Spot) => void;
-  onPhotoZoneTouch: () => void;
-  onDetailsZoneTouch: () => void;
 };
 
 function SpotFullscreenPage({
@@ -568,8 +610,6 @@ function SpotFullscreenPage({
   onDelete,
   onReportProblem,
   onRequestRemoval,
-  onPhotoZoneTouch,
-  onDetailsZoneTouch,
 }: SpotPageProps) {
   const imageUris = spot.imageUris.filter((uri) => uri.length > 0);
   const [photoIndex, setPhotoIndex] = useState(initialPhotoIndex);
@@ -588,7 +628,7 @@ function SpotFullscreenPage({
 
   return (
     <View style={{ width, height }}>
-      <View style={styles.fill} onTouchStart={onPhotoZoneTouch}>
+      <View style={styles.fill}>
         <SpotPhotoStage
           uris={imageUris}
           name={spot.name}
@@ -612,7 +652,7 @@ function SpotFullscreenPage({
           </View>
         ) : null}
         {zoomed ? null : (
-          <View onTouchStart={onDetailsZoneTouch} style={styles.bottomWrap}>
+          <View style={styles.bottomWrap}>
             <SpotDetailsOverlay
               spot={spot}
               spotIndex={spotIndex}
@@ -676,7 +716,6 @@ export default function SpotFullscreenViewer({
   const { width, height } = useWindowDimensions();
   const listRef = useRef<FlatList<Spot>>(null);
   const lastSpotIdRef = useRef<string | null>(null);
-  const [spotPagerEnabled, setSpotPagerEnabled] = useState(true);
   const startIndex = Math.max(
     0,
     spots.findIndex((spot) => spot.id === initialSpotId)
@@ -710,13 +749,11 @@ export default function SpotFullscreenViewer({
   useEffect(() => {
     if (!visible) {
       lastSpotIdRef.current = null;
-      setSpotPagerEnabled(true);
       return;
     }
 
     lastSpotIdRef.current = initialSpotId;
     setSpotIndex(startIndex);
-    setSpotPagerEnabled(true);
   }, [initialSpotId, startIndex, visible]);
 
   useEffect(() => {
@@ -761,7 +798,6 @@ export default function SpotFullscreenViewer({
         return;
       }
 
-      setSpotPagerEnabled(true);
       listRef.current?.scrollToIndex({ index, animated: true });
       commitSpotIndex(index);
     },
@@ -813,8 +849,6 @@ export default function SpotFullscreenViewer({
         onDelete={onDelete}
         onReportProblem={onReportProblem}
         onRequestRemoval={onRequestRemoval}
-        onPhotoZoneTouch={() => setSpotPagerEnabled(false)}
-        onDetailsZoneTouch={() => setSpotPagerEnabled(true)}
       />
     ),
     [
@@ -880,7 +914,7 @@ export default function SpotFullscreenViewer({
           pagingEnabled
           nestedScrollEnabled
           directionalLockEnabled
-          scrollEnabled={spotPagerEnabled && spots.length > 1}
+          scrollEnabled={false}
           showsHorizontalScrollIndicator={false}
           initialScrollIndex={startIndex}
           getItemLayout={getItemLayout}

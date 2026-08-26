@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { getClientStorage } from '../lib/clientStorage';
+import { parseSchools } from '../lib/readCache';
 import type { School } from '../types/school';
 
 type FavoritesStore = {
@@ -87,6 +88,7 @@ export const useFavorites = create<FavoritesStore>()(
       },
       partialize: (state) => ({
         favoriteSchoolIds: state.favoriteSchoolIds,
+        favoriteSchools: state.favoriteSchools,
       }),
       merge: (persistedState, currentState) => {
         const persistedFavoriteIds =
@@ -94,13 +96,23 @@ export const useFavorites = create<FavoritesStore>()(
           persistedState !== null &&
           'favoriteSchoolIds' in persistedState &&
           Array.isArray(persistedState.favoriteSchoolIds)
-            ? persistedState.favoriteSchoolIds
+            ? persistedState.favoriteSchoolIds.filter(
+                (id): id is string => typeof id === 'string'
+              )
+            : [];
+        const persistedSchools =
+          typeof persistedState === 'object' &&
+          persistedState !== null &&
+          'favoriteSchools' in persistedState
+            ? parseSchools(persistedState.favoriteSchools)
             : [];
 
         return {
           ...currentState,
           favoriteSchoolIds: persistedFavoriteIds,
-          favoriteSchools: [],
+          favoriteSchools: persistedSchools.filter((school) =>
+            persistedFavoriteIds.includes(school.id)
+          ),
         };
       },
     }

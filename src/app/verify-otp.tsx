@@ -1,9 +1,11 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, ScrollView, Text, TextInput, View } from 'react-native';
 import FeedbackPressable from '../components/FeedbackPressable';
+import KeyboardShiftView from '../components/keyboard-shift-view';
 import ScreenHeader from '../components/screen-header';
 import { colors } from '../constants/colors';
+import { captureAuthCompleted } from '../lib/analytics';
 import { useAuthStore } from '../store/authStore';
 
 const CODE_LENGTH = 6;
@@ -119,6 +121,7 @@ function VerifyOtpContent({ email }: { email: string }) {
 
     try {
       await verifyOtp(email, value);
+      captureAuthCompleted('signup', 'email');
       router.replace('/');
     } catch (verifyError) {
       setError(
@@ -161,7 +164,14 @@ function VerifyOtpContent({ email }: { email: string }) {
     <View className="flex-1 bg-surface">
       <ScreenHeader title="Verify email" onBack={goBack} />
 
-      <View className="flex-1 self-center w-full max-w-[640px] px-6 pt-8 pb-8">
+      <KeyboardShiftView>
+        <ScrollView
+          className="flex-1"
+          contentContainerClassName="flex-grow self-center w-full max-w-[640px] px-6 pt-8 pb-8"
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets={false}
+          showsVerticalScrollIndicator={false}
+        >
         <Text
           className="text-2xl text-ink font-outfit-black"
         >
@@ -292,7 +302,8 @@ function VerifyOtpContent({ email }: { email: string }) {
             </Text>
           </FeedbackPressable>
         </View>
-      </View>
+        </ScrollView>
+      </KeyboardShiftView>
     </View>
   );
 }

@@ -1,46 +1,111 @@
 describe('crashReporting', () => {
-  const originalDsn = process.env.EXPO_PUBLIC_SENTRY_DSN;
-
   afterEach(() => {
-    process.env.EXPO_PUBLIC_SENTRY_DSN = originalDsn;
     jest.resetModules();
   });
 
-  it('leaves Sentry unused when no DSN is configured', () => {
+  it('sets and clears the Sentry user', () => {
     jest.isolateModules(() => {
-      delete process.env.EXPO_PUBLIC_SENTRY_DSN;
-      const Sentry = require('@sentry/react-native') as { init: jest.Mock };
-      const { initCrashReporting, wrapRoot } = require('../crashReporting') as {
-        initCrashReporting: () => void;
-        wrapRoot: (root: unknown) => unknown;
+      const Sentry = require('@sentry/react-native') as {
+        setUser: jest.Mock;
       };
-      const Root = () => null;
+      const { setCrashReportingUser, clearCrashReportingUser } = require('../crashReporting') as {
+        setCrashReportingUser: (userId: string) => void;
+        clearCrashReportingUser: () => void;
+      };
 
-      initCrashReporting();
-      expect(Sentry.init).not.toHaveBeenCalled();
-      expect(wrapRoot(Root)).toBe(Root);
+      setCrashReportingUser('user-1');
+      expect(Sentry.setUser).toHaveBeenCalledWith({ id: 'user-1' });
+      clearCrashReportingUser();
+      expect(Sentry.setUser).toHaveBeenCalledWith(null);
     });
   });
 
-  it('initializes Sentry when a DSN is set', () => {
+  it('skips empty user ids', () => {
     jest.isolateModules(() => {
-      process.env.EXPO_PUBLIC_SENTRY_DSN =
-        'https://examplePublicKey@o0.ingest.sentry.io/0';
-      const Sentry = require('@sentry/react-native') as { init: jest.Mock };
-      const { initCrashReporting, wrapRoot } = require('../crashReporting') as {
-        initCrashReporting: () => void;
-        wrapRoot: (root: unknown) => unknown;
+      const Sentry = require('@sentry/react-native') as {
+        setUser: jest.Mock;
       };
-      const Root = () => null;
+      const { setCrashReportingUser } = require('../crashReporting') as {
+        setCrashReportingUser: (userId: string) => void;
+      };
 
-      initCrashReporting();
-      expect(Sentry.init).toHaveBeenCalledWith(
-        expect.objectContaining({
-          dsn: 'https://examplePublicKey@o0.ingest.sentry.io/0',
-          sendDefaultPii: false,
-        })
+      setCrashReportingUser('');
+      expect(Sentry.setUser).not.toHaveBeenCalled();
+    });
+  });
+
+  it('does nothing when OTA updates are disabled', () => {
+    jest.isolateModules(() => {
+      const Sentry = require('@sentry/react-native') as {
+        setTag: jest.Mock;
+      };
+      const { applyCrashReportingUpdateContext } = require('../crashReporting') as {
+        applyCrashReportingUpdateContext: () => void;
+      };
+
+      applyCrashReportingUpdateContext();
+      expect(Sentry.setTag).not.toHaveBeenCalled();
+    });
+  });
+
+  it('tags Sentry with the current update when updates are enabled', () => {
+    jest.isolateModules(() => {
+      jest.doMock('expo-updates', () => ({
+        isEnabled: true,
+        updateId: 'update-1',
+        channel: 'production',
+        runtimeVersion: '1.0.0',
+      }));
+      const Sentry = require('@sentry/react-native') as {
+        setTag: jest.Mock;
+      };
+      const { applyCrashReportingUpdateContext } = require('../crashReporting') as {
+        applyCrashReportingUpdateContext: () => void;
+      };
+
+      applyCrashReportingUpdateContext();
+      expect(Sentry.setTag).toHaveBeenCalledWith('updateId', 'update-1');
+      expect(Sentry.setTag).toHaveBeenCalledWith('channel', 'production');
+      expect(Sentry.setTag).toHaveBeenCalledWith('runtimeVersion', '1.0.0');
+    });
+  });
+
+  it('falls back to embedded and skips empty channel tags', () => {
+    jest.isolateModules(() => {
+      jest.doMock('expo-updates', () => ({
+        isEnabled: true,
+        updateId: null,
+        channel: null,
+        runtimeVersion: '',
+      }));
+      const Sentry = require('@sentry/react-native') as {
+        setTag: jest.Mock;
+      };
+      const { applyCrashReportingUpdateContext } = require('../crashReporting') as {
+        applyCrashReportingUpdateContext: () => void;
+      };
+
+      applyCrashReportingUpdateContext();
+      expect(Sentry.setTag).toHaveBeenCalledWith('updateId', 'embedded');
+      expect(Sentry.setTag).not.toHaveBeenCalledWith(
+        'channel',
+        expect.anything()
       );
-      expect(wrapRoot(Root)).toBe(Root);
+    });
+  });
+
+  it('swallows expo-updates failures in unsupported runtimes', () => {
+    jest.isolateModules(() => {
+      jest.doMock('expo-updates', () => ({
+        get isEnabled(): boolean {
+          throw new Error('native module missing');
+        },
+      }));
+      const { applyCrashReportingUpdateContext } = require('../crashReporting') as {
+        applyCrashReportingUpdateContext: () => void;
+      };
+
+      expect(() => applyCrashReportingUpdateContext()).not.toThrow();
     });
   });
 });

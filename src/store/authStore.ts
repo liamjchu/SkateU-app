@@ -2,6 +2,7 @@ import type { Session, User } from '@supabase/supabase-js';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { create } from 'zustand';
+import { captureAnalyticsEvent } from '../lib/analytics';
 import { getApiUrl } from '../lib/api';
 import {
   AccountExistsError,
@@ -73,9 +74,23 @@ const parseAuthParams = (url: string): Record<string, string> => {
 };
 
 // A redirect URL's code/tokens are single-use. Both the in-app browser result
-// and the global deep-link listener may hand us the same URL, so we remember
-// what we've already processed and skip duplicates (a reused code errors out).
-const handledKeys = new Set<string>();
+// and the global deep-link listener may hand us the same URL, so we share one
+// in-flight promise per code/token. Returning true for a duplicate before the
+// exchange finished used to navigate the user home as if they were signed in.
+const inFlightSessionExchanges = new Map<string, Promise<boolean>>();
+
+async function waitForInFlightSessionExchanges(): Promise<void> {
+  if (inFlightSessionExchanges.size === 0) {
+    return;
+  }
+
+  try {
+    await Promise.all([...inFlightSessionExchanges.values()]);
+  } catch {
+    // The deep-link caller surfaces the error. This waiter only cares whether
+    // a session landed in the store.
+  }
+}
 
 // Holds the active auth-state listener so repeated init() calls don't stack up
 // multiple subscriptions (which would fire the setter several times per event).
@@ -159,7 +174,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // one active subscription.
     authSubscription?.unsubscribe();
 
-    // Keep the store in sync with log in, sign out, and token refreshes.
+    // Keep the store in sync with sign in, sign out, and token refreshes.
     const { data } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
         deleteAccountProof = null;
@@ -279,12 +294,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     if (result.type !== 'success' || !result.url) {
       // Android especially can close the sheet as a dismiss after the deep
-      // link has already established the session.
+      // link has already started the session exchange.
+      await waitForInFlightSessionExchanges();
       return Boolean(get().session);
     }
 
     // Hand the returned URL to Supabase to establish the session. The global
-    // deep-link listener may also fire for the same URL; handledKeys dedupes it.
+    // deep-link listener may also fire for the same URL; in-flight promises
+    // dedupe it so both callers wait for a real session.
     return await get().setSessionFromUrl(result.url);
   },
 
@@ -305,35 +322,73 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       return false;
     }
 
-    // Skip if we've already consumed this code/token (see handledKeys above).
-    if (handledKeys.has(key)) {
-      return true;
-    }
-    handledKeys.add(key);
-
-    if (params.code) {
-      // PKCE flow: swap the one-time code for a session. Supabase reads the
-      // matching code_verifier it stashed in AsyncStorage during signInWithOAuth,
-      // so this still works even if the app reloaded on the deep link.
-      const { error } = await supabase.auth.exchangeCodeForSession(params.code);
-      if (error) {
-        handledKeys.delete(key);
-        throw error;
-      }
-    } else {
-      // Implicit flow fallback: tokens arrive directly in the URL.
-      const { error } = await supabase.auth.setSession({
-        access_token: params.access_token,
-        refresh_token: params.refresh_token,
-      });
-      if (error) {
-        handledKeys.delete(key);
-        throw error;
-      }
+    const existing = inFlightSessionExchanges.get(key);
+    if (existing) {
+      return existing;
     }
 
-    // Either path fires onAuthStateChange, which updates session/user here.
-    return true;
+    const exchange = (async () => {
+      try {
+        if (params.code) {
+          // PKCE flow: swap the one-time code for a session. Supabase reads the
+          // matching code_verifier it stashed in AsyncStorage during signInWithOAuth,
+          // so this still works even if the app reloaded on the deep link.
+          const { data, error } = await supabase.auth.exchangeCodeForSession(
+            params.code
+          );
+          if (error) {
+            throw error;
+          }
+          if (data.session) {
+            set({
+              session: data.session,
+              user: data.session.user,
+            });
+            return true;
+          }
+        } else {
+          // Implicit flow fallback: tokens arrive directly in the URL.
+          const { data, error } = await supabase.auth.setSession({
+            access_token: params.access_token,
+            refresh_token: params.refresh_token,
+          });
+          if (error) {
+            throw error;
+          }
+          if (data.session) {
+            set({
+              session: data.session,
+              user: data.session.user,
+            });
+            return true;
+          }
+        }
+
+        if (get().session) {
+          return true;
+        }
+
+        const { data, error } = await supabase.auth.getSession();
+        if (error) {
+          throw error;
+        }
+        if (!data.session) {
+          return false;
+        }
+
+        set({
+          session: data.session,
+          user: data.session.user,
+        });
+        return true;
+      } catch (error) {
+        inFlightSessionExchanges.delete(key);
+        throw error;
+      }
+    })();
+
+    inFlightSessionExchanges.set(key, exchange);
+    return exchange;
   },
 
   completePasswordRecovery: () => {
@@ -343,13 +398,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   signOut: async () => {
     const { error } = await supabase.auth.signOut();
 
+    deleteAccountProof = null;
+    useAgeEligibilityStore.getState().clear();
+    // Always drop the local session so a profile-load overlay can dismiss
+    // even when the remote sign-out call fails.
+    set({ session: null, user: null, passwordRecovery: false });
+
     if (error) {
       throw error;
     }
-
-    deleteAccountProof = null;
-    useAgeEligibilityStore.getState().clear();
-    set({ passwordRecovery: false });
   },
 
   // Sends a 6-digit email OTP to the already-registered user. Unlike signUp's
@@ -416,6 +473,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         body?.error ?? 'We couldn’t delete your account right now. Please try again.'
       );
     }
+
+    // Capture before clearing the authenticated PostHog identity.
+    captureAnalyticsEvent('account_deleted');
 
     // The server has deleted the auth user; drop the local session too.
     const userId = get().user?.id ?? data.session?.user.id;

@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FeedbackPressable from '../components/FeedbackPressable';
 import LegalAcceptCheckbox from '../components/legal-accept-checkbox';
+import KeyboardShiftView from '../components/keyboard-shift-view';
 import { UsernameForm } from '../components/username-form';
 import { StickerStripe } from '../components/sticker';
 import { canAcceptLegalTerms } from '../lib/legalAcceptance';
@@ -58,9 +59,8 @@ export default function OnboardingScreen() {
         <StickerStripe />
       </View>
 
-      <KeyboardAvoidingView
-        className="flex-1"
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      <KeyboardShiftView
+        closedBottomPadding={Math.max(insets.bottom, 24) + 16}
       >
         <ScrollView
           className="flex-1"
@@ -69,6 +69,7 @@ export default function OnboardingScreen() {
             paddingBottom: Math.max(insets.bottom, 24) + 16,
           }}
           keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets={false}
           showsVerticalScrollIndicator={false}
         >
           <View className="w-full max-w-[640px] self-center px-6 pt-8">
@@ -116,7 +117,7 @@ export default function OnboardingScreen() {
             </FeedbackPressable>
           </View>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardShiftView>
     </View>
   );
 }

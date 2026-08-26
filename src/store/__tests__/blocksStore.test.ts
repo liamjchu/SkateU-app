@@ -1,3 +1,7 @@
+jest.mock('@react-native-async-storage/async-storage', () =>
+  require('@react-native-async-storage/async-storage/jest/async-storage-mock')
+);
+
 process.env.EXPO_PUBLIC_API_URL = 'http://localhost:8081';
 
 const mockHideCreatorSpots = jest.fn();
@@ -82,5 +86,34 @@ describe('blocksStore', () => {
     fetchMock.mockResolvedValue(mockResponse({}));
     await useBlocksStore.getState().unblockUser('blocked-1', 'token');
     expect(useBlocksStore.getState().isBlocked('blocked-1')).toBe(false);
+  });
+
+  it('keeps an already-blocked user and merges persisted rows', async () => {
+    useBlocksStore.setState({
+      users: [{ userId: 'blocked-1', username: 'blocked_skater' }],
+    });
+    fetchMock.mockResolvedValue(
+      mockResponse({ user: { userId: 'blocked-1', username: 'blocked_skater' } })
+    );
+    await useBlocksStore.getState().blockUser('blocked-1', 'token');
+    expect(useBlocksStore.getState().users).toHaveLength(1);
+
+    const merge = useBlocksStore.persist.getOptions().merge;
+    expect(merge).toBeDefined();
+    const merged = merge!(
+      { users: [{ userId: 'blocked-2', username: null }] },
+      useBlocksStore.getState()
+    );
+    expect(merged.users).toEqual([{ userId: 'blocked-2', username: null }]);
+    useBlocksStore.getState().setHasHydrated(true);
+    expect(useBlocksStore.getState().hasHydrated).toBe(true);
+  });
+
+  it('maps a timed-out list request', async () => {
+    const abort = new Error('Aborted');
+    abort.name = 'AbortError';
+    fetchMock.mockRejectedValue(abort);
+    await useBlocksStore.getState().fetchBlocks('token');
+    expect(useBlocksStore.getState().error).toMatch(/timed out/i);
   });
 });

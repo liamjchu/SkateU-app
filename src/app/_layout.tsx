@@ -6,19 +6,22 @@ import {
     Outfit_900Black,
     useFonts
 } from '@expo-google-fonts/outfit';
+import * as Sentry from '@sentry/react-native';
 import * as Linking from 'expo-linking';
-import { SplashScreen, Stack, useRouter, useSegments } from 'expo-router';
-import { useEffect } from 'react';
-import { Image, Platform, Pressable, Text, View, useWindowDimensions } from 'react-native';
+import { SplashScreen, Stack, usePathname, useRouter, useSegments } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Platform, Text, View, useWindowDimensions } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { PostHogErrorBoundary } from 'posthog-react-native';
 import {
     configureReanimatedLogger,
     ReanimatedLogLevel,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import '../../global.css';
+import AuthNoticeBanner from '../components/AuthNoticeBanner';
+import StartupLoadingOverlay from '../components/startup-loading-overlay';
 import { colors } from '../constants/colors';
-import images from '../constants/images';
 import { checkAppleCredentialStatus } from '../lib/appleAuthentication';
 import {
     getLegalGate,
@@ -27,16 +30,39 @@ import {
     legalGateRedirectPath,
 } from '../lib/legalAcceptance';
 import { shouldLeaveAuthEntryRoute } from '../lib/authNavigation';
+import { toUserFacingError } from '../lib/userFacingError';
 import { useAgeEligibilityStore } from '../store/ageEligibilityStore';
+import { useAuthNoticeStore } from '../store/authNoticeStore';
 import { useAuthStore } from '../store/authStore';
 import { useBlocksStore } from '../store/blocksStore';
+import { useCommentsStore } from '../store/commentsStore';
 import { useDraftSpotsStore } from '../store/draftSpotsStore';
 import { useFavorites } from '../store/favoritesStore';
 import { useProfileStore } from '../store/profileStore';
+import { useSchools } from '../store/schoolsStore';
 import { useSpotsStore } from '../store/spotsStore';
-import { initCrashReporting, wrapRoot } from '../lib/crashReporting';
+import {
+    AnalyticsProvider,
+    captureAnalyticsScreen,
+    identifyAnalyticsUser,
+    resetAnalyticsUser,
+} from '../lib/analytics';
+import {
+    applyCrashReportingUpdateContext,
+    clearCrashReportingUser,
+    setCrashReportingUser,
+} from '../lib/crashReporting';
 
-initCrashReporting();
+Sentry.init({
+  dsn: 'https://7bd71649d209fd9fa912e31ffc0598ca@o4511957074182145.ingest.us.sentry.io/4511957099741184',
+  sendDefaultPii: true,
+  enableLogs: true,
+  tracesSampleRate: 0,
+  enableAutoSessionTracking: true,
+  replaysSessionSampleRate: 0,
+  replaysOnErrorSampleRate: 0,
+});
+applyCrashReportingUpdateContext();
 
 if (Platform.OS !== 'web') {
   void SplashScreen.preventAutoHideAsync();
@@ -46,6 +72,17 @@ configureReanimatedLogger({
   level: ReanimatedLogLevel.warn,
   strict: false,
 });
+
+function RootErrorFallback() {
+  return (
+    <View
+      style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+      accessibilityRole="alert"
+    >
+      <Text>Something went wrong. Please restart the app.</Text>
+    </View>
+  );
+}
 
 function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
@@ -58,9 +95,12 @@ function RootLayout() {
 
   const initAuth = useAuthStore((state) => state.init);
   const setSessionFromUrl = useAuthStore((state) => state.setSessionFromUrl);
+  const signOut = useAuthStore((state) => state.signOut);
+  const showAuthNotice = useAuthNoticeStore((state) => state.showAuthNotice);
 
   // --- Auth + profile state that drives the username gate ---
   const userId = useAuthStore((state) => state.user?.id ?? null);
+  const userEmail = useAuthStore((state) => state.user?.email ?? undefined);
   const accessToken = useAuthStore((state) => state.session?.access_token ?? null);
   const authInitializing = useAuthStore((state) => state.initializing);
   const passwordRecovery = useAuthStore((state) => state.passwordRecovery);
@@ -80,8 +120,11 @@ function RootLayout() {
   );
   const fetchBlocks = useBlocksStore((state) => state.fetchBlocks);
   const clearBlocks = useBlocksStore((state) => state.clear);
+  const setSessionUserId = useSpotsStore((state) => state.setSessionUserId);
+  const [cachesReady, setCachesReady] = useState(false);
 
   const router = useRouter();
+  const pathname = usePathname();
   const segments = useSegments();
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
@@ -94,10 +137,34 @@ function RootLayout() {
   }, [initAuth]);
 
   useEffect(() => {
+    if (userId) {
+      identifyAnalyticsUser(userId, { email: userEmail });
+      setCrashReportingUser(userId);
+      return;
+    }
+
+    resetAnalyticsUser();
+    clearCrashReportingUser();
+  }, [userEmail, userId]);
+
+  useEffect(() => {
+    captureAnalyticsScreen(pathname);
+  }, [pathname]);
+
+  useEffect(() => {
     // Persistent saved schools are browser/device state, so restore them only
     // after client mounting instead of during the web server render.
-    void useFavorites.persist.rehydrate();
-    void useDraftSpotsStore.persist.rehydrate();
+    void Promise.all([
+      useFavorites.persist.rehydrate(),
+      useDraftSpotsStore.persist.rehydrate(),
+      useSpotsStore.persist.rehydrate(),
+      useSchools.persist.rehydrate(),
+      useCommentsStore.persist.rehydrate(),
+      useProfileStore.persist.rehydrate(),
+      useBlocksStore.persist.rehydrate(),
+    ]).finally(() => {
+      setCachesReady(true);
+    });
   }, []);
 
   useEffect(() => {
@@ -111,20 +178,26 @@ function RootLayout() {
   // Load (or clear) the profile whenever the signed-in user changes. Keyed on
   // the user id so token refreshes don't trigger needless refetches.
   useEffect(() => {
-    clearMySpots();
-    clearLikedSpots();
-    clearReportedSpotIds();
+    if (!cachesReady) {
+      return;
+    }
+
+    setSessionUserId(userId);
 
     if (userId) {
       fetchProfile(userId, accessToken);
       if (accessToken) {
         void fetchBlocks(accessToken);
       }
-    } else {
-      clearProfile();
-      clearBlocks();
+      return;
     }
-  }, [clearBlocks, clearLikedSpots, clearMySpots, clearReportedSpotIds, fetchBlocks, userId, accessToken, fetchProfile, clearProfile]);
+
+    clearMySpots();
+    clearLikedSpots();
+    clearReportedSpotIds();
+    clearProfile();
+    clearBlocks();
+  }, [cachesReady, clearBlocks, clearLikedSpots, clearMySpots, clearReportedSpotIds, fetchBlocks, setSessionUserId, userId, accessToken, fetchProfile, clearProfile]);
 
   useEffect(() => {
     // Supabase redirects OAuth and recovery emails to distinct native paths.
@@ -160,13 +233,21 @@ function RootLayout() {
             router.replace('/update-password');
           }
         })
-        .catch(() => {
+        .catch((error: unknown) => {
           if (isRecoveryLink) {
             router.replace({
               pathname: '/forgot-password',
               params: { resetError: 'expired' },
             });
           }
+
+          showAuthNotice({
+            kind: 'error',
+            message: toUserFacingError(
+              error,
+              'Could not finish sign-in. Please try again.'
+            ),
+          });
         });
     };
 
@@ -177,13 +258,15 @@ function RootLayout() {
     );
 
     return () => subscription.remove();
-  }, [router, setSessionFromUrl]);
+  }, [router, setSessionFromUrl, showAuthNotice]);
 
   // The app is ready to decide on routing once fonts are loaded, the persisted
   // session has been restored, and (if signed in) the profile has resolved.
   const fontsReady = fontsLoaded || !!fontError;
+  const sessionReady = !authInitializing;
   const profileReady = !userId || profileLoaded;
-  const appReady = fontsReady && !authInitializing && profileReady;
+  const profileBlocked = Boolean(userId && profileError);
+  const appReady = fontsReady && sessionReady && profileReady && cachesReady;
 
   // Signed-in users without a username and without a 13+ answer stay on
   // age-gate. After that they stay on onboarding until they pick a username.
@@ -205,6 +288,14 @@ function RootLayout() {
   });
   const routeSettled =
     isSettledLegalRoute(legalGate, routeRoot) && !leavingAuthEntry;
+  const bootSteps = [
+    fontsReady,
+    sessionReady,
+    cachesReady,
+    !profileBlocked && profileReady,
+    !profileBlocked && routeSettled,
+  ];
+  const startupProgress = bootSteps.filter(Boolean).length / bootSteps.length;
 
   useEffect(() => {
     if (!appReady) {
@@ -251,7 +342,9 @@ function RootLayout() {
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.surface }}>
+    <AnalyticsProvider>
+      <PostHogErrorBoundary fallback={RootErrorFallback}>
+        <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.surface }}>
       <Stack
         screenOptions={{
           headerShown: false,
@@ -267,10 +360,13 @@ function RootLayout() {
         <Stack.Screen name="accept-legal" />
         <Stack.Screen name="legal" />
         <Stack.Screen name="profile" />
+        <Stack.Screen name="user/[userId]" />
+        <Stack.Screen name="follow-list" />
         <Stack.Screen name="settings" />
         <Stack.Screen name="blocked-accounts" />
         <Stack.Screen name="help" />
         <Stack.Screen name="change-username" />
+        <Stack.Screen name="edit-bio" />
         <Stack.Screen name="change-password" />
         <Stack.Screen
           name="login"
@@ -296,47 +392,30 @@ function RootLayout() {
       </Stack>
 
       {!appReady || !routeSettled ? (
-        <View
-          className="absolute inset-0 z-50 items-center justify-center bg-surface px-8"
-          accessibilityRole="progressbar"
-          accessibilityLabel="Loading SkateU"
-        >
-          <Image
-            source={images.brandLockupCentered}
-            accessibilityLabel="SkateU"
-            style={{ width: splashLogoWidth, height: splashLogoHeight }}
-            resizeMode="contain"
-          />
-          {userId && profileError ? (
-            <View
-              className="absolute left-4 right-4 flex-row items-center rounded-2xl bg-field px-4 py-3"
-              style={{
-                top: insets.top + 12,
-              }}
-            >
-              <Text
-                accessibilityRole="alert"
-                accessibilityLiveRegion="polite"
-                className="flex-1 pr-3 font-outfit-medium text-base text-ink"
-              >
-                {profileError}
-              </Text>
-              <Pressable
-                className="rounded-xl bg-accent px-3 py-2"
-                onPress={() => fetchProfile(userId, accessToken)}
-                disabled={profileLoading}
-                accessibilityRole="button"
-                accessibilityLabel="Retry loading profile"
-                accessibilityState={{ busy: profileLoading }}
-              >
-                <Text className="font-outfit-bold text-sm text-brand">Retry</Text>
-              </Pressable>
-            </View>
-          ) : null}
-        </View>
+        <StartupLoadingOverlay
+          progress={startupProgress}
+          logoWidth={splashLogoWidth}
+          logoHeight={splashLogoHeight}
+          errorBannerTop={insets.top + 12}
+          profileError={userId ? profileError : null}
+          profileLoading={profileLoading}
+          onSignOut={() => {
+            void signOut().catch(() => {
+              // Local session is cleared in signOut even if this rejects.
+            });
+          }}
+          onRetryProfile={() => {
+            if (userId) {
+              fetchProfile(userId, accessToken);
+            }
+          }}
+        />
       ) : null}
-    </GestureHandlerRootView>
+      <AuthNoticeBanner />
+        </GestureHandlerRootView>
+      </PostHogErrorBoundary>
+    </AnalyticsProvider>
   );
 }
 
-export default wrapRoot(RootLayout);
+export default Sentry.wrap(RootLayout);

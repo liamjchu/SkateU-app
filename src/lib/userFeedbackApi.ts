@@ -1,3 +1,4 @@
+import { captureAnalyticsEvent } from './analytics';
 import { getApiUrl } from './api';
 import { sanitizeErrorMessage } from './userFacingError';
 import type { SubmitUserFeedbackInput } from '../types/userFeedback';
@@ -123,6 +124,8 @@ export async function submitUserFeedback(
   if (typeof data.id !== 'string' || data.id.length === 0) {
     throw new Error(SUBMIT_FAILED_ERROR);
   }
+
+  captureAnalyticsEvent('help_submitted', { type: input.type });
 
   return { id: data.id };
 }
