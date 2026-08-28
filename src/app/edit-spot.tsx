@@ -1,5 +1,6 @@
 import { useNavigation } from '@react-navigation/native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+import { useGuardedRouter } from '../lib/navigationGuard';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
@@ -41,12 +42,12 @@ type Coordinates = {
   longitude: number;
 };
 
-const AUTH_REQUIRED_ERROR = 'Sign in to edit a spot.';
+const AUTH_REQUIRED_ERROR = 'Log in to edit a spot.';
 const MISSING_SPOT_ERROR =
   'Couldn’t find this spot. Head back and try again.';
 
 export default function EditSpotScreen() {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const navigation = useNavigation();
   const searchParams = useLocalSearchParams();
 

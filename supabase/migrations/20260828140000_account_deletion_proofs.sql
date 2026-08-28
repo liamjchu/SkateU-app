@@ -14,5 +14,3 @@ revoke all on table public.account_deletion_proofs from public;
 revoke all on table public.account_deletion_proofs from anon;
 revoke all on table public.account_deletion_proofs from authenticated;
 grant all on table public.account_deletion_proofs to service_role;
-
-notify pgrst, 'reload schema';

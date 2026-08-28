@@ -1,5 +1,5 @@
 import { Feather, Octicons } from '@expo/vector-icons';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -36,7 +36,7 @@ import {
 } from '../lib/spotDraft';
 import { STALE_SPOTS_MESSAGE } from '../lib/readCache';
 import { toMutationError, toUserFacingError } from '../lib/userFacingError';
-import { guardedNavigate } from '../lib/navigationGuard';
+import { guardedNavigate, useGuardedRouter } from '../lib/navigationGuard';
 import { fetchPublicProfileView } from '../lib/publicProfile';
 import { useAuthStore } from '../store/authStore';
 import { useDraftSpotsStore } from '../store/draftSpotsStore';
@@ -107,7 +107,7 @@ function tabFromParam(value: string | string[] | undefined): ProfileSpotTab {
 }
 
 export default function ProfileScreen() {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const searchParams = useLocalSearchParams();
   const reduceMotion = useReducedMotion();
   const user = useAuthStore((state) => state.user);
@@ -219,7 +219,7 @@ export default function ProfileScreen() {
 
     const accessToken = session?.access_token;
     if (!accessToken) {
-      Alert.alert('Sign in required', 'Sign in again to update your photo.');
+      Alert.alert('Log in required', 'Log in again to update your photo.');
       return;
     }
 
@@ -380,7 +380,7 @@ export default function ProfileScreen() {
   const handleRetryDisplayedSpots = () => {
     const accessToken = session?.access_token;
     if (!accessToken) {
-      Alert.alert('Sign in again', 'Sign in again to refresh your spots.');
+      Alert.alert('Log in again', 'Log in again to refresh your spots.');
       return;
     }
 
@@ -410,7 +410,7 @@ export default function ProfileScreen() {
           onPress: async () => {
             const accessToken = session?.access_token;
             if (!accessToken) {
-              Alert.alert('Sign in to delete a spot.');
+              Alert.alert('Log in to delete a spot.');
               return;
             }
 

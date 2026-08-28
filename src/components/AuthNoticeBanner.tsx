@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useGuardedRouter } from '../lib/navigationGuard';
 import { useEffect } from 'react';
 import { Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,7 +11,7 @@ const SUCCESS_DISMISS_MS = 3000;
 
 export default function AuthNoticeBanner() {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
+  const router = useGuardedRouter();
   const notice = useAuthNoticeStore((state) => state.notice);
   const clearAuthNotice = useAuthNoticeStore((state) => state.clearAuthNotice);
 
@@ -78,9 +78,9 @@ export default function AuthNoticeBanner() {
               }}
               className="mt-3 self-start rounded-xl bg-accent px-4 py-2"
               accessibilityRole="button"
-              accessibilityLabel="Sign in"
+              accessibilityLabel="Log in"
             >
-              <Text className="font-outfit-bold text-sm text-brand">Sign in</Text>
+              <Text className="font-outfit-bold text-sm text-brand">Log in</Text>
             </FeedbackPressable>
           ) : null}
         </View>

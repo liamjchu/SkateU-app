@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 
-export const AUTH_NOTICE_SIGNED_IN_TITLE = 'Signed in';
-export const AUTH_NOTICE_SIGNED_IN_MESSAGE = "You're signed in.";
-export const AUTH_NOTICE_FAILED_TITLE = "Couldn't finish sign-in";
+export const AUTH_NOTICE_SIGNED_IN_TITLE = 'Logged in';
+export const AUTH_NOTICE_SIGNED_IN_MESSAGE = "You're logged in.";
+export const AUTH_NOTICE_FAILED_TITLE = "Couldn't finish logging in";
 export const AUTH_NOTICE_FAILED_FALLBACK =
   'Check your connection and try again.';
 

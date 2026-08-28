@@ -1,4 +1,4 @@
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
     ActivityIndicator,
@@ -16,7 +16,7 @@ import ScreenHeader from '../../components/screen-header';
 import SocialLinks from '../../components/social-links';
 import { colors } from '../../constants/colors';
 import { captureAnalyticsEvent } from '../../lib/analytics';
-import { guardedNavigate } from '../../lib/navigationGuard';
+import { guardedNavigate, useGuardedRouter } from '../../lib/navigationGuard';
 import {
     fetchCreatorSpots,
     fetchPublicProfileView,
@@ -39,7 +39,7 @@ function firstParam(value: string | string[] | undefined): string | undefined {
 }
 
 export default function UserProfileScreen() {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const params = useLocalSearchParams<{ userId?: string | string[] }>();
   const userId = firstParam(params.userId);
   const session = useAuthStore((state) => state.session);
@@ -132,7 +132,7 @@ export default function UserProfileScreen() {
     const accessToken = session?.access_token;
     if (!accessToken) {
       guardedNavigate('login-to-follow', () => {
-        router.push('/login');
+        router.push('/signup');
       });
       return;
     }

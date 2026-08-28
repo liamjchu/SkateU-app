@@ -96,8 +96,9 @@ async function waitForInFlightSessionExchanges(): Promise<void> {
 // multiple subscriptions (which would fire the setter several times per event).
 let authSubscription: { unsubscribe: () => void } | null = null;
 
-const DELETE_ACCOUNT_TIMEOUT_MS = 10_000;
+const DELETE_ACCOUNT_TIMEOUT_MS = 45_000;
 let deleteAccountProof: string | null = null;
+let deleteAccountAccessToken: string | null = null;
 
 async function fetchDeleteAccountApi(
   path: string,
@@ -118,7 +119,7 @@ async function fetchDeleteAccountApi(
     });
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Account deletion timed out. Enter a new code and try again.');
+      throw new Error('Account deletion timed out. Please try again.');
     }
     throw error;
   } finally {
@@ -207,10 +208,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   signUp: async (email, password) => {
-    if (!useAgeEligibilityStore.getState().confirmedThisSession) {
-      throw new Error('Confirm you are 13 or older before creating an account.');
-    }
-
     const trimmedEmail = email.trim();
     const { data, error } = await supabase.auth.signUp({
       email: trimmedEmail,
@@ -280,7 +277,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
 
     if (!data?.url) {
-      throw new Error('Could not start Google sign-in. Please try again.');
+      throw new Error('Could not start Google log-in. Please try again.');
     }
 
     // Open the Google login in an in-app browser sheet. It resolves once the
@@ -311,7 +308,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // Google/Supabase can report failures on the redirect URL itself.
     if (params.error || params.error_description) {
       throw new Error(
-        params.error_description || params.error || 'Google sign-in failed.'
+        params.error_description || params.error || 'Google log-in failed.'
       );
     }
 
@@ -399,6 +396,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const { error } = await supabase.auth.signOut();
 
     deleteAccountProof = null;
+    deleteAccountAccessToken = null;
     useAgeEligibilityStore.getState().clear();
     // Always drop the local session so a profile-load overlay can dismiss
     // even when the remote sign-out call fails.
@@ -415,6 +413,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   // that whoever is tapping "Delete account" controls that inbox.
   sendDeleteAccountOtp: async (email) => {
     deleteAccountProof = null;
+    deleteAccountAccessToken = null;
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim(),
       options: { shouldCreateUser: false },
@@ -426,46 +425,53 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   verifyDeleteAccountOtp: async (email, token) => {
-    deleteAccountProof = null;
-    const { data, error } = await supabase.auth.verifyOtp({
-      email: email.trim(),
-      token: token.trim(),
-      type: 'email',
-    });
+    if (!deleteAccountAccessToken) {
+      const { data, error } = await supabase.auth.verifyOtp({
+        email: email.trim(),
+        token: token.trim(),
+        type: 'email',
+      });
 
-    if (error) {
-      throw error;
+      if (error) {
+        throw error;
+      }
+
+      const accessToken = data.session?.access_token;
+      if (!accessToken) {
+        throw new Error('We couldn’t verify account deletion. Please try again.');
+      }
+
+      deleteAccountAccessToken = accessToken;
+
+      try {
+        deleteAccountProof = await createDeleteAccountProof(accessToken);
+      } catch {
+        deleteAccountProof = null;
+      }
     }
-
-    const accessToken = data.session?.access_token;
-    if (!accessToken) {
-      throw new Error('We couldn’t verify account deletion. Please try again.');
-    }
-
-    deleteAccountProof = await createDeleteAccountProof(accessToken);
   },
 
   deleteAccount: async () => {
     const { data } = await supabase.auth.getSession();
-    const accessToken = data.session?.access_token;
+    const accessToken = deleteAccountAccessToken ?? data.session?.access_token;
     const proof = deleteAccountProof;
 
     if (!accessToken) {
-      throw new Error('Sign in to delete your account.');
+      throw new Error('Log in to delete your account.');
     }
-    if (!proof) {
+    if (!deleteAccountAccessToken && !proof) {
       throw new Error('Enter a new email verification code to delete your account.');
     }
 
-    // Do not retry with the same credential locally: the server consumes it
-    // atomically before it attempts the permanent deletion.
-    deleteAccountProof = null;
     const response = await fetchDeleteAccountApi('/api/delete-account', accessToken, {
       method: 'DELETE',
-      headers: { 'X-Delete-Account-Proof': proof },
+      headers: proof ? { 'X-Delete-Account-Proof': proof } : {},
     });
 
     if (!response.ok) {
+      if (response.status === 403) {
+        deleteAccountProof = null;
+      }
       const body = (await response.json().catch(() => null)) as
         | { error?: string }
         | null;
@@ -473,6 +479,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         body?.error ?? 'We couldn’t delete your account right now. Please try again.'
       );
     }
+
+    deleteAccountProof = null;
+    deleteAccountAccessToken = null;
 
     // Capture before clearing the authenticated PostHog identity.
     captureAnalyticsEvent('account_deleted');

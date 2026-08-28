@@ -1,5 +1,5 @@
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useGuardedRouter } from '../lib/navigationGuard';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { colors } from '../constants/colors';
 import { formatCompactRelativeTime } from '../lib/relativeTime';
@@ -40,7 +40,7 @@ export default function SpotCommentRow({
   const isDeleting = deletingId === comment.id;
   const canModerateOther =
     Boolean(currentUserId) && !isOwn && Boolean(comment.userId);
-  const router = useRouter();
+  const router = useGuardedRouter();
 
   return (
     <View className={isReply ? 'ml-6 mt-3 border-l-2 border-border-soft pl-3' : ''}>

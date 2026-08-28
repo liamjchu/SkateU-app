@@ -1,4 +1,5 @@
-import { usePathname, useRouter } from 'expo-router';
+import { usePathname } from 'expo-router';
+import { useGuardedRouter } from '../../lib/navigationGuard';
 import { useMemo, useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
 import SupportChoiceList from '../../components/SupportChoiceList';
@@ -20,7 +21,7 @@ import { useAuthStore } from '../../store/authStore';
 import type { ContactCategory } from '../../types/userFeedback';
 
 export default function ContactSkateUScreen() {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const pathname = usePathname();
   const session = useAuthStore((state) => state.session);
   const knownEmail = useAuthStore((state) => state.user?.email ?? '');
@@ -66,7 +67,7 @@ export default function ContactSkateUScreen() {
 
     const accessToken = session?.access_token;
     if (!accessToken) {
-      setSubmitError('Sign in to send a message.');
+      setSubmitError('Log in to send a message.');
       return;
     }
 

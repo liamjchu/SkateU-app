@@ -29,7 +29,7 @@ export default function LegalAcceptCheckbox({
         className="mt-4 min-h-14 flex-row items-center rounded-2xl border border-border-soft bg-field px-4 py-3"
         accessibilityRole="checkbox"
         accessibilityState={{ checked, disabled }}
-        accessibilityLabel="Agree to SkateU Terms, Community Guidelines, Privacy Policy, that SkateU may feature spots you post on Instagram, TikTok, and YouTube, and confirm you are at least 13"
+        accessibilityLabel="Agree to SkateU Terms, Community Guidelines, Privacy Policy, that SkateU may feature spots you post on Instagram, TikTok, and YouTube, and that you are 13 or older"
       >
         <View
           className={`h-7 w-7 shrink-0 items-center justify-center rounded-md border ${
@@ -42,7 +42,7 @@ export default function LegalAcceptCheckbox({
         </View>
         <Text className="ml-3 min-w-0 flex-1 font-outfit-medium text-base leading-6 text-ink">
           I agree, including that SkateU may feature spots I post on Instagram,
-          TikTok, and YouTube, and I confirm I am at least 13 years old.
+          TikTok, and YouTube. I am 13 or older.
         </Text>
       </FeedbackPressable>
     </View>

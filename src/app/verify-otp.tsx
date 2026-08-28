@@ -1,4 +1,5 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+import { useGuardedRouter } from '../lib/navigationGuard';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, TextInput, View } from 'react-native';
 import FeedbackPressable from '../components/FeedbackPressable';
@@ -12,7 +13,7 @@ const CODE_LENGTH = 6;
 const RESEND_COOLDOWN = 60;
 
 export default function VerifyOtpScreen() {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const params = useLocalSearchParams<{ email?: string }>();
   const email = typeof params.email === 'string' ? params.email : undefined;
 
@@ -23,7 +24,7 @@ export default function VerifyOtpScreen() {
       } catch {
         // Navigate even when there is no active Supabase session to clear.
       } finally {
-        router.replace('/login');
+        router.replace('/signup');
       }
     };
 
@@ -39,12 +40,12 @@ export default function VerifyOtpScreen() {
           className="mt-4 rounded-2xl bg-accent px-5 py-3"
           onPress={handleReturnToLogin}
           accessibilityRole="button"
-          accessibilityLabel="Return to sign in"
+          accessibilityLabel="Return to sign up"
         >
           <Text
             className="text-base text-brand font-outfit-bold"
           >
-            Return to sign in
+            Return to sign up
           </Text>
         </FeedbackPressable>
       </View>
@@ -55,7 +56,7 @@ export default function VerifyOtpScreen() {
 }
 
 function VerifyOtpContent({ email }: { email: string }) {
-  const router = useRouter();
+  const router = useGuardedRouter();
 
   const verifyOtp = useAuthStore((state) => state.verifyOtp);
   const resendSignUpOtp = useAuthStore((state) => state.resendSignUpOtp);
@@ -86,7 +87,7 @@ function VerifyOtpContent({ email }: { email: string }) {
       return;
     }
 
-    router.replace('/login');
+    router.replace('/signup');
   };
 
   const handleChangeCode = (value: string) => {

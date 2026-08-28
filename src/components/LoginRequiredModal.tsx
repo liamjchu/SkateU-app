@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useGuardedRouter } from '../lib/navigationGuard';
 import { Modal, Pressable, Text, View } from 'react-native';
 import FeedbackPressable from './FeedbackPressable';
 
@@ -12,14 +12,14 @@ type LoginRequiredModalProps = {
 export default function LoginRequiredModal({
   visible,
   onCancel,
-  title = 'Sign in to like and add spots',
-  message = 'You can still browse campuses, view spots, and read comments. Sign in to like spots, add your own, or report content.',
+  title = 'Sign up to like and add spots',
+  message = 'You can still browse campuses, view spots, and read comments. Sign up to like spots, add your own, or report content. Already have an account? You can log in from the next screen.',
 }: LoginRequiredModalProps) {
-  const router = useRouter();
+  const router = useGuardedRouter();
 
   const handleLoginPress = () => {
     onCancel();
-    router.push('/login');
+    router.push('/signup');
   };
 
   return (
@@ -32,14 +32,14 @@ export default function LoginRequiredModal({
       <View
         className="flex-1"
         accessibilityViewIsModal
-        accessibilityLabel="Sign in required"
+        accessibilityLabel="Sign up required"
         style={{ backgroundColor: 'rgba(42, 34, 36, 0.32)' }}
       >
         <Pressable
           onPress={onCancel}
           className="absolute inset-0"
           accessibilityRole="button"
-          accessibilityLabel="Dismiss sign in prompt"
+          accessibilityLabel="Dismiss sign up prompt"
         />
 
         <View
@@ -58,7 +58,7 @@ export default function LoginRequiredModal({
               <FeedbackPressable
                 onPress={onCancel}
                 className="min-h-12 flex-1 items-center justify-center rounded-xl bg-surface-soft py-4"
-                accessibilityLabel="Cancel sign in prompt"
+                accessibilityLabel="Cancel sign up prompt"
                 accessibilityRole="button"
               >
                 <Text className="text-base text-ink font-outfit-bold">
@@ -69,11 +69,11 @@ export default function LoginRequiredModal({
                 haptic="light"
                 onPress={handleLoginPress}
                 className="min-h-12 flex-1 items-center justify-center rounded-xl bg-accent py-4"
-                accessibilityLabel="Go to sign in"
+                accessibilityLabel="Go to sign up"
                 accessibilityRole="button"
               >
                 <Text className="text-base text-brand font-outfit-bold">
-                  Sign in
+                  Sign up
                 </Text>
               </FeedbackPressable>
             </View>

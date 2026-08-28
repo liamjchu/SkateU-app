@@ -1,14 +1,16 @@
-import { GUEST_BROWSE_CAPABILITIES, formatGuestBrowseMessage } from '../guestBrowseCopy';
+import { formatGuestBrowseMessage } from '../guestBrowseCopy';
 
 describe('guest browse copy', () => {
-  it('describes only capabilities guests currently have', () => {
+  it('describes guest browsing and defers likes and reports to sign-up', () => {
     const message = formatGuestBrowseMessage();
-    expect(message).toContain('Explore SkateU without creating an account.');
-    for (const capability of GUEST_BROWSE_CAPABILITIES) {
-      expect(message).toContain(capability);
-    }
-    expect(message).toContain('Create an account when you want to like spots');
-    expect(GUEST_BROWSE_CAPABILITIES.join(' ')).not.toContain('like');
-    expect(GUEST_BROWSE_CAPABILITIES.join(' ')).not.toContain('report');
+    expect(message).toBe(
+      'Explore schools, spots, the feed, and comments without an account. Sign up to like, add spots, comment, or report.'
+    );
+
+    const [guestHalf, signUpHalf] = message.split('Sign up');
+    expect(guestHalf.toLowerCase()).not.toContain('like');
+    expect(guestHalf.toLowerCase()).not.toContain('report');
+    expect(signUpHalf.toLowerCase()).toContain('like');
+    expect(signUpHalf.toLowerCase()).toContain('report');
   });
 });

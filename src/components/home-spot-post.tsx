@@ -1,5 +1,5 @@
 import { Feather, Octicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useGuardedRouter } from '../lib/navigationGuard';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { colors } from '../constants/colors';
 import { formatCompactRelativeTime } from '../lib/relativeTime';
@@ -44,7 +44,7 @@ export default function HomeSpotPost({
 }: HomeSpotPostProps) {
   const liked = spot.likedByUser === true;
   const imageUris = spot.imageUris.filter((uri) => uri.length > 0);
-  const router = useRouter();
+  const router = useGuardedRouter();
   const currentUserId = useAuthStore((state) => state.user?.id ?? null);
 
   return (

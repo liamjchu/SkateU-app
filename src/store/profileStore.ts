@@ -200,10 +200,10 @@ export const useProfileStore = create<ProfileState>()(
 
       console.warn('Failed to load legal acceptance', legalError);
       set({
-        profile: cached,
+        profile: publicProfile,
         loading: false,
-        loaded: cached !== null,
-        error: PROFILE_LOAD_FAILED,
+        loaded: true,
+        error: null,
       });
     }
   },

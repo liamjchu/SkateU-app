@@ -5,6 +5,8 @@ import { colors } from '../constants/colors';
 import CachedRemoteImage from './CachedRemoteImage';
 import FeedbackPressable from './FeedbackPressable';
 
+const RAIL_MEDIA_HEIGHT = 128;
+
 type HomeRailCardProps = {
   imageUrl?: string | null;
   title: string;
@@ -37,11 +39,14 @@ export default function HomeRailCard({
             <CachedRemoteImage
               uri={imageUrl}
               className="h-32 w-full bg-surface-soft"
-              style={{ height: 128, width: '100%' }}
+              style={{ height: RAIL_MEDIA_HEIGHT, width: '100%' }}
               accessible={false}
             />
           ) : (
-            <View className="h-32 w-full items-center justify-center bg-accent">
+            <View
+              className="h-32 w-full items-center justify-center bg-accent"
+              style={{ height: RAIL_MEDIA_HEIGHT, width: '100%' }}
+            >
               <Feather name="map-pin" size={22} color={colors.brand} />
             </View>
           )}

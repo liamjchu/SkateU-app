@@ -1,4 +1,5 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+import { useGuardedRouter } from '../lib/navigationGuard';
 import { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
@@ -21,7 +22,7 @@ const RESEND_COOLDOWN = 60;
 // entry, hidden input) but verifies identity before a permanent account
 // deletion instead of confirming a new signup.
 export default function VerifyDeleteAccountScreen() {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const params = useLocalSearchParams<{ email?: string; from?: string }>();
   const email = typeof params.email === 'string' ? params.email : '';
   const fromAcceptLegal = params.from === 'accept-legal';

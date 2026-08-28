@@ -1,6 +1,6 @@
 import * as Linking from 'expo-linking';
 import type { Href } from 'expo-router';
-import { useRouter } from 'expo-router';
+import { useGuardedRouter } from '../lib/navigationGuard';
 import { Text, View } from 'react-native';
 import {
   parseLegalMarkdown,
@@ -145,7 +145,7 @@ export default function LegalMarkdownView({
   markdown,
   hideLeadingTitle = false,
 }: LegalMarkdownViewProps) {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const blocks = parseLegalMarkdown(markdown);
   const visibleBlocks =
     hideLeadingTitle && blocks[0]?.type === 'h1' ? blocks.slice(1) : blocks;

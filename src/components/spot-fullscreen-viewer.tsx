@@ -1,5 +1,5 @@
 import { Feather, Ionicons, Octicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useGuardedRouter } from '../lib/navigationGuard';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     AccessibilityInfo,
@@ -317,7 +317,7 @@ function SpotDetailsOverlay({
   const liked = spot.likedByUser === true;
   const isLiking = likingSpotId === spot.id;
   const description = spot.description.trim();
-  const router = useRouter();
+  const router = useGuardedRouter();
   const currentUserId = useAuthStore((state) => state.user?.id ?? null);
 
   return (

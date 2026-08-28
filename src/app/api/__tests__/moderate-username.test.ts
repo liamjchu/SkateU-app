@@ -128,6 +128,68 @@ describe('POST /api/moderate-username', () => {
     expect(payload.profile.username).toBe('liam');
   });
 
+  it('tells the model to allow incidental numbers like 69 in ordinary handles', async () => {
+    setConfigured();
+    const fetchMock: FetchMock = jest.fn(async (input, init) => {
+      const url = String(input);
+      if (url.includes('/auth/v1/user')) {
+        return jsonResponse({ id: 'user-1' });
+      }
+      if (url.includes('api.openai.com')) {
+        return jsonResponse({
+          choices: [{ message: { content: JSON.stringify({ appropriate: true, reason: '' }) } }],
+        });
+      }
+      if (url.includes('/rest/v1/profiles') && init?.method === 'PATCH') {
+        return jsonResponse([
+          {
+            id: 'user-1',
+            username: 'ivan6910',
+            avatar_url: null,
+            updated_at: '2026-08-21T00:00:00.000Z',
+          },
+        ]);
+      }
+      if (url.includes('/rest/v1/profile_legal')) {
+        return jsonResponse([
+          {
+            id: 'user-1',
+            legal_version: '2026-08-20',
+            legal_accepted_at: '2026-08-21T00:00:00.000Z',
+            age_attested_at: '2026-08-21T00:00:00.000Z',
+          },
+        ]);
+      }
+      if (url.includes('/rest/v1/profiles')) {
+        return jsonResponse([
+          {
+            id: 'user-1',
+            username: 'ivan6910',
+            avatar_url: null,
+            updated_at: '2026-08-21T00:00:00.000Z',
+          },
+        ]);
+      }
+      throw new Error(`Unexpected fetch: ${init?.method ?? 'GET'} ${url}`);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await POST(postRequest({ username: 'ivan6910' }));
+    expect(response.status).toBe(200);
+
+    const openaiCall = fetchMock.mock.calls.find(([input]) =>
+      String(input).includes('api.openai.com')
+    );
+    expect(openaiCall).toBeDefined();
+    const body = JSON.parse(String(openaiCall?.[1]?.body ?? '{}')) as {
+      messages: { role: string; content: string }[];
+    };
+    const systemPrompt = body.messages.find((message) => message.role === 'system')?.content ?? '';
+    expect(systemPrompt).toContain('ivan6910');
+    expect(systemPrompt).toContain('Do not treat 69 as sexual');
+    expect(systemPrompt).toContain('When uncertain whether a username is sexual');
+  });
+
   it('returns a gentle reason when the model rejects the username', async () => {
     setConfigured();
     global.fetch = jest.fn(async (input) => {

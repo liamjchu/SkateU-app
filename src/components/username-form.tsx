@@ -92,15 +92,15 @@ export function UsernameForm({
     setValue(text.toLowerCase().replace(/[^a-z0-9_]/g, ''));
   };
 
-  const canSubmit =
+  const fieldsReady =
     status === 'available' &&
     Boolean(accessToken) &&
     !submitting &&
-    !unchanged &&
-    submitEnabled;
+    !unchanged;
+  const canSubmit = fieldsReady && submitEnabled;
 
   const handleSubmit = async () => {
-    if (!accessToken || !canSubmit) {
+    if (!accessToken || !fieldsReady) {
       return;
     }
 
@@ -133,7 +133,7 @@ export function UsernameForm({
 
   return (
     <View className="mt-8">
-      <View className="flex-row items-center rounded-2xl border border-border-soft bg-field pl-5 pr-3">
+      <View className="min-h-14 flex-row items-center rounded-2xl border border-border-soft bg-field pl-5 pr-3">
         <Text className="font-outfit-bold text-base text-muted">@</Text>
         <TextInput
           value={value}
@@ -147,7 +147,8 @@ export function UsernameForm({
           autoFocus
           maxLength={USERNAME_MAX}
           editable={!submitting}
-          className="flex-1 py-4 pl-1 pr-2 font-outfit-semibold text-base text-ink"
+          className="flex-1 pl-1 pr-2 font-outfit-semibold text-base text-ink"
+          style={{ paddingVertical: 0, textAlignVertical: 'center' }}
         />
         <View className="h-6 w-6 items-center justify-center">
           {status === 'checking' ? (
@@ -198,13 +199,16 @@ export function UsernameForm({
       <FeedbackPressable
         haptic="light"
         onPress={handleSubmit}
-        disabled={!canSubmit}
+        disabled={submitting || !fieldsReady}
         className={`mt-6 min-h-14 w-full items-center justify-center rounded-2xl py-4 ${
           canSubmit ? 'bg-accent' : 'bg-actionDisabled'
         }`}
         accessibilityLabel={submitting ? submittingLabel : submitLabel}
         accessibilityRole="button"
-        accessibilityState={{ disabled: !canSubmit, busy: submitting }}
+        accessibilityState={{
+          disabled: submitting || !fieldsReady,
+          busy: submitting,
+        }}
       >
         <Text
           className={`font-outfit-bold text-lg ${canSubmit ? 'text-brand' : 'text-muted'}`}

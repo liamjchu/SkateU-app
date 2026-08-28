@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useGuardedRouter } from '../lib/navigationGuard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FeedbackPressable from '../components/FeedbackPressable';
 import LegalAcceptCheckbox from '../components/legal-accept-checkbox';
@@ -11,7 +11,7 @@ import { useAuthStore } from '../store/authStore';
 import { useProfileStore } from '../store/profileStore';
 
 export default function AcceptLegalScreen() {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const insets = useSafeAreaInsets();
   const email = useAuthStore((state) => state.user?.email ?? '');
   const accessToken = useAuthStore((state) => state.session?.access_token);
@@ -34,10 +34,17 @@ export default function AcceptLegalScreen() {
     !closingAccount;
 
   const handleAccept = async () => {
-    if (!accessToken || !canSubmit) {
-      if (!agreed) {
-        setError('Confirm you are at least 13 and agree before continuing.');
-      }
+    if (submitting || closingAccount) {
+      return;
+    }
+
+    if (!agreed) {
+      setError('Agree to continue.');
+      return;
+    }
+
+    if (!accessToken) {
+      setError('Sign in again to keep going.');
       return;
     }
 
@@ -97,6 +104,8 @@ export default function AcceptLegalScreen() {
       await signOut();
     } catch {
       // The auth listener will settle state if sign-out cannot complete here.
+    } finally {
+      router.replace('/');
     }
   };
 
@@ -137,8 +146,7 @@ export default function AcceptLegalScreen() {
               SkateU has a few rules
             </Text>
             <Text className="mt-2 font-outfit-medium text-base leading-6 text-muted">
-              Read the documents, then confirm you are at least 13 to keep using
-              your account.
+              Read the documents and agree to keep using your account.
             </Text>
 
             <View className="mt-8">
@@ -165,13 +173,16 @@ export default function AcceptLegalScreen() {
             <FeedbackPressable
               haptic="light"
               onPress={() => void handleAccept()}
-              disabled={!canSubmit}
+              disabled={submitting || closingAccount}
               className={`mt-6 min-h-14 items-center justify-center rounded-2xl px-5 py-4 ${
                 canSubmit ? 'bg-accent' : 'bg-actionDisabled'
               }`}
               accessibilityRole="button"
               accessibilityLabel={submitting ? 'Saving' : 'Agree and continue'}
-              accessibilityState={{ disabled: !canSubmit, busy: submitting }}
+              accessibilityState={{
+                disabled: submitting || closingAccount,
+                busy: submitting,
+              }}
             >
               <Text
                 className={`text-center font-outfit-bold text-lg ${
@@ -204,13 +215,14 @@ export default function AcceptLegalScreen() {
             </Text>
 
             <FeedbackPressable
+              haptic="light"
               onPress={handleSignOut}
               className="mt-8 min-h-12 items-center justify-center py-4"
               accessibilityRole="button"
-              accessibilityLabel="Sign out"
+              accessibilityLabel="Log out"
             >
               <Text className="font-outfit-semibold text-base text-muted">
-                Sign out
+                Log out
               </Text>
             </FeedbackPressable>
           </View>

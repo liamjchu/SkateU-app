@@ -108,4 +108,71 @@ describe('ensureWebCrypto', () => {
         typeof TextEncoder !== 'undefined'
     ).toBe(true);
   });
+
+  it('accepts an AlgorithmIdentifier object for digest', async () => {
+    Object.defineProperty(globalThis, 'crypto', {
+      configurable: true,
+      enumerable: true,
+      value: {
+        getRandomValues: originalCrypto.getRandomValues.bind(originalCrypto),
+        randomUUID: originalCrypto.randomUUID.bind(originalCrypto),
+      },
+    });
+
+    ensureWebCrypto();
+
+    const digest = await globalThis.crypto.subtle.digest(
+      { name: 'SHA-256' },
+      new TextEncoder().encode('skateu')
+    );
+    expect(digest.byteLength).toBeGreaterThan(0);
+  });
+
+  it('replaces global crypto when the existing object rejects subtle', async () => {
+    const frozen = Object.freeze({
+      getRandomValues: originalCrypto.getRandomValues.bind(originalCrypto),
+      randomUUID: originalCrypto.randomUUID.bind(originalCrypto),
+    });
+    Object.defineProperty(globalThis, 'crypto', {
+      configurable: true,
+      enumerable: true,
+      value: frozen,
+    });
+
+    ensureWebCrypto();
+
+    expect(hasWebCryptoDigest()).toBe(true);
+    await expect(
+      globalThis.crypto.subtle.digest(
+        'SHA-256',
+        new TextEncoder().encode('skateu')
+      )
+    ).resolves.toBeInstanceOf(ArrayBuffer);
+  });
+
+  it('installs expo-crypto fallbacks when global crypto is missing', () => {
+    Object.defineProperty(globalThis, 'crypto', {
+      configurable: true,
+      enumerable: true,
+      value: undefined,
+    });
+
+    ensureWebCrypto();
+
+    expect(hasWebCryptoDigest()).toBe(true);
+    const bytes = new Uint8Array(4);
+    expect(globalThis.crypto.getRandomValues(bytes)).toBe(bytes);
+    expect(typeof globalThis.crypto.randomUUID()).toBe('string');
+  });
+
+  it('returns false when reading crypto throws', () => {
+    Object.defineProperty(globalThis, 'crypto', {
+      configurable: true,
+      get() {
+        throw new Error('crypto host object');
+      },
+    });
+
+    expect(hasWebCryptoDigest()).toBe(false);
+  });
 });

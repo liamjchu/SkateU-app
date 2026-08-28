@@ -63,7 +63,7 @@ The app stores some information on your device, including:
 
 - Your sign-in session
 - Schools you mark as favorites, which are saved on that device and are not synced to your SkateU account
-- Unpublished spot drafts, including the name, description, map pin, and photos you started adding. Drafts stay on that device until you post or delete them. They are not uploaded to SkateU until you post. Signing out does not necessarily delete them. You can delete a draft from Profile. Deleting your account clears drafts for that account on that device. Removing the app from a device also removes local drafts.
+- Unpublished spot drafts, including the name, description, map pin, and photos you started adding. Drafts stay on that device until you post or delete them. They are not uploaded to SkateU until you post. Logging out does not necessarily delete them. You can delete a draft from Profile. Deleting your account clears drafts for that account on that device. Removing the app from a device also removes local drafts.
 - On iOS, a stored Apple user identifier used only to check whether Apple Sign In is still authorized.
 
 ### Website Android beta requests
@@ -180,7 +180,7 @@ You can:
 - Report comments and block other accounts
 - Unlike spots you liked
 - Change your username, profile photo, or profile bio
-- Sign out
+- Log out
 - Delete your account from Settings in the app
 
 Deleting your account permanently removes your sign-in, profile, likes, spot removal requests, comment reports, and account blocks. Spots you added stay in SkateU and are no longer linked to you. Comments you posted stay in SkateU and are shown without your username. Unpublished spot drafts for that account are deleted from the device.

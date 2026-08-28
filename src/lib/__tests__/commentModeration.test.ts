@@ -45,8 +45,17 @@ describe('parseCommentVerdict', () => {
     expect(() => parseCommentVerdict('not-json')).toThrow(
       'Comment moderation is unavailable.'
     );
+    expect(() => parseCommentVerdict('null')).toThrow(
+      'Comment moderation is unavailable.'
+    );
+    expect(() => parseCommentVerdict('{"approved":"maybe"}')).toThrow(
+      'Comment moderation is unavailable.'
+    );
     expect(() =>
       parseCommentVerdict('{"approved":false,"flag":"NONE","reason":""}')
+    ).toThrow('Comment moderation is unavailable.');
+    expect(() =>
+      parseCommentVerdict('{"approved":false,"flag":"INAPPROPRIATE","reason":"   "}')
     ).toThrow('Comment moderation is unavailable.');
   });
 });
@@ -90,6 +99,18 @@ describe('moderateComment', () => {
       'Comment moderation is unavailable.'
     );
     expect(errorSpy).toHaveBeenCalled();
+
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ choices: [{ message: {} }] }), { status: 200 })
+    );
+    await expect(moderateComment('Sick ledge')).rejects.toThrow(
+      'Comment moderation is unavailable.'
+    );
+
+    fetchMock.mockRejectedValueOnce(new Error('network down'));
+    await expect(moderateComment('Sick ledge')).rejects.toThrow(
+      'Comment moderation is unavailable.'
+    );
   });
 });
 

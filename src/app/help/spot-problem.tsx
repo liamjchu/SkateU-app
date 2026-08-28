@@ -1,4 +1,5 @@
-import { useLocalSearchParams, usePathname, useRouter } from 'expo-router';
+import { useLocalSearchParams, usePathname } from 'expo-router';
+import { useGuardedRouter } from '../../lib/navigationGuard';
 import { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -24,7 +25,7 @@ import type { SpotMediaItem } from '../../types/spot';
 import type { SpotProblemCategory } from '../../types/userFeedback';
 
 export default function ReportSpotProblemScreen() {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const pathname = usePathname();
   const searchParams = useLocalSearchParams();
   const spotId = Array.isArray(searchParams.spotId)
@@ -80,7 +81,7 @@ export default function ReportSpotProblemScreen() {
 
     const accessToken = session?.access_token;
     if (!accessToken) {
-      setSubmitError('Sign in to report a problem.');
+      setSubmitError('Log in to report a problem.');
       return;
     }
 

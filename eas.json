@@ -26,7 +26,7 @@
       "node": "22.19.0",
       "autoIncrement": true,
       "environment": "production",
-      "channel": "production"
+      "channel": "internal"
     }
   },
   "submit": {

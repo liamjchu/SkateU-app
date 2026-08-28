@@ -668,7 +668,7 @@ describe('POST /api/spots', () => {
     const response = await POST(makePostRequest(validForm()));
     expect(response.status).toBe(401);
     const body = (await response.json()) as { error: string };
-    expect(body.error.toLowerCase()).toContain('sign in');
+    expect(body.error.toLowerCase()).toContain('log in');
   });
 
   it('returns 401 when the token is invalid', async () => {
@@ -682,7 +682,7 @@ describe('POST /api/spots', () => {
     );
     expect(response.status).toBe(401);
     const body = (await response.json()) as { error: string };
-    expect(body.error.toLowerCase()).toContain('sign in');
+    expect(body.error.toLowerCase()).toContain('log in');
   });
 
   it('returns 401 when the token is expired', async () => {

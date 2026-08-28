@@ -1,5 +1,5 @@
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useGuardedRouter } from '../lib/navigationGuard';
 import { useState } from 'react';
 import { Alert, ScrollView, Text, View } from 'react-native';
 import FeedbackPressable from '../components/FeedbackPressable';
@@ -64,7 +64,7 @@ function SettingsRow({
 }
 
 export default function SettingsScreen() {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const email = useAuthStore((state) => state.user?.email ?? '');
   const canSignInWithPassword = useAuthStore((state) =>
     userCanSignInWithPassword(state.user)
@@ -97,9 +97,9 @@ export default function SettingsScreen() {
       await signOut();
       router.replace('/');
     } catch (error) {
-      console.warn('Failed to sign out', error);
+      console.warn('Failed to log out', error);
       Alert.alert(
-        'Couldn’t sign out',
+        'Couldn’t log out',
         toUserFacingError(error, 'Please try again.')
       );
       setLoggingOut(false);
@@ -107,9 +107,9 @@ export default function SettingsScreen() {
   };
 
   const handleLogout = () => {
-    Alert.alert('Sign out?', 'You can sign back in anytime.', [
+    Alert.alert('Log out?', 'You can log back in anytime.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign out', style: 'destructive', onPress: performLogout },
+      { text: 'Log out', style: 'destructive', onPress: performLogout },
     ]);
   };
 
@@ -254,7 +254,7 @@ export default function SettingsScreen() {
         <View className="mt-6 overflow-hidden rounded-2xl bg-field">
           <SettingsRow
             icon="log-out"
-            label={loggingOut ? 'Signing out...' : 'Sign out'}
+            label={loggingOut ? 'Logging out...' : 'Log out'}
             disabled={loggingOut}
             busy={loggingOut}
             onPress={handleLogout}
