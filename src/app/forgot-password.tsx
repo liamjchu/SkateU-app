@@ -1,4 +1,5 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+import { useGuardedRouter } from '../lib/navigationGuard';
 import { useState } from 'react';
 import {
     ScrollView,
@@ -26,7 +27,7 @@ const getRequestErrorMessage = (requestError: unknown): string => {
 };
 
 export default function ForgotPasswordScreen() {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const { resetError } = useLocalSearchParams<{ resetError?: string }>();
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
@@ -76,7 +77,7 @@ export default function ForgotPasswordScreen() {
       <ScreenHeader
         title="Reset password"
         onBack={goBackToSignIn}
-        backAccessibilityLabel="Back to sign in"
+        backAccessibilityLabel="Back to log in"
       />
 
       <KeyboardShiftView>
@@ -171,10 +172,10 @@ export default function ForgotPasswordScreen() {
                   onPress={goBackToSignIn}
                   className="min-h-12 items-center justify-center rounded-2xl border border-accent px-4 py-3"
                   accessibilityRole="button"
-                  accessibilityLabel="Back to sign in"
+                  accessibilityLabel="Back to log in"
                 >
                   <Text className="font-outfit-bold text-base text-accent">
-                    Back to sign in
+                    Back to log in
                   </Text>
                 </FeedbackPressable>
               ) : null}

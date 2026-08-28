@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useGuardedRouter } from '../lib/navigationGuard';
 import { Text } from 'react-native';
 import { LEGAL_APP_ROUTES } from '../lib/legalAcceptance';
 
@@ -7,7 +7,7 @@ type SpotSocialNoticeProps = {
 };
 
 export default function SpotSocialNotice({ action }: SpotSocialNoticeProps) {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const lead =
     action === 'saving'
       ? 'By saving, you let SkateU feature this spot on Instagram, TikTok, and YouTube.'

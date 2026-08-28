@@ -1,7 +1,7 @@
 import type { User } from '@supabase/supabase-js';
 
 export const ACCOUNT_EXISTS_MESSAGE =
-  'An account already exists with this email. Please sign in instead.';
+  'An account already exists with this email. Please log in instead.';
 
 export class AccountExistsError extends Error {
   constructor() {

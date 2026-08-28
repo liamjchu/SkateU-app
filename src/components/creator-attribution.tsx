@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useGuardedRouter } from '../lib/navigationGuard';
 import { Text, type TextProps } from 'react-native';
 import { openUserProfile } from '../lib/userProfileNavigation';
 import { useAuthStore } from '../store/authStore';
@@ -23,7 +23,7 @@ export default function CreatorAttribution({
   accessibilityLabel,
   style,
 }: CreatorAttributionProps) {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const currentUserId = useAuthStore((state) => state.user?.id ?? null);
   const label = username ? `@${username}` : fallback;
   const canOpen = Boolean(userId);

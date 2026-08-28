@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useGuardedRouter } from '../lib/navigationGuard';
 import { useRef, useState } from 'react';
 import {
   Platform,
@@ -9,12 +9,10 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { canCreateAccountAtAge } from '../lib/ageEligibility';
 import { getPasswordRequirementStatus, validatePassword } from '../lib/password';
 import { colors } from '../constants/colors';
 import { captureAuthCompleted } from '../lib/analytics';
 import { toUserFacingError } from '../lib/userFacingError';
-import { useAgeEligibilityStore } from '../store/ageEligibilityStore';
 import { useAuthStore } from '../store/authStore';
 import AppleSignInButton from './AppleSignInButton';
 import FeedbackPressable from './FeedbackPressable';
@@ -31,14 +29,11 @@ type AuthCredentialsFormProps = {
 export default function AuthCredentialsForm({
   mode,
 }: AuthCredentialsFormProps) {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const insets = useSafeAreaInsets();
   const passwordInputRef = useRef<TextInput>(null);
   const signIn = useAuthStore((state) => state.signIn);
   const signUp = useAuthStore((state) => state.signUp);
-  const confirmedAgeEligibleThisSession = useAgeEligibilityStore(
-    (state) => state.confirmedThisSession
-  );
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -73,11 +68,6 @@ export default function AuthCredentialsForm({
   };
 
   const goBack = () => {
-    if (isSignup) {
-      router.replace('/age-gate');
-      return;
-    }
-
     if (router.canGoBack()) {
       router.back();
       return;
@@ -97,14 +87,6 @@ export default function AuthCredentialsForm({
     }
 
     if (isSignup) {
-      if (
-        !confirmedAgeEligibleThisSession ||
-        !canCreateAccountAtAge(true)
-      ) {
-        router.replace('/age-gate');
-        return;
-      }
-
       const passwordError = validatePassword(password);
 
       if (passwordError) {
@@ -150,7 +132,7 @@ export default function AuthCredentialsForm({
       <Text className="mt-1 font-outfit-medium text-base leading-5 text-muted">
         {isSignup
           ? 'Sign up to like spots, add your own, and use your profile.'
-          : 'Sign in to like spots, add your own, and use your profile.'}
+          : 'Log in to like spots, add your own, and use your profile.'}
       </Text>
 
       <View className="mt-5 gap-3">
@@ -170,7 +152,8 @@ export default function AuthCredentialsForm({
             blurOnSubmit={false}
             onSubmitEditing={() => passwordInputRef.current?.focus()}
             editable={!submitting}
-            className="p-0 py-4 font-outfit-medium text-base text-ink"
+            className="p-0 font-outfit-medium text-base text-ink"
+            style={{ padding: 0, textAlignVertical: 'center' }}
           />
         </View>
 
@@ -191,7 +174,8 @@ export default function AuthCredentialsForm({
               returnKeyType="go"
               onSubmitEditing={() => void handleSubmit()}
               editable={!submitting}
-              className="flex-1 p-0 py-4 font-outfit-medium text-base text-ink"
+              className="flex-1 p-0 font-outfit-medium text-base text-ink"
+              style={{ padding: 0, textAlignVertical: 'center' }}
             />
             <FeedbackPressable
               onPress={() => setShowPassword((prev) => !prev)}
@@ -279,7 +263,7 @@ export default function AuthCredentialsForm({
           className={`min-h-14 items-center justify-center rounded-2xl py-4 ${
             submitting ? 'bg-actionDisabled' : 'bg-accent'
           }`}
-          accessibilityLabel={isSignup ? 'Sign up' : 'Sign in'}
+          accessibilityLabel={isSignup ? 'Sign up' : 'Log in'}
           accessibilityRole="button"
           accessibilityState={{ disabled: submitting, busy: submitting }}
         >
@@ -289,32 +273,32 @@ export default function AuthCredentialsForm({
             {submitting
               ? isSignup
                 ? 'Creating account…'
-                : 'Signing in…'
+                : 'Logging in…'
               : isSignup
                 ? 'Sign up'
-                : 'Sign in'}
+                : 'Log in'}
           </Text>
         </FeedbackPressable>
 
         <FeedbackPressable
           onPress={() => {
             if (isSignup) {
-              router.replace('/login');
+              router.push('/login');
               return;
             }
 
-            router.push('/age-gate');
+            router.replace('/signup');
           }}
           disabled={submitting}
           className="min-h-11 items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel={
-            isSignup ? 'Switch to sign in' : 'Switch to sign up'
+            isSignup ? 'Switch to log in' : 'Switch to sign up'
           }
         >
           <Text className="font-outfit-semibold text-sm text-muted">
             {isSignup
-              ? 'Already have an account? Sign in'
+              ? 'Already have an account? Log in'
               : "Don't have an account? Sign up"}
           </Text>
         </FeedbackPressable>
@@ -352,7 +336,7 @@ export default function AuthCredentialsForm({
 
   return (
     <View className="flex-1 bg-surface">
-      <ScreenHeader title={isSignup ? 'Sign up' : 'Sign in'} onBack={goBack} />
+      <ScreenHeader title={isSignup ? 'Sign up' : 'Log in'} onBack={goBack} />
 
       <KeyboardShiftView closedBottomPadding={Math.max(insets.bottom, 24)}>
         <ScrollView

@@ -25,19 +25,21 @@ function readBearerToken(request: Request): string | null {
   return match ? match[1].trim() : null;
 }
 
-const SYSTEM_PROMPT = `You are a username moderation filter for SkateU, a 13+ campus skate-spot app. Decide if a username is safe to display publicly.
+const SYSTEM_PROMPT = `You are a username moderation filter for SkateU, a 13+ campus skate-spot app. Decide if a username is safe to display publicly. Be lenient. Only reject when the username is clearly about a disallowed topic, not because a substring, number, or nickname could be stretched that way.
 
-Reject the username if it contains, references, or clearly hints at any of the following, INCLUDING obfuscated, misspelled, leetspeak (e.g. 4=a, 3=e, 1=i, 0=o, $=s), or concatenated forms without spaces:
-- Sexual content, body parts, or sexual acts
+Reject the username if it clearly contains or is intended as any of the following, INCLUDING obfuscated, misspelled, leetspeak (e.g. 4=a, 3=e, 1=i, 0=o, $=s), or concatenated forms without spaces:
+- Explicit sexual words or sexual acts as the obvious meaning of the name (not incidental digits)
 - Slurs or hate toward any group (race, religion, gender, sexuality, disability, etc.)
 - Harassment, threats, or violence
-- Drugs, alcohol abuse, or illegal activity
+- Explicit drug dealing or illegal activity as the obvious meaning of the name
 - Impersonation of staff/admin/official accounts (e.g. "admin", "moderator", "official")
 - Sensitive personal information, including passwords, passcodes, PINs, login credentials, API/private keys, Social Security numbers, credit/debit card numbers or security codes, bank/routing numbers, government IDs, passports, driver's licenses, student IDs, medical records, private home addresses, personal phone numbers, personal email addresses, or private documents
 
-Casual swear words used as a nickname are allowed (damn, hell, shit, fuck, ass, and similar) when they are not slurs, sexual, or hateful. Do not reject a username just for ordinary cussing.
+Casual swear words used as a nickname are allowed (damn, hell, shit, fuck, ass, and similar) when they are not slurs or hateful. Do not reject a username just for ordinary cussing.
 
-Allow ordinary names, nicknames, school/skate terms, hobbies, numbers, and casual swears when they do not resemble sensitive personal information. Never repeat a detected secret or identifier in the reason. When uncertain whether something is a slur or sensitive personal information, reject. When uncertain whether a casual swear is too strong, allow it.
+Allow ordinary names, nicknames, school/skate terms, hobbies, numbers, and casual swears. Numbers that commonly appear in usernames (birth years, jersey numbers, random digits) are fine. Digits like 69, 420, or 666 mixed into a normal name or handle are allowed (e.g. ivan6910, john69, skater420). Do not treat 69 as sexual, or 420 as drugs, just because those digits appear. Only reject that kind of number when the rest of the username is clearly sexual or about dealing drugs. Also allow substring coincidences (sex in sussex, ass in class, 69 inside 6910).
+
+Never repeat a detected secret or identifier in the reason. When uncertain whether something is a slur or sensitive personal information, reject. When uncertain whether a username is sexual, drug-related, or too edgy because of numbers or slang, allow it.
 
 Respond ONLY with compact JSON: {"appropriate": boolean, "reason": string}. If appropriate is false, "reason" must be one short, gentle, casual sentence, like a friend giving a nudge. Do not scold or use words like inappropriate, prohibited, not allowed, rejected, or unsafe. Suggest trying another username. If appropriate is true, reason must be an empty string.`;
 

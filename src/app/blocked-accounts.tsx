@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { ActivityIndicator, Alert, ScrollView, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useGuardedRouter } from '../lib/navigationGuard';
 import FeedbackPressable from '../components/FeedbackPressable';
 import ScreenHeader from '../components/screen-header';
 import { colors } from '../constants/colors';
@@ -9,7 +9,7 @@ import { useAuthStore } from '../store/authStore';
 import { useBlocksStore } from '../store/blocksStore';
 
 export default function BlockedAccountsScreen() {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const accessToken = useAuthStore((state) => state.session?.access_token ?? null);
   const users = useBlocksStore((state) => state.users);
   const loading = useBlocksStore((state) => state.loading);

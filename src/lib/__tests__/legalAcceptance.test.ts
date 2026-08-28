@@ -82,7 +82,6 @@ describe('getLegalGate', () => {
         userId: null,
         profileLoaded: true,
         profile: null,
-        confirmedAgeEligibleThisSession: false,
       })
     ).toBe('none');
     expect(
@@ -90,12 +89,11 @@ describe('getLegalGate', () => {
         userId: 'user-1',
         profileLoaded: false,
         profile: null,
-        confirmedAgeEligibleThisSession: false,
       })
     ).toBe('none');
   });
 
-  it('sends signed-in users without a username to the age gate first', () => {
+  it('sends signed-in users without a username to onboarding', () => {
     expect(
       getLegalGate({
         userId: 'user-1',
@@ -106,12 +104,11 @@ describe('getLegalGate', () => {
           legal_accepted_at: null,
           age_attested_at: null,
         }),
-        confirmedAgeEligibleThisSession: false,
       })
-    ).toBe('age-gate');
+    ).toBe('onboarding');
   });
 
-  it('sends incomplete accounts to onboarding after a 13+ confirmation', () => {
+  it('sends incomplete accounts to onboarding until they pick a username', () => {
     expect(
       getLegalGate({
         userId: 'user-1',
@@ -122,7 +119,6 @@ describe('getLegalGate', () => {
           legal_accepted_at: null,
           age_attested_at: null,
         }),
-        confirmedAgeEligibleThisSession: true,
       })
     ).toBe('onboarding');
     expect(
@@ -134,7 +130,6 @@ describe('getLegalGate', () => {
           legal_version: null,
           legal_accepted_at: null,
         }),
-        confirmedAgeEligibleThisSession: false,
       })
     ).toBe('onboarding');
   });
@@ -149,7 +144,6 @@ describe('getLegalGate', () => {
           legal_accepted_at: null,
           age_attested_at: null,
         }),
-        confirmedAgeEligibleThisSession: false,
       })
     ).toBe('accept-legal');
   });
@@ -160,7 +154,6 @@ describe('getLegalGate', () => {
         userId: 'user-1',
         profileLoaded: true,
         profile: profile(),
-        confirmedAgeEligibleThisSession: false,
       })
     ).toBe('none');
   });
@@ -173,6 +166,7 @@ describe('legal route lock', () => {
     expect(isAllowedDuringLegalGate('age-gate', 'onboarding')).toBe(false);
     expect(isAllowedDuringLegalGate('onboarding', 'legal')).toBe(true);
     expect(isAllowedDuringLegalGate('onboarding', 'onboarding')).toBe(true);
+    expect(isAllowedDuringLegalGate('onboarding', 'age-gate')).toBe(true);
     expect(isAllowedDuringLegalGate('onboarding', 'index')).toBe(false);
     expect(isAllowedDuringLegalGate('accept-legal', 'legal')).toBe(true);
     expect(isAllowedDuringLegalGate('accept-legal', 'verify-delete-account')).toBe(
@@ -190,6 +184,7 @@ describe('legal route lock', () => {
     expect(isSettledLegalRoute('age-gate', 'age-gate')).toBe(true);
     expect(isSettledLegalRoute('onboarding', 'index')).toBe(false);
     expect(isSettledLegalRoute('onboarding', 'onboarding')).toBe(true);
+    expect(isSettledLegalRoute('onboarding', 'age-gate')).toBe(true);
     expect(isSettledLegalRoute('onboarding', 'legal')).toBe(true);
     expect(isSettledLegalRoute('accept-legal', 'index')).toBe(false);
     expect(isSettledLegalRoute('accept-legal', 'accept-legal')).toBe(true);

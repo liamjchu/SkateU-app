@@ -352,13 +352,13 @@ describe('commentsStore', () => {
     );
   });
 
-  it('maps a 401 load failure to a sign-in message', async () => {
+  it('maps a 401 load failure to a log-in message', async () => {
     fetchMock.mockResolvedValue(
       mockResponse({ error: '' }, { ok: false, status: 401 })
     );
     await useCommentsStore.getState().fetchComments('spot-1');
     expect(useCommentsStore.getState().bySpotId['spot-1'].error).toBe(
-      'Please sign in again.'
+      'Please log in again.'
     );
   });
 

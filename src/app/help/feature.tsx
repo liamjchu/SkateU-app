@@ -1,4 +1,5 @@
-import { usePathname, useRouter } from 'expo-router';
+import { usePathname } from 'expo-router';
+import { useGuardedRouter } from '../../lib/navigationGuard';
 import { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import SpotImagePicker from '../../components/SpotImagePicker';
@@ -17,7 +18,7 @@ import { useAuthStore } from '../../store/authStore';
 import type { SpotMediaItem } from '../../types/spot';
 
 export default function SuggestFeatureScreen() {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const pathname = usePathname();
   const session = useAuthStore((state) => state.session);
   const { submitting, runSubmit } = useSupportSubmit();
@@ -48,7 +49,7 @@ export default function SuggestFeatureScreen() {
 
     const accessToken = session?.access_token;
     if (!accessToken) {
-      setSubmitError('Sign in to send an idea.');
+      setSubmitError('Log in to send an idea.');
       return;
     }
 

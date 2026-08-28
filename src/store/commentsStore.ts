@@ -158,7 +158,7 @@ async function readErrorMessage(response: Response): Promise<string> {
     return 'The server is temporarily unavailable. Please try again.';
   }
   if (response.status === 401) {
-    return 'Sign in again to keep going.';
+    return 'Log in again to keep going.';
   }
   return `Request failed with status ${response.status}.`;
 }

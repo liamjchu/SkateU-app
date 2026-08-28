@@ -46,7 +46,7 @@ describe('DELETE /api/delete-account', () => {
     expect(response.status).toBe(500);
   });
 
-  it('requires the deletion proof header', async () => {
+  it('requires a recent email OTP', async () => {
     setConfigured();
     global.fetch = jest.fn(async (input) => {
       if (String(input).includes('/auth/v1/user')) {
@@ -59,6 +59,33 @@ describe('DELETE /api/delete-account', () => {
       deleteRequest({ Authorization: 'Bearer good-token' })
     );
     expect(response.status).toBe(403);
+  });
+
+  it('deletes the auth user after a recent OTP without a proof table', async () => {
+    setConfigured();
+    const payload = Buffer.from(
+      JSON.stringify({
+        amr: [{ method: 'otp', timestamp: Math.floor(Date.now() / 1000) }],
+      })
+    ).toString('base64');
+    const otpToken = `hdr.${payload}.sig`;
+    const fetchMock: FetchMock = jest.fn(async (input, init) => {
+      const url = String(input);
+      if (url.includes('/auth/v1/user')) {
+        return jsonResponse({ id: 'user-1' });
+      }
+      if (url.includes('/auth/v1/admin/users/user-1') && init?.method === 'DELETE') {
+        return jsonResponse({ success: true });
+      }
+      throw new Error(`Unexpected fetch: ${init?.method ?? 'GET'} ${url}`);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await DELETE(
+      deleteRequest({ Authorization: `Bearer ${otpToken}` })
+    );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ success: true });
   });
 
   it('deletes the auth user after consuming a valid proof', async () => {

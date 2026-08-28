@@ -1,5 +1,5 @@
 ﻿import { Feather, Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
@@ -49,7 +49,7 @@ import {
     schoolMatchesTypeFilter,
 } from '../lib/schoolSearch';
 import { toMutationError, toUserFacingError } from '../lib/userFacingError';
-import { guardedNavigate } from '../lib/navigationGuard';
+import { guardedNavigate, useGuardedRouter } from '../lib/navigationGuard';
 import {
     STALE_SCHOOLS_MESSAGE,
     STALE_SPOTS_MESSAGE,
@@ -114,7 +114,7 @@ function getSchoolSearchCopy(filter: SchoolTypeFilter): {
 }
 
 export default function HomeScreen() {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const insets = useSafeAreaInsets();
   const { schools, upsertSchool, popularSchools: cachedPopularSchools, popularFilter, setPopularFeed } = useSchools();
   const session = useAuthStore((state) => state.session);
@@ -877,8 +877,8 @@ export default function HomeScreen() {
       return;
     }
 
-    guardedNavigate('login', () => {
-      router.push('/login');
+    guardedNavigate('signup', () => {
+      router.push('/signup');
     });
   };
 
@@ -1253,10 +1253,10 @@ export default function HomeScreen() {
               icon="eye-outline"
               title={GUEST_BROWSE_TITLE}
               message={formatGuestBrowseMessage()}
-              actionLabel="Sign in"
+              actionLabel="Sign up"
               onAction={() =>
-                guardedNavigate('login', () => {
-                  router.push('/login');
+                guardedNavigate('signup', () => {
+                  router.push('/signup');
                 })
               }
             />

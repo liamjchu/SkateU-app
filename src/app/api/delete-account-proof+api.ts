@@ -6,7 +6,6 @@ import {
     authUserMessage,
 } from './spots+api';
 
-
 export const DELETION_PROOF_TTL_MS = 5 * 60_000;
 
 type JwtAmr = {
@@ -25,7 +24,7 @@ function readBearerToken(request: Request): string | null {
   return match ? match[1].trim() : null;
 }
 
-function hasRecentOtpAuthentication(accessToken: string): boolean {
+export function hasRecentOtpAuthentication(accessToken: string): boolean {
   const encodedPayload = accessToken.split('.')[1];
   if (!encodedPayload) {
     return false;

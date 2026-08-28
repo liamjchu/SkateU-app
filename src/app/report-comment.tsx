@@ -1,4 +1,5 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+import { useGuardedRouter } from '../lib/navigationGuard';
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -34,7 +35,7 @@ function firstParam(value: string | string[] | undefined): string {
 }
 
 export default function ReportCommentScreen() {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const searchParams = useLocalSearchParams();
   const commentId = firstParam(searchParams.commentId);
   const spotId = firstParam(searchParams.spotId);
@@ -77,7 +78,7 @@ export default function ReportCommentScreen() {
 
     const accessToken = session?.access_token;
     if (!accessToken) {
-      setSubmitError('Sign in to report a comment.');
+      setSubmitError('Log in to report a comment.');
       return;
     }
 

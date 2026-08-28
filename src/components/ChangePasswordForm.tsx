@@ -101,7 +101,7 @@ export default function ChangePasswordForm({
     }
 
     if (!email) {
-      setError('Sign in to update your password.');
+      setError('Log in to update your password.');
       return;
     }
     if (!isSetMode && !currentPassword) {
@@ -135,7 +135,7 @@ export default function ChangePasswordForm({
       setConfirmPassword('');
       setSuccess(
         isSetMode
-          ? 'Your password has been set. You can now also sign in with email.'
+          ? 'Your password has been set. You can now also log in with email.'
           : 'Your password has been updated.'
       );
     } catch (changeError) {
@@ -153,7 +153,7 @@ export default function ChangePasswordForm({
         </Text>
         <Text className="mt-2 font-outfit-medium text-base text-muted">
           {isSetMode
-            ? 'Add an email password to this account. Your Google or Apple sign-in will keep working.'
+            ? 'Add an email password to this account. Your Google or Apple log-in will keep working.'
             : 'Verify your current password before choosing a new one.'}
         </Text>
         <Text className="mt-2 font-outfit-medium text-sm text-muted">

@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, Text, View } from 'react-native';
 import FeedbackPressable from '../components/FeedbackPressable';
@@ -6,7 +6,7 @@ import ProfileFollowRow from '../components/profile-follow-row';
 import ScreenHeader from '../components/screen-header';
 import { colors } from '../constants/colors';
 import { captureAnalyticsEvent } from '../lib/analytics';
-import { guardedNavigate } from '../lib/navigationGuard';
+import { guardedNavigate, useGuardedRouter } from '../lib/navigationGuard';
 import {
   fetchFollowList,
   followListUserAsProfile,
@@ -33,7 +33,7 @@ function tabFromParam(value: string | string[] | undefined): FollowListKind {
 }
 
 export default function FollowListScreen() {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const params = useLocalSearchParams<{
     userId?: string | string[];
     tab?: string | string[];
@@ -128,7 +128,7 @@ export default function FollowListScreen() {
 
     if (!accessToken) {
       guardedNavigate('login-to-follow', () => {
-        router.push('/login');
+        router.push('/signup');
       });
       return;
     }

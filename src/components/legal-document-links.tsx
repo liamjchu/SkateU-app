@@ -1,5 +1,5 @@
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useGuardedRouter } from '../lib/navigationGuard';
 import { Text, View } from 'react-native';
 import { colors } from '../constants/colors';
 import { LEGAL_APP_ROUTES } from '../lib/legalAcceptance';
@@ -24,7 +24,7 @@ const DOCUMENTS = [
 ] as const;
 
 export default function LegalDocumentLinks() {
-  const router = useRouter();
+  const router = useGuardedRouter();
 
   return (
     <View className="overflow-hidden rounded-2xl bg-field">

@@ -1,6 +1,5 @@
 const mockSignUp = jest.fn();
 const mockSignInWithPassword = jest.fn();
-let mockConfirmedThisSession = true;
 
 jest.mock('expo-linking', () => ({
   createURL: () => 'skateu://auth/callback',
@@ -27,7 +26,7 @@ jest.mock('../../lib/supabase', () => ({
 
 jest.mock('../../store/ageEligibilityStore', () => ({
   useAgeEligibilityStore: {
-    getState: () => ({ confirmedThisSession: mockConfirmedThisSession }),
+    getState: () => ({ confirmedThisSession: true, clear: jest.fn() }),
   },
 }));
 
@@ -46,7 +45,6 @@ beforeEach(() => {
   mockSignUp.mockReset();
   mockSignInWithPassword.mockReset();
   fetchMock.mockReset();
-  mockConfirmedThisSession = true;
 });
 
 describe('signUp existing accounts', () => {
@@ -72,15 +70,6 @@ describe('signUp existing accounts', () => {
       useAuthStore.getState().signUp('skater@example.com', 'Password1!')
     ).rejects.toThrow(ACCOUNT_EXISTS_MESSAGE);
     expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it('rejects signup when age has not been confirmed', async () => {
-    mockConfirmedThisSession = false;
-
-    await expect(
-      useAuthStore.getState().signUp('skater@example.com', 'Password1!')
-    ).rejects.toThrow('Confirm you are 13 or older before creating an account.');
-    expect(mockSignUp).not.toHaveBeenCalled();
   });
 
   it('rethrows a generic signup failure', async () => {

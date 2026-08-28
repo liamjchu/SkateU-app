@@ -1,5 +1,5 @@
 import { ActivityIndicator, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useGuardedRouter } from '../lib/navigationGuard';
 import { colors } from '../constants/colors';
 import { openUserProfile } from '../lib/userProfileNavigation';
 import type { FollowListUser } from '../types/publicProfile';
@@ -23,7 +23,7 @@ export default function ProfileFollowRow({
   showDivider,
   onFollowPress,
 }: ProfileFollowRowProps) {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const label = user.username ? `@${user.username}` : 'A skater';
 
   return (

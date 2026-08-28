@@ -3,7 +3,6 @@ import {
     type Href,
     useFocusEffect,
     useLocalSearchParams,
-    useRouter,
 } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -70,7 +69,7 @@ import {
 } from '../lib/spotAvailability';
 import { STALE_SPOTS_MESSAGE } from '../lib/readCache';
 import { toMutationError } from '../lib/userFacingError';
-import { guardedNavigate } from '../lib/navigationGuard';
+import { guardedNavigate, useGuardedRouter } from '../lib/navigationGuard';
 import { draftsForSchool } from '../lib/spotDraft';
 import { useUserLocation } from '../hooks/useUserLocation';
 import { useAuthStore } from '../store/authStore';
@@ -102,7 +101,7 @@ const MAP_ATTRIBUTION_SHORT = {
 export default function MapScreen() {
   const webViewRef = useRef<WebView>(null);
   const searchParams = useLocalSearchParams();
-  const router = useRouter();
+  const router = useGuardedRouter();
   const initialSpotId = Array.isArray(searchParams.spotId)
     ? searchParams.spotId[0]
     : searchParams.spotId;
@@ -360,7 +359,7 @@ export default function MapScreen() {
 
       try {
         const pinSvg = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 22s7-6.4 7-12a7 7 0 1 0-14 0c0 5.6 7 12 7 12z" fill="${colors.accent}" stroke="${colors.brand}" stroke-width="1.5" stroke-linejoin="round"/><circle cx="12" cy="10" r="2.5" fill="${colors.white}"/></svg>');
-        const pinHtml = '<img class="skateu-pin-shadow" alt="" width="41" height="41" src="https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png" /><span class="skateu-pin-scale"><img class="skateu-pin-img" alt="" width="50" height="50" src="' + pinSvg + '" /></span>';
+        const pinHtml = '<img class="skateu-pin-shadow" alt="" width="41" height="41" draggable="false" src="https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png" /><span class="skateu-pin-scale"><img class="skateu-pin-img" alt="" width="50" height="50" draggable="false" src="' + pinSvg + '" /></span>';
 
         ${getCreateMapLibreMapScript({
           latitude: validLat,
@@ -433,6 +432,9 @@ export default function MapScreen() {
               if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
                 window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'MARKER_PRESS', id: spot.id }));
               }
+            });
+            el.addEventListener('contextmenu', function (event) {
+              event.preventDefault();
             });
 
             window.markers[spot.id] = marker;
@@ -1050,7 +1052,7 @@ export default function MapScreen() {
           onPress: async () => {
             const accessToken = session?.access_token;
             if (!accessToken) {
-              Alert.alert('Sign in to delete a spot.');
+              Alert.alert('Log in to delete a spot.');
               return;
             }
 
@@ -1381,20 +1383,20 @@ export default function MapScreen() {
         onCancel={() => setShowLoginRequired(false)}
         title={
           loginRequiredReason === 'removal'
-            ? 'Sign in to request removal'
+            ? 'Sign up to request removal'
             : loginRequiredReason === 'spot_problem'
-              ? 'Sign in to report a problem'
+              ? 'Sign up to report a problem'
               : loginRequiredReason === 'block'
-                ? 'Sign in to block this user'
+                ? 'Sign up to block this user'
                 : undefined
         }
         message={
           loginRequiredReason === 'removal'
-            ? 'You can still browse campuses. Sign in if you want to request that a spot be removed.'
+            ? 'You can still browse campuses. Sign up if you want to request that a spot be removed.'
             : loginRequiredReason === 'spot_problem'
-              ? 'You can still browse campuses. Sign in if you want to report a problem with this spot.'
+              ? 'You can still browse campuses. Sign up if you want to report a problem with this spot.'
               : loginRequiredReason === 'block'
-                ? 'You can still browse campuses. Sign in if you want to block this user.'
+                ? 'You can still browse campuses. Sign up if you want to block this user.'
                 : undefined
         }
       />
@@ -1490,6 +1492,7 @@ export default function MapScreen() {
         key={mapAttempt}
         ref={webViewRef}
         style={{ flex: 1, backgroundColor: 'transparent' }}
+        allowsLinkPreview={false}
         originWhitelist={['*']}
         source={webViewSource}
         // Explicitly enable JS and DOM Storage (critical for map libraries)

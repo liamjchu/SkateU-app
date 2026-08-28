@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useGuardedRouter } from '../lib/navigationGuard';
 import { ScrollView, View } from 'react-native';
 import ChangePasswordForm from '../components/ChangePasswordForm';
 import KeyboardShiftView from '../components/keyboard-shift-view';
@@ -7,7 +7,7 @@ import { useAuthStore } from '../store/authStore';
 import { userCanSignInWithPassword } from '../lib/authAccount';
 
 export default function ChangePasswordScreen() {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const email = useAuthStore((state) => state.user?.email ?? '');
   const canSignInWithPassword = useAuthStore((state) =>
     userCanSignInWithPassword(state.user)

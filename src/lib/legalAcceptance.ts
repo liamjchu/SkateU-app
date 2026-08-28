@@ -50,20 +50,12 @@ export function getLegalGate(args: {
   userId: string | null;
   profileLoaded: boolean;
   profile: Profile | null;
-  confirmedAgeEligibleThisSession: boolean;
 }): LegalGate {
   if (!args.userId || !args.profileLoaded) {
     return 'none';
   }
 
   if (!args.profile?.username) {
-    if (
-      !hasAgeAttestation(args.profile) &&
-      !args.confirmedAgeEligibleThisSession
-    ) {
-      return 'age-gate';
-    }
-
     return 'onboarding';
   }
 
@@ -91,7 +83,7 @@ export function isAllowedDuringLegalGate(
   }
 
   if (gate === 'onboarding') {
-    return routeRoot === 'onboarding';
+    return routeRoot === 'onboarding' || routeRoot === 'age-gate';
   }
 
   return (

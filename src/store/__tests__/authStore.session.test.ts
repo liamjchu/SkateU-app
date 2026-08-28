@@ -315,10 +315,15 @@ describe('authStore.signOut and recovery', () => {
 });
 
 describe('authStore.deleteAccount', () => {
+  beforeEach(async () => {
+    mockSignInWithOtp.mockResolvedValue({ error: null });
+    await useAuthStore.getState().sendDeleteAccountOtp('reset@example.com');
+  });
+
   it('requires a session and a verified proof', async () => {
     mockGetSession.mockResolvedValue({ data: { session: null } });
     await expect(useAuthStore.getState().deleteAccount()).rejects.toThrow(
-      'Sign in to delete your account.'
+      'Log in to delete your account.'
     );
 
     mockGetSession.mockResolvedValue({
@@ -399,27 +404,47 @@ describe('authStore.deleteAccount', () => {
       ok: false,
       json: async () => ({ error: 'proof down' }),
     } as unknown as Response);
-    await expect(
-      useAuthStore.getState().verifyDeleteAccountOtp('skater@example.com', '123456')
-    ).rejects.toThrow('proof down');
+    await useAuthStore.getState().verifyDeleteAccountOtp('skater@example.com', '123456');
+    expect(mockVerifyOtp).toHaveBeenCalled();
 
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({ error: 'delete down' }),
+    } as unknown as Response);
+    mockGetSession.mockResolvedValue({
+      data: { session: { access_token: 'token', user: { id: 'user-1' } } },
+    });
+    await expect(useAuthStore.getState().deleteAccount()).rejects.toThrow('delete down');
+  });
+
+  it('reuses a verified delete OTP instead of consuming it again', async () => {
     mockVerifyOtp.mockResolvedValue({
       data: { session: { access_token: 'token', user: { id: 'user-1' } } },
       error: null,
     });
-    fetchMock
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ proof: 'proof-1' }),
-      } as unknown as Response)
-      .mockResolvedValueOnce({
-        ok: false,
-        json: async () => ({ error: 'delete down' }),
-      } as unknown as Response);
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({ error: 'proof down' }),
+    } as unknown as Response);
+
+    await expect(
+      useAuthStore.getState().verifyDeleteAccountOtp('skater@example.com', '123456')
+    ).resolves.toBeUndefined();
+    expect(mockVerifyOtp).toHaveBeenCalledTimes(1);
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({}),
+    } as unknown as Response);
     mockGetSession.mockResolvedValue({
       data: { session: { access_token: 'token', user: { id: 'user-1' } } },
     });
+    useAuthStore.setState({ user: { id: 'user-1' } as never });
+
     await useAuthStore.getState().verifyDeleteAccountOtp('skater@example.com', '123456');
-    await expect(useAuthStore.getState().deleteAccount()).rejects.toThrow('delete down');
+    await useAuthStore.getState().deleteAccount();
+
+    expect(mockVerifyOtp).toHaveBeenCalledTimes(1);
+    expect(mockSignOut).toHaveBeenCalled();
   });
 });

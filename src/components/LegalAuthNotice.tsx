@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useGuardedRouter } from '../lib/navigationGuard';
 import { Text, View } from 'react-native';
 import { LEGAL_APP_ROUTES } from '../lib/legalAcceptance';
 import FeedbackPressable from './FeedbackPressable';
@@ -13,13 +13,12 @@ const LINKS = [
 ] as const;
 
 export default function LegalAuthNotice() {
-  const router = useRouter();
+  const router = useGuardedRouter();
 
   return (
     <View className="mt-6">
       <Text className="text-center font-outfit-medium text-sm leading-5 text-muted">
-        By continuing, you agree to SkateU’s terms and confirm you are at least
-        13.
+        By continuing, you agree to SkateU’s terms. You must be 13 or older.
       </Text>
       <View className="mt-3 flex-row flex-wrap items-center justify-center gap-x-4 gap-y-2">
         {LINKS.map((link) => (

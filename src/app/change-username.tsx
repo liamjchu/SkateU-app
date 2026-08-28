@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useGuardedRouter } from '../lib/navigationGuard';
 import { ScrollView, Text, View } from 'react-native';
 import ScreenHeader from '../components/screen-header';
 import KeyboardShiftView from '../components/keyboard-shift-view';
@@ -6,7 +6,7 @@ import { UsernameForm } from '../components/username-form';
 import { useProfileStore } from '../store/profileStore';
 
 export default function ChangeUsernameScreen() {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const username = useProfileStore((state) => state.profile?.username ?? '');
 
   const goBack = () => {

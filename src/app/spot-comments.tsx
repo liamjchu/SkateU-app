@@ -1,4 +1,5 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+import { useGuardedRouter } from '../lib/navigationGuard';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
@@ -37,7 +38,7 @@ function firstParam(value: string | string[] | undefined): string {
 }
 
 export default function SpotCommentsScreen() {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
   const spotId = firstParam(params.spotId);
@@ -444,8 +445,8 @@ export default function SpotCommentsScreen() {
       <LoginRequiredModal
         visible={showLoginRequired}
         onCancel={() => setShowLoginRequired(false)}
-        title="Sign in to comment"
-        message="You can still read comments. Sign in if you want to join the conversation, report a comment, or block a user."
+        title="Sign up to comment"
+        message="You can still read comments. Sign up if you want to join the conversation, report a comment, or block a user. Already have an account? You can log in from the next screen."
       />
     </SafeAreaView>
   );

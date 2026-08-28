@@ -1,13 +1,13 @@
 import { sanitizeErrorMessage, toMutationError, toUserFacingError } from '../userFacingError';
 
 describe('user-facing errors', () => {
-  it('turns access-token jargon into a sign-in prompt', () => {
+  it('turns access-token jargon into a log-in prompt', () => {
     expect(
       sanitizeErrorMessage('Invalid login credentials', 'Try again.')
     ).toBe('That email or password is incorrect.');
     expect(
       sanitizeErrorMessage('The access token is expired.', 'Try again.')
-    ).toBe('Your session expired. Please sign in again.');
+    ).toBe('Your session expired. Please log in again.');
   });
 
   it('professionalizes casual retry copy', () => {
@@ -29,5 +29,20 @@ describe('user-facing errors', () => {
     expect(
       toMutationError(new Error('Network request failed'), 'Please try again.')
     ).toBe('You need a connection to save this.');
+    expect(toMutationError('failed to fetch', 'Please try again.')).toBe(
+      'You need a connection to save this.'
+    );
+  });
+
+  it('turns bearer jargon without expiry into a log-in prompt', () => {
+    expect(sanitizeErrorMessage('Missing Authorization header', 'Nope.')).toBe(
+      'Please log in again.'
+    );
+    expect(toUserFacingError({ nope: true }, 'Try again in a sec.')).toBe(
+      'Please try again.'
+    );
+    expect(toMutationError(new Error('spot save failed'), 'Please try again.')).toBe(
+      'spot save failed'
+    );
   });
 });

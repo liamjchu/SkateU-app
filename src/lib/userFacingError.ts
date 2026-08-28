@@ -29,7 +29,7 @@ function professionalize(text: string): string {
     .replace(/hang on, the map’s still loading\.?/gi, 'The map is still loading.')
     .replace(/hang on, the map's still loading\.?/gi, 'The map is still loading.')
     .replace(/hang on…/gi, 'Please wait…')
-    .replace(/sign in again to keep going\.?/gi, 'Please sign in again.')
+    .replace(/(?:sign|log) in again to keep going\.?/gi, 'Please log in again.')
     .replace(/that took too long\. please try again\.?/gi, 'This is taking too long. Please try again.')
     .replace(/that took too long\. try again in a sec\.?/gi, 'This is taking too long. Please try again.')
     .replace(/\s+/g, ' ')
@@ -62,9 +62,9 @@ export function sanitizeErrorMessage(raw: string, fallback: string): string {
     lower.includes('bearer')
   ) {
     if (lower.includes('expir')) {
-      return 'Your session expired. Please sign in again.';
+      return 'Your session expired. Please log in again.';
     }
-    return 'Please sign in again.';
+    return 'Please log in again.';
   }
 
   if (

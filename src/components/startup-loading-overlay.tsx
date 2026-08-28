@@ -3,13 +3,13 @@ import {
   Animated,
   Easing,
   Image,
-  Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { colors } from '../constants/colors';
 import images from '../constants/images';
+import FeedbackPressable from './FeedbackPressable';
 
 const TRACK_WIDTH = 180;
 const TRACK_HEIGHT = 4;
@@ -88,15 +88,17 @@ export default function StartupLoadingOverlay({
             {profileError}
           </Text>
           <View className="mt-3 flex-row items-center justify-end gap-2">
-            <Pressable
+            <FeedbackPressable
+              haptic="light"
               className="rounded-xl px-3 py-2"
               onPress={onSignOut}
               accessibilityRole="button"
-              accessibilityLabel="Sign out"
+              accessibilityLabel="Log out"
             >
-              <Text className="font-outfit-bold text-sm text-ink">Sign out</Text>
-            </Pressable>
-            <Pressable
+              <Text className="font-outfit-bold text-sm text-ink">Log out</Text>
+            </FeedbackPressable>
+            <FeedbackPressable
+              haptic="light"
               className="rounded-xl bg-accent px-3 py-2"
               onPress={onRetryProfile}
               disabled={profileLoading}
@@ -105,7 +107,7 @@ export default function StartupLoadingOverlay({
               accessibilityState={{ busy: profileLoading }}
             >
               <Text className="font-outfit-bold text-sm text-brand">Retry</Text>
-            </Pressable>
+            </FeedbackPressable>
           </View>
         </View>
       ) : null}

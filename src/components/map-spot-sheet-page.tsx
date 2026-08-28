@@ -1,7 +1,8 @@
 import { Feather, Octicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useGuardedRouter } from '../lib/navigationGuard';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { colors } from '../constants/colors';
+import { openSpotDirections } from '../lib/openSpotDirections';
 import { formatRelativeTime } from '../lib/relativeTime';
 import { openUserProfile } from '../lib/userProfileNavigation';
 import { useAuthStore } from '../store/authStore';
@@ -71,7 +72,7 @@ export default function MapSpotSheetPage({
   const isLiking = likingSpotId === spot.id;
   const imageUris = spot.imageUris.filter((uri) => uri.length > 0);
   const timeLabel = spotTimeLabel(spot);
-  const router = useRouter();
+  const router = useGuardedRouter();
   const currentUserId = useAuthStore((state) => state.user?.id ?? null);
   const body = (
     <MapSpotSheetBody
@@ -287,8 +288,24 @@ function MapSpotSheetBody({
           </FeedbackPressable>
         ) : null}
 
+        <FeedbackPressable
+          haptic="light"
+          onPress={() => {
+            void openSpotDirections(spot);
+          }}
+          className="mt-4 h-12 flex-row items-center justify-center rounded-2xl bg-surface-soft"
+          accessibilityRole="button"
+          accessibilityLabel={`Get walking directions to ${spot.name}`}
+          accessibilityHint="Opens Apple Maps or Google Maps"
+        >
+          <Feather name="navigation" size={16} color={colors.ink} />
+          <Text className="ml-2 font-outfit-semibold text-sm text-ink">
+            Get directions
+          </Text>
+        </FeedbackPressable>
+
         {isOwned ? (
-          <View className="mt-4 flex-row gap-3">
+          <View className="mt-3 flex-row gap-3">
             <FeedbackPressable
               haptic="light"
               onPress={onEdit}

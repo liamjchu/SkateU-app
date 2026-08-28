@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useRouter } from 'expo-router';
+import { useGuardedRouter } from '../lib/navigationGuard';
 import { ScrollView, Text, TextInput, View } from 'react-native';
 import FeedbackPressable from '../components/FeedbackPressable';
 import KeyboardShiftView from '../components/keyboard-shift-view';
@@ -14,7 +14,7 @@ import { useAuthStore } from '../store/authStore';
 import { useProfileStore } from '../store/profileStore';
 
 export default function EditBioScreen() {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const accessToken = useAuthStore((state) => state.session?.access_token);
   const savedBio = useProfileStore((state) => state.profile?.bio ?? '');
   const updateBio = useProfileStore((state) => state.updateBio);

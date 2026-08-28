@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useGuardedRouter } from '../lib/navigationGuard';
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LegalMarkdownView from './LegalMarkdownView';
@@ -13,7 +13,7 @@ export default function LegalDocumentScreen({
   title,
   markdown,
 }: LegalDocumentScreenProps) {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const insets = useSafeAreaInsets();
 
   const goBack = () => {

@@ -1,11 +1,11 @@
 import { Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useGuardedRouter } from '../lib/navigationGuard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FeedbackPressable from '../components/FeedbackPressable';
 import { StickerStripe } from '../components/sticker';
 
 export default function AgeRestrictedScreen() {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const insets = useSafeAreaInsets();
 
   return (

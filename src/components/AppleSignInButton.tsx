@@ -86,7 +86,7 @@ export default function AppleSignInButton({
       });
       const { data } = await supabase.auth.getSession();
       if (!data.session) {
-        const message = 'Could not sign in with Apple. Please try again.';
+        const message = 'Could not log in with Apple. Please try again.';
         showAuthNotice({ kind: 'error', message });
         onError?.(message);
         return;
@@ -102,7 +102,7 @@ export default function AppleSignInButton({
 
       const message = toUserFacingError(
         error,
-        'Could not sign in with Apple. Please try again.'
+        'Could not log in with Apple. Please try again.'
       );
       showAuthNotice({ kind: 'error', message });
       onError?.(message);

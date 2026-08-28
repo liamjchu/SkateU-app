@@ -58,7 +58,7 @@ export default function GoogleSignInButton({
 
       const { data } = await supabase.auth.getSession();
       if (!data.session) {
-        const message = 'Could not sign in with Google. Please try again.';
+        const message = 'Could not log in with Google. Please try again.';
         showAuthNotice({ kind: 'error', message });
         onError?.(message);
         return;
@@ -70,7 +70,7 @@ export default function GoogleSignInButton({
     } catch (error) {
       const message = toUserFacingError(
         error,
-        'Could not sign in with Google. Please try again.'
+        'Could not log in with Google. Please try again.'
       );
       showAuthNotice({ kind: 'error', message });
       onError?.(message);

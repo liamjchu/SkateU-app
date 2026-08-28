@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
+import { useGuardedRouter } from '../lib/navigationGuard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FeedbackPressable from '../components/FeedbackPressable';
 import LegalAcceptCheckbox from '../components/legal-accept-checkbox';
@@ -12,6 +13,7 @@ import { useAuthStore } from '../store/authStore';
 import { useProfileStore } from '../store/profileStore';
 
 export default function OnboardingScreen() {
+  const router = useGuardedRouter();
   const insets = useSafeAreaInsets();
   const user = useAuthStore((state) => state.user);
   const accessToken = useAuthStore((state) => state.session?.access_token);
@@ -37,6 +39,8 @@ export default function OnboardingScreen() {
       await signOut();
     } catch {
       // The auth listener will settle state if sign-out cannot complete here.
+    } finally {
+      router.replace('/');
     }
   };
 
@@ -89,11 +93,11 @@ export default function OnboardingScreen() {
               onBeforeSubmit={async () => {
                 if (!agreed) {
                   throw new Error(
-                    'Confirm you are at least 13 and agree before continuing.'
+                    'Agree to continue.'
                   );
                 }
                 if (!accessToken) {
-                  throw new Error('Sign in again to keep going.');
+                  throw new Error('Log in again to keep going.');
                 }
                 await acceptLegal(accessToken);
               }}
@@ -106,13 +110,14 @@ export default function OnboardingScreen() {
               onSaved={() => undefined}
             />
             <FeedbackPressable
+              haptic="light"
               onPress={handleSignOut}
               className="mt-8 min-h-12 items-center justify-center py-4"
               accessibilityRole="button"
-              accessibilityLabel="Sign out"
+              accessibilityLabel="Log out"
             >
               <Text className="font-outfit-semibold text-base text-muted">
-                Sign out
+                Log out
               </Text>
             </FeedbackPressable>
           </View>

@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useGuardedRouter } from '../lib/navigationGuard';
 import { useEffect, useState } from 'react';
 import {
     Pressable,
@@ -30,7 +30,7 @@ const getUpdateErrorMessage = (updateError: unknown): string => {
 };
 
 export default function UpdatePasswordScreen() {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const isPasswordRecovery = useAuthStore((state) => state.passwordRecovery);
   const completePasswordRecovery = useAuthStore(
     (state) => state.completePasswordRecovery
@@ -92,7 +92,7 @@ export default function UpdatePasswordScreen() {
       <ScreenHeader
         title="New password"
         onBack={() => router.replace('/login')}
-        backAccessibilityLabel="Back to sign in"
+        backAccessibilityLabel="Back to log in"
         backDisabled={submitting || success}
       />
 

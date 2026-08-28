@@ -9,10 +9,11 @@ import {
 import * as Sentry from '@sentry/react-native';
 import * as Linking from 'expo-linking';
 import { SplashScreen, Stack, usePathname, useRouter, useSegments } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Platform, Text, View, useWindowDimensions } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { PostHogErrorBoundary } from 'posthog-react-native';
+import { useIsFocused } from '@react-navigation/native';
 import {
     configureReanimatedLogger,
     ReanimatedLogLevel,
@@ -31,7 +32,6 @@ import {
 } from '../lib/legalAcceptance';
 import { shouldLeaveAuthEntryRoute } from '../lib/authNavigation';
 import { toUserFacingError } from '../lib/userFacingError';
-import { useAgeEligibilityStore } from '../store/ageEligibilityStore';
 import { useAuthNoticeStore } from '../store/authNoticeStore';
 import { useAuthStore } from '../store/authStore';
 import { useBlocksStore } from '../store/blocksStore';
@@ -84,6 +84,15 @@ function RootErrorFallback() {
   );
 }
 
+function FocusedTouchGate({ children }: { children: ReactNode }) {
+  const focused = useIsFocused();
+  return (
+    <View style={{ flex: 1 }} pointerEvents={focused ? 'auto' : 'none'}>
+      {children}
+    </View>
+  );
+}
+
 function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     Outfit_400Regular,
@@ -104,9 +113,6 @@ function RootLayout() {
   const accessToken = useAuthStore((state) => state.session?.access_token ?? null);
   const authInitializing = useAuthStore((state) => state.initializing);
   const passwordRecovery = useAuthStore((state) => state.passwordRecovery);
-  const confirmedAgeEligibleThisSession = useAgeEligibilityStore(
-    (state) => state.confirmedThisSession
-  );
   const profile = useProfileStore((state) => state.profile);
   const profileLoaded = useProfileStore((state) => state.loaded);
   const profileLoading = useProfileStore((state) => state.loading);
@@ -245,7 +251,7 @@ function RootLayout() {
             kind: 'error',
             message: toUserFacingError(
               error,
-              'Could not finish sign-in. Please try again.'
+              'Could not finish logging in. Please try again.'
             ),
           });
         });
@@ -268,16 +274,15 @@ function RootLayout() {
   const profileBlocked = Boolean(userId && profileError);
   const appReady = fontsReady && sessionReady && profileReady && cachesReady;
 
-  // Signed-in users without a username and without a 13+ answer stay on
-  // age-gate. After that they stay on onboarding until they pick a username.
-  // Users who already have a username but have not accepted the current Terms
-  // stay on accept-legal. Anonymous browsing is unchanged. Legal documents stay
-  // reachable. Delete-account OTP stays reachable during accept-legal.
+  // Signed-in users without a username stay on onboarding until they pick one
+  // and agree. Users who already have a username but have not accepted the
+  // current Terms stay on accept-legal. Anonymous browsing is unchanged. Legal
+  // documents stay reachable. Delete-account OTP stays reachable during
+  // accept-legal.
   const legalGate = getLegalGate({
     userId,
     profileLoaded,
     profile,
-    confirmedAgeEligibleThisSession,
   });
   const routeRoot = segments[0];
   const leavingAuthEntry = shouldLeaveAuthEntryRoute({
@@ -352,6 +357,9 @@ function RootLayout() {
           gestureEnabled: true,
           contentStyle: { backgroundColor: colors.surface },
         }}
+        screenLayout={({ children }) => (
+          <FocusedTouchGate>{children}</FocusedTouchGate>
+        )}
       >
         <Stack.Screen name="index" options={{ animation: 'none' }} />
         <Stack.Screen name="onboarding" />
@@ -369,11 +377,11 @@ function RootLayout() {
         <Stack.Screen name="edit-bio" />
         <Stack.Screen name="change-password" />
         <Stack.Screen
-          name="login"
+          name="signup"
           options={{ animationTypeForReplace: 'pop' }}
         />
         <Stack.Screen
-          name="signup"
+          name="login"
           options={{ animationTypeForReplace: 'pop' }}
         />
         <Stack.Screen
@@ -400,9 +408,13 @@ function RootLayout() {
           profileError={userId ? profileError : null}
           profileLoading={profileLoading}
           onSignOut={() => {
-            void signOut().catch(() => {
-              // Local session is cleared in signOut even if this rejects.
-            });
+            void signOut()
+              .catch(() => {
+                // Local session is cleared in signOut even if this rejects.
+              })
+              .finally(() => {
+                router.replace('/');
+              });
           }}
           onRetryProfile={() => {
             if (userId) {

@@ -15,6 +15,9 @@ export const CAMPUS_MAP_PIN_CSS = `
         overflow: visible;
         width: 50px;
         height: 50px;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
       }
       .skateu-pin-shadow {
         position: absolute;
@@ -23,6 +26,8 @@ export const CAMPUS_MAP_PIN_CSS = `
         width: 41px;
         height: 41px;
         pointer-events: none;
+        -webkit-touch-callout: none;
+        -webkit-user-drag: none;
       }
       .skateu-pin-scale {
         display: block;
@@ -30,11 +35,20 @@ export const CAMPUS_MAP_PIN_CSS = `
         height: 50px;
         transform-origin: 50% 100%;
         will-change: transform;
+        pointer-events: none;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
       }
       .skateu-pin-img {
         display: block;
         width: 50px;
         height: 50px;
+        pointer-events: none;
+        -webkit-touch-callout: none;
+        -webkit-user-drag: none;
+        -webkit-user-select: none;
+        user-select: none;
       }
 `;
 

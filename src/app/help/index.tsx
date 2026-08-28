@@ -1,5 +1,6 @@
 import { Feather } from '@expo/vector-icons';
-import { useRouter, type Href } from 'expo-router';
+import { type Href } from 'expo-router';
+import { useGuardedRouter } from '../../lib/navigationGuard';
 import { ScrollView, Text, View } from 'react-native';
 import FeedbackPressable from '../../components/FeedbackPressable';
 import ScreenHeader from '../../components/screen-header';
@@ -40,7 +41,7 @@ const HELP_ROWS: HelpRow[] = [
 ];
 
 export default function HelpSupportScreen() {
-  const router = useRouter();
+  const router = useGuardedRouter();
 
   const goBack = () => {
     if (router.canGoBack()) {

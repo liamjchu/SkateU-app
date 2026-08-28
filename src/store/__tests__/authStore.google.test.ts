@@ -121,7 +121,7 @@ describe('signInWithGoogle', () => {
     });
 
     await expect(useAuthStore.getState().signInWithGoogle()).rejects.toThrow(
-      'Could not start Google sign-in. Please try again.'
+      'Could not start Google log-in. Please try again.'
     );
   });
 

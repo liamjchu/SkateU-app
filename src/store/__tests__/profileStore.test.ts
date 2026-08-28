@@ -173,7 +173,7 @@ describe('profileStore.fetchProfile', () => {
     expect(useProfileStore.getState().error).toContain('couldn’t load your profile');
   });
 
-  it('surfaces a legal-acceptance request failure', async () => {
+  it('keeps the public profile when legal acceptance cannot be loaded', async () => {
     mockFrom.mockReturnValue(
       createQuery({
         data: {
@@ -188,8 +188,16 @@ describe('profileStore.fetchProfile', () => {
     );
     fetchMock.mockResolvedValue(mockResponse({ error: 'down' }, false));
     await useProfileStore.getState().fetchProfile('user-1', 'token');
-    expect(useProfileStore.getState().loaded).toBe(false);
-    expect(useProfileStore.getState().error).toContain('couldn’t load your profile');
+    expect(useProfileStore.getState()).toMatchObject({
+      loaded: true,
+      loading: false,
+      error: null,
+      profile: {
+        id: 'user-1',
+        username: 'liam',
+        legal_version: null,
+      },
+    });
   });
 });
 
@@ -522,6 +530,93 @@ describe('profileStore.updateBio', () => {
     ).resolves.toEqual({
       ok: false,
       message: 'Let’s keep this one school-friendly and try again.',
+    });
+  });
+
+  it('falls back when the bio column is missing', async () => {
+    const first = createQuery({
+      data: null,
+      error: { message: 'profiles.bio does not exist' },
+    });
+    const second = createQuery({
+      data: {
+        id: 'user-1',
+        username: 'liam',
+        avatar_url: null,
+        updated_at: '2026-08-21T00:00:00.000Z',
+      },
+      error: null,
+    });
+    mockFrom.mockReturnValueOnce(first).mockReturnValueOnce(second);
+
+    await useProfileStore.getState().fetchProfile('user-1');
+    expect(useProfileStore.getState().profile).toMatchObject({
+      id: 'user-1',
+      username: 'liam',
+      bio: null,
+    });
+  });
+
+  it('throws avatar, bio, and remove failures', async () => {
+    fetchMock.mockResolvedValueOnce(mockResponse({ error: 'photo down' }, false));
+    await expect(
+      useProfileStore.getState().updateAvatar('token', { uri: 'file://photo.jpg' })
+    ).rejects.toThrow('photo down');
+
+    fetchMock.mockResolvedValueOnce(mockResponse({}, true));
+    await expect(
+      useProfileStore.getState().updateAvatar('token', {
+        uri: 'file://photo.jpg',
+        fileName: 'pic.png',
+        mimeType: 'image/png',
+      })
+    ).rejects.toThrow('Could not save the photo right now. Try again.');
+
+    const abort = new Error('Aborted');
+    abort.name = 'AbortError';
+    fetchMock.mockRejectedValueOnce(abort);
+    await expect(
+      useProfileStore.getState().updateAvatar('token', { uri: 'file://photo.jpg' })
+    ).rejects.toThrow('Saving the photo timed out. Please try again.');
+
+    fetchMock.mockResolvedValueOnce(mockResponse({ error: 'remove down' }, false));
+    await expect(useProfileStore.getState().removeAvatar('token')).rejects.toThrow(
+      'remove down'
+    );
+
+    fetchMock.mockResolvedValueOnce(mockResponse({}, true));
+    await expect(useProfileStore.getState().removeAvatar('token')).rejects.toThrow(
+      'Could not remove the photo right now. Try again.'
+    );
+
+    fetchMock.mockRejectedValueOnce(abort);
+    await expect(useProfileStore.getState().removeAvatar('token')).rejects.toThrow(
+      'Removing the photo timed out. Please try again.'
+    );
+
+    fetchMock.mockResolvedValueOnce(mockResponse({ error: 'bio down' }, false));
+    await expect(
+      useProfileStore.getState().updateBio('token', 'hello')
+    ).rejects.toThrow('bio down');
+
+    fetchMock.mockResolvedValueOnce(mockResponse({ allowed: true }, true));
+    await expect(
+      useProfileStore.getState().updateBio('token', 'hello')
+    ).rejects.toThrow('Could not save the bio right now. Try again.');
+
+    fetchMock.mockRejectedValueOnce(abort);
+    await expect(
+      useProfileStore.getState().updateBio('token', 'hello')
+    ).rejects.toThrow('Saving the bio timed out. Please try again.');
+
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({ allowed: false }, true)
+    );
+    await expect(
+      useProfileStore.getState().updateBio('token', 'hello')
+    ).resolves.toEqual({
+      ok: false,
+      message: 'Let’s try a different bio.',
     });
   });
 });

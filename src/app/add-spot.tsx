@@ -1,5 +1,6 @@
 import { useNavigation } from '@react-navigation/native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+import { useGuardedRouter } from '../lib/navigationGuard';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
@@ -46,7 +47,7 @@ type Coordinates = {
   longitude: number;
 };
 
-const AUTH_REQUIRED_ERROR = 'Sign in to add a spot.';
+const AUTH_REQUIRED_ERROR = 'Log in to add a spot.';
 const MISSING_SCHOOL_ERROR =
   'This needs a campus. Go back to the map and try again.';
 const DRAFT_AUTOSAVE_MS = 400;
@@ -77,7 +78,7 @@ function coordinatesDiffer(left: Coordinates, right: Coordinates): boolean {
 }
 
 export default function AddSpotScreen() {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const navigation = useNavigation();
   const searchParams = useLocalSearchParams();
 

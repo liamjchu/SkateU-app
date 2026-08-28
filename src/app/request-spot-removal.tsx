@@ -1,4 +1,5 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+import { useGuardedRouter } from '../lib/navigationGuard';
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -25,7 +26,7 @@ import { useSpotsStore } from '../store/spotsStore';
 import type { SpotRemovalReason } from '../types/spotRemovalRequest';
 
 export default function RequestSpotRemovalScreen() {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const searchParams = useLocalSearchParams();
   const spotId = Array.isArray(searchParams.spotId)
     ? searchParams.spotId[0]
@@ -73,7 +74,7 @@ export default function RequestSpotRemovalScreen() {
 
     const accessToken = session?.access_token;
     if (!accessToken) {
-      setSubmitError('Sign in to request removal.');
+      setSubmitError('Log in to request removal.');
       return;
     }
 

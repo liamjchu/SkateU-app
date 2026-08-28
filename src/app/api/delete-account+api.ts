@@ -1,4 +1,5 @@
 import { sha256Hex } from '../../lib/webCrypto';
+import { hasRecentOtpAuthentication } from './delete-account-proof+api';
 import {
     AUTH_REQUEST_TIMEOUT_MS,
     getSupabaseConfig,
@@ -6,9 +7,9 @@ import {
     authUserMessage,
 } from './spots+api';
 
-// Permanently deletes the signed-in user's account only after a newly verified
-// email OTP issued a short-lived proof. The raw proof is returned once to the
-// client, while this endpoint stores and compares only its hash.
+// Permanently deletes the signed-in user's account after a recent email OTP.
+// A short-lived proof hash is preferred when that table is available; otherwise
+// the JWT's recent OTP authentication is enough.
 
 function readBearerToken(request: Request): string | null {
   const header =
@@ -93,23 +94,26 @@ export async function DELETE(request: Request): Promise<Response> {
   }
 
   const proof = readDeletionProof(request);
-  if (!proof) {
+  const recentOtp = hasRecentOtpAuthentication(accessToken);
+
+  if (proof) {
+    const proofConsumption = await consumeDeletionProof(config, auth.userId, proof);
+    if (proofConsumption !== 'consumed' && !recentOtp) {
+      if (proofConsumption === 'unavailable') {
+        return Response.json(
+          { error: 'Couldn’t finish deleting your account. Try again in a sec.' },
+          { status: 503 }
+        );
+      }
+
+      return Response.json(
+        { error: 'We couldn’t finish deleting your account. Please try again.' },
+        { status: 403 }
+      );
+    }
+  } else if (!recentOtp) {
     return Response.json(
       { error: 'Email verification is required to delete your account.' },
-      { status: 403 }
-    );
-  }
-
-  const proofConsumption = await consumeDeletionProof(config, auth.userId, proof);
-  if (proofConsumption === 'unavailable') {
-    return Response.json(
-      { error: 'Couldn’t finish deleting your account. Try again in a sec.' },
-      { status: 503 }
-    );
-  }
-  if (proofConsumption === 'invalid') {
-    return Response.json(
-      { error: 'Your deletion verification has expired. Enter a new code and try again.' },
       { status: 403 }
     );
   }
@@ -147,7 +151,7 @@ export async function DELETE(request: Request): Promise<Response> {
     return Response.json(
       {
         error: timedOut
-          ? 'Account deletion timed out. Enter a new code and try again.'
+          ? 'Account deletion timed out. Please try again.'
           : 'Could not delete your account right now. Try again.',
       },
       { status: timedOut ? 504 : 502 }

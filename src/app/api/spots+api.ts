@@ -849,13 +849,13 @@ export function authUserMessage(
 ): string {
   switch (reason) {
     case 'expired':
-      return 'Your session expired. Sign in again.';
+      return 'Your session expired. Log in again.';
     case 'timeout':
       return 'That took too long. Try again in a sec.';
     case 'missing':
-      return 'Sign in to continue.';
+      return 'Log in to continue.';
     default:
-      return 'Sign in again to keep going.';
+      return 'Log in again to keep going.';
   }
 }
 
