@@ -111,20 +111,20 @@ export default function NoticeBanner({
         onLayout={({ nativeEvent }) => {
           setContentHeight(nativeEvent.layout.height);
         }}
-        className="pb-4"
+        className="pb-3"
       >
         <View
-          className="flex-row items-start rounded-2xl bg-field p-3.5"
+          className="flex-row items-start rounded-2xl bg-field p-2.5"
           accessibilityRole="summary"
           accessibilityLabel={`${title}. ${message}`}
         >
-          <View className="h-10 w-10 items-center justify-center rounded-xl bg-accent">
-            <Ionicons name={icon} size={18} color={colors.brand} />
+          <View className="h-8 w-8 items-center justify-center rounded-xl bg-accent">
+            <Ionicons name={icon} size={16} color={colors.brand} />
           </View>
 
           <View className="ml-3 min-w-0 flex-1">
-            <Text className="font-outfit-bold text-base text-ink">{title}</Text>
-            <Text className="mt-0.5 font-outfit-medium text-sm leading-5 text-muted">
+            <Text className="font-outfit-bold text-sm text-ink">{title}</Text>
+            <Text className="mt-0.5 font-outfit-medium text-xs leading-4 text-muted">
               {message}
             </Text>
 
@@ -132,7 +132,7 @@ export default function NoticeBanner({
               <FeedbackPressable
                 haptic="light"
                 onPress={onAction}
-                className="mt-3 self-start rounded-xl bg-accent px-4 py-2"
+                className="mt-2 self-start rounded-xl bg-accent px-4 py-1.5"
                 accessibilityRole="button"
                 accessibilityLabel={actionLabel}
               >
