@@ -23,6 +23,8 @@ export default defineConfig({
         "src/lib/waitlistEmail.ts",
         "src/lib/legal-markdown.ts",
         "src/constants/site.ts",
+        "src/constants/products.ts",
+        "src/app/shop/**/*.tsx",
       ],
       exclude: ["**/*.test.ts", "**/*.test.tsx"],
       thresholds: {

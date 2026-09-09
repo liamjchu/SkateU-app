@@ -5,6 +5,8 @@ import {
   PROFILE_LEGAL_TABLE_COLUMNS,
   PROFILE_PUBLIC_SELECT_COLUMNS,
   PROFILE_PUBLIC_SELECT_COLUMNS_WITHOUT_BIO,
+  PROFILE_PUBLIC_SELECT_COLUMNS_WITHOUT_BIO_AND_XP,
+  PROFILE_PUBLIC_SELECT_COLUMNS_WITHOUT_XP,
 } from '../../lib/legalAcceptance';
 import { getSupabaseConfig } from './spots+api';
 
@@ -16,6 +18,7 @@ type PublicProfileRow = {
   avatar_url?: string | null;
   bio?: string | null;
   updated_at?: string | null;
+  xp_total?: number | null;
 };
 
 type LegalRow = {
@@ -55,6 +58,10 @@ function supabaseRestHeaders(config: SupabaseConfig): HeadersInit {
 
 function isMissingBioColumn(status: number, body: string): boolean {
   return status === 400 && body.includes('profiles.bio does not exist');
+}
+
+function isMissingXpColumn(status: number, body: string): boolean {
+  return status === 400 && body.includes('profiles.xp_total does not exist');
 }
 
 async function fetchLegalRowFromProfiles(
@@ -113,32 +120,34 @@ export async function fetchPublicProfile(
   userId: string,
   signal?: AbortSignal
 ): Promise<PublicProfileRow | null> {
-  const primary = await fetchPublicProfileWithSelect(
-    config,
-    userId,
+  const attempts = [
     PROFILE_PUBLIC_SELECT_COLUMNS,
-    signal
-  );
+    PROFILE_PUBLIC_SELECT_COLUMNS_WITHOUT_XP,
+    PROFILE_PUBLIC_SELECT_COLUMNS_WITHOUT_BIO,
+    PROFILE_PUBLIC_SELECT_COLUMNS_WITHOUT_BIO_AND_XP,
+  ];
 
-  if (primary.ok) {
-    return primary.row;
-  }
-
-  if (isMissingBioColumn(primary.status, primary.body)) {
-    const fallback = await fetchPublicProfileWithSelect(
+  let lastStatus = 500;
+  for (const selectColumns of attempts) {
+    const result = await fetchPublicProfileWithSelect(
       config,
       userId,
-      PROFILE_PUBLIC_SELECT_COLUMNS_WITHOUT_BIO,
+      selectColumns,
       signal
     );
-    if (fallback.ok) {
-      return fallback.row;
+    if (result.ok) {
+      return result.row;
     }
-
-    throw new Error(`Profile lookup failed: ${fallback.status}`);
+    lastStatus = result.status;
+    if (
+      !isMissingBioColumn(result.status, result.body) &&
+      !isMissingXpColumn(result.status, result.body)
+    ) {
+      throw new Error(`Profile lookup failed: ${result.status}`);
+    }
   }
 
-  throw new Error(`Profile lookup failed: ${primary.status}`);
+  throw new Error(`Profile lookup failed: ${lastStatus}`);
 }
 
 export async function fetchLegalRow(
@@ -179,6 +188,7 @@ export function mergeProfileRecord(
     legal_version: legal?.legal_version ?? null,
     legal_accepted_at: legal?.legal_accepted_at ?? null,
     age_attested_at: legal?.age_attested_at ?? null,
+    xp_total: profile.xp_total ?? 0,
   });
 }
 

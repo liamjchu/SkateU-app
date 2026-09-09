@@ -1,4 +1,9 @@
 import { HOME_RAIL_PAGE_SIZE } from '../../../lib/homeFeed';
+import {
+  NEARBY_CANDIDATE_LIMIT,
+  NEARBY_SCHOOLS_LIMIT,
+  NEARBY_SEARCH_RADII_MI,
+} from '../../../lib/nearbySchools';
 import { GET, SEARCH_LIMIT } from '../schools+api';
 
 const originalFetch = global.fetch;
@@ -148,6 +153,225 @@ describe('GET /api/schools popular pagination', () => {
       id: 'school-a',
       spotImageUrl: 'https://cdn.test/popular.jpg',
     });
+  });
+});
+
+describe('GET /api/schools nearby', () => {
+  const AUSTIN = { latitude: 30.2672, longitude: -97.7431 };
+  const MILES_PER_LATITUDE_DEGREE = 69.0932;
+
+  function nearbyRequest(query = `lat=${AUSTIN.latitude}&lng=${AUSTIN.longitude}`) {
+    return new Request(`https://app.test/api/schools?nearby=1&${query}`);
+  }
+
+  function schoolRequests(fetchMock: jest.Mock): URL[] {
+    return fetchMock.mock.calls
+      .map(([input]) => new URL(String(input)))
+      .filter((requestUrl) => requestUrl.pathname.endsWith('/rest/v1/schools'));
+  }
+
+  // Recovers the search radius in miles from the PostgREST and=(...) clause.
+  function radiusMilesOf(requestUrl: URL): number {
+    const bounds = requestUrl.searchParams.get('and') ?? '';
+    const [minLat, maxLat] = [
+      /latitude\.gte\.(-?[\d.]+)/.exec(bounds)?.[1],
+      /latitude\.lte\.(-?[\d.]+)/.exec(bounds)?.[1],
+    ].map(Number);
+
+    return ((maxLat - minLat) / 2) * MILES_PER_LATITUDE_DEGREE;
+  }
+
+  function makeSchoolAt(id: string, latOffset: number, numspots = 0): SchoolRow {
+    return {
+      ...makeSchool(id, numspots),
+      latitude: AUSTIN.latitude + latOffset,
+      longitude: AUSTIN.longitude,
+    };
+  }
+
+  it.each([
+    ['no coordinates', ''],
+    ['a missing longitude', `lat=${AUSTIN.latitude}`],
+    ['an out-of-range latitude', 'lat=91&lng=-97.7'],
+    ['an out-of-range longitude', 'lat=30.2&lng=181'],
+    ['an unparseable latitude', 'lat=north&lng=-97.7'],
+  ])('returns empty schools without calling PostgREST for %s', async (_label, query) => {
+    setConfigured();
+    const fetchMock = jest.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await GET(nearbyRequest(query));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ schools: [] });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('orders results by distance and keeps schools with no spots', async () => {
+    setConfigured();
+    // Returned in numspots order, which is the opposite of distance order.
+    const rows = [
+      makeSchoolAt('far', 0.4, 30),
+      makeSchoolAt('mid', 0.05, 10),
+      makeSchoolAt('near', 0.002, 0),
+    ];
+    const fetchMock = jest.fn(async (input: string | URL | Request) => {
+      const requestUrl = new URL(String(input));
+      if (requestUrl.pathname.endsWith('/rest/v1/spots')) {
+        return jsonResponse([]);
+      }
+
+      return jsonResponse(rows);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await GET(nearbyRequest());
+    const body = (await response.json()) as {
+      schools: Array<{ id: string; numSpots: number; spotImageUrl: string | null }>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.schools.map((school) => school.id)).toEqual([
+      'near',
+      'mid',
+      'far',
+    ]);
+    expect(body.schools[0]).toMatchObject({ numSpots: 0, spotImageUrl: null });
+  });
+
+  it('caps the response at the rail size', async () => {
+    setConfigured();
+    const rows = Array.from({ length: NEARBY_SCHOOLS_LIMIT + 5 }, (_, index) =>
+      // Reversed so the closest school is the last row returned.
+      makeSchoolAt(`school-${index}`, (NEARBY_SCHOOLS_LIMIT + 5 - index) * 0.002)
+    );
+    const fetchMock = jest.fn(async (input: string | URL | Request) => {
+      const requestUrl = new URL(String(input));
+      return requestUrl.pathname.endsWith('/rest/v1/spots')
+        ? jsonResponse([])
+        : jsonResponse(rows);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await GET(nearbyRequest());
+    const body = (await response.json()) as { schools: Array<{ id: string }> };
+
+    expect(body.schools).toHaveLength(NEARBY_SCHOOLS_LIMIT);
+    expect(body.schools[0]?.id).toBe(`school-${NEARBY_SCHOOLS_LIMIT + 4}`);
+  });
+
+  it('stops at the first ring that holds enough schools', async () => {
+    setConfigured();
+    const rows = Array.from({ length: NEARBY_SCHOOLS_LIMIT }, (_, index) =>
+      makeSchoolAt(`school-${index}`, index * 0.001)
+    );
+    const fetchMock = jest.fn(async (input: string | URL | Request) => {
+      const requestUrl = new URL(String(input));
+      return requestUrl.pathname.endsWith('/rest/v1/spots')
+        ? jsonResponse([])
+        : jsonResponse(rows);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await GET(nearbyRequest());
+
+    const requests = schoolRequests(fetchMock);
+    expect(requests).toHaveLength(1);
+    expect(radiusMilesOf(requests[0]!)).toBeCloseTo(NEARBY_SEARCH_RADII_MI[0]!, 3);
+    expect(requests[0]?.searchParams.get('limit')).toBe(
+      String(NEARBY_CANDIDATE_LIMIT)
+    );
+    expect(requests[0]?.searchParams.get('order')).toBe('numspots.desc,id.asc');
+  });
+
+  it('widens the search ring until it finds enough schools', async () => {
+    setConfigured();
+    const fetchMock = jest.fn(async (input: string | URL | Request) => {
+      const requestUrl = new URL(String(input));
+      if (requestUrl.pathname.endsWith('/rest/v1/spots')) {
+        return jsonResponse([]);
+      }
+
+      // Only rings wider than the second one reach any schools.
+      return jsonResponse(
+        radiusMilesOf(requestUrl) > NEARBY_SEARCH_RADII_MI[1]!
+          ? Array.from({ length: NEARBY_SCHOOLS_LIMIT }, (_, index) =>
+              makeSchoolAt(`school-${index}`, index * 0.01)
+            )
+          : []
+      );
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await GET(nearbyRequest());
+    const body = (await response.json()) as { schools: Array<{ id: string }> };
+
+    const requests = schoolRequests(fetchMock);
+    expect(requests).toHaveLength(3);
+    expect(requests.map(radiusMilesOf)).toEqual(
+      NEARBY_SEARCH_RADII_MI.slice(0, 3).map((radius) =>
+        expect.closeTo(radius, 3)
+      )
+    );
+    expect(body.schools).toHaveLength(NEARBY_SCHOOLS_LIMIT);
+  });
+
+  it('returns what the widest ring found when every ring is short', async () => {
+    setConfigured();
+    const fetchMock = jest.fn(async (input: string | URL | Request) => {
+      const requestUrl = new URL(String(input));
+      return requestUrl.pathname.endsWith('/rest/v1/spots')
+        ? jsonResponse([])
+        : jsonResponse([makeSchoolAt('lonely', 1)]);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await GET(nearbyRequest());
+    const body = (await response.json()) as { schools: Array<{ id: string }> };
+
+    expect(schoolRequests(fetchMock)).toHaveLength(NEARBY_SEARCH_RADII_MI.length);
+    expect(body.schools.map((school) => school.id)).toEqual(['lonely']);
+  });
+
+  it('passes the type filter through and drops unknown types', async () => {
+    setConfigured();
+    const fetchMock = jest.fn(async (input: string | URL | Request) => {
+      const requestUrl = new URL(String(input));
+      return requestUrl.pathname.endsWith('/rest/v1/spots')
+        ? jsonResponse([])
+        : jsonResponse([]);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await GET(
+      nearbyRequest(
+        `lat=${AUSTIN.latitude}&lng=${AUSTIN.longitude}&type=higher_ed,unknown`
+      )
+    );
+
+    expect(schoolRequests(fetchMock)[0]?.searchParams.get('type')).toBe(
+      'in.(higher_ed)'
+    );
+  });
+
+  it('returns a generic 500 when the bounding-box query fails', async () => {
+    setConfigured();
+    global.fetch = jest.fn(async () =>
+      new Response('permission denied for table public.schools', { status: 500 })
+    ) as unknown as typeof fetch;
+    const consoleError = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    const response = await GET(nearbyRequest());
+    const bodyText = await response.text();
+
+    expect(response.status).toBe(500);
+    expect(JSON.parse(bodyText)).toEqual({
+      error: 'Unable to search schools right now.',
+    });
+    expect(bodyText).not.toContain('public.schools');
+    expect(consoleError).toHaveBeenCalled();
   });
 });
 

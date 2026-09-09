@@ -22,6 +22,7 @@ import HomeRailCard, { HomeFeedRail } from '../components/home-rail-card';
 import HomeSchoolStories from '../components/home-school-stories';
 import HomeSpotPost from '../components/home-spot-post';
 import LoginRequiredModal from '../components/LoginRequiredModal';
+import NearbySchoolsRail from '../components/nearby-schools-rail';
 import SpotFullscreenViewer from '../components/spot-fullscreen-viewer';
 import NoticeBanner from '../components/NoticeBanner';
 import PopularSchoolCard, {
@@ -34,9 +35,10 @@ import SchoolTypePills, {
 import { StickerStripe } from '../components/sticker';
 import IMAGES from '../constants/images';
 import { colors } from '../constants/colors';
+import { useNearbySchools } from '../hooks/useNearbySchools';
 import { captureAnalyticsEvent } from '../lib/analytics';
 import { getApiUrl } from '../lib/api';
-import { triggerHaptic } from '../lib/haptics';
+import { rankFromXp } from '../lib/xpRank';
 import { HOME_RAIL_PAGE_SIZE, HOME_SPOTS_PAGE_SIZE } from '../lib/homeFeed';
 import {
     getHomeLogoTapAction,
@@ -120,6 +122,7 @@ export default function HomeScreen() {
   const session = useAuthStore((state) => state.session);
   const authInitializing = useAuthStore((state) => state.initializing);
   const avatarUrl = useProfileStore((state) => state.profile?.avatar_url ?? null);
+  const ownRank = rankFromXp(useProfileStore((state) => state.profile?.xp_total ?? 0));
   const toggleSpotLike = useSpotsStore((state) => state.toggleSpotLike);
   const cachedRecentSpots = useSpotsStore((state) => state.recentSpots);
   const recentFilter = useSpotsStore((state) => state.recentFilter);
@@ -165,7 +168,6 @@ export default function HomeScreen() {
   );
   const [fullscreenPhotoIndex, setFullscreenPhotoIndex] = useState(0);
   const [commentsCoveringViewer, setCommentsCoveringViewer] = useState(false);
-  const [likingSpotId, setLikingSpotId] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const popularFilterRef = useRef(activeFilter);
   const recentFilterRef = useRef(activeFilter);
@@ -190,6 +192,15 @@ export default function HomeScreen() {
   const recentSpots = recentFilter === activeFilter ? cachedRecentSpots : [];
   popularSchoolsRef.current = popularSchools;
   recentSpotsRef.current = recentSpots;
+
+  const {
+    schools: nearbySchools,
+    origin: nearbyOrigin,
+    status: nearbyStatus,
+    error: nearbyError,
+    enableLocation: enableNearbyLocation,
+    retry: retryNearbySchools,
+  } = useNearbySchools(activeFilter);
 
   const isSearchMode = isSearchFocused || searchQuery.trim().length > 0;
 
@@ -806,25 +817,17 @@ export default function HomeScreen() {
       return;
     }
 
-    if (likingSpotId) {
-      return;
-    }
-
-    setLikingSpotId(spot.id);
     try {
       await toggleSpotLike(
         spot.id,
         spot.likedByUser === true,
         accessToken
       );
-      triggerHaptic('light');
     } catch (error) {
       Alert.alert(
         'Couldn’t update that like',
         toMutationError(error, 'Please try again.')
       );
-    } finally {
-      setLikingSpotId(null);
     }
   };
 
@@ -894,6 +897,7 @@ export default function HomeScreen() {
     setIsLoadingRecent(true);
     setPopularRetryNonce((nonce) => nonce + 1);
     setRecentRetryNonce((nonce) => nonce + 1);
+    retryNearbySchools();
   };
 
   const homeLogoTapAction = getHomeLogoTapAction({
@@ -972,6 +976,20 @@ export default function HomeScreen() {
       <View className="gap-8">
         <HomeSchoolStories
           schools={displayedFavoriteSchools}
+          onPress={handleSchoolPress}
+          onToggleSave={handleFavoritePress}
+        />
+
+        <NearbySchoolsRail
+          schools={nearbySchools}
+          origin={nearbyOrigin}
+          status={nearbyStatus}
+          error={nearbyError}
+          savedSchoolIds={favoriteSchoolIds}
+          onEnableLocation={() => {
+            void enableNearbyLocation();
+          }}
+          onRetry={retryNearbySchools}
           onPress={handleSchoolPress}
           onToggleSave={handleFavoritePress}
         />
@@ -1108,16 +1126,22 @@ export default function HomeScreen() {
     ),
     [
       displayedFavoriteSchools,
+      enableNearbyLocation,
       favoriteSchoolIds,
       handleFavoritePress,
       handleSchoolPress,
       isLoadingPopular,
       isLoadingRecent,
       loadMorePopularSchools,
+      nearbyError,
+      nearbyOrigin,
+      nearbySchools,
+      nearbyStatus,
       popularError,
       popularSchools,
       recentError,
       recentSpots.length,
+      retryNearbySchools,
       isLoadingMorePopular,
     ]
   );
@@ -1155,21 +1179,16 @@ export default function HomeScreen() {
           <FeedbackPressable
             haptic="light"
             onPress={handleProfilePress}
-            className="ml-3 shrink-0 items-center justify-center bg-white"
-            style={{
-              width: PROFILE_BUTTON_SIZE,
-              height: PROFILE_BUTTON_SIZE,
-              borderRadius: PROFILE_BUTTON_SIZE / 2,
-              overflow: 'hidden',
-            }}
+            className="ml-3 shrink-0 items-center justify-center"
             accessibilityLabel="Open profile"
             accessibilityRole="button"
           >
             <ProfileAvatar
               uri={avatarUrl}
-              size={PROFILE_BUTTON_SIZE}
-              iconSize={20}
+              size={36}
+              iconSize={16}
               tone="onLight"
+              rank={ownRank}
             />
           </FeedbackPressable>
         </View>
@@ -1269,7 +1288,6 @@ export default function HomeScreen() {
               data={recentSpots}
               keyExtractor={(spot) => spot.id}
               extraData={{
-                likingSpotId,
                 commentCounts,
                 isLoadingMoreRecent,
                 recentError,
@@ -1281,7 +1299,6 @@ export default function HomeScreen() {
                     commentCount:
                       commentCounts[item.id] ?? item.commentCount,
                   }}
-                  isLiking={likingSpotId === item.id}
                   onLike={handleLikeSpot}
                   onViewMap={handleRecentSpotPress}
                   onOpenComments={handleOpenComments}
@@ -1493,7 +1510,6 @@ export default function HomeScreen() {
         onOpenComments={handleOpenComments}
         onViewMap={handleViewMapFromFullscreen}
         onNearEnd={loadMoreRecentSpots}
-        likingSpotId={likingSpotId}
       />
       <LoginRequiredModal
         visible={showLoginRequired}

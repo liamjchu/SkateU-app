@@ -1,4 +1,4 @@
-import * as Location from 'expo-location';
+import { getExpoLocation } from '../lib/expoLocation';
 import { useCallback, useEffect, useState } from 'react';
 
 export type UserLocationStatus =
@@ -26,6 +26,12 @@ export function useUserLocation(enabled: boolean): UseUserLocationResult {
   const [watchKey, setWatchKey] = useState(0);
 
   const requestPermission = useCallback(async (): Promise<boolean> => {
+    const Location = getExpoLocation();
+    if (!Location) {
+      setStatus('unavailable');
+      return false;
+    }
+
     const servicesEnabled = await Location.hasServicesEnabledAsync();
     if (!servicesEnabled) {
       setStatus('unavailable');
@@ -48,8 +54,14 @@ export function useUserLocation(enabled: boolean): UseUserLocationResult {
       return;
     }
 
+    const Location = getExpoLocation();
+    if (!Location) {
+      setStatus('unavailable');
+      return;
+    }
+
     let cancelled = false;
-    let subscription: Location.LocationSubscription | null = null;
+    let subscription: { remove: () => void } | null = null;
 
     const watch = async () => {
       const servicesEnabled = await Location.hasServicesEnabledAsync();

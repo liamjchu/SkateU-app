@@ -8,6 +8,7 @@ import {
     submittingDraftsForUser,
     getDraftStatusHint,
     isMeaningfulDraftContent,
+    isStaleSubmittingDraft,
     MAX_SPOT_DRAFTS,
     mediaToDraftImages,
     parseSpotDrafts,
@@ -240,5 +241,44 @@ describe('spotDraft helpers', () => {
     expect(next.createdAt).toBe(existing.createdAt);
     expect(next.updatedAt).toBe('2026-03-01T00:00:00.000Z');
     expect(next.name).toBe('Updated');
+  });
+
+  it('treats submitting drafts with no in-flight request as stale', () => {
+    expect(
+      isStaleSubmittingDraft(makeDraft({ status: 'submitting' }), {
+        nowMs: Date.parse('2026-01-02T00:01:00.000Z'),
+        timeoutMs: 60_000,
+        inFlight: false,
+      })
+    ).toBe(true);
+    expect(
+      isStaleSubmittingDraft(makeDraft({ status: 'draft' }), {
+        nowMs: Date.parse('2026-01-02T00:01:00.000Z'),
+        timeoutMs: 60_000,
+        inFlight: false,
+      })
+    ).toBe(false);
+  });
+
+  it('keeps a live submitting draft until the mutation timeout elapses', () => {
+    const draft = makeDraft({
+      status: 'submitting',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+    });
+
+    expect(
+      isStaleSubmittingDraft(draft, {
+        nowMs: Date.parse('2026-01-02T00:00:30.000Z'),
+        timeoutMs: 60_000,
+        inFlight: true,
+      })
+    ).toBe(false);
+    expect(
+      isStaleSubmittingDraft(draft, {
+        nowMs: Date.parse('2026-01-02T00:01:01.000Z'),
+        timeoutMs: 60_000,
+        inFlight: true,
+      })
+    ).toBe(true);
   });
 });

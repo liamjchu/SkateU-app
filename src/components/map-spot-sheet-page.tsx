@@ -16,7 +16,6 @@ type MapSpotSheetPageProps = {
   spot: Spot;
   width: number;
   fill?: boolean;
-  likingSpotId: string | null;
   commentCount: number;
   isOwned: boolean;
   wasReported: boolean;
@@ -53,7 +52,6 @@ export default function MapSpotSheetPage({
   spot,
   width,
   fill = true,
-  likingSpotId,
   commentCount,
   isOwned,
   wasReported,
@@ -69,7 +67,6 @@ export default function MapSpotSheetPage({
   onBlockCreator,
 }: MapSpotSheetPageProps) {
   const liked = spot.likedByUser === true;
-  const isLiking = likingSpotId === spot.id;
   const imageUris = spot.imageUris.filter((uri) => uri.length > 0);
   const timeLabel = spotTimeLabel(spot);
   const router = useGuardedRouter();
@@ -135,6 +132,7 @@ export default function MapSpotSheetPage({
                   uri={spot.creatorAvatarUrl}
                   size={16}
                   iconSize={10}
+                  rank={spot.creatorRank}
                 />
               </FeedbackPressable>
             ) : (
@@ -142,6 +140,7 @@ export default function MapSpotSheetPage({
                 uri={spot.creatorAvatarUrl}
                 size={16}
                 iconSize={10}
+                rank={spot.creatorRank}
               />
             )}
             <CreatorAttribution
@@ -155,8 +154,8 @@ export default function MapSpotSheetPage({
           </View>
         </View>
         <FeedbackPressable
+          haptic="light"
           onPress={onLike}
-          disabled={isLiking}
           className={`mr-2 flex-row items-center rounded-xl px-3 py-2 ${
             liked ? 'bg-accent' : 'bg-surface-soft'
           }`}
@@ -164,19 +163,13 @@ export default function MapSpotSheetPage({
             liked ? `Unlike ${spot.name}` : `Like ${spot.name}`
           }
           accessibilityRole="button"
+          accessibilityState={{ selected: liked }}
         >
-          {isLiking ? (
-            <ActivityIndicator
-              size="small"
-              color={liked ? colors.brand : colors.ink}
-            />
-          ) : (
-            <Octicons
-              name={liked ? 'heart-fill' : 'heart'}
-              size={17}
-              color={liked ? colors.brand : colors.ink}
-            />
-          )}
+          <Octicons
+            name={liked ? 'heart-fill' : 'heart'}
+            size={17}
+            color={liked ? colors.brand : colors.ink}
+          />
           <Text
             className={`ml-1.5 font-outfit-semibold text-sm ${
               liked ? 'text-brand' : 'text-ink'

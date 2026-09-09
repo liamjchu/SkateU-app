@@ -1,3 +1,5 @@
+import type { XpRank } from './xp'
+
 export type SpotComment = {
   id: string
   spotId: string
@@ -10,6 +12,7 @@ export type SpotComment = {
   // Moderated SkateU avatar URL, or null when the author has none or the
   // account was deleted.
   creatorAvatarUrl: string | null
+  creatorRank?: XpRank
   createdAt: string
   replies: SpotComment[]
 }

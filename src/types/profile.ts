@@ -9,6 +9,7 @@ export type Profile = {
   legal_version: string | null;
   legal_accepted_at: string | null;
   age_attested_at: string | null;
+  xp_total: number;
 };
 
 export function readOptionalProfileText(value: unknown): string | null {
@@ -24,7 +25,12 @@ export function mapProfile(row: {
   legal_version?: string | null;
   legal_accepted_at?: string | null;
   age_attested_at?: string | null;
+  xp_total?: number | null;
 }): Profile {
+  const xpTotal =
+    typeof row.xp_total === 'number' && Number.isFinite(row.xp_total)
+      ? Math.max(0, Math.floor(row.xp_total))
+      : 0;
   return {
     id: row.id,
     username: readOptionalProfileText(row.username),
@@ -34,5 +40,6 @@ export function mapProfile(row: {
     legal_version: readOptionalProfileText(row.legal_version),
     legal_accepted_at: readOptionalProfileText(row.legal_accepted_at),
     age_attested_at: readOptionalProfileText(row.age_attested_at),
+    xp_total: xpTotal,
   };
 }

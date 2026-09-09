@@ -128,6 +128,7 @@ describe('location picker map layers', () => {
     });
     expect(html).toContain('tiles.openfreemap.org/styles/liberty');
     expect(html).toContain('maplibre-gl');
+    expect(html).toContain('loadMapLibre');
     expect(html).toContain('resetMapNorth');
     expect(html).not.toContain('basemaps.cartocdn.com');
   });

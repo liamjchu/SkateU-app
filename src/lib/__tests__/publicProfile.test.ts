@@ -22,6 +22,7 @@ const profile: PublicProfileView = {
   username: 'skater_jane',
   avatarUrl: null,
   bio: null,
+  rank: 'hobbyist',
   followerCount: 1,
   followingCount: 2,
   isFollowing: false,
@@ -64,6 +65,7 @@ describe('mapPublicProfileView', () => {
       avatarUrl:
         'https://project.supabase.co/storage/v1/object/public/avatars/a.jpg',
       bio: 'Skater at State',
+      rank: 'hobbyist',
       followerCount: 3,
       followingCount: 8,
       isFollowing: true,
@@ -91,6 +93,7 @@ describe('mapPublicProfileView', () => {
       username: null,
       avatarUrl: null,
       bio: null,
+      rank: 'hobbyist',
       followerCount: 0,
       followingCount: 0,
       isFollowing: false,
@@ -138,6 +141,7 @@ describe('mapFollowListUsers', () => {
         username: 'skater_jane',
         avatarUrl:
           'https://project.supabase.co/storage/v1/object/public/avatars/a.jpg',
+        rank: 'hobbyist',
         isFollowing: true,
       },
     ]);
@@ -162,6 +166,7 @@ describe('mapFollowListUsers', () => {
         id: userId,
         username: null,
         avatarUrl: null,
+        rank: 'hobbyist',
         isFollowing: false,
       },
     ]);
@@ -175,6 +180,7 @@ describe('followListUserAsProfile', () => {
         id: userId,
         username: 'skater_jane',
         avatarUrl: null,
+        rank: 'hobbyist',
         isFollowing: true,
       })
     ).toEqual({
@@ -182,6 +188,7 @@ describe('followListUserAsProfile', () => {
       username: 'skater_jane',
       avatarUrl: null,
       bio: null,
+      rank: 'hobbyist',
       followerCount: 0,
       followingCount: 0,
       isFollowing: true,
@@ -254,6 +261,7 @@ describe('fetchFollowList', () => {
         id: userId,
         username: 'skater_jane',
         avatarUrl: null,
+        rank: 'hobbyist',
         isFollowing: false,
       },
     ]);

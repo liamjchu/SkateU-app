@@ -2,6 +2,7 @@ import { getApiUrl } from './api';
 import { displayableAvatarUrl } from './avatarUrl';
 import { sanitizeErrorMessage } from './userFacingError';
 import type { FollowListKind } from './userFollows';
+import { parseXpRank } from './xpRank';
 import type { FollowListUser, PublicProfileView } from '../types/publicProfile';
 import type { Spot } from '../types/spot';
 
@@ -85,6 +86,10 @@ export function mapPublicProfileView(value: unknown): PublicProfileView | null {
       typeof value.profile.bio === 'string' && value.profile.bio.length > 0
         ? value.profile.bio
         : null,
+    rank: parseXpRank(value.rank) ?? 'hobbyist',
+    ...(typeof value.xpTotal === 'number' && Number.isFinite(value.xpTotal)
+      ? { xpTotal: Math.max(0, Math.floor(value.xpTotal)) }
+      : {}),
     followerCount: readCount(value.followerCount),
     followingCount: readCount(value.followingCount),
     isFollowing: value.isFollowing === true,
@@ -110,6 +115,7 @@ export function mapFollowListUser(value: unknown): FollowListUser | null {
     avatarUrl: displayableAvatarUrl(
       typeof value.avatarUrl === 'string' ? value.avatarUrl : null
     ),
+    rank: parseXpRank(value.rank) ?? 'hobbyist',
     isFollowing: value.isFollowing === true,
   };
 }
@@ -136,6 +142,7 @@ export function followListUserAsProfile(user: FollowListUser): PublicProfileView
     username: user.username,
     avatarUrl: user.avatarUrl,
     bio: null,
+    rank: user.rank,
     followerCount: 0,
     followingCount: 0,
     isFollowing: user.isFollowing,

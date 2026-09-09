@@ -38,6 +38,14 @@ export function SiteShell({ children }: { children: ReactNode }) {
               priority
             />
           </a>
+          <nav aria-label="Site">
+            <a
+              href="/shop"
+              className="rounded-xl px-3 py-2 text-sm font-bold uppercase tracking-[0.16em] text-white transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand motion-reduce:transition-none"
+            >
+              Shop
+            </a>
+          </nav>
         </div>
         <div aria-hidden className="h-1 bg-accent" />
       </header>

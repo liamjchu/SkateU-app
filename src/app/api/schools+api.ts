@@ -1,4 +1,14 @@
 import { HOME_RAIL_PAGE_SIZE, parseOffset } from '../../lib/homeFeed';
+import {
+  boundingBoxFilter,
+  boundingBoxFor,
+  NEARBY_CANDIDATE_LIMIT,
+  NEARBY_SCHOOLS_LIMIT,
+  NEARBY_SEARCH_RADII_MI,
+  parseNearbyOrigin,
+  sortSchoolsByDistance,
+  type NearbyOrigin,
+} from '../../lib/nearbySchools';
 import { MIN_SEARCH_LENGTH } from '../../lib/schoolSearch';
 
 type SchoolType = 'k12_public' | 'k12_private' | 'higher_ed';
@@ -188,6 +198,50 @@ async function fetchPopularSpotImageBySchool(
   return imageBySchoolId;
 }
 
+async function withSpotImages(
+  config: { url: string; apiKey: string },
+  schools: SchoolSearchResult[]
+): Promise<SchoolSearchResult[]> {
+  const imageBySchoolId = await fetchPopularSpotImageBySchool(
+    config,
+    schools.map((school) => school.id)
+  );
+
+  return schools.map((school) => ({
+    ...school,
+    spotImageUrl: imageBySchoolId.get(school.id) ?? null,
+  }));
+}
+
+// Walks the widening search rings and stops at the first one holding enough
+// schools. Rows are ordered by numspots so that when a dense metro overflows
+// the candidate limit, the truncated rows are still the useful ones.
+async function fetchNearbySchoolRows(
+  config: { url: string; apiKey: string },
+  origin: NearbyOrigin,
+  typeParams: Record<string, string>
+) {
+  let rows: DatabaseSchool[] = [];
+
+  for (const radiusMiles of NEARBY_SEARCH_RADII_MI) {
+    rows = await fetchSchoolRows(
+      config,
+      {
+        and: boundingBoxFilter(boundingBoxFor(origin, radiusMiles)),
+        ...typeParams,
+      },
+      NEARBY_CANDIDATE_LIMIT,
+      'numspots.desc,id.asc'
+    );
+
+    if (rows.length >= NEARBY_SCHOOLS_LIMIT) {
+      break;
+    }
+  }
+
+  return rows;
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const search = url.searchParams.get('search')?.trim() ?? '';
@@ -200,8 +254,22 @@ export async function GET(request: Request) {
     .map((id) => id.trim())
     .filter((id) => /^[A-Za-z0-9_-]+$/.test(id))
     .slice(0, IDS_LIMIT);
+  // Null when this is not a nearby request, or when the coordinates are
+  // missing or out of range; both fall through to the empty response below.
+  const nearbyOrigin =
+    url.searchParams.get('nearby') === '1'
+      ? parseNearbyOrigin(
+          url.searchParams.get('lat'),
+          url.searchParams.get('lng')
+        )
+      : null;
 
-  if (!isPopularRequest && ids.length === 0 && search.length < MIN_SEARCH_LENGTH) {
+  if (
+    !isPopularRequest &&
+    nearbyOrigin === null &&
+    ids.length === 0 &&
+    search.length < MIN_SEARCH_LENGTH
+  ) {
     return Response.json({ schools: [] });
   }
 
@@ -224,16 +292,27 @@ export async function GET(request: Request) {
         'numspots.desc,id.asc',
         offset
       );
-      const imageBySchoolId = await fetchPopularSpotImageBySchool(
-        config,
-        schools.map((school) => school.id)
-      );
 
       return Response.json({
-        schools: schools.map((school) => ({
-          ...mapSchool(school),
-          spotImageUrl: imageBySchoolId.get(school.id) ?? null,
-        })),
+        schools: await withSpotImages(config, schools.map(mapSchool)),
+      });
+    }
+
+    if (nearbyOrigin) {
+      // Schools without spots are kept; the rail is about proximity, and the
+      // card falls back to a placeholder when there is no photo.
+      const candidates = await fetchNearbySchoolRows(
+        config,
+        nearbyOrigin,
+        typeParams
+      );
+      const closest = sortSchoolsByDistance(
+        nearbyOrigin,
+        candidates.map(mapSchool)
+      ).slice(0, NEARBY_SCHOOLS_LIMIT);
+
+      return Response.json({
+        schools: await withSpotImages(config, closest),
       });
     }
 
@@ -243,16 +322,9 @@ export async function GET(request: Request) {
         { id: `in.(${ids.join(',')})` },
         ids.length
       );
-      const imageBySchoolId = await fetchPopularSpotImageBySchool(
-        config,
-        schools.map((school) => school.id)
-      );
 
       return Response.json({
-        schools: schools.map((school) => ({
-          ...mapSchool(school),
-          spotImageUrl: imageBySchoolId.get(school.id) ?? null,
-        })),
+        schools: await withSpotImages(config, schools.map(mapSchool)),
       });
     }
 

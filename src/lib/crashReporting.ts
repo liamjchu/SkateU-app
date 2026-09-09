@@ -1,9 +1,32 @@
 import * as Sentry from '@sentry/react-native';
-import * as Updates from 'expo-updates';
+import { requireOptionalNativeModule } from 'expo-modules-core';
+
+type UpdatesModule = {
+  isEnabled?: boolean;
+  updateId?: string | null;
+  channel?: string | null;
+  runtimeVersion?: string | null;
+};
+
+function getUpdates(): UpdatesModule | null {
+  if (
+    requireOptionalNativeModule('ExpoUpdates') == null &&
+    process.env.NODE_ENV !== 'test'
+  ) {
+    return null;
+  }
+
+  try {
+    return require('expo-updates') as UpdatesModule;
+  } catch {
+    return null;
+  }
+}
 
 export function applyCrashReportingUpdateContext(): void {
   try {
-    if (!Updates.isEnabled) {
+    const Updates = getUpdates();
+    if (!Updates?.isEnabled) {
       return;
     }
 

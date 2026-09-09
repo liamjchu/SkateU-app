@@ -1,7 +1,7 @@
-import * as Location from 'expo-location';
 import { Alert, Linking } from 'react-native';
 
 import type { UserLocationStatus } from '../hooks/useUserLocation';
+import { getExpoLocation } from './expoLocation';
 
 type GoToMyLocationOptions = {
   status: UserLocationStatus;
@@ -34,6 +34,15 @@ export async function goToMyLocation({
   }
 
   if (status === 'unavailable') {
+    showSettingsAlert(
+      'Location is off',
+      'Turn on Location Services to see where you are on the map.'
+    );
+    return;
+  }
+
+  const Location = getExpoLocation();
+  if (!Location) {
     showSettingsAlert(
       'Location is off',
       'Turn on Location Services to see where you are on the map.'

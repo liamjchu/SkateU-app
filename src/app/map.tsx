@@ -59,6 +59,8 @@ import {
     getCreateMapLibreMapScript,
     getMapLibreBaseCss,
     getMapLibreHeadTags,
+    getMapLibreLoaderScript,
+    MAP_WEBVIEW_BASE_URL,
 } from '../lib/openFreeMap';
 import { captureAnalyticsEvent } from '../lib/analytics';
 import { triggerHaptic } from '../lib/haptics';
@@ -126,7 +128,7 @@ export default function MapScreen() {
   const fetchMySpots = useSpotsStore((s) => s.fetchMySpots);
   const loading = useSpotsStore((s) => s.loading);
   const error = useSpotsStore((s) => s.error);
-  const loadedSchoolId = useSpotsStore((s) => s.schoolId);
+  const spotsFetchedAt = useSpotsStore((s) => s.spotsFetchedAt);
   const fetchSpots = useSpotsStore((s) => s.fetchSpots);
   const { schools, upsertSchool } = useSchools();
   const { favoriteSchoolIds, toggleFavoriteSchool } = useFavorites();
@@ -179,7 +181,6 @@ export default function MapScreen() {
   );
   const sheetListRef = useRef<FlatList<Spot>>(null);
   const didSelectInitialSpotRef = useRef(false);
-  const [likingSpotId, setLikingSpotId] = useState<string | null>(null);
   const [deletingSpotId, setDeletingSpotId] = useState<string | null>(null);
   const missingSpotAlertedRef = useRef<string | undefined>(undefined);
   const [emptySpotsNoticeDismissed, setEmptySpotsNoticeDismissed] =
@@ -290,6 +291,9 @@ export default function MapScreen() {
       !myLoading &&
       mySpots.some((spot) => spot.id === selectedSpot.id)
   );
+  const recoverStaleSubmittingDrafts = useDraftSpotsStore(
+    (state) => state.recoverStaleSubmittingDrafts
+  );
   const campusDrafts = useMemo(() => {
     if (!userId || !schoolId) {
       return [];
@@ -347,16 +351,25 @@ export default function MapScreen() {
     <div id="map"></div>
     <script>
       // 1. ERROR CATCHER: Send any JS errors inside the WebView back to React Native
-      window.onerror = function(message, source, lineno, colno, error) {
+      window.postToNative = window.postToNative || function (message) {
         if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-          window.ReactNativeWebView.postMessage(JSON.stringify({
-            type: 'CONSOLE_ERROR',
-            message: message + ' at line ' + lineno
-          }));
+          window.ReactNativeWebView.postMessage(JSON.stringify(message));
         }
+      };
+      window.onerror = function(message, source, lineno, colno, error) {
+        var text = String(message || '');
+        if (text.indexOf('sendCenter') !== -1) {
+          return true;
+        }
+        window.postToNative({
+          type: 'CONSOLE_ERROR',
+          message: text + ' at line ' + lineno
+        });
         return true;
       };
 
+      ${getMapLibreLoaderScript()}
+      window.loadMapLibre(function () {
       try {
         const pinSvg = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 22s7-6.4 7-12a7 7 0 1 0-14 0c0 5.6 7 12 7 12z" fill="${colors.accent}" stroke="${colors.brand}" stroke-width="1.5" stroke-linejoin="round"/><circle cx="12" cy="10" r="2.5" fill="${colors.white}"/></svg>');
         const pinHtml = '<img class="skateu-pin-shadow" alt="" width="41" height="41" draggable="false" src="https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png" /><span class="skateu-pin-scale"><img class="skateu-pin-img" alt="" width="50" height="50" draggable="false" src="' + pinSvg + '" /></span>';
@@ -459,13 +472,12 @@ export default function MapScreen() {
           }
         });
       } catch (e) {
-        if (window.ReactNativeWebView) {
-          window.ReactNativeWebView.postMessage(JSON.stringify({
-            type: 'CONSOLE_ERROR',
-            message: 'Init Error: ' + e.message
-          }));
-        }
+        window.postToNative({
+          type: 'CONSOLE_ERROR',
+          message: 'Init Error: ' + e.message
+        });
       }
+      });
     </script>
   </body>
   </html>
@@ -473,7 +485,7 @@ export default function MapScreen() {
   }, [initialSpotId, insets.top, mapAttempt, validLat, validLng]);
 
   const webViewSource = useMemo(
-    () => ({ html, baseUrl: 'https://localhost' }),
+    () => ({ html, baseUrl: MAP_WEBVIEW_BASE_URL }),
     [html]
   );
 
@@ -512,14 +524,13 @@ export default function MapScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (schoolId) {
-        fetchSpots(schoolId, session?.access_token);
-      }
+      recoverStaleSubmittingDrafts();
+      fetchSpots(session?.access_token);
 
       if (session?.access_token) {
         fetchMySpots(session.access_token);
       }
-    }, [fetchMySpots, fetchSpots, schoolId, session?.access_token])
+    }, [fetchMySpots, fetchSpots, recoverStaleSubmittingDrafts, session?.access_token])
   );
 
   useEffect(() => {
@@ -590,7 +601,7 @@ export default function MapScreen() {
     if (!initialSpotId || didSelectInitialSpotRef.current) {
       return;
     }
-    if (loadedSchoolId !== schoolId) {
+    if (!spotsFetchedAt) {
       return;
     }
 
@@ -604,7 +615,7 @@ export default function MapScreen() {
     setSheetSpots(sortSpotsByDistanceFrom(spots, spot));
     setSheetOriginId(spot.id);
     setSelectedSpotId(spot.id);
-  }, [initialSpotId, loadedSchoolId, schoolId, spots]);
+  }, [initialSpotId, spots, spotsFetchedAt]);
 
   const retryMap = useCallback(() => {
     htmlMapLayerRef.current = mapLayer;
@@ -618,10 +629,8 @@ export default function MapScreen() {
   const retrySpots = useCallback(() => {
     missingSpotAlertedRef.current = undefined;
     didSelectInitialSpotRef.current = false;
-    if (schoolId) {
-      fetchSpots(schoolId, session?.access_token);
-    }
-  }, [fetchSpots, schoolId, session?.access_token]);
+    fetchSpots(session?.access_token);
+  }, [fetchSpots, session?.access_token]);
 
   useEffect(() => {
     const requestedSpot = spots.find((item) => item.id === initialSpotId);
@@ -629,8 +638,7 @@ export default function MapScreen() {
       requestedSpotId: initialSpotId,
       selectedSpot: requestedSpot,
       loading,
-      loadedSchoolId,
-      routeSchoolId: schoolId,
+      spotsFetchedAt,
       error,
     });
 
@@ -642,20 +650,20 @@ export default function MapScreen() {
       missingSpotAlertedRef.current = initialSpotId;
       Alert.alert(SPOT_LOAD_FAILED_MESSAGE);
     }
-  }, [error, initialSpotId, loadedSchoolId, loading, schoolId, spots]);
+  }, [error, initialSpotId, loading, spots, spotsFetchedAt]);
 
   useEffect(() => {
     if (!selectedSpotId || selectedSpot) {
       return;
     }
-    if (loading || loadedSchoolId !== schoolId) {
+    if (loading || !spotsFetchedAt) {
       return;
     }
 
     setSelectedSpotId(undefined);
     setSheetSpots([]);
     setSheetOriginId(undefined);
-  }, [loadedSchoolId, loading, schoolId, selectedSpot, selectedSpotId]);
+  }, [loading, selectedSpot, selectedSpotId, spotsFetchedAt]);
 
   useEffect(() => {
     if (!selectedSpot) {
@@ -786,7 +794,22 @@ export default function MapScreen() {
     setSelectedSpotId(undefined);
     setSheetSpots([]);
     setSheetOriginId(undefined);
-    webViewRef.current?.injectJavaScript(`window.sendCenter(); true;`);
+    if (mapStatus === 'ready' && webViewReadyRef.current) {
+      webViewRef.current?.injectJavaScript(
+        `if (typeof window.sendCenter === 'function') { window.sendCenter(); } true;`
+      );
+      return;
+    }
+
+    const params = new URLSearchParams();
+    params.set('lat', validLat.toString());
+    params.set('lng', validLng.toString());
+    params.set('layer', mapLayer === 'satellite' ? 'satellite' : 'default');
+    if (schoolId) params.set('schoolId', schoolId);
+    if (schoolName) params.set('schoolName', schoolName);
+    guardedNavigate('add-spot', () => {
+      router.push(`/add-spot?${params.toString()}`);
+    });
   };
 
   const handleDraftsChipPress = () => {
@@ -895,25 +918,17 @@ export default function MapScreen() {
       return;
     }
 
-    if (likingSpotId) {
-      return;
-    }
-
-    setLikingSpotId(target.id);
     try {
       await toggleSpotLike(
         target.id,
         target.likedByUser === true,
         accessToken
       );
-      triggerHaptic('light');
     } catch (error) {
       Alert.alert(
         'Couldn’t update that like',
         toMutationError(error, 'Please try again.')
       );
-    } finally {
-      setLikingSpotId(null);
     }
   };
 
@@ -1419,7 +1434,6 @@ export default function MapScreen() {
           void handleLikePress(spot);
         }}
         onOpenComments={handleOpenComments}
-        likingSpotId={likingSpotId}
         ownedSpotIds={ownedSpotIds}
         reportedSpotIds={reportedSpotIds}
         mySpotsLoading={myLoading}
@@ -1551,7 +1565,7 @@ export default function MapScreen() {
         </View>
       ) : null}
 
-      {mapStatus === 'ready' && error && spots.length > 0 && loadedSchoolId === schoolId ? (
+      {mapStatus === 'ready' && error && spots.length > 0 && spotsFetchedAt ? (
         <View
           className="absolute left-4 right-4 z-40"
           style={{ top: insets.top + 88 }}
@@ -1607,6 +1621,7 @@ export default function MapScreen() {
       {mapStatus === 'ready' &&
       !loading &&
       !error &&
+      spotsFetchedAt &&
       spots.length === 0 &&
       !emptySpotsNoticeDismissed ? (
         <View className="absolute left-6 right-6 top-1/2 z-30 -translate-y-1/2 items-center rounded-2xl bg-field px-6 py-6">
@@ -1625,7 +1640,7 @@ export default function MapScreen() {
               No skate spots here yet
             </Text>
             <Text className="mt-1.5 text-center font-outfit-medium text-sm leading-5 text-muted-strong">
-              Be the first to drop a spot on this campus.
+              Be the first to drop a spot.
             </Text>
             <FeedbackPressable
               onPress={handleAddSpotPress}
@@ -1785,7 +1800,6 @@ export default function MapScreen() {
             })}
             onMomentumScrollEnd={handleSheetScrollEnd}
             extraData={{
-              likingSpotId,
               selectedSpotId,
               deletingSpotId,
               commentCounts,
@@ -1794,7 +1808,6 @@ export default function MapScreen() {
               <MapSpotSheetPage
                 spot={item}
                 width={sheetWidth}
-                likingSpotId={likingSpotId}
                 commentCount={
                   commentCounts[item.id] ?? item.commentCount ?? 0
                 }
@@ -1830,7 +1843,6 @@ export default function MapScreen() {
                 spot={selectedSpot}
                 width={sheetWidth}
                 fill={false}
-                likingSpotId={likingSpotId}
                 commentCount={
                   commentCounts[selectedSpot.id] ??
                   selectedSpot.commentCount ??

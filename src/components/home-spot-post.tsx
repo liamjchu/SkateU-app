@@ -1,6 +1,6 @@
 import { Feather, Octicons } from '@expo/vector-icons';
 import { useGuardedRouter } from '../lib/navigationGuard';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { colors } from '../constants/colors';
 import { formatCompactRelativeTime } from '../lib/relativeTime';
 import { openUserProfile } from '../lib/userProfileNavigation';
@@ -13,7 +13,6 @@ import SpotMediaPager from './spot-media-pager';
 
 type HomeSpotPostProps = {
   spot: Spot;
-  isLiking: boolean;
   onLike: (spot: Spot) => void;
   onViewMap: (spot: Spot) => void;
   onOpenComments: (spot: Spot) => void;
@@ -36,7 +35,6 @@ function spotPlace(spot: Spot): string {
 
 export default function HomeSpotPost({
   spot,
-  isLiking,
   onLike,
   onViewMap,
   onOpenComments,
@@ -87,10 +85,10 @@ export default function HomeSpotPost({
                   : 'Open profile'
               }
             >
-              <ProfileAvatar uri={spot.creatorAvatarUrl} size={16} iconSize={10} />
+              <ProfileAvatar uri={spot.creatorAvatarUrl} size={16} iconSize={10} rank={spot.creatorRank} />
             </FeedbackPressable>
           ) : (
-            <ProfileAvatar uri={spot.creatorAvatarUrl} size={16} iconSize={10} />
+            <ProfileAvatar uri={spot.creatorAvatarUrl} size={16} iconSize={10} rank={spot.creatorRank} />
           )}
           <CreatorAttribution
             userId={spot.creatorUserId}
@@ -138,7 +136,6 @@ export default function HomeSpotPost({
         <FeedbackPressable
           haptic="light"
           onPress={() => onLike(spot)}
-          disabled={isLiking}
           className={`min-h-11 flex-row items-center rounded-xl px-3.5 ${
             liked ? 'bg-accent' : 'bg-surface-soft'
           }`}
@@ -146,20 +143,13 @@ export default function HomeSpotPost({
           accessibilityLabel={
             liked ? `Unlike ${spot.name}` : `Like ${spot.name}`
           }
-          accessibilityState={{ selected: liked, busy: isLiking }}
+          accessibilityState={{ selected: liked }}
         >
-          {isLiking ? (
-            <ActivityIndicator
-              size="small"
-              color={liked ? colors.brand : colors.ink}
-            />
-          ) : (
-            <Octicons
-              name={liked ? 'heart-fill' : 'heart'}
-              size={17}
-              color={liked ? colors.brand : colors.ink}
-            />
-          )}
+          <Octicons
+            name={liked ? 'heart-fill' : 'heart'}
+            size={17}
+            color={liked ? colors.brand : colors.ink}
+          />
           <Text
             className={`ml-1.5 font-outfit-semibold text-sm ${
               liked ? 'text-brand' : 'text-ink'

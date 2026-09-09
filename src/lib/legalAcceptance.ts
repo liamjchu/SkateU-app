@@ -12,9 +12,15 @@ export function canAcceptLegalTerms(agreed: boolean): boolean {
 }
 
 export const PROFILE_PUBLIC_SELECT_COLUMNS =
-  'id, username, avatar_url, bio, updated_at';
+  'id, username, avatar_url, bio, updated_at, xp_total';
 
 export const PROFILE_PUBLIC_SELECT_COLUMNS_WITHOUT_BIO =
+  'id, username, avatar_url, updated_at, xp_total';
+
+export const PROFILE_PUBLIC_SELECT_COLUMNS_WITHOUT_XP =
+  'id, username, avatar_url, bio, updated_at';
+
+export const PROFILE_PUBLIC_SELECT_COLUMNS_WITHOUT_BIO_AND_XP =
   'id, username, avatar_url, updated_at';
 
 export const PROFILE_LEGAL_TABLE_COLUMNS =

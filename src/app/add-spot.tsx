@@ -4,6 +4,7 @@ import { useGuardedRouter } from '../lib/navigationGuard';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
+    Alert,
     Keyboard,
     ScrollView,
     Text,
@@ -35,10 +36,19 @@ import {
 } from '../lib/spotDraft';
 import { filterExistingDraftImages } from '../lib/spotDraftFiles';
 import { mediaListsEqual } from '../lib/spotMedia';
+import {
+    beginDraftSubmission,
+    CANCEL_SUBMISSION_MESSAGE,
+    CANCEL_SUBMISSION_TITLE,
+    finishDraftSubmission,
+    isSpotSubmissionCancelledError,
+    SUBMISSION_CANCELLED_ERROR,
+} from '../lib/spotSubmission';
 import { toMutationError } from '../lib/userFacingError';
 import { useAuthStore } from '../store/authStore';
 import { useDraftSpotsStore } from '../store/draftSpotsStore';
 import { useMapViewStore } from '../store/mapViewStore';
+import { useProfileStore } from '../store/profileStore';
 import { useSpotsStore } from '../store/spotsStore';
 import type { SpotMediaItem } from '../types/spot';
 
@@ -115,6 +125,7 @@ export default function AddSpotScreen() {
     useState<LocationPickerStatus>('loading');
   const [saving, setSaving] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [posted, setPosted] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [hasSubmitted, setHasSubmitted] = useState(false);
 
@@ -126,13 +137,20 @@ export default function AddSpotScreen() {
   const draftIdRef = useRef(draftIdParam);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const persistInFlightRef = useRef<Promise<void> | null>(null);
+  const activeSubmissionSignalRef = useRef<AbortSignal | null>(null);
+  const mountedRef = useRef(true);
 
   const addSpot = useSpotsStore((s) => s.addSpot);
   const session = useAuthStore((s) => s.session);
+  const userId = useAuthStore((s) => s.user?.id ?? null);
+  const fetchProfile = useProfileStore((s) => s.fetchProfile);
   const hasHydratedDrafts = useDraftSpotsStore((s) => s.hasHydrated);
   const getDraft = useDraftSpotsStore((s) => s.getDraft);
   const upsertDraft = useDraftSpotsStore((s) => s.upsertDraft);
   const setDraftStatus = useDraftSpotsStore((s) => s.setDraftStatus);
+  const cancelDraftSubmission = useDraftSpotsStore(
+    (s) => s.cancelDraftSubmission
+  );
   const deleteDraft = useDraftSpotsStore((s) => s.deleteDraft);
 
   const locationChanged = coordinatesDiffer(
@@ -414,6 +432,44 @@ export default function AddSpotScreen() {
     void flushDraftAndLeave();
   };
 
+  const revertSubmittedUi = (message: string | null) => {
+    submittedRef.current = false;
+    savingRef.current = false;
+    allowRemovalRef.current = false;
+    if (!mountedRef.current) {
+      return;
+    }
+    setSubmitted(false);
+    setPosted(false);
+    setSaving(false);
+    setSaveError(message);
+  };
+
+  const handleCancelSubmission = () => {
+    if (postedRef.current) {
+      return;
+    }
+
+    const draftId = draftIdRef.current;
+    triggerHaptic('warning');
+    Alert.alert(CANCEL_SUBMISSION_TITLE, CANCEL_SUBMISSION_MESSAGE, [
+      { text: 'Keep sending', style: 'cancel' },
+      {
+        text: 'Stop sending',
+        style: 'destructive',
+        onPress: () => {
+          if (postedRef.current) {
+            return;
+          }
+          if (draftId) {
+            cancelDraftSubmission(draftId);
+          }
+          revertSubmittedUi(SUBMISSION_CANCELLED_ERROR);
+        },
+      },
+    ]);
+  };
+
   const handlePost = async () => {
     if (savingRef.current || postedRef.current || submitted) {
       return;
@@ -437,7 +493,8 @@ export default function AddSpotScreen() {
     }
 
     const accessToken = session?.access_token;
-    if (!accessToken) {
+    const userId = session?.user?.id;
+    if (!accessToken || !userId) {
       setSaveError(AUTH_REQUIRED_ERROR);
       return;
     }
@@ -450,12 +507,41 @@ export default function AddSpotScreen() {
     await persistInFlightRef.current;
     await persistDraftNow();
 
+    let draftId = draftIdRef.current;
+    if (!draftId) {
+      try {
+        const draft = await upsertDraft({
+          userId,
+          schoolId,
+          schoolName: formRef.current.resolvedSchoolName || 'Campus map',
+          name: name.trim(),
+          description: description.trim(),
+          latitude: selectedLocation.latitude,
+          longitude: selectedLocation.longitude,
+          images: mediaToDraftImages(media),
+        });
+        draftId = draft.id;
+        draftIdRef.current = draft.id;
+        setActiveDraftId(draft.id);
+      } catch (error) {
+        savingRef.current = false;
+        const message = toMutationError(
+          error,
+          'We couldn’t save this draft. Please try again.'
+        );
+        setSaveError(message);
+        return;
+      }
+    }
+
+    const signal = beginDraftSubmission(draftId);
+    activeSubmissionSignalRef.current = signal;
+
     submittedRef.current = true;
     allowRemovalRef.current = true;
-    if (draftIdRef.current) {
-      setDraftStatus(draftIdRef.current, 'submitting', null);
-    }
+    setDraftStatus(draftId, 'submitting', null);
     setSubmitted(true);
+    setPosted(false);
     setSaving(false);
     setSaveError(null);
     triggerHaptic('success');
@@ -473,38 +559,47 @@ export default function AddSpotScreen() {
 
     void (async () => {
       try {
-        await addSpot(payload, accessToken);
+        await addSpot(payload, accessToken, { signal });
+        if (activeSubmissionSignalRef.current !== signal || signal.aborted) {
+          return;
+        }
         postedRef.current = true;
-        if (draftIdRef.current) {
-          try {
-            await deleteDraft(draftIdRef.current);
-          } catch (error) {
-            console.warn('Could not remove the local draft after posting.', error);
-          }
+        finishDraftSubmission(draftId, signal);
+        if (userId) {
+          void fetchProfile(userId, accessToken);
+        }
+        if (mountedRef.current) {
+          setPosted(true);
+        }
+        try {
+          await deleteDraft(draftId);
+        } catch (error) {
+          console.warn('Could not remove the local draft after posting.', error);
         }
       } catch (error) {
+        finishDraftSubmission(draftId, signal);
+        if (activeSubmissionSignalRef.current !== signal) {
+          return;
+        }
+        if (isSpotSubmissionCancelledError(error)) {
+          revertSubmittedUi(
+            getDraft(draftId)?.lastError ?? SUBMISSION_CANCELLED_ERROR
+          );
+          return;
+        }
         const message = toMutationError(
           error,
           'We couldn’t submit this spot. Please try again.'
         );
-        if (draftIdRef.current) {
-          setDraftStatus(draftIdRef.current, 'draft', message);
+        setDraftStatus(draftId, 'draft', message);
+        revertSubmittedUi(message);
+        if (mountedRef.current) {
+          triggerHaptic('warning');
         }
-        submittedRef.current = false;
-        savingRef.current = false;
-        allowRemovalRef.current = false;
-        if (!mountedRef.current) {
-          return;
-        }
-        setSubmitted(false);
-        setSaving(false);
-        setSaveError(message);
-        triggerHaptic('warning');
       }
     })();
   };
 
-  const mountedRef = useRef(true);
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -579,6 +674,18 @@ export default function AddSpotScreen() {
                 Come back later
               </Text>
             </FeedbackPressable>
+            {!posted ? (
+              <FeedbackPressable
+                onPress={handleCancelSubmission}
+                className="mt-3 min-h-12 w-full items-center justify-center px-5 py-3"
+                accessibilityRole="button"
+                accessibilityLabel="Cancel submission"
+              >
+                <Text className="font-outfit-bold text-base text-muted">
+                  Cancel submission
+                </Text>
+              </FeedbackPressable>
+            ) : null}
           </View>
         </View>
       ) : (

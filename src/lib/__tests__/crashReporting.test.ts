@@ -108,4 +108,17 @@ describe('crashReporting', () => {
       expect(() => applyCrashReportingUpdateContext()).not.toThrow();
     });
   });
+
+  it('swallows expo-updates when the native module cannot be required', () => {
+    jest.isolateModules(() => {
+      jest.doMock('expo-updates', () => {
+        throw new Error("Cannot find native module 'ExpoUpdates'");
+      });
+      const { applyCrashReportingUpdateContext } = require('../crashReporting') as {
+        applyCrashReportingUpdateContext: () => void;
+      };
+
+      expect(() => applyCrashReportingUpdateContext()).not.toThrow();
+    });
+  });
 });

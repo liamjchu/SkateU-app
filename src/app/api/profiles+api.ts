@@ -1,4 +1,5 @@
 import { displayableAvatarUrl } from '../../lib/avatarUrl';
+import { rankFromXp } from '../../lib/xpRank';
 import { fetchPublicProfile } from './profile-record';
 import {
   fetchFollowStats,
@@ -62,6 +63,9 @@ export async function GET(request: Request): Promise<Response> {
     }
 
     const stats = await fetchFollowStats(config, userId, viewerId);
+    const xpTotal = typeof profile.xp_total === 'number' ? profile.xp_total : 0;
+    const rank = rankFromXp(xpTotal);
+    const isOwner = viewerId === userId;
 
     return Response.json({
       profile: {
@@ -70,6 +74,8 @@ export async function GET(request: Request): Promise<Response> {
         avatarUrl: displayableAvatarUrl(profile.avatar_url),
         bio: profile.bio ?? null,
       },
+      rank,
+      ...(isOwner ? { xpTotal } : {}),
       followerCount: stats.followerCount,
       followingCount: stats.followingCount,
       isFollowing: stats.isFollowing,

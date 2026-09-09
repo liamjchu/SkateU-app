@@ -4,6 +4,7 @@ import {
     getCreateMapLibreMapScript,
     getMapLibreBaseCss,
     getMapLibreHeadTags,
+    getMapLibreLoaderScript,
 } from './openFreeMap';
 
 export type LocationMapLayer = 'default' | 'satellite';
@@ -59,13 +60,19 @@ export function buildLocationPickerHtml({
       window.postToNative = postMessage;
 
       window.onerror = function (message, source, lineno) {
+        var text = String(message || '');
+        if (text.indexOf('sendCenter') !== -1) {
+          return true;
+        }
         postMessage({
           type: 'CONSOLE_ERROR',
-          message: String(message) + ' at line ' + lineno,
+          message: text + ' at line ' + lineno,
         });
         return true;
       };
 
+      ${getMapLibreLoaderScript()}
+      window.loadMapLibre(function () {
       try {
         ${getCreateMapLibreMapScript({ latitude, longitude, layer })}
         ${getLeafletUserLocationScript()}
@@ -130,6 +137,7 @@ export function buildLocationPickerHtml({
             : 'Unable to initialize the location map.',
         });
       }
+      });
     })();
   </script>
 </body>

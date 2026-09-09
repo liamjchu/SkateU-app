@@ -21,6 +21,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import '../../global.css';
 import AuthNoticeBanner from '../components/AuthNoticeBanner';
+import XpRankUpOverlay from '../components/XpRankUpOverlay';
+import XpToastBanner from '../components/XpToastBanner';
 import StartupLoadingOverlay from '../components/startup-loading-overlay';
 import { colors } from '../constants/colors';
 import { checkAppleCredentialStatus } from '../lib/appleAuthentication';
@@ -41,6 +43,8 @@ import { useFavorites } from '../store/favoritesStore';
 import { useProfileStore } from '../store/profileStore';
 import { useSchools } from '../store/schoolsStore';
 import { useSpotsStore } from '../store/spotsStore';
+import { useXpFeedbackStore } from '../store/xpFeedbackStore';
+import { useXpFeedback } from '../hooks/useXpFeedback';
 import {
     AnalyticsProvider,
     captureAnalyticsScreen,
@@ -128,6 +132,7 @@ function RootLayout() {
   const clearBlocks = useBlocksStore((state) => state.clear);
   const setSessionUserId = useSpotsStore((state) => state.setSessionUserId);
   const [cachesReady, setCachesReady] = useState(false);
+  useXpFeedback();
 
   const router = useRouter();
   const pathname = usePathname();
@@ -168,6 +173,7 @@ function RootLayout() {
       useCommentsStore.persist.rehydrate(),
       useProfileStore.persist.rehydrate(),
       useBlocksStore.persist.rehydrate(),
+      useXpFeedbackStore.persist.rehydrate(),
     ]).finally(() => {
       setCachesReady(true);
     });
@@ -424,6 +430,8 @@ function RootLayout() {
         />
       ) : null}
       <AuthNoticeBanner />
+      <XpToastBanner />
+      <XpRankUpOverlay />
         </GestureHandlerRootView>
       </PostHogErrorBoundary>
     </AnalyticsProvider>

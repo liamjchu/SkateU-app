@@ -7,12 +7,20 @@ import {
   createDraftId,
   draftsForSchool as selectDraftsForSchool,
   draftsForUser as selectDraftsForUser,
+  isStaleSubmittingDraft,
   parseSpotDrafts,
 } from '../lib/spotDraft';
 import {
   copyDraftImages,
   deleteDraftFiles,
 } from '../lib/spotDraftFiles';
+import {
+  abortDraftSubmission,
+  isDraftSubmissionInFlight,
+  SPOT_SUBMISSION_TIMEOUT_MS,
+  SUBMISSION_CANCELLED_ERROR,
+  SUBMISSION_STALE_ERROR,
+} from '../lib/spotSubmission';
 import type { SpotDraft, SpotDraftInput, SpotDraftStatus } from '../types/spotDraft';
 
 type DraftSpotsState = {
@@ -25,6 +33,8 @@ type DraftSpotsState = {
     status: SpotDraftStatus,
     lastError?: string | null
   ) => void;
+  cancelDraftSubmission: (id: string) => void;
+  recoverStaleSubmittingDrafts: (nowMs?: number) => void;
   deleteDraft: (id: string) => Promise<void>;
   getDraft: (id: string) => SpotDraft | undefined;
   draftsForUser: (userId: string) => SpotDraft[];
@@ -42,17 +52,12 @@ export const useDraftSpotsStore = create<DraftSpotsState>()(
       upsertDraft: async (input) => {
         const existing = input.id
           ? get().drafts.find((draft) => draft.id === input.id)
-          : get().drafts.find(
-              (draft) =>
-                draft.userId === input.userId &&
-                draft.schoolId === input.schoolId &&
-                draft.status === 'submitting'
-            );
+          : undefined;
         if (existing?.status === 'submitting' && input.status !== 'draft') {
           return existing;
         }
         const now = new Date().toISOString();
-        const draftId = input.id ?? existing?.id ?? createDraftId();
+        const draftId = input.id ?? createDraftId();
         const copiedImages = await copyDraftImages(draftId, input.images);
         const latestExisting =
           get().drafts.find((draft) => draft.id === draftId) ?? existing;
@@ -78,13 +83,59 @@ export const useDraftSpotsStore = create<DraftSpotsState>()(
         return draft;
       },
       setDraftStatus: (id, status, lastError) => {
+        const now = new Date().toISOString();
         set((state) => ({
           drafts: state.drafts.map((draft) =>
             draft.id === id
               ? {
                   ...draft,
                   status,
+                  updatedAt: now,
                   ...(lastError !== undefined ? { lastError } : {}),
+                }
+              : draft
+          ),
+        }));
+      },
+      cancelDraftSubmission: (id) => {
+        const draft = get().getDraft(id);
+        abortDraftSubmission(id);
+        if (!draft || draft.status !== 'submitting') {
+          return;
+        }
+        get().setDraftStatus(id, 'draft', SUBMISSION_CANCELLED_ERROR);
+      },
+      recoverStaleSubmittingDrafts: (nowMs = Date.now()) => {
+        const staleIds: string[] = [];
+        for (const draft of get().drafts) {
+          const inFlight = isDraftSubmissionInFlight(draft.id);
+          if (
+            !isStaleSubmittingDraft(draft, {
+              nowMs,
+              timeoutMs: SPOT_SUBMISSION_TIMEOUT_MS,
+              inFlight,
+            })
+          ) {
+            continue;
+          }
+          if (inFlight) {
+            abortDraftSubmission(draft.id);
+          }
+          staleIds.push(draft.id);
+        }
+        if (staleIds.length === 0) {
+          return;
+        }
+        const staleIdSet = new Set(staleIds);
+        const now = new Date(nowMs).toISOString();
+        set((state) => ({
+          drafts: state.drafts.map((draft) =>
+            staleIdSet.has(draft.id)
+              ? {
+                  ...draft,
+                  status: 'draft' as const,
+                  lastError: SUBMISSION_STALE_ERROR,
+                  updatedAt: now,
                 }
               : draft
           ),
@@ -114,7 +165,9 @@ export const useDraftSpotsStore = create<DraftSpotsState>()(
       storage: createJSONStorage(getClientStorage),
       skipHydration: true,
       onRehydrateStorage: () => () => {
-        useDraftSpotsStore.getState().setHasHydrated(true);
+        const store = useDraftSpotsStore.getState();
+        store.setHasHydrated(true);
+        store.recoverStaleSubmittingDrafts();
       },
       partialize: (state) => ({
         drafts: state.drafts,

@@ -19,6 +19,7 @@ describe("Home", () => {
 
     expect(skipLink?.textContent).toBe("Skip to content");
     expect(container.querySelector('a[aria-label="SkateU home"]')?.getAttribute("href")).toBe("/");
+    expect(container.querySelector('header a[href="/shop"]')?.textContent).toBe("Shop");
     expect(container.textContent).toContain("Locals know the spots,");
     expect(container.textContent).toContain("Now you do too");
     expect(container.textContent).toContain("finding, liking, and sharing");

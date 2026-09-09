@@ -12,6 +12,7 @@ import {
     type SpotModerationVerdict,
 } from '../../lib/spotModeration';
 import { displayableAvatarUrl } from '../../lib/avatarUrl';
+import { rankFromXp } from '../../lib/xpRank';
 import type { Spot } from '../../types/spot';
 import {
     applyBlockedUserFilter,
@@ -28,6 +29,7 @@ export const MAX_SCHOOL_ID_LENGTH = 64;
 export const NAME_MAX = 100;
 export const DESCRIPTION_MAX = 1000;
 export const MAX_IMAGES = 3;
+export const MAP_SPOTS_LIMIT = 5000;
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
 export const UPLOAD_TIMEOUT_MS = 30_000;
 export const AUTH_REQUEST_TIMEOUT_MS = 10_000;
@@ -42,9 +44,9 @@ const IMAGE_EXTENSIONS: Record<string, string> = {
 };
 
 export const SPOT_SELECT_COLUMNS =
-  'id,school_id,created_by_user_id,name,description,latitude,longitude,image_urls,created_at,updated_at,likes_count,comments_count,schools(name,city,state),creator:profiles(username,avatar_url)';
+  'id,school_id,created_by_user_id,name,description,latitude,longitude,image_urls,created_at,updated_at,likes_count,comments_count,schools(name,city,state),creator:profiles(username,avatar_url,xp_total)';
 const RECENT_SPOT_SELECT_COLUMNS =
-  'id,school_id,created_by_user_id,name,description,latitude,longitude,image_urls,created_at,updated_at,likes_count,comments_count,schools!inner(name,city,state,type),creator:profiles(username,avatar_url)';
+  'id,school_id,created_by_user_id,name,description,latitude,longitude,image_urls,created_at,updated_at,likes_count,comments_count,schools!inner(name,city,state,type),creator:profiles(username,avatar_url,xp_total)';
 const VALID_SCHOOL_TYPES = ['k12_public', 'k12_private', 'higher_ed'] as const;
 
 export const PENDING_SPOT_STATUS = 'pending_moderation';
@@ -441,7 +443,11 @@ export type DatabaseSpot = {
   likes_count?: number;
   comments_count?: number;
   schools: { name: string; city: string; state: string } | null;
-  creator: { username: string | null; avatar_url?: string | null } | null;
+  creator: {
+    username: string | null;
+    avatar_url?: string | null;
+    xp_total?: number | null;
+  } | null;
 };
 
 export type DatabaseSpotInsert = {
@@ -474,6 +480,7 @@ export function mapSpot(row: DatabaseSpot, likedByUser = false): Spot {
     creatorUserId: row.created_by_user_id ?? null,
     creatorUsername: row.creator?.username ?? null,
     creatorAvatarUrl: displayableAvatarUrl(row.creator?.avatar_url ?? null),
+    creatorRank: row.creator ? rankFromXp(row.creator.xp_total ?? 0) : undefined,
     createdAt: row.created_at ?? '',
     updatedAt: row.updated_at ?? '',
     likeCount: row.likes_count ?? 0,
@@ -1151,17 +1158,13 @@ export async function GET(request: Request): Promise<Response> {
     return getCreatorSpots(request, config, creatorUserIdParam);
   }
 
-  const validation = validateSchoolId(url.searchParams.get('schoolId'));
-  if (!validation.ok) {
-    return Response.json({ error: validation.message }, { status: 400 });
-  }
-
+  // Default map list: every visible spot. A leftover schoolId query param is ignored.
   try {
     const viewer = await resolveViewerAndBlocks(request, config);
     const query = new URL(`${config.url}/rest/v1/spots`);
-    query.searchParams.set('school_id', `eq.${validation.value}`);
     query.searchParams.set('select', SPOT_SELECT_COLUMNS);
     query.searchParams.set('order', 'created_at.asc');
+    query.searchParams.set('limit', String(MAP_SPOTS_LIMIT));
     applyVisibleSpotFilter(query);
     applyBlockedUserFilter(query, 'created_by_user_id', viewer.blockedIds);
 

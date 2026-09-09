@@ -49,7 +49,6 @@ type SpotFullscreenViewerProps = {
   onOpenComments: (spot: Spot) => void;
   onViewMap?: (spot: Spot) => void;
   onNearEnd?: () => void;
-  likingSpotId?: string | null;
   originSpotId?: string;
   ownedSpotIds?: string[];
   reportedSpotIds?: string[];
@@ -206,7 +205,6 @@ type OverlayActionProps = {
   label: string;
   count?: number;
   selected?: boolean;
-  busy?: boolean;
   onPress: () => void;
   icon: 'heart' | 'heart-fill' | 'message-circle' | 'map';
   accessibilityLabel: string;
@@ -217,7 +215,6 @@ function OverlayAction({
   label,
   count,
   selected = false,
-  busy = false,
   onPress,
   icon,
   accessibilityLabel,
@@ -228,18 +225,15 @@ function OverlayAction({
     <FeedbackPressable
       haptic="light"
       onPress={onPress}
-      disabled={busy}
       className={`min-h-11 flex-1 flex-row items-center justify-center rounded-full px-3.5 ${
         selected ? 'bg-accent' : 'bg-white/20'
       }`}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityHint={accessibilityHint}
-      accessibilityState={{ selected, busy }}
+      accessibilityState={{ selected }}
     >
-      {busy ? (
-        <ActivityIndicator size="small" color={iconColor} />
-      ) : icon === 'heart' || icon === 'heart-fill' ? (
+      {icon === 'heart' || icon === 'heart-fill' ? (
         <Octicons name={icon} size={16} color={iconColor} />
       ) : (
         <Feather name={icon} size={16} color={iconColor} />
@@ -274,7 +268,6 @@ type DetailsOverlayProps = {
   bottomInset: number;
   variant: SpotFullscreenVariant;
   distanceLabel: string;
-  likingSpotId?: string | null;
   onPrev: () => void;
   onNext: () => void;
   onLike: () => void;
@@ -299,7 +292,6 @@ function SpotDetailsOverlay({
   bottomInset,
   variant,
   distanceLabel,
-  likingSpotId,
   onPrev,
   onNext,
   onLike,
@@ -315,7 +307,6 @@ function SpotDetailsOverlay({
   onRequestRemoval,
 }: DetailsOverlayProps) {
   const liked = spot.likedByUser === true;
-  const isLiking = likingSpotId === spot.id;
   const description = spot.description.trim();
   const router = useGuardedRouter();
   const currentUserId = useAuthStore((state) => state.user?.id ?? null);
@@ -419,6 +410,7 @@ function SpotDetailsOverlay({
               size={18}
               iconSize={11}
               tone="onDark"
+              rank={spot.creatorRank}
             />
           </FeedbackPressable>
         ) : (
@@ -427,6 +419,7 @@ function SpotDetailsOverlay({
             size={18}
             iconSize={11}
             tone="onDark"
+            rank={spot.creatorRank}
           />
         )}
         <CreatorAttribution
@@ -453,7 +446,6 @@ function SpotDetailsOverlay({
           label="Like"
           count={spot.likeCount ?? 0}
           selected={liked}
-          busy={isLiking}
           onPress={onLike}
           icon={liked ? 'heart-fill' : 'heart'}
           accessibilityLabel={
@@ -567,7 +559,6 @@ type SpotPageProps = {
   bottomInset: number;
   variant: SpotFullscreenVariant;
   originSpotId?: string;
-  likingSpotId?: string | null;
   ownedSpotIds: string[];
   reportedSpotIds: string[];
   mySpotsLoading: boolean;
@@ -595,7 +586,6 @@ function SpotFullscreenPage({
   bottomInset,
   variant,
   originSpotId,
-  likingSpotId,
   ownedSpotIds,
   reportedSpotIds,
   mySpotsLoading,
@@ -662,7 +652,6 @@ function SpotFullscreenPage({
               bottomInset={bottomInset}
               variant={variant}
               distanceLabel={distanceLabel}
-              likingSpotId={likingSpotId}
               onPrev={() => onGoToSpot(spotIndex - 1)}
               onNext={() => onGoToSpot(spotIndex + 1)}
               onLike={() => onLike(spot)}
@@ -700,7 +689,6 @@ export default function SpotFullscreenViewer({
   onOpenComments,
   onViewMap,
   onNearEnd,
-  likingSpotId,
   originSpotId,
   ownedSpotIds = [],
   reportedSpotIds = [],
@@ -834,7 +822,6 @@ export default function SpotFullscreenViewer({
         bottomInset={insets.bottom}
         variant={variant}
         originSpotId={originSpotId}
-        likingSpotId={likingSpotId}
         ownedSpotIds={ownedSpotIds}
         reportedSpotIds={reportedSpotIds}
         mySpotsLoading={mySpotsLoading}
@@ -860,7 +847,6 @@ export default function SpotFullscreenViewer({
       insets.bottom,
       insets.top,
       isSignedIn,
-      likingSpotId,
       mySpotsLoading,
       onClose,
       onDelete,
@@ -881,13 +867,12 @@ export default function SpotFullscreenViewer({
 
   const listExtraData = useMemo(
     () => ({
-      likingSpotId,
       ownedSpotIds,
       reportedSpotIds,
       deletingSpotId,
       spots,
     }),
-    [deletingSpotId, likingSpotId, ownedSpotIds, reportedSpotIds, spots]
+    [deletingSpotId, ownedSpotIds, reportedSpotIds, spots]
   );
 
   if (!visible || spots.length === 0) {

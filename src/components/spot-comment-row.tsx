@@ -63,6 +63,7 @@ export default function SpotCommentRow({
                 uri={comment.creatorAvatarUrl}
                 size={28}
                 iconSize={14}
+                rank={comment.creatorRank}
               />
             </FeedbackPressable>
           ) : (
@@ -70,6 +71,7 @@ export default function SpotCommentRow({
               uri={comment.creatorAvatarUrl}
               size={28}
               iconSize={14}
+              rank={comment.creatorRank}
             />
           )}
         </View>

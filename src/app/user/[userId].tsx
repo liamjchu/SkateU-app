@@ -24,6 +24,7 @@ import {
     unfollowUser,
 } from '../../lib/publicProfile';
 import { toMutationError, toUserFacingError } from '../../lib/userFacingError';
+import { XP_RANK_LABELS } from '../../lib/xpRank';
 import { useAuthStore } from '../../store/authStore';
 import type { PublicProfileView } from '../../types/publicProfile';
 import type { Spot } from '../../types/spot';
@@ -216,7 +217,12 @@ export default function UserProfileScreen() {
           <>
             <View className="items-center rounded-2xl bg-field p-6">
               <View className="mb-4">
-                <ProfileAvatar uri={profile.avatarUrl} size={96} iconSize={40} />
+                <ProfileAvatar
+                  uri={profile.avatarUrl}
+                  size={96}
+                  iconSize={40}
+                  rank={profile.rank}
+                />
               </View>
               <Text
                 className="max-w-full px-4 text-center font-outfit-black text-2xl text-ink"
@@ -224,6 +230,9 @@ export default function UserProfileScreen() {
                 ellipsizeMode="tail"
               >
                 {displayName}
+              </Text>
+              <Text className="mt-1 text-center font-outfit-medium text-sm text-muted">
+                {XP_RANK_LABELS[profile.rank]}
               </Text>
               {profile.bio ? (
                 <View className="mt-3 w-full px-2">
@@ -286,7 +295,15 @@ export default function UserProfileScreen() {
               </FeedbackPressable>
             </View>
 
-            <Text className="mt-8 font-outfit-bold text-sm text-muted">Spots</Text>
+            <Text
+              className="mt-8 font-outfit-bold text-sm text-muted"
+              accessibilityRole="header"
+              accessibilityLabel={
+                spots.length > 0 ? `Spots, ${spots.length}` : 'Spots'
+              }
+            >
+              Spots{spots.length > 0 ? ` (${spots.length})` : ''}
+            </Text>
             {spotsError ? (
               <View className="mt-4 items-center rounded-2xl border border-errorBorder bg-errorSurface p-5">
                 <Text

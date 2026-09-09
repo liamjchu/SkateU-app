@@ -41,7 +41,7 @@ export default function ProfileFollowRow({
         accessibilityRole="link"
         accessibilityLabel={`Open ${label}'s profile`}
       >
-        <ProfileAvatar uri={user.avatarUrl} size={40} iconSize={18} />
+        <ProfileAvatar uri={user.avatarUrl} size={40} iconSize={18} rank={user.rank} />
         <Text
           className="ml-3 min-w-0 flex-1 font-outfit-semibold text-base text-ink"
           numberOfLines={1}

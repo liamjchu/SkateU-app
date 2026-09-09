@@ -21,6 +21,7 @@ import {
     mapSpot,
     MAX_IMAGE_BYTES,
     MAX_IMAGES,
+    MAP_SPOTS_LIMIT,
     MAX_SCHOOL_ID_LENGTH,
     NAME_MAX,
     PATCH,
@@ -427,13 +428,13 @@ describe('GET /api/spots', () => {
     const fetchMock: FetchMock = jest.fn(async (_input: string | URL | Request) => jsonResponse([]));
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    const response = await GET(
-      new Request('https://app.test/api/spots?schoolId=school1')
-    );
+    const response = await GET(new Request('https://app.test/api/spots'));
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ spots: [] });
     const spotsUrl = new URL(String(fetchMock.mock.calls[0][0]));
     expect(spotsUrl.searchParams.get('status')).toBe(VISIBLE_SPOT_STATUS_FILTER);
+    expect(spotsUrl.searchParams.get('school_id')).toBeNull();
+    expect(spotsUrl.searchParams.get('limit')).toBe(String(MAP_SPOTS_LIMIT));
   });
 
   it('filters blocked creators when a bearer token is present', async () => {
@@ -457,7 +458,7 @@ describe('GET /api/spots', () => {
     global.fetch = fetchMock as unknown as typeof fetch;
 
     const response = await GET(
-      new Request('https://app.test/api/spots?schoolId=school1', {
+      new Request('https://app.test/api/spots', {
         headers: { Authorization: 'Bearer good-token' },
       })
     );
@@ -491,9 +492,7 @@ describe('GET /api/spots', () => {
     };
     global.fetch = jest.fn(async () => jsonResponse([row])) as unknown as typeof fetch;
 
-    const response = await GET(
-      new Request('https://app.test/api/spots?schoolId=school1')
-    );
+    const response = await GET(new Request('https://app.test/api/spots'));
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       spots: [
@@ -509,6 +508,7 @@ describe('GET /api/spots', () => {
           schoolId: 'school1',
           creatorUsername: 'skater_jane',
           creatorAvatarUrl: null,
+          creatorRank: 'hobbyist',
           creatorUserId: null,
           createdAt: '2024-01-01T00:00:00.000Z',
           updatedAt: '2024-01-01T00:00:00.000Z',
@@ -521,10 +521,34 @@ describe('GET /api/spots', () => {
     });
   });
 
-  it('returns 400 when schoolId is missing', async () => {
+  it('returns all visible spots without requiring a schoolId', async () => {
     setConfigured();
+    const fetchMock: FetchMock = jest.fn(async (_input: string | URL | Request) =>
+      jsonResponse([])
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
     const response = await GET(new Request('https://app.test/api/spots'));
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ spots: [] });
+    const spotsUrl = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(spotsUrl.searchParams.get('school_id')).toBeNull();
+  });
+
+  it('ignores a leftover schoolId query param', async () => {
+    setConfigured();
+    const fetchMock: FetchMock = jest.fn(async (_input: string | URL | Request) =>
+      jsonResponse([])
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await GET(
+      new Request('https://app.test/api/spots?schoolId=school1')
+    );
+    expect(response.status).toBe(200);
+    const spotsUrl = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(spotsUrl.searchParams.get('school_id')).toBeNull();
+    expect(spotsUrl.searchParams.get('limit')).toBe(String(MAP_SPOTS_LIMIT));
   });
 
   it('returns recent spots without a schoolId', async () => {
@@ -607,12 +631,19 @@ describe('GET /api/spots', () => {
     expect(recentUrl.searchParams.get('schools.type')).toBeNull();
   });
 
-  it('returns 400 when schoolId is invalid', async () => {
+  it('ignores an invalid leftover schoolId query param', async () => {
     setConfigured();
+    const fetchMock: FetchMock = jest.fn(async (_input: string | URL | Request) =>
+      jsonResponse([])
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
     const response = await GET(
       new Request('https://app.test/api/spots?schoolId=bad%20id')
     );
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(200);
+    const spotsUrl = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(spotsUrl.searchParams.get('school_id')).toBeNull();
   });
 
   it('returns 500 when Supabase is not configured', async () => {
@@ -1259,6 +1290,7 @@ describe('mapSpot new fields', () => {
     expect(spot.schoolName).toBe('UT Austin');
     expect(spot.commentCount).toBe(0);
     expect(spot.creatorAvatarUrl).toBeNull();
+    expect(spot.creatorRank).toBe('hobbyist');
   });
 
   it('defaults schoolName and timestamps to empty string when absent', () => {
@@ -1280,6 +1312,7 @@ describe('mapSpot new fields', () => {
     expect(spot.updatedAt).toBe('');
     expect(spot.creatorUsername).toBeNull();
     expect(spot.creatorAvatarUrl).toBeNull();
+    expect(spot.creatorRank).toBeUndefined();
     expect(spot.commentCount).toBe(0);
   });
 
@@ -1318,6 +1351,23 @@ describe('mapSpot new fields', () => {
       },
     });
     expect(oauth.creatorAvatarUrl).toBeNull();
+  });
+
+  it('maps creator rank from live XP without exposing the number', () => {
+    const pro = mapSpot({
+      id: 'spot1',
+      school_id: 'school1',
+      name: 'Rail',
+      description: 'A rail',
+      latitude: 10,
+      longitude: 20,
+      image_urls: [],
+      created_at: '2024-01-01T00:00:00.000Z',
+      updated_at: '2024-01-01T00:00:00.000Z',
+      schools: { name: 'UT Austin', city: 'Austin', state: 'TX' },
+      creator: { username: 'skater_jane', xp_total: 5000 },
+    });
+    expect(pro.creatorRank).toBe('pro');
   });
 });
 
