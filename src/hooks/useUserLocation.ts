@@ -20,7 +20,15 @@ type UseUserLocationResult = {
   requestPermission: () => Promise<boolean>;
 };
 
-export function useUserLocation(enabled: boolean): UseUserLocationResult {
+type UseUserLocationOptions = {
+  requestIfNeeded?: boolean;
+};
+
+export function useUserLocation(
+  enabled: boolean,
+  options: UseUserLocationOptions = {}
+): UseUserLocationResult {
+  const requestIfNeeded = options.requestIfNeeded !== false;
   const [status, setStatus] = useState<UserLocationStatus>('idle');
   const [coords, setCoords] = useState<UserLocationCoords | null>(null);
   const [watchKey, setWatchKey] = useState(0);
@@ -79,6 +87,11 @@ export function useUserLocation(enabled: boolean): UseUserLocationResult {
       }
 
       if (!permission.granted) {
+        if (!requestIfNeeded) {
+          setStatus('denied');
+          return;
+        }
+
         setStatus('requesting');
         permission = await Location.requestForegroundPermissionsAsync();
         if (cancelled) {
@@ -123,7 +136,7 @@ export function useUserLocation(enabled: boolean): UseUserLocationResult {
       cancelled = true;
       subscription?.remove();
     };
-  }, [enabled, watchKey]);
+  }, [enabled, requestIfNeeded, watchKey]);
 
   return { coords, status, requestPermission };
 }

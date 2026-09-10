@@ -3,7 +3,11 @@ import { useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { colors } from '../constants/colors';
 import { PASSWORD_REQUIREMENTS, validatePassword } from '../lib/password';
-import { changePassword, setPassword } from '../lib/password-change';
+import {
+  changePassword,
+  setPassword,
+  toPasswordChangeErrorMessage,
+} from '../lib/password-change';
 import FeedbackPressable from './FeedbackPressable';
 
 type ChangePasswordFormProps = {
@@ -20,19 +24,6 @@ type PasswordFieldProps = {
   visible: boolean;
   onToggleVisibility: () => void;
   editable: boolean;
-};
-
-const getChangePasswordErrorMessage = (changeError: unknown): string => {
-  const message = changeError instanceof Error ? changeError.message : '';
-
-  if (message === 'Incorrect current password.') {
-    return message;
-  }
-  if (/network|fetch|internet/i.test(message)) {
-    return 'Check your internet connection and try again.';
-  }
-
-  return 'We couldn’t update your password right now. Please try again.';
 };
 
 function PasswordField({
@@ -139,7 +130,7 @@ export default function ChangePasswordForm({
           : 'Your password has been updated.'
       );
     } catch (changeError) {
-      setError(getChangePasswordErrorMessage(changeError));
+      setError(toPasswordChangeErrorMessage(changeError));
     } finally {
       setSubmitting(false);
     }

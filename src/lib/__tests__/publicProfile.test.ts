@@ -72,6 +72,23 @@ describe('mapPublicProfileView', () => {
     });
   });
 
+  it('maps xpTotal when the payload includes it', () => {
+    expect(
+      mapPublicProfileView({
+        profile: { id: userId, username: 'skater_jane' },
+        rank: 'flow_rider',
+        xpTotal: 1000,
+        followerCount: 0,
+        followingCount: 0,
+        isFollowing: false,
+      })
+    ).toMatchObject({
+      id: userId,
+      rank: 'flow_rider',
+      xpTotal: 1000,
+    });
+  });
+
   it('rejects malformed payloads and empty ids', () => {
     expect(mapPublicProfileView(null)).toBeNull();
     expect(mapPublicProfileView([])).toBeNull();
@@ -336,12 +353,27 @@ describe('fetchCreatorSpots', () => {
       },
     ];
     fetchMock.mockResolvedValue(jsonResponse({ spots }));
-    await expect(fetchCreatorSpots(userId, 'token')).resolves.toEqual(spots);
+    await expect(fetchCreatorSpots(userId, 'token')).resolves.toEqual({
+      spots,
+      total: 1,
+    });
   });
 
   it('returns an empty list when spots is missing', async () => {
     fetchMock.mockResolvedValue(jsonResponse({}));
-    await expect(fetchCreatorSpots(userId)).resolves.toEqual([]);
+    await expect(fetchCreatorSpots(userId)).resolves.toEqual({
+      spots: [],
+      total: 0,
+    });
+  });
+
+  it('requests the next page with an offset', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ spots: [], total: 24 }));
+    await fetchCreatorSpots(userId, 'token', 12);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `http://localhost:8081/api/spots?creatorUserId=${userId}&offset=12`,
+      expect.objectContaining({ method: 'GET' })
+    );
   });
 
   it('throws when the spots request fails', async () => {

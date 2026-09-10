@@ -190,6 +190,8 @@ describe('legal route lock', () => {
     expect(isSettledLegalRoute('accept-legal', 'index')).toBe(false);
     expect(isSettledLegalRoute('accept-legal', 'accept-legal')).toBe(true);
     expect(isSettledLegalRoute('none', 'index')).toBe(true);
+    expect(isSettledLegalRoute('none', '(tabs)')).toBe(true);
+    expect(isSettledLegalRoute('age-gate', '(tabs)')).toBe(false);
     expect(isSettledLegalRoute('none', 'legal')).toBe(true);
     expect(isSettledLegalRoute('none', 'age-gate')).toBe(true);
     expect(isSettledLegalRoute('none', 'onboarding')).toBe(false);

@@ -1,6 +1,7 @@
 import {
   applyBlockedUserFilter,
   fetchBlockedUserIds,
+  fetchBlockedUserIdsEitherWay,
   fetchReportedCommentIds,
 } from '../blockedUsers';
 
@@ -56,6 +57,24 @@ describe('fetchBlockedUserIds', () => {
   it('throws the response body when the lookup fails', async () => {
     fetchMock.mockResolvedValue(new Response('nope', { status: 500 }));
     await expect(fetchBlockedUserIds(config, 'user-1')).rejects.toThrow('nope');
+  });
+});
+
+describe('fetchBlockedUserIdsEitherWay', () => {
+  it('returns the other party from blocks in either direction', async () => {
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify([
+          { blocker_id: 'user-1', blocked_id: 'user-2' },
+          { blocker_id: 'user-3', blocked_id: 'user-1' },
+          { blocker_id: 'user-1', blocked_id: '' },
+        ]),
+        { status: 200 }
+      )
+    );
+    await expect(fetchBlockedUserIdsEitherWay(config, 'user-1')).resolves.toEqual(
+      ['user-2', 'user-3']
+    );
   });
 });
 

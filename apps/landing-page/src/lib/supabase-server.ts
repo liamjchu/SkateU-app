@@ -2,9 +2,40 @@ import "server-only";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+type ShopOrderPaymentStatus = "paid" | "unpaid" | "no_payment_required";
+
+type ShopOrderRow = {
+  id: string;
+  session_id: string;
+  email: string | null;
+  product_slug: string;
+  quantity: number;
+  amount_total: number | null;
+  currency: string;
+  payment_status: ShopOrderPaymentStatus;
+  shipping_name: string | null;
+  shipping_line1: string | null;
+  shipping_line2: string | null;
+  shipping_city: string | null;
+  shipping_state: string | null;
+  shipping_postal_code: string | null;
+  shipping_country: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type ShopOrderInsert = Omit<ShopOrderRow, "id" | "created_at" | "updated_at">;
+
 type Database = {
   public: {
-    Tables: Record<never, never>;
+    Tables: {
+      shop_orders: {
+        Row: ShopOrderRow;
+        Insert: ShopOrderInsert;
+        Update: Partial<ShopOrderInsert>;
+        Relationships: [];
+      };
+    };
     Views: Record<never, never>;
     Functions: {
       subscribe_email: {

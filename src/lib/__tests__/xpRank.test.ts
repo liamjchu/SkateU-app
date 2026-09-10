@@ -12,6 +12,7 @@ import {
   parseXpRank,
   rankFromXp,
   rankProgress,
+  formatXpToNextLabel,
   xpToNextRank,
 } from '../xpRank';
 
@@ -42,6 +43,9 @@ describe('xpRank', () => {
     expect(nextRank('pro')).toBeNull();
     expect(xpToNextRank(42)).toEqual({ next: 'shop_rider', remaining: 58 });
     expect(xpToNextRank(5000)).toBeNull();
+    expect(formatXpToNextLabel(42)).toBe('42/100 XP to Shop Rider');
+    expect(formatXpToNextLabel(1000)).toBe('1000/1500 XP to Amateur');
+    expect(formatXpToNextLabel(5000)).toBe('5000 XP');
     expect(rankProgress(0)).toBe(0);
     expect(rankProgress(50)).toBe(0.5);
     expect(rankProgress(100)).toBe(0);

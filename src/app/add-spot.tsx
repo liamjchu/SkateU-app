@@ -21,6 +21,7 @@ import ScreenHeader from '../components/screen-header';
 import SpotImagePicker from '../components/SpotImagePicker';
 import SpotSocialNotice from '../components/spot-social-notice';
 import { colors } from '../constants/colors';
+import { getApiUrl } from '../lib/api';
 import {
     getSpotFormErrors,
     getSpotFormMissingSummary,
@@ -29,6 +30,8 @@ import {
     SPOT_NAME_MAX,
 } from '../lib/addSpotForm';
 import { triggerHaptic } from '../lib/haptics';
+import { nearestSchool } from '../lib/mapFocus';
+import { parseSchools } from '../lib/readCache';
 import {
     draftImagesToMedia,
     isMeaningfulDraftContent,
@@ -49,6 +52,7 @@ import { useAuthStore } from '../store/authStore';
 import { useDraftSpotsStore } from '../store/draftSpotsStore';
 import { useMapViewStore } from '../store/mapViewStore';
 import { useProfileStore } from '../store/profileStore';
+import { useSchools } from '../store/schoolsStore';
 import { useSpotsStore } from '../store/spotsStore';
 import type { SpotMediaItem } from '../types/spot';
 
@@ -152,6 +156,7 @@ export default function AddSpotScreen() {
     (s) => s.cancelDraftSubmission
   );
   const deleteDraft = useDraftSpotsStore((s) => s.deleteDraft);
+  const upsertSchool = useSchools((s) => s.upsertSchool);
 
   const locationChanged = coordinatesDiffer(
     selectedLocation,
@@ -247,6 +252,57 @@ export default function AddSpotScreen() {
       cancelled = true;
     };
   }, [draftIdParam, getDraft, hasHydratedDrafts]);
+
+  useEffect(() => {
+    if (!draftReady) {
+      return;
+    }
+
+    const catalogMatch = nearestSchool(useSchools.getState().schools, {
+      latitude: selectedLocation.latitude,
+      longitude: selectedLocation.longitude,
+    });
+    if (catalogMatch) {
+      setResolvedSchoolId(catalogMatch.id);
+      setResolvedSchoolName(catalogMatch.name);
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      void (async () => {
+        try {
+          const response = await fetch(
+            getApiUrl(
+              `/api/schools?nearest=1&lat=${selectedLocation.latitude}&lng=${selectedLocation.longitude}`
+            )
+          );
+          if (!response.ok) {
+            return;
+          }
+          const body = (await response.json()) as { schools?: unknown };
+          const school = parseSchools(body.schools)[0];
+          if (cancelled || !school) {
+            return;
+          }
+          upsertSchool(school);
+          setResolvedSchoolId(school.id);
+          setResolvedSchoolName(school.name);
+        } catch {
+          // Keep the last campus label; save still assigns the closest school.
+        }
+      })();
+    }, DRAFT_AUTOSAVE_MS);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [
+    draftReady,
+    selectedLocation.latitude,
+    selectedLocation.longitude,
+    upsertSchool,
+  ]);
 
   const persistDraftNow = useCallback(async () => {
     const previous = persistInFlightRef.current;
@@ -354,6 +410,8 @@ export default function AddSpotScreen() {
     saving,
     selectedLocation.latitude,
     selectedLocation.longitude,
+    resolvedSchoolId,
+    resolvedSchoolName,
     submitted,
   ]);
 

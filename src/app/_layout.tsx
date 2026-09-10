@@ -40,6 +40,7 @@ import { useBlocksStore } from '../store/blocksStore';
 import { useCommentsStore } from '../store/commentsStore';
 import { useDraftSpotsStore } from '../store/draftSpotsStore';
 import { useFavorites } from '../store/favoritesStore';
+import { useNotificationsStore } from '../store/notificationsStore';
 import { useProfileStore } from '../store/profileStore';
 import { useSchools } from '../store/schoolsStore';
 import { useSpotsStore } from '../store/spotsStore';
@@ -130,6 +131,7 @@ function RootLayout() {
   );
   const fetchBlocks = useBlocksStore((state) => state.fetchBlocks);
   const clearBlocks = useBlocksStore((state) => state.clear);
+  const syncNotificationsUser = useNotificationsStore((state) => state.syncUser);
   const setSessionUserId = useSpotsStore((state) => state.setSessionUserId);
   const [cachesReady, setCachesReady] = useState(false);
   useXpFeedback();
@@ -195,6 +197,7 @@ function RootLayout() {
     }
 
     setSessionUserId(userId);
+    syncNotificationsUser(userId);
 
     if (userId) {
       fetchProfile(userId, accessToken);
@@ -209,7 +212,7 @@ function RootLayout() {
     clearReportedSpotIds();
     clearProfile();
     clearBlocks();
-  }, [cachesReady, clearBlocks, clearLikedSpots, clearMySpots, clearReportedSpotIds, fetchBlocks, setSessionUserId, userId, accessToken, fetchProfile, clearProfile]);
+  }, [cachesReady, clearBlocks, clearLikedSpots, clearMySpots, clearReportedSpotIds, fetchBlocks, setSessionUserId, syncNotificationsUser, userId, accessToken, fetchProfile, clearProfile]);
 
   useEffect(() => {
     // Supabase redirects OAuth and recovery emails to distinct native paths.
@@ -367,15 +370,15 @@ function RootLayout() {
           <FocusedTouchGate>{children}</FocusedTouchGate>
         )}
       >
-        <Stack.Screen name="index" options={{ animation: 'none' }} />
+        <Stack.Screen name="(tabs)" options={{ animation: 'none' }} />
         <Stack.Screen name="onboarding" />
         <Stack.Screen name="age-gate" />
         <Stack.Screen name="age-restricted" />
         <Stack.Screen name="accept-legal" />
         <Stack.Screen name="legal" />
-        <Stack.Screen name="profile" />
         <Stack.Screen name="user/[userId]" />
         <Stack.Screen name="follow-list" />
+        <Stack.Screen name="notifications" />
         <Stack.Screen name="settings" />
         <Stack.Screen name="blocked-accounts" />
         <Stack.Screen name="help" />
@@ -397,7 +400,6 @@ function RootLayout() {
         <Stack.Screen name="update-password" />
         <Stack.Screen name="verify-otp" />
         <Stack.Screen name="verify-delete-account" />
-        <Stack.Screen name="map" options={{ contentStyle: { backgroundColor: colors.brand } }} />
         <Stack.Screen name="add-spot" options={{ contentStyle: { backgroundColor: colors.surface } }} />
         <Stack.Screen name="edit-spot" options={{ contentStyle: { backgroundColor: colors.surface } }} />
         <Stack.Screen name="request-spot-removal" options={{ contentStyle: { backgroundColor: colors.surface } }} />

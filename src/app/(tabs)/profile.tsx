@@ -17,41 +17,41 @@ import Animated, {
     useSharedValue,
     withTiming
 } from 'react-native-reanimated';
-import FeedbackPressable from '../components/FeedbackPressable';
-import ProfileAvatar from '../components/ProfileAvatar';
-import ProfileBioText from '../components/ProfileBioText';
-import ProfileFollowStats from '../components/profile-follow-stats';
-import ProfileSpotRow from '../components/profile-spot-row';
-import ProfileXpPanel from '../components/profile-xp-panel';
-import ScreenHeader from '../components/screen-header';
-import StaleCacheBanner from '../components/StaleCacheBanner';
-import SocialLinks from '../components/social-links';
-import { colors } from '../constants/colors';
-import { displayableAvatarUrl } from '../lib/avatarUrl';
-import { triggerHaptic } from '../lib/haptics';
-import { formatRelativeTime } from '../lib/relativeTime';
+import FeedbackPressable from '../../components/FeedbackPressable';
+import ProfileAvatar from '../../components/ProfileAvatar';
+import ProfileIdentityCard from '../../components/profile-identity-card';
+import ProfileSpotRow from '../../components/profile-spot-row';
+import ProfileXpPanel from '../../components/profile-xp-panel';
+import ScreenHeader from '../../components/screen-header';
+import StaleCacheBanner from '../../components/StaleCacheBanner';
+import SocialLinks from '../../components/social-links';
+import { colors } from '../../constants/colors';
+import { displayableAvatarUrl } from '../../lib/avatarUrl';
+import { triggerHaptic } from '../../lib/haptics';
+import { formatRelativeTime } from '../../lib/relativeTime';
 import {
     draftsForUser,
     getDraftStatusHint,
     submittingDraftsForUser,
-} from '../lib/spotDraft';
+} from '../../lib/spotDraft';
 import {
     CANCEL_SUBMISSION_MESSAGE,
     CANCEL_SUBMISSION_TITLE,
-} from '../lib/spotSubmission';
-import { STALE_SPOTS_MESSAGE } from '../lib/readCache';
-import { toMutationError, toUserFacingError } from '../lib/userFacingError';
-import { guardedNavigate, useGuardedRouter } from '../lib/navigationGuard';
-import { fetchPublicProfileView } from '../lib/publicProfile';
-import { fetchXpEvents } from '../lib/xpEvents';
-import { rankFromXp } from '../lib/xpRank';
-import { useAuthStore } from '../store/authStore';
-import { useDraftSpotsStore } from '../store/draftSpotsStore';
-import { useProfileStore } from '../store/profileStore';
-import { useSpotsStore } from '../store/spotsStore';
-import type { Spot } from '../types/spot';
-import type { SpotDraft } from '../types/spotDraft';
-import type { XpEventView } from '../types/xp';
+} from '../../lib/spotSubmission';
+import { STALE_SPOTS_MESSAGE } from '../../lib/readCache';
+import { toMutationError, toUserFacingError } from '../../lib/userFacingError';
+import { openSpotOnMap } from '../../lib/mapNavigation';
+import { guardedNavigate, useGuardedRouter } from '../../lib/navigationGuard';
+import { fetchPublicProfileView } from '../../lib/publicProfile';
+import { fetchXpEvents } from '../../lib/xpEvents';
+import { rankFromXp } from '../../lib/xpRank';
+import { useAuthStore } from '../../store/authStore';
+import { useDraftSpotsStore } from '../../store/draftSpotsStore';
+import { useProfileStore } from '../../store/profileStore';
+import { useSpotsStore } from '../../store/spotsStore';
+import type { Spot } from '../../types/spot';
+import type { SpotDraft } from '../../types/spotDraft';
+import type { XpEventView } from '../../types/xp';
 
 type ProfileSpotTab = 'created' | 'liked' | 'drafts';
 const PROFILE_TAB_COUNT = 3;
@@ -438,28 +438,12 @@ export default function ProfileScreen() {
   };
 
   const handleSpotPress = (spot: Spot) => {
-    if (!spot.schoolId) {
+    if (!openSpotOnMap(router, spot)) {
       Alert.alert(
         'Campus map unavailable',
         'This spot is not tied to a campus, so there is no map to open.'
       );
-      return;
     }
-
-    guardedNavigate(`map-spot:${spot.id}`, () => {
-      router.push({
-        pathname: '/map',
-        params: {
-          lat: spot.latitude.toString(),
-          lng: spot.longitude.toString(),
-          schoolId: spot.schoolId,
-          schoolName: spot.schoolName || 'Campus map',
-          schoolCity: spot.city,
-          schoolState: spot.state,
-          spotId: spot.id,
-        },
-      });
-    });
   };
 
   const handleUnlike = async (spot: Spot) => {
@@ -537,153 +521,162 @@ export default function ProfileScreen() {
     <View className="flex-1 bg-surface">
       <ScreenHeader
         title="Profile"
-        onBack={() => {
-          if (router.canGoBack()) {
-            router.back();
-            return;
-          }
-
-          router.replace('/');
-        }}
         rightAction={
-          <FeedbackPressable
-            haptic="light"
-            onPress={() =>
-              guardedNavigate('settings', () => {
-                router.push('/settings');
-              })
-            }
-            className="h-12 w-12 items-center justify-center rounded-full"
-            accessibilityLabel="Open settings"
-            accessibilityRole="button"
-          >
-            <Feather name="settings" size={23} color="#FFFFFF" />
-          </FeedbackPressable>
+          user ? (
+            <FeedbackPressable
+              haptic="light"
+              onPress={() =>
+                guardedNavigate('settings', () => {
+                  router.push('/settings');
+                })
+              }
+              className="h-12 w-12 items-center justify-center rounded-full"
+              accessibilityLabel="Open settings"
+              accessibilityRole="button"
+            >
+              <Feather name="settings" size={23} color="#FFFFFF" />
+            </FeedbackPressable>
+          ) : undefined
         }
       />
 
+      {!user ? (
+        <View className="flex-1 items-center justify-center px-8">
+          <View className="w-full max-w-[400px] items-center rounded-2xl bg-field p-6">
+            <ProfileAvatar size={96} iconSize={40} />
+            <Text className="mt-4 text-center font-outfit-black text-2xl text-ink">
+              Your profile
+            </Text>
+            <Text className="mt-2 text-center font-outfit-medium text-base leading-6 text-muted">
+              Log in to save spots, follow skaters, and keep your profile.
+            </Text>
+            <FeedbackPressable
+              haptic="light"
+              onPress={() =>
+                guardedNavigate('signup', () => {
+                  router.push('/signup');
+                })
+              }
+              className="mt-6 h-12 w-full items-center justify-center rounded-2xl bg-accent"
+              accessibilityRole="button"
+              accessibilityLabel="Sign up"
+            >
+              <Text className="font-outfit-bold text-base text-brand">Sign up</Text>
+            </FeedbackPressable>
+            <FeedbackPressable
+              haptic="selection"
+              onPress={() =>
+                guardedNavigate('login', () => {
+                  router.push('/login');
+                })
+              }
+              className="mt-3 h-12 w-full items-center justify-center rounded-2xl bg-surface-soft"
+              accessibilityRole="button"
+              accessibilityLabel="Log in"
+            >
+              <Text className="font-outfit-bold text-base text-ink">Log in</Text>
+            </FeedbackPressable>
+          </View>
+        </View>
+      ) : (
       <ScrollView
         className="flex-1"
         contentContainerClassName="self-center w-full max-w-[720px] px-6 pb-10 pt-6"
         showsVerticalScrollIndicator={false}
       >
-        <View className="items-center rounded-2xl bg-field p-6">
-          <FeedbackPressable
-            haptic="selection"
-            onPress={() => {
-              void handleAvatarPress();
-            }}
-            disabled={updatingAvatar}
-            className="mb-4"
-            accessibilityRole="button"
-            accessibilityLabel={
-              displayableAvatarUrl(avatarUrl)
-                ? 'Change profile photo'
-                : 'Add profile photo'
+        <ProfileIdentityCard
+          uri={avatarUrl}
+          rank={rankFromXp(xpTotal)}
+          displayName={username ? `@${username}` : 'Your Profile'}
+          spotCount={mySpots.length}
+          followerCount={followerCount}
+          followingCount={followingCount}
+          bio={bio}
+          onAvatarPress={() => {
+            void handleAvatarPress();
+          }}
+          avatarBusy={updatingAvatar}
+          avatarAccessibilityLabel={
+            displayableAvatarUrl(avatarUrl)
+              ? 'Change profile photo'
+              : 'Add profile photo'
+          }
+          avatarOverlay={
+            updatingAvatar ? (
+              <View
+                pointerEvents="none"
+                className="items-center justify-center rounded-full bg-black/40"
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                }}
+              >
+                <ActivityIndicator color={colors.white} size="small" />
+              </View>
+            ) : (
+              <View
+                className="absolute items-center justify-center bg-brand"
+                style={{
+                  bottom: 0,
+                  right: 0,
+                  width: 28,
+                  height: 28,
+                  borderRadius: 14,
+                  overflow: 'hidden',
+                }}
+              >
+                <Feather name="camera" size={13} color={colors.white} />
+              </View>
+            )
+          }
+          onFollowersPress={() => {
+            if (!user?.id) {
+              return;
             }
-            accessibilityState={{ busy: updatingAvatar, disabled: updatingAvatar }}
-          >
-            <View>
-              <ProfileAvatar
-                uri={avatarUrl}
-                size={96}
-                iconSize={40}
-                rank={rankFromXp(xpTotal)}
-              />
-              {updatingAvatar ? (
-                <View
-                  pointerEvents="none"
-                  className="items-center justify-center rounded-full bg-black/40"
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                  }}
-                >
-                  <ActivityIndicator color={colors.white} size="small" />
-                </View>
-              ) : (
-                <View
-                  className="absolute items-center justify-center bg-brand"
-                  style={{
-                    bottom: 0,
-                    right: 0,
-                    width: 32,
-                    height: 32,
-                    borderRadius: 16,
-                    overflow: 'hidden',
-                  }}
-                >
-                  <Feather name="camera" size={14} color={colors.white} />
-                </View>
-              )}
-            </View>
-          </FeedbackPressable>
-
-          <Text
-            className="max-w-full px-4 text-center font-outfit-black text-2xl text-ink"
-            numberOfLines={1}
-            ellipsizeMode="tail"
-          >
-            {username ? `@${username}` : 'Your Profile'}
-          </Text>
-
-          <ProfileXpPanel xpTotal={xpTotal} events={xpEvents} />
-
-          {bio ? (
-            <View className="mt-3 w-full px-2">
-              <ProfileBioText bio={bio} />
-            </View>
-          ) : (
+            router.push({
+              pathname: '/follow-list',
+              params: {
+                userId: user.id,
+                tab: 'followers',
+                ...(username ? { username } : {}),
+              },
+            });
+          }}
+          onFollowingPress={() => {
+            if (!user?.id) {
+              return;
+            }
+            router.push({
+              pathname: '/follow-list',
+              params: {
+                userId: user.id,
+                tab: 'following',
+                ...(username ? { username } : {}),
+              },
+            });
+          }}
+        >
+          {bio ? null : (
             <FeedbackPressable
               haptic="selection"
               onPress={() => router.push('/edit-bio')}
-              className="mt-3"
+              className="mt-4 self-start"
               accessibilityRole="button"
               accessibilityLabel="Add a bio"
             >
-              <Text className="text-center font-outfit-medium text-sm text-muted">
+              <Text className="text-left font-outfit-medium text-sm text-muted">
                 Add a bio
               </Text>
             </FeedbackPressable>
           )}
-
-          <ProfileFollowStats
-            followerCount={followerCount}
-            followingCount={followingCount}
-            onFollowersPress={() => {
-              if (!user?.id) {
-                return;
-              }
-              router.push({
-                pathname: '/follow-list',
-                params: {
-                  userId: user.id,
-                  tab: 'followers',
-                  ...(username ? { username } : {}),
-                },
-              });
-            }}
-            onFollowingPress={() => {
-              if (!user?.id) {
-                return;
-              }
-              router.push({
-                pathname: '/follow-list',
-                params: {
-                  userId: user.id,
-                  tab: 'following',
-                  ...(username ? { username } : {}),
-                },
-              });
-            }}
-          />
-        </View>
+          <ProfileXpPanel xpTotal={xpTotal} events={xpEvents} />
+        </ProfileIdentityCard>
 
         <View
-          className="relative mt-8 flex-row rounded-2xl bg-surface-soft p-1"
+          className="relative mt-5 flex-row rounded-2xl bg-surface-soft p-1"
           onLayout={(event) => {
             spotToggleWidth.value = event.nativeEvent.layout.width;
           }}
@@ -992,6 +985,7 @@ export default function ProfileScreen() {
           <SocialLinks showCaption />
         </View>
       </ScrollView>
+      )}
     </View>
   );
 }

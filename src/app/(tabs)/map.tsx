@@ -33,59 +33,71 @@ import Animated, {
 import { useIsFocused } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
-import FeedbackPressable from '../components/FeedbackPressable';
-import LoginRequiredModal from '../components/LoginRequiredModal';
-import MapCompassButton from '../components/MapCompassButton';
-import MapSpotSheetPage from '../components/map-spot-sheet-page';
-import SpotFullscreenViewer from '../components/spot-fullscreen-viewer';
-import StaleCacheBanner from '../components/StaleCacheBanner';
-import { StickerStripe } from '../components/sticker';
-import images from '../constants/images';
-import { colors } from '../constants/colors';
+import FeedbackPressable from '../../components/FeedbackPressable';
+import LoginRequiredModal from '../../components/LoginRequiredModal';
+import MapCompassButton from '../../components/MapCompassButton';
+import MapExploreChrome from '../../components/map-explore-chrome';
+import MapSpotSheetPage from '../../components/map-spot-sheet-page';
+import SpotFullscreenViewer from '../../components/spot-fullscreen-viewer';
+import StaleCacheBanner from '../../components/StaleCacheBanner';
+import images from '../../constants/images';
+import { colors } from '../../constants/colors';
 import {
     CAMPUS_MAP_PIN_CSS,
     buildSelectSpotJavascript,
     getCampusMapPinScript,
-} from '../lib/campusMapPins';
-import { goToMyLocation } from '../lib/goToMyLocation';
+} from '../../lib/campusMapPins';
+import { goToMyLocation } from '../../lib/goToMyLocation';
 import {
     CAMPUS_USER_LOCATION_ZOOM,
     buildGoToUserLocationJavascript,
     buildSetUserLocationJavascript,
     CLEAR_USER_LOCATION_JAVASCRIPT,
     getLeafletUserLocationScript,
-} from '../lib/leafletUserLocation';
+} from '../../lib/leafletUserLocation';
+import {
+    buildFlyToCampusJavascript,
+    buildSetCampusCenterJavascript,
+    DEFAULT_MAP_CENTER,
+    densestSchool,
+    MAP_EXPLORE_CHROME_CONTENT_HEIGHT,
+    nearestSchool,
+    parseMapRouteFocus,
+} from '../../lib/mapFocus';
 import {
     getCreateMapLibreMapScript,
     getMapLibreBaseCss,
     getMapLibreHeadTags,
     getMapLibreLoaderScript,
     MAP_WEBVIEW_BASE_URL,
-} from '../lib/openFreeMap';
-import { captureAnalyticsEvent } from '../lib/analytics';
-import { triggerHaptic } from '../lib/haptics';
-import { sortSpotsByDistanceFrom } from '../lib/spotDistance';
+} from '../../lib/openFreeMap';
+import { captureAnalyticsEvent } from '../../lib/analytics';
+import { triggerHaptic } from '../../lib/haptics';
+import { sortSpotsByDistanceFrom } from '../../lib/spotDistance';
 import {
     getSpotSelectionStatus,
     SPOT_LOAD_FAILED_MESSAGE,
-} from '../lib/spotAvailability';
-import { STALE_SPOTS_MESSAGE } from '../lib/readCache';
-import { toMutationError } from '../lib/userFacingError';
-import { guardedNavigate, useGuardedRouter } from '../lib/navigationGuard';
-import { draftsForSchool } from '../lib/spotDraft';
-import { useUserLocation } from '../hooks/useUserLocation';
-import { useAuthStore } from '../store/authStore';
-import { useBlocksStore } from '../store/blocksStore';
-import { useCommentsStore } from '../store/commentsStore';
-import { useDraftSpotsStore } from '../store/draftSpotsStore';
-import { useFavorites } from '../store/favoritesStore';
-import { useMapViewStore } from '../store/mapViewStore';
-import { useSchools } from '../store/schoolsStore';
-import { useSpotsStore } from '../store/spotsStore';
-import type { School } from '../types/school';
-import type { Spot } from '../types/spot';
+} from '../../lib/spotAvailability';
+import { STALE_SPOTS_MESSAGE } from '../../lib/readCache';
+import { toMutationError } from '../../lib/userFacingError';
+import { guardedNavigate, useGuardedRouter } from '../../lib/navigationGuard';
+import { draftsForSchool } from '../../lib/spotDraft';
+import { useUserLocation } from '../../hooks/useUserLocation';
+import { useAuthStore } from '../../store/authStore';
+import { useBlocksStore } from '../../store/blocksStore';
+import { useCommentsStore } from '../../store/commentsStore';
+import { useDraftSpotsStore } from '../../store/draftSpotsStore';
+import { useFavorites } from '../../store/favoritesStore';
+import { useMapFocusStore } from '../../store/mapFocusStore';
+import { useMapViewStore } from '../../store/mapViewStore';
+import { useSchools } from '../../store/schoolsStore';
+import { useSpotsStore } from '../../store/spotsStore';
+import type { School } from '../../types/school';
+import type { Spot } from '../../types/spot';
 
 const COLLAPSED_SHEET_HEIGHT = 100;
+/** Handle, title, photo, and a 1-line description. Directions stay in the inner scroll. */
+const EXPANDED_SHEET_CONTENT_HEIGHT = 328;
 const TILE_ERROR_THRESHOLD = 3;
 
 const MAP_ATTRIBUTIONS = {
@@ -130,7 +142,7 @@ export default function MapScreen() {
   const error = useSpotsStore((s) => s.error);
   const spotsFetchedAt = useSpotsStore((s) => s.spotsFetchedAt);
   const fetchSpots = useSpotsStore((s) => s.fetchSpots);
-  const { schools, upsertSchool } = useSchools();
+  const { schools, popularSchools, hasHydrated: schoolsHydrated, upsertSchool } = useSchools();
   const { favoriteSchoolIds, toggleFavoriteSchool } = useFavorites();
   const sharedMapLayer = useMapViewStore((state) => state.mapLayer);
   const setSharedMapLayer = useMapViewStore((state) => state.setMapLayer);
@@ -146,7 +158,7 @@ export default function MapScreen() {
     coords: userLocation,
     status: userLocationStatus,
     requestPermission: requestUserLocationPermission,
-  } = useUserLocation(isFocused && mapStatus === 'ready');
+  } = useUserLocation(isFocused, { requestIfNeeded: false });
   const [selectedSpotId, setSelectedSpotId] = useState<string | undefined>(
     undefined
   );
@@ -209,61 +221,116 @@ export default function MapScreen() {
     }
   }, [initialMapLayer, mapLayer, setSharedMapLayer, sharedMapLayer]);
 
-  const schoolId = Array.isArray(searchParams.schoolId)
-    ? searchParams.schoolId[0]
-    : searchParams.schoolId;
-  const schoolName = Array.isArray(searchParams.schoolName)
-    ? searchParams.schoolName[0]
-    : searchParams.schoolName;
-  const schoolCity = Array.isArray(searchParams.schoolCity)
-    ? searchParams.schoolCity[0]
-    : searchParams.schoolCity;
-  const schoolState = Array.isArray(searchParams.schoolState)
-    ? searchParams.schoolState[0]
-    : searchParams.schoolState;
-  const schoolNumSpotsParam = Array.isArray(searchParams.schoolNumSpots)
-    ? searchParams.schoolNumSpots[0]
-    : searchParams.schoolNumSpots;
-  const displayedSchoolName = schoolName ?? 'Campus map';
-  const locationSubtitle = schoolCity && schoolState 
-          ? `${schoolCity}, ${schoolState}` 
-          : '';
-
-  const lat = Number(searchParams.lat ?? '41.8268');
-  const lng = Number(searchParams.lng ?? '-71.4010');
-  const validLat = Number.isFinite(lat) ? lat : 41.8268;
-  const validLng = Number.isFinite(lng) ? lng : -71.4010;
-  const schoolNumSpots = Number(schoolNumSpotsParam ?? '0');
-  const currentSchool = useMemo<School | null>(() => {
-    if (!schoolId || !schoolName) {
-      return null;
-    }
-
-    const savedSchool = schools.find((school) => school.id === schoolId);
-
-    return {
-      id: schoolId,
-      name: schoolName,
-      lat: savedSchool?.lat ?? validLat,
-      lng: savedSchool?.lng ?? validLng,
-      city: savedSchool?.city ?? schoolCity ?? '',
-      state: savedSchool?.state ?? schoolState ?? '',
-      numSpots: savedSchool?.numSpots ?? (Number.isFinite(schoolNumSpots) ? schoolNumSpots : 0),
-      type: savedSchool?.type,
-    };
-  }, [
-    schoolCity,
-    schoolId,
-    schoolName,
-    schoolNumSpots,
-    schoolState,
-    schools,
-    validLat,
-    validLng,
-  ]);
+  const focusedSchool = useMapFocusStore((state) => state.school);
+  const focusLatitude = useMapFocusStore((state) => state.latitude);
+  const focusLongitude = useMapFocusStore((state) => state.longitude);
+  const focusSpotId = useMapFocusStore((state) => state.spotId);
+  const cameraGeneration = useMapFocusStore((state) => state.cameraGeneration);
+  const hasUserChosenFocus = useMapFocusStore((state) => state.hasUserChosenFocus);
+  const setSchoolFocus = useMapFocusStore((state) => state.setSchoolFocus);
+  const setCoordinateFocus = useMapFocusStore((state) => state.setCoordinateFocus);
+  const applyRouteParams = useMapFocusStore((state) => state.applyRouteParams);
+  const dismissSchoolFocus = useMapFocusStore((state) => state.dismissSchool);
+  const currentSchool = focusedSchool;
+  const schoolId = currentSchool?.id;
+  const validLat = Number.isFinite(focusLatitude)
+    ? focusLatitude
+    : DEFAULT_MAP_CENTER.latitude;
+  const validLng = Number.isFinite(focusLongitude)
+    ? focusLongitude
+    : DEFAULT_MAP_CENTER.longitude;
+  const initialCenterRef = useRef({
+    latitude: useMapFocusStore.getState().latitude,
+    longitude: useMapFocusStore.getState().longitude,
+  });
+  const appliedRouteKeyRef = useRef('');
+  const lastFlownGenerationRef = useRef(0);
   const isFavoriteSchool = currentSchool
     ? favoriteSchoolIds.includes(currentSchool.id)
     : false;
+
+  useEffect(() => {
+    const parsed = parseMapRouteFocus(
+      searchParams as Record<string, string | string[] | undefined>,
+      schools
+    );
+    if (!parsed) {
+      return;
+    }
+
+    const key = `${parsed.school?.id ?? ''}:${parsed.spotId ?? ''}:${parsed.latitude}:${parsed.longitude}`;
+    if (appliedRouteKeyRef.current === key) {
+      return;
+    }
+
+    appliedRouteKeyRef.current = key;
+    applyRouteParams(
+      searchParams as Record<string, string | string[] | undefined>,
+      schools
+    );
+  }, [applyRouteParams, schools, searchParams]);
+
+  useEffect(() => {
+    if (hasUserChosenFocus) {
+      return;
+    }
+
+    if (
+      userLocationStatus === 'idle' ||
+      userLocationStatus === 'requesting'
+    ) {
+      return;
+    }
+
+    if (userLocationStatus === 'ready' && userLocation) {
+      setCoordinateFocus(userLocation.latitude, userLocation.longitude);
+      return;
+    }
+
+    if (!schoolsHydrated) {
+      return;
+    }
+
+    const fallbackSchool = densestSchool(
+      popularSchools.length > 0 ? popularSchools : schools
+    );
+    if (fallbackSchool) {
+      setSchoolFocus(fallbackSchool);
+      return;
+    }
+
+    setCoordinateFocus(
+      DEFAULT_MAP_CENTER.latitude,
+      DEFAULT_MAP_CENTER.longitude
+    );
+  }, [
+    hasUserChosenFocus,
+    popularSchools,
+    schools,
+    schoolsHydrated,
+    setCoordinateFocus,
+    setSchoolFocus,
+    userLocation,
+    userLocationStatus,
+  ]);
+
+  useEffect(() => {
+    if (mapStatus !== 'ready' || !webViewReadyRef.current) {
+      return;
+    }
+
+    if (lastFlownGenerationRef.current === cameraGeneration) {
+      webViewRef.current?.injectJavaScript(
+        buildSetCampusCenterJavascript(validLat, validLng)
+      );
+      return;
+    }
+
+    lastFlownGenerationRef.current = cameraGeneration;
+    webViewRef.current?.injectJavaScript(
+      buildFlyToCampusJavascript(validLat, validLng)
+    );
+  }, [cameraGeneration, mapStatus, validLat, validLng]);
   const selectedSpot = useMemo(
     () => spots.find((spot) => spot.id === selectedSpotId),
     [selectedSpotId, spots]
@@ -326,7 +393,10 @@ export default function MapScreen() {
       }));
   }, [commentCounts, sheetSpots, spots]);
   const sheetWidth = isTabletLayout ? tabletSheetWidth : width;
-  const sheetBodyHeight = Math.round(height * (isTabletLayout ? 0.5 : 0.56));
+  const sheetBodyHeight =
+    EXPANDED_SHEET_CONTENT_HEIGHT +
+    Math.max(insets.bottom, 16) +
+    (liveSheetSpots.length > 1 ? 28 : 0);
 
   const htmlMapLayerRef = useRef<'default' | 'satellite'>(initialMapLayer);
 
@@ -375,16 +445,29 @@ export default function MapScreen() {
         const pinHtml = '<img class="skateu-pin-shadow" alt="" width="41" height="41" draggable="false" src="https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png" /><span class="skateu-pin-scale"><img class="skateu-pin-img" alt="" width="50" height="50" draggable="false" src="' + pinSvg + '" /></span>';
 
         ${getCreateMapLibreMapScript({
-          latitude: validLat,
-          longitude: validLng,
+          latitude: initialCenterRef.current.latitude,
+          longitude: initialCenterRef.current.longitude,
           layer: htmlMapLayer === 'satellite' ? 'satellite' : 'default',
         })}
         ${getLeafletUserLocationScript()}
 
-        window.recenterMap = function () {
-          if (!window.map) return;
+        window.campusCenter = [${initialCenterRef.current.longitude}, ${initialCenterRef.current.latitude}];
+        window.setCampusCenter = function (lat, lng) {
+          window.campusCenter = [lng, lat];
+        };
+        window.flyToCampus = function (lat, lng) {
+          window.setCampusCenter(lat, lng);
+          if (!window.map || typeof window.map.easeTo !== 'function') return;
+          const zoom = window.map.getZoom();
           window.map.easeTo({
-            center: [${validLng}, ${validLat}],
+            center: [lng, lat],
+            zoom: zoom && zoom > 3 ? Math.max(zoom, 15.5) : 15.5,
+          });
+        };
+        window.recenterMap = function () {
+          if (!window.map || !window.campusCenter) return;
+          window.map.easeTo({
+            center: window.campusCenter,
             zoom: window.map.getZoom(),
           });
         };
@@ -459,12 +542,12 @@ export default function MapScreen() {
         };
 
         window.onMapReady(function () {
-          if (${initialSpotId ? 'true' : 'false'}) {
+          if (${initialSpotId || focusSpotId ? 'true' : 'false'}) {
             window.focusLatLng(
-              ${validLat},
-              ${validLng},
-              Math.round((window.innerHeight || 0) * 0.56) + 16,
-              ${insets.top + 81}
+              ${initialCenterRef.current.latitude},
+              ${initialCenterRef.current.longitude},
+              ${EXPANDED_SHEET_CONTENT_HEIGHT + 16},
+              ${insets.top + MAP_EXPLORE_CHROME_CONTENT_HEIGHT}
             );
           }
           if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
@@ -482,7 +565,7 @@ export default function MapScreen() {
   </body>
   </html>
   `;
-  }, [initialSpotId, insets.top, mapAttempt, validLat, validLng]);
+  }, [initialSpotId, insets.top, mapAttempt]);
 
   const webViewSource = useMemo(
     () => ({ html, baseUrl: MAP_WEBVIEW_BASE_URL }),
@@ -598,14 +681,21 @@ export default function MapScreen() {
   }, [mapAttempt, mapStatus]);
 
   useEffect(() => {
-    if (!initialSpotId || didSelectInitialSpotRef.current) {
+    if (focusSpotId) {
+      didSelectInitialSpotRef.current = false;
+    }
+  }, [focusSpotId]);
+
+  useEffect(() => {
+    const requestedSpotId = focusSpotId ?? initialSpotId;
+    if (!requestedSpotId || didSelectInitialSpotRef.current) {
       return;
     }
     if (!spotsFetchedAt) {
       return;
     }
 
-    const spot = spots.find((item) => item.id === initialSpotId);
+    const spot = spots.find((item) => item.id === requestedSpotId);
     if (!spot) {
       return;
     }
@@ -615,7 +705,7 @@ export default function MapScreen() {
     setSheetSpots(sortSpotsByDistanceFrom(spots, spot));
     setSheetOriginId(spot.id);
     setSelectedSpotId(spot.id);
-  }, [initialSpotId, spots, spotsFetchedAt]);
+  }, [focusSpotId, initialSpotId, spots, spotsFetchedAt]);
 
   const retryMap = useCallback(() => {
     htmlMapLayerRef.current = mapLayer;
@@ -633,9 +723,10 @@ export default function MapScreen() {
   }, [fetchSpots, session?.access_token]);
 
   useEffect(() => {
-    const requestedSpot = spots.find((item) => item.id === initialSpotId);
+    const requestedSpotId = focusSpotId ?? initialSpotId;
+    const requestedSpot = spots.find((item) => item.id === requestedSpotId);
     const status = getSpotSelectionStatus({
-      requestedSpotId: initialSpotId,
+      requestedSpotId,
       selectedSpot: requestedSpot,
       loading,
       spotsFetchedAt,
@@ -644,13 +735,13 @@ export default function MapScreen() {
 
     if (
       (status === 'missing' || status === 'failed') &&
-      initialSpotId &&
-      missingSpotAlertedRef.current !== initialSpotId
+      requestedSpotId &&
+      missingSpotAlertedRef.current !== requestedSpotId
     ) {
-      missingSpotAlertedRef.current = initialSpotId;
+      missingSpotAlertedRef.current = requestedSpotId;
       Alert.alert(SPOT_LOAD_FAILED_MESSAGE);
     }
-  }, [error, initialSpotId, loading, spots, spotsFetchedAt]);
+  }, [error, focusSpotId, initialSpotId, loading, spots, spotsFetchedAt]);
 
   useEffect(() => {
     if (!selectedSpotId || selectedSpot) {
@@ -712,19 +803,19 @@ export default function MapScreen() {
       return;
     }
 
-    const topPadding = insets.top + 81;
+    const topPadding = insets.top + MAP_EXPLORE_CHROME_CONTENT_HEIGHT;
     const sheetCover =
-      (sheetLayoutHeight > 0 ? sheetLayoutHeight : Math.round(height * 0.56)) + 16;
+      (sheetLayoutHeight > 0 ? sheetLayoutHeight : sheetBodyHeight) + 16;
     webViewRef.current?.injectJavaScript(
       `window.focusLatLng(${selectedSpot.latitude},${selectedSpot.longitude},${sheetCover},${topPadding}); true;`
     );
   }, [
-    height,
     insets.top,
     mapStatus,
     selectedSpot?.id,
     selectedSpot?.latitude,
     selectedSpot?.longitude,
+    sheetBodyHeight,
     sheetLayoutHeight,
   ]);
 
@@ -775,14 +866,36 @@ export default function MapScreen() {
     toggleFavoriteSchool(currentSchool);
   }, [currentSchool, toggleFavoriteSchool, upsertSchool]);
 
-  const handleBackPress = useCallback(() => {
-    if (router.canGoBack()) {
-      router.back();
-      return;
-    }
+  const handleSelectExploreSchool = useCallback(
+    (school: School) => {
+      upsertSchool(school);
+      setSchoolFocus(school);
+      didSelectInitialSpotRef.current = false;
+    },
+    [setSchoolFocus, upsertSchool]
+  );
 
-    router.replace('/');
-  }, [router]);
+  const handleDismissSchool = useCallback(() => {
+    dismissSchoolFocus();
+    appliedRouteKeyRef.current = '';
+    router.setParams({
+      schoolId: '',
+      schoolName: '',
+      schoolCity: '',
+      schoolState: '',
+      schoolNumSpots: '',
+      spotId: '',
+    });
+  }, [dismissSchoolFocus, router]);
+
+  const resolveAddSpotSchool = useCallback(
+    (latitude: number, longitude: number): School | null => {
+      return (
+        nearestSchool(schools, { latitude, longitude }) ?? currentSchool
+      );
+    },
+    [currentSchool, schools]
+  );
 
   const handleAddSpotPress = () => {
     if (!session) {
@@ -801,12 +914,21 @@ export default function MapScreen() {
       return;
     }
 
+    const addSchool = resolveAddSpotSchool(validLat, validLng);
     const params = new URLSearchParams();
     params.set('lat', validLat.toString());
     params.set('lng', validLng.toString());
     params.set('layer', mapLayer === 'satellite' ? 'satellite' : 'default');
-    if (schoolId) params.set('schoolId', schoolId);
-    if (schoolName) params.set('schoolName', schoolName);
+    if (addSchool) {
+      params.set('schoolId', addSchool.id);
+      params.set('schoolName', addSchool.name);
+    } else {
+      Alert.alert(
+        'Pick a campus first',
+        'Search for a school so this spot has a campus.'
+      );
+      return;
+    }
     guardedNavigate('add-spot', () => {
       router.push(`/add-spot?${params.toString()}`);
     });
@@ -1154,12 +1276,20 @@ export default function MapScreen() {
 
       if (data.type === 'CURRENT_CENTER' && typeof data.latitude === 'number' && typeof data.longitude === 'number') {
         const layer = data.layer === 'satellite' ? 'satellite' : 'default';
+        const addSchool = resolveAddSpotSchool(data.latitude, data.longitude);
+        if (!addSchool) {
+          Alert.alert(
+            'Pick a campus first',
+            'Search for a school so this spot has a campus.'
+          );
+          return;
+        }
         const params = new URLSearchParams();
         params.set('lat', data.latitude.toString());
         params.set('lng', data.longitude.toString());
         params.set('layer', layer);
-        if (schoolId) params.set('schoolId', schoolId);
-        if (schoolName) params.set('schoolName', schoolName);
+        params.set('schoolId', addSchool.id);
+        params.set('schoolName', addSchool.name);
         guardedNavigate('add-spot', () => {
           router.push(`/add-spot?${params.toString()}`);
         });
@@ -1199,71 +1329,22 @@ export default function MapScreen() {
 
   return (
     <View className="flex-1 bg-brand">
-      <View
-        className="absolute left-0 right-0 z-50 bg-brand"
-        style={{
-          top: 0,
-          height: insets.top + 81,
-          paddingTop: insets.top,
+      <MapExploreChrome
+        topInset={insets.top}
+        school={currentSchool}
+        isFavorite={isFavoriteSchool}
+        savedSchoolIds={favoriteSchoolIds}
+        onSelectSchool={handleSelectExploreSchool}
+        onToggleFavorite={handleFavoritePress}
+        onDismissSchool={handleDismissSchool}
+        onToggleSaveResult={(school) => {
+          upsertSchool(school);
+          toggleFavoriteSchool(school);
         }}
-      >
-        <View className="flex-1 flex-row items-center justify-between px-5">
-        <FeedbackPressable
-          haptic="light"
-          onPress={handleBackPress}
-          className="h-12 w-12 items-center justify-center rounded-full"
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-        >
-          <Feather name="chevron-left" size={28} color="#FFFFFF" />
-        </FeedbackPressable>
-
-        <View
-          pointerEvents="none"
-          className="absolute inset-y-0 left-0 right-0 items-center justify-center px-20"
-        >
-          <Text
-            className="text-center font-outfit-bold text-2xl text-white"
-            numberOfLines={1}
-          >
-            {displayedSchoolName}
-          </Text>
-          {locationSubtitle && (
-            <Text
-              className="text-center font-outfit-medium text-sm"
-              style={{ color: 'rgba(255,255,255,0.72)' }}
-              numberOfLines={1}
-            >
-              {locationSubtitle}
-            </Text>
-          )}
-        </View>
-
-        {currentSchool ? (
-          <FeedbackPressable
-            haptic="selection"
-            onPress={handleFavoritePress}
-            className="h-12 w-12 items-center justify-center rounded-full"
-            accessibilityLabel={
-              isFavoriteSchool ? 'Remove school from saved schools' : 'Save this school'
-            }
-            accessibilityRole="button"
-          >
-            <Ionicons
-              name={isFavoriteSchool ? 'bookmark' : 'bookmark-outline'}
-              size={24}
-              color={isFavoriteSchool ? colors.accent : '#FFFFFF'}
-            />
-          </FeedbackPressable>
-        ) : (
-          <View className="h-12 w-12" />
-        )}
-        </View>
-        <StickerStripe />
-      </View>
+      />
       <View
         className="absolute left-4 z-[999] gap-2.5"
-        style={{ bottom: Math.max(insets.bottom, 12) + 36 }}
+        style={{ bottom: 48 }}
         accessibilityRole="toolbar"
         accessibilityLabel="Map navigation"
       >
@@ -1308,8 +1389,16 @@ export default function MapScreen() {
           className="h-14 w-14 items-center justify-center rounded-full bg-white"
           style={styles.mapControl}
           accessibilityRole="button"
-          accessibilityLabel="Recenter on campus"
-          accessibilityHint="Moves the map back to the campus center"
+          accessibilityLabel={
+            currentSchool
+              ? 'Recenter on campus'
+              : 'Recenter on this area'
+          }
+          accessibilityHint={
+            currentSchool
+              ? 'Moves the map back to the campus center'
+              : 'Moves the map back to the current focus'
+          }
           accessibilityState={{ disabled: mapStatus !== 'ready' }}
         >
           <Feather name="crosshair" size={26} color={colors.brand} />
@@ -1338,7 +1427,7 @@ export default function MapScreen() {
       </View>
       <View
         className="absolute right-4 z-[999] items-end"
-        style={{ bottom: Math.max(insets.bottom, 12) + 36 }}
+        style={{ bottom: 12 }}
       >
         {campusDrafts.length > 0 ? (
           <FeedbackPressable
@@ -1380,7 +1469,7 @@ export default function MapScreen() {
         onPress={() => setShowAttribution(true)}
         disabled={mapStatus !== 'ready'}
         className="absolute left-4 z-[998] max-w-[70%] self-start rounded-full bg-black/40 px-2.5 py-1"
-        style={{ bottom: Math.max(insets.bottom, 10) }}
+        style={{ bottom: 10 }}
         accessibilityRole="button"
         accessibilityLabel="Map attribution"
         accessibilityHint="Shows full credit for the active map layer"
@@ -1489,7 +1578,7 @@ export default function MapScreen() {
         </View>
       </Modal>
       <WebView
-        accessibilityLabel={`Campus map for ${displayedSchoolName}. ${spots.length} skate ${spots.length === 1 ? 'spot' : 'spots'} available. Use the map or the accessible spot actions to select a spot.`}
+        accessibilityLabel={`${currentSchool ? `Campus map for ${currentSchool.name}` : 'Explore map'}. ${spots.length} skate ${spots.length === 1 ? 'spot' : 'spots'} available. Use the map or the accessible spot actions to select a spot.`}
         accessibilityActions={spots.map((spot) => ({
           name: `select-${spot.id}`,
           label: `Select ${spot.name}`,
@@ -1536,7 +1625,7 @@ export default function MapScreen() {
       {mapStatus === 'loading' ? (
         <View
           className="absolute inset-0 z-40 items-center justify-center bg-brand/90 px-8"
-          style={{ top: insets.top + 80 }}
+          style={{ top: insets.top + MAP_EXPLORE_CHROME_CONTENT_HEIGHT }}
         >
           <ActivityIndicator color="#FFFFFF" />
           <Text className="mt-3 text-center font-outfit-medium text-base text-white">
@@ -1568,7 +1657,7 @@ export default function MapScreen() {
       {mapStatus === 'ready' && error && spots.length > 0 && spotsFetchedAt ? (
         <View
           className="absolute left-4 right-4 z-40"
-          style={{ top: insets.top + 88 }}
+          style={{ top: insets.top + MAP_EXPLORE_CHROME_CONTENT_HEIGHT }}
         >
           <StaleCacheBanner
             message={STALE_SPOTS_MESSAGE}
@@ -1579,7 +1668,7 @@ export default function MapScreen() {
       ) : mapStatus === 'ready' && error ? (
         <View
           className="absolute left-4 right-4 z-40 rounded-2xl border border-errorBorder bg-field px-4 py-3"
-          style={{ top: insets.top + 88 }}
+          style={{ top: insets.top + MAP_EXPLORE_CHROME_CONTENT_HEIGHT }}
         >
           <View className="flex-row items-center justify-between">
             <View className="flex-1 pr-3">
@@ -1607,7 +1696,7 @@ export default function MapScreen() {
       ) : mapStatus === 'ready' && loading ? (
         <View
           className="absolute left-0 right-0 z-40 items-center"
-          style={{ top: insets.top + 96 }}
+          style={{ top: insets.top + MAP_EXPLORE_CHROME_CONTENT_HEIGHT }}
         >
           <View className="flex-row items-center rounded-full bg-white px-3 py-1.5">
             <ActivityIndicator size="small" color={colors.brand} />

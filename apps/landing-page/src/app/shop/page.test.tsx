@@ -19,8 +19,8 @@ describe("Shop page", () => {
 
     expect(container.querySelector('header a[href="/shop"]')?.textContent).toBe("Shop");
     expect(container.querySelector("#shop-title")?.textContent).toBe("Shop");
-    expect(container.textContent).toContain("Stickers first");
-    expect(container.textContent).toContain("Checkout is not open yet");
+    expect(container.textContent).toContain("Stickers are live");
+    expect(container.textContent).not.toContain("Checkout is not open yet");
     expect(container.textContent).not.toMatch(/\$/);
 
     expect(categories?.querySelector('[aria-current="page"]')?.textContent).toBe("Stickers");
@@ -35,6 +35,7 @@ describe("Shop page", () => {
 
     const productLink = container.querySelector('a[href="/shop/skateu-sticker"]');
     expect(productLink?.textContent).toContain("SkateU Sticker");
-    expect(productLink?.textContent).toContain("Coming soon");
+    expect(productLink?.textContent).toContain("Available now");
+    expect(productLink?.textContent).not.toContain("Coming soon");
   });
 });

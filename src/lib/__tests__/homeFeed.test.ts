@@ -1,6 +1,7 @@
 import {
   HOME_RAIL_PAGE_SIZE,
   HOME_SPOTS_PAGE_SIZE,
+  PROFILE_SPOTS_PAGE_SIZE,
   MAX_HOME_FEED_OFFSET,
   parseOffset,
 } from '../homeFeed';
@@ -8,6 +9,7 @@ import {
 describe('home feed page sizes', () => {
   it('keeps popular schools on a larger page than latest spots', () => {
     expect(HOME_SPOTS_PAGE_SIZE).toBe(6);
+    expect(PROFILE_SPOTS_PAGE_SIZE).toBe(12);
     expect(HOME_RAIL_PAGE_SIZE).toBe(24);
     expect(HOME_SPOTS_PAGE_SIZE).toBeLessThan(HOME_RAIL_PAGE_SIZE);
   });

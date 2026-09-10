@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  productBySlug,
+  liveProductBySlug,
   PRODUCTS,
+  productBySlug,
   productsInCategory,
   SHOP_CATEGORIES,
+  STICKER_SLUG,
 } from "./products";
 
 describe("shop catalog", () => {
@@ -17,13 +19,13 @@ describe("shop catalog", () => {
     ]);
   });
 
-  it("has one coming-soon sticker and no prices", () => {
+  it("has one live sticker without a hardcoded dollar amount", () => {
     expect(PRODUCTS).toHaveLength(1);
     expect(PRODUCTS[0]).toMatchObject({
-      slug: "skateu-sticker",
+      slug: STICKER_SLUG,
       name: "SkateU Sticker",
       category: "stickers",
-      status: "coming_soon",
+      status: "live",
     });
     expect(JSON.stringify(PRODUCTS)).not.toMatch(/\$/);
   });
@@ -31,7 +33,7 @@ describe("shop catalog", () => {
 
 describe("productBySlug", () => {
   it("returns the sticker by slug", () => {
-    expect(productBySlug("skateu-sticker")?.name).toBe("SkateU Sticker");
+    expect(productBySlug(STICKER_SLUG)?.name).toBe("SkateU Sticker");
   });
 
   it("returns undefined when the slug is missing", () => {
@@ -40,10 +42,20 @@ describe("productBySlug", () => {
   });
 });
 
+describe("liveProductBySlug", () => {
+  it("returns the live sticker", () => {
+    expect(liveProductBySlug(STICKER_SLUG)?.status).toBe("live");
+  });
+
+  it("returns null when the slug is unknown", () => {
+    expect(liveProductBySlug("missing")).toBeNull();
+  });
+});
+
 describe("productsInCategory", () => {
   it("returns sticker products", () => {
     expect(productsInCategory("stickers").map((product) => product.slug)).toEqual([
-      "skateu-sticker",
+      STICKER_SLUG,
     ]);
   });
 

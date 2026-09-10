@@ -25,7 +25,6 @@ type ProfileAvatarProps = {
   uri?: string | null;
   size: number;
   iconSize?: number;
-  tone?: 'default' | 'onDark' | 'onLight';
   rank?: XpRank | null;
 };
 
@@ -98,15 +97,11 @@ export default function ProfileAvatar({
   uri,
   size,
   iconSize,
-  tone = 'default',
   rank = null,
 }: ProfileAvatarProps) {
   const displayUri = displayableAvatarUrl(uri);
   const glyphSize = iconSize ?? Math.max(12, Math.round(size * 0.45));
   const radius = size / 2;
-  const onDark = tone === 'onDark';
-  const backgroundClass =
-    tone === 'onDark' ? 'bg-white/15' : tone === 'onLight' ? 'bg-white' : 'bg-accent';
   const showRing = rank != null;
   const outer = showRing ? avatarOuterSize(size) : size;
 
@@ -121,7 +116,7 @@ export default function ProfileAvatar({
         </View>
       ) : null}
       <View
-        className={`items-center justify-center overflow-hidden ${backgroundClass}`}
+        className="items-center justify-center overflow-hidden bg-accent"
         style={{
           width: size,
           height: size,
@@ -135,11 +130,7 @@ export default function ProfileAvatar({
             style={{ width: size, height: size, borderRadius: radius }}
           />
         ) : (
-          <Feather
-            name="user"
-            size={glyphSize}
-            color={onDark ? colors.white : colors.brand}
-          />
+          <Feather name="user" size={glyphSize} color={colors.brand} />
         )}
       </View>
     </View>

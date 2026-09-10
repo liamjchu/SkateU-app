@@ -43,6 +43,7 @@ export default function ProfileSpotRow({
           <CachedRemoteImage
             uri={spot.imageUris[0]}
             className="h-16 w-16 rounded-xl"
+            style={{ width: 64, height: 64, borderRadius: 12 }}
             accessible={false}
           />
         ) : (
@@ -88,15 +89,9 @@ export default function ProfileSpotRow({
             {statusHint}
           </Text>
         ) : spot.description.trim().length > 0 ? (
-          <ExpandableText
-            collapsedLines={2}
-            className="font-outfit-medium mt-0.5 text-sm text-muted"
-            onPress={onPress}
-            accessibilityLabel={`Open ${spot.name} on the ${spot.schoolName || 'campus'} map`}
-            accessibilityHint="Opens the campus map and selects this spot"
-          >
+          <Text className="mt-0.5 font-outfit-medium text-sm text-muted">
             {spot.description.trim()}
-          </ExpandableText>
+          </Text>
         ) : null}
         <View className="mt-1 flex-row items-center">
           <Octicons name="heart-fill" size={12} color={colors.accent} />

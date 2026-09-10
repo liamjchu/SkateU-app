@@ -7,6 +7,7 @@ import FeedbackPressable from './FeedbackPressable';
 type SchoolTypePillsProps = {
   selected: SchoolTypeFilter;
   onSelect: (filter: SchoolTypeFilter) => void;
+  variant?: 'default' | 'compact';
 };
 
 type FilterOption = {
@@ -38,7 +39,10 @@ export function getSchoolTypesParam(filter: SchoolTypeFilter): string | null {
 export default function SchoolTypePills({
   selected,
   onSelect,
+  variant = 'default',
 }: SchoolTypePillsProps) {
+  const compact = variant === 'compact';
+
   return (
     <ScrollView
       horizontal
@@ -54,9 +58,9 @@ export default function SchoolTypePills({
             key={option.key}
             haptic="selection"
             onPress={() => onSelect(option.key)}
-            className={`h-10 flex-row items-center rounded-xl px-4 ${
-              isSelected ? 'bg-accent' : 'bg-field'
-            }`}
+            className={`flex-row items-center ${
+              compact ? 'h-9 rounded-full px-3' : 'h-10 rounded-xl px-4'
+            } ${isSelected ? 'bg-accent' : 'bg-field'}`}
             accessibilityRole="button"
             accessibilityLabel={
               option.key === 'saved'
@@ -71,7 +75,7 @@ export default function SchoolTypePills({
                   ? 'bookmark'
                   : option.icon
               }
-              size={15}
+              size={compact ? 14 : 15}
               color={isSelected ? colors.brand : colors.ink}
             />
             <Text

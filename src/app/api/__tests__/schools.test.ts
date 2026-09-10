@@ -117,21 +117,36 @@ describe('GET /api/schools popular pagination', () => {
     );
   });
 
-  it('uses the most-liked spot photo for each school card', async () => {
+  it('uses the most-liked public spot photo for each school card', async () => {
     setConfigured();
     const fetchMock = jest.fn(async (input: string | URL | Request) => {
       const requestUrl = new URL(String(input));
       if (requestUrl.pathname.endsWith('/rest/v1/spots')) {
+        expect(requestUrl.searchParams.get('status')).toBe(
+          'in.(active,under_review)'
+        );
         expect(requestUrl.searchParams.get('order')).toBe(
-          'likes_count.desc,created_at.desc'
+          'likes_count.desc,comments_count.desc,id.asc'
         );
         return jsonResponse([
           {
             school_id: 'school-a',
+            status: 'removed',
+            image_urls: ['https://cdn.test/rejected.jpg'],
+          },
+          {
+            school_id: 'school-a',
+            status: 'pending_moderation',
+            image_urls: ['https://cdn.test/pending.jpg'],
+          },
+          {
+            school_id: 'school-a',
+            status: 'active',
             image_urls: ['https://cdn.test/popular.jpg'],
           },
           {
             school_id: 'school-a',
+            status: 'active',
             image_urls: ['https://cdn.test/recent.jpg'],
           },
         ]);
@@ -153,6 +168,50 @@ describe('GET /api/schools popular pagination', () => {
       id: 'school-a',
       spotImageUrl: 'https://cdn.test/popular.jpg',
     });
+  });
+});
+
+describe('GET /api/schools nearest', () => {
+  it('returns the closest school from the nearest_school RPC', async () => {
+    setConfigured();
+    const fetchMock = jest.fn(async (input: string | URL | Request, _init?: RequestInit) => {
+      const requestUrl = new URL(String(input));
+      if (requestUrl.pathname.endsWith('/rpc/nearest_school')) {
+        return jsonResponse([
+          makeSchool('risd', 4),
+        ]);
+      }
+      if (requestUrl.pathname.endsWith('/rest/v1/spots')) {
+        return jsonResponse([]);
+      }
+      throw new Error(`Unexpected fetch: ${requestUrl.pathname}`);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await GET(
+      new Request('https://app.test/api/schools?nearest=1&lat=41.82&lng=-71.41')
+    );
+    const body = (await response.json()) as { schools: Array<{ id: string }> };
+
+    expect(response.status).toBe(200);
+    expect(body.schools.map((school) => school.id)).toEqual(['risd']);
+    expect(fetchMock.mock.calls[0]?.[1]).toEqual(
+      expect.objectContaining({ method: 'POST' })
+    );
+  });
+
+  it('returns empty schools without calling PostgREST when coordinates are missing', async () => {
+    setConfigured();
+    const fetchMock = jest.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await GET(
+      new Request('https://app.test/api/schools?nearest=1')
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ schools: [] });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

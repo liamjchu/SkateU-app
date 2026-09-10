@@ -75,7 +75,7 @@ export default function MapSpotSheetPage({
     <MapSpotSheetBody
       spot={spot}
       imageUris={imageUris}
-      photoHeight={fill ? 220 : 248}
+      photoHeight={fill ? 160 : 168}
       isOwned={isOwned}
       wasReported={wasReported}
       canShowRemoval={canShowRemoval}
@@ -275,7 +275,7 @@ function MapSpotSheetBody({
             accessibilityRole="button"
             accessibilityLabel={`Open full screen view of ${spot.name}`}
           >
-            <Text className="mt-3 font-outfit-medium text-base text-muted-strong">
+            <Text className="mt-3 font-outfit-medium text-base text-muted-strong" numberOfLines={1}>
               {spot.description.trim()}
             </Text>
           </FeedbackPressable>

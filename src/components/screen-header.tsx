@@ -7,7 +7,7 @@ import { StickerStripe } from './sticker';
 
 type ScreenHeaderProps = {
   title: string;
-  onBack: () => void;
+  onBack?: () => void;
   backAccessibilityLabel?: string;
   backDisabled?: boolean;
   rightAction?: ReactNode;
@@ -31,17 +31,21 @@ export default function ScreenHeader({
         }}
       >
         <View className="h-20 flex-row items-center">
-          <FeedbackPressable
-            haptic="light"
-            onPress={onBack}
-            disabled={backDisabled}
-            className="h-12 w-12 items-center justify-center rounded-full"
-            accessibilityLabel={backAccessibilityLabel}
-            accessibilityRole="button"
-            accessibilityState={{ disabled: backDisabled }}
-          >
-            <Feather name="chevron-left" size={28} color="#FFFFFF" />
-          </FeedbackPressable>
+          {onBack ? (
+            <FeedbackPressable
+              haptic="light"
+              onPress={onBack}
+              disabled={backDisabled}
+              className="h-12 w-12 items-center justify-center rounded-full"
+              accessibilityLabel={backAccessibilityLabel}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: backDisabled }}
+            >
+              <Feather name="chevron-left" size={28} color="#FFFFFF" />
+            </FeedbackPressable>
+          ) : (
+            <View className="h-12 w-12" />
+          )}
 
           <Text
             accessibilityRole="header"

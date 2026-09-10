@@ -1,5 +1,38 @@
 import type { School, SchoolTypeFilter } from '../types/school';
 
+export function getSchoolSearchCopy(filter: SchoolTypeFilter): {
+  placeholder: string;
+  accessibilityLabel: string;
+  accessibilityHint: string;
+} {
+  switch (filter) {
+    case 'saved':
+      return {
+        placeholder: 'Search saved schools...',
+        accessibilityLabel: 'Search saved schools',
+        accessibilityHint: 'Filters your saved schools by name, city, or state',
+      };
+    case 'k12':
+      return {
+        placeholder: 'Search K-12 schools...',
+        accessibilityLabel: 'Search K-12 schools',
+        accessibilityHint: 'Type a school, city, or 2-letter state',
+      };
+    case 'college':
+      return {
+        placeholder: 'Search colleges...',
+        accessibilityLabel: 'Search colleges',
+        accessibilityHint: 'Type a school, city, or 2-letter state',
+      };
+    default:
+      return {
+        placeholder: 'Search all schools...',
+        accessibilityLabel: 'Search all schools',
+        accessibilityHint: 'Type a school, city, or 2-letter state',
+      };
+  }
+}
+
 // Matches GET /api/schools and search_schools. Two characters lets "RI" work.
 export const MIN_SEARCH_LENGTH = 2;
 

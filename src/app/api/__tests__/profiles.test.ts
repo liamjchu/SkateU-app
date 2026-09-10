@@ -80,13 +80,14 @@ describe('GET /api/profiles', () => {
     await expect(response.json()).resolves.toEqual({
       profile: { id: profileId, username: 'skater_jane', avatarUrl: null, bio: null },
       rank: 'hobbyist',
+      xpTotal: 0,
       followerCount: 4,
       followingCount: 2,
       isFollowing: false,
     });
   });
 
-  it('includes xpTotal only when the viewer is the profile owner', async () => {
+  it('includes xpTotal for owners and other viewers', async () => {
     setConfigured();
     global.fetch = jest.fn(async (input) => {
       const url = String(input);
@@ -133,6 +134,50 @@ describe('GET /api/profiles', () => {
       followerCount: 0,
       followingCount: 0,
       isFollowing: false,
+    });
+  });
+
+  it('includes xpTotal when another signed-in user views the profile', async () => {
+    setConfigured();
+    global.fetch = jest.fn(async (input) => {
+      const url = String(input);
+      if (url.includes('/auth/v1/user')) {
+        return jsonResponse({ id: viewerId });
+      }
+      if (url.includes('/rest/v1/user_blocks')) {
+        return jsonResponse([]);
+      }
+      if (url.includes('/rest/v1/profiles')) {
+        return jsonResponse([
+          {
+            id: profileId,
+            username: 'skater_jane',
+            avatar_url: null,
+            xp_total: 1000,
+          },
+        ]);
+      }
+      if (url.includes('following_id=eq.') && url.includes('follower_id=eq.')) {
+        return jsonResponse([]);
+      }
+      if (url.includes('following_id=eq.')) {
+        return countResponse(0);
+      }
+      if (url.includes('follower_id=eq.')) {
+        return countResponse(0);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as unknown as typeof fetch;
+
+    const response = await GET(
+      new Request(`https://app.test/api/profiles?userId=${profileId}`, {
+        headers: { Authorization: 'Bearer good-token' },
+      })
+    );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      rank: 'flow_rider',
+      xpTotal: 1000,
     });
   });
 

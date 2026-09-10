@@ -263,12 +263,23 @@ export async function unfollowUser(
   });
 }
 
+export type CreatorSpotsPage = {
+  spots: Spot[];
+  total: number;
+};
+
 export async function fetchCreatorSpots(
   userId: string,
-  accessToken?: string | null
-): Promise<Spot[]> {
+  accessToken?: string | null,
+  offset = 0
+): Promise<CreatorSpotsPage> {
+  const params = new URLSearchParams({ creatorUserId: userId });
+  if (offset > 0) {
+    params.set('offset', String(offset));
+  }
+
   const response = await fetchWithTimeout(
-    getApiUrl(`/api/spots?creatorUserId=${encodeURIComponent(userId)}`),
+    getApiUrl(`/api/spots?${params.toString()}`),
     {
       method: 'GET',
       headers: authHeaders(accessToken),
@@ -279,6 +290,12 @@ export async function fetchCreatorSpots(
     throw new Error(await readErrorMessage(response, SPOTS_FAILED_ERROR));
   }
 
-  const data = (await response.json()) as { spots?: Spot[] };
-  return Array.isArray(data.spots) ? data.spots : [];
+  const data = (await response.json()) as { spots?: Spot[]; total?: unknown };
+  const spots = Array.isArray(data.spots) ? data.spots : [];
+  const total =
+    typeof data.total === 'number' && Number.isFinite(data.total)
+      ? Math.max(0, Math.floor(data.total))
+      : offset + spots.length;
+
+  return { spots, total };
 }

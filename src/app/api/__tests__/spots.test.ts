@@ -871,6 +871,64 @@ describe('POST /api/spots', () => {
     });
   });
 
+  it('saves the geographically closest school, not the selected schoolId', async () => {
+    setConfigured();
+    const createdRow: DatabaseSpot = {
+      id: 'spot1',
+      school_id: 'closest-school',
+      name: 'Rail',
+      description: 'A nice rail',
+      latitude: 41.82,
+      longitude: -71.41,
+      image_urls: [],
+      created_at: '2024-01-01T00:00:00.000Z',
+      updated_at: '2024-01-01T00:00:00.000Z',
+      schools: { name: 'RISD', city: 'Providence', state: 'RI' },
+      creator: { username: 'skater_jane' },
+    };
+    const fetchMock: FetchMock = jest.fn(async (input) => {
+      const requestUrl = input.toString();
+      if (requestUrl.includes('/auth/v1/user')) {
+        return jsonResponse({ id: 'user-1' });
+      }
+      if (requestUrl.includes('/rpc/nearest_school')) {
+        return jsonResponse([
+          {
+            id: 'closest-school',
+            name: 'RISD',
+            city: 'Providence',
+            state: 'RI',
+            latitude: 41.826,
+            longitude: -71.408,
+            numspots: 8,
+            type: 'higher_ed',
+          },
+        ]);
+      }
+      if (requestUrl.includes('api.openai.com')) {
+        return openAIApprovalResponse();
+      }
+      return jsonResponse([createdRow], 201);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const form = validForm();
+    const response = await POST(
+      makePostRequest(form, { Authorization: 'Bearer good-token' })
+    );
+    expect(response.status).toBe(201);
+
+    const insertCall = fetchMock.mock.calls.find(
+      (call) =>
+        call[0].toString().includes('/rest/v1/spots') &&
+        call[1]?.method === 'POST'
+    );
+    const inserted = JSON.parse(String(insertCall?.[1]?.body)) as {
+      school_id: string;
+    };
+    expect(inserted.school_id).toBe('closest-school');
+  });
+
   it('returns 422 with a gentle reason when moderation rejects the spot', async () => {
     setConfigured();
     const createdRow: DatabaseSpot = {
@@ -1488,6 +1546,12 @@ describe('GET /api/spots?creatorUserId=', () => {
     expect(String(listingCall?.[0])).toContain(`created_by_user_id=eq.${creatorId}`);
     expect(new URL(String(listingCall?.[0])).searchParams.get('status')).toBe(
       VISIBLE_SPOT_STATUS_FILTER
+    );
+    expect(new URL(String(listingCall?.[0])).searchParams.get('limit')).toBe('12');
+    expect(listingCall?.[1]).toEqual(
+      expect.objectContaining({
+        headers: expect.objectContaining({ Prefer: 'count=exact' }),
+      })
     );
   });
 

@@ -61,8 +61,11 @@ In the Supabase SQL Editor, run the idempotent scripts in this order:
 12. `supabase/spot_removal_requests_setup.sql`
 13. `supabase/user_feedback_setup.sql`
 14. `supabase/user_blocks_setup.sql`
-15. `supabase/comment_reports_setup.sql`
-16. `supabase/school_search_setup.sql`
+15. `supabase/user_follows_setup.sql`
+16. `supabase/comment_reports_setup.sql`
+17. `supabase/school_search_setup.sql`
+18. `supabase/nearest_school_setup.sql`
+19. `supabase/user_notifications_setup.sql`
 
 Draft Terms of Use, Privacy Policy, and Community Guidelines live in `docs/`. They are product policies for later lawyer review, not legal advice.
 

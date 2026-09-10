@@ -9,11 +9,13 @@ export const SHOP_CATEGORIES = [
 
 export type ShopCategoryId = (typeof SHOP_CATEGORIES)[number]["id"];
 
+export type ProductStatus = "live" | "coming_soon";
+
 export type Product = {
   slug: string;
   name: string;
   category: ShopCategoryId;
-  status: "coming_soon";
+  status: ProductStatus;
   description: string;
   image: typeof IMAGES.sticker;
 };
@@ -23,12 +25,14 @@ export const PRODUCTS: Product[] = [
     slug: "skateu-sticker",
     name: "SkateU Sticker",
     category: "stickers",
-    status: "coming_soon",
+    status: "live",
     description:
-      "The SkateU logo as a sticker. Stick it on a laptop, board, or bottle. Checkout is coming soon.",
+      "The SkateU logo as a sticker. Stick it on a laptop, board, or bottle.",
     image: IMAGES.sticker,
   },
 ];
+
+export const STICKER_SLUG = "skateu-sticker";
 
 export function productBySlug(slug: string): Product | undefined {
   return PRODUCTS.find((product) => product.slug === slug);
@@ -36,4 +40,14 @@ export function productBySlug(slug: string): Product | undefined {
 
 export function productsInCategory(category: ShopCategoryId): Product[] {
   return PRODUCTS.filter((product) => product.category === category);
+}
+
+export function liveProductBySlug(slug: string): Product | null {
+  const product = productBySlug(slug);
+
+  if (!product || product.status !== "live") {
+    return null;
+  }
+
+  return product;
 }

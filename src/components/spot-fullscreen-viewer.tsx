@@ -409,7 +409,6 @@ function SpotDetailsOverlay({
               uri={spot.creatorAvatarUrl}
               size={18}
               iconSize={11}
-              tone="onDark"
               rank={spot.creatorRank}
             />
           </FeedbackPressable>
@@ -418,7 +417,6 @@ function SpotDetailsOverlay({
             uri={spot.creatorAvatarUrl}
             size={18}
             iconSize={11}
-            tone="onDark"
             rank={spot.creatorRank}
           />
         )}

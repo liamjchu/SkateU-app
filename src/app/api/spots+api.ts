@@ -1,5 +1,5 @@
 import { deferTask } from 'expo-server';
-import { HOME_SPOTS_PAGE_SIZE, parseOffset } from '../../lib/homeFeed';
+import { HOME_SPOTS_PAGE_SIZE, PROFILE_SPOTS_PAGE_SIZE, parseOffset } from '../../lib/homeFeed';
 import {
     IMAGE_SANITIZE_ERROR,
     sanitizeSpotImage,
@@ -19,6 +19,7 @@ import {
     fetchBlockedUserIds,
 } from './blockedUsers';
 import { hasBlockEitherWay } from './followGraph';
+import { fetchNearestSchool } from './schools+api';
 
 // --- Configuration & constants (mirrors schools+api.ts) ---------------------
 
@@ -292,6 +293,12 @@ export async function finalizePendingSpotEdit(
     }
 
     if (verdict.approved) {
+      const schoolId = await resolveSchoolIdForLocation(
+        config,
+        payload.latitude,
+        payload.longitude,
+        ''
+      );
       await patchSpotFields(config, spotId, {
         name: payload.name,
         description: payload.description,
@@ -299,6 +306,7 @@ export async function finalizePendingSpotEdit(
         longitude: payload.longitude,
         image_urls: payload.image_urls,
         pending_edit: null,
+        ...(schoolId ? { school_id: schoolId } : {}),
       });
       const dropped = latest.imageUrls.filter(
         (url) => !payload.image_urls.includes(url)
@@ -589,7 +597,8 @@ export type ValidatedPatchBody = {
 
 /**
  * Validates the trimmed fields of an edit-spot request. Name, description, and
- * location are editable; the school a spot belongs to is fixed after creation.
+ * location are editable. After an approved location change, the spot is
+ * reassigned to the geographically closest school.
  */
 export function validatePatchBody(
   fields: Record<string, string>
@@ -1047,6 +1056,23 @@ function isFilePart(value: FormDataEntryValue): value is File {
   return typeof value !== 'string';
 }
 
+function parseExactCount(response: Response): number {
+  const range =
+    response.headers.get('content-range') ??
+    response.headers.get('Content-Range');
+  if (!range) {
+    return 0;
+  }
+
+  const match = /\/(\d+|\*)$/.exec(range.trim());
+  if (!match || match[1] === '*') {
+    return 0;
+  }
+
+  const count = Number(match[1]);
+  return Number.isFinite(count) ? count : 0;
+}
+
 async function fetchLikedSpotIds(
   config: SupabaseConfig,
   userId: string,
@@ -1309,6 +1335,7 @@ async function getCreatorSpots(
   }
 
   const creatorUserId = creatorValidation.value;
+  const url = new URL(request.url);
 
   try {
     const viewer = await resolveViewerAndBlocks(request, config);
@@ -1329,14 +1356,20 @@ async function getCreatorSpots(
     const query = new URL(`${config.url}/rest/v1/spots`);
     query.searchParams.set('created_by_user_id', `eq.${creatorUserId}`);
     query.searchParams.set('select', SPOT_SELECT_COLUMNS);
-    query.searchParams.set('order', 'created_at.desc');
+    query.searchParams.set('order', 'created_at.desc,id.desc');
+    query.searchParams.set('limit', String(PROFILE_SPOTS_PAGE_SIZE));
     applyVisibleSpotFilter(query);
     applyBlockedUserFilter(query, 'created_by_user_id', viewer.blockedIds);
+    const offset = parseOffset(url.searchParams.get('offset'));
+    if (offset > 0) {
+      query.searchParams.set('offset', String(offset));
+    }
 
     const response = await fetch(query.toString(), {
       headers: {
         apikey: config.apiKey,
         Authorization: `Bearer ${config.apiKey}`,
+        Prefer: 'count=exact',
       },
     });
 
@@ -1345,8 +1378,10 @@ async function getCreatorSpots(
     }
 
     const rows = (await response.json()) as DatabaseSpot[];
+    const total = Math.max(parseExactCount(response), offset + rows.length);
     return Response.json({
       spots: await mapSpotsForUser(config, rows, viewer.userId),
+      total,
     });
   } catch (error) {
     console.error('Loading creator spots failed:', error);
@@ -1358,6 +1393,24 @@ async function getCreatorSpots(
 }
 
 // --- POST /api/spots --------------------------------------------------------
+
+async function resolveSchoolIdForLocation(
+  config: SupabaseConfig,
+  latitude: number,
+  longitude: number,
+  fallbackSchoolId: string
+): Promise<string> {
+  try {
+    const nearest = await fetchNearestSchool(config, { latitude, longitude });
+    if (nearest?.id) {
+      return nearest.id;
+    }
+  } catch (error) {
+    console.error('Resolving nearest school failed:', error);
+  }
+
+  return fallbackSchoolId;
+}
 
 export async function POST(request: Request): Promise<Response> {
   const accessToken = readBearerToken(request);
@@ -1425,11 +1478,18 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: sanitizedImages.message }, { status: 400 });
   }
 
+  const schoolId = await resolveSchoolIdForLocation(
+    config,
+    bodyValidation.value.latitude,
+    bodyValidation.value.longitude,
+    bodyValidation.value.schoolId
+  );
+
   let imageUrls: string[];
   try {
     imageUrls = await uploadImages(
       config,
-      bodyValidation.value.schoolId,
+      schoolId,
       sanitizedImages.value
     );
   } catch (error) {
@@ -1441,7 +1501,11 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
-    const record = buildInsertRecord(bodyValidation.value, auth.userId, imageUrls);
+    const record = buildInsertRecord(
+      { ...bodyValidation.value, schoolId },
+      auth.userId,
+      imageUrls
+    );
     const insertUrl = new URL(`${config.url}/rest/v1/spots`);
     insertUrl.searchParams.set('select', SPOT_SELECT_COLUMNS);
 

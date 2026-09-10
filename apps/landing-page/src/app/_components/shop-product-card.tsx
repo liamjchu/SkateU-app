@@ -3,6 +3,8 @@ import Image from "next/image";
 import type { Product } from "../../constants/products";
 
 export function ShopProductCard({ product }: { product: Product }) {
+  const statusLabel = product.status === "live" ? "Available now" : "Coming soon";
+
   return (
     <article className="w-full overflow-hidden rounded-2xl border border-border-soft bg-surface text-left">
       <a
@@ -20,7 +22,7 @@ export function ShopProductCard({ product }: { product: Product }) {
         </div>
         <div className="flex flex-col gap-2 p-5 sm:p-6">
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-muted">
-            Coming soon
+            {statusLabel}
           </p>
           <h2 className="text-2xl font-black uppercase tracking-[-0.03em] text-ink">
             {product.name}

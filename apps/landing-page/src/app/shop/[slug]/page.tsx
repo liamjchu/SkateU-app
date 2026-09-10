@@ -4,10 +4,13 @@ import { notFound } from "next/navigation";
 
 import { SiteShell } from "../../_components/site-shell";
 import { PRODUCTS, productBySlug } from "../../../constants/products";
+import { getProductPriceDisplay } from "../../../lib/shop-price";
 
 type ProductPageProps = {
   params: Promise<{ slug: string }>;
 };
+
+export const dynamic = "force-dynamic";
 
 export function generateStaticParams() {
   return PRODUCTS.map((product) => ({ slug: product.slug }));
@@ -39,6 +42,10 @@ export default async function ProductPage({ params }: ProductPageProps) {
     notFound();
   }
 
+  const priceDisplay =
+    product.status === "live" ? await getProductPriceDisplay() : null;
+  const canBuy = product.status === "live";
+
   return (
     <SiteShell>
       <main id="main-content" tabIndex={-1} className="relative z-10 focus:outline-none">
@@ -68,7 +75,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
               <div className="text-left">
                 <p className="text-[11px] font-black uppercase tracking-[0.18em] text-muted">
-                  Coming soon
+                  {canBuy ? "Available now" : "Coming soon"}
                 </p>
                 <h1
                   id="product-title"
@@ -77,13 +84,28 @@ export default async function ProductPage({ params }: ProductPageProps) {
                   {product.name}
                 </h1>
                 <p className="mt-5 text-base leading-7 text-muted">{product.description}</p>
-                <button
-                  type="button"
-                  disabled
-                  className="mt-6 inline-flex min-h-14 w-full items-center justify-center rounded-xl bg-actionDisabled px-6 text-sm font-bold text-muted"
-                >
-                  Checkout coming soon
-                </button>
+                {priceDisplay ? (
+                  <p className="mt-4 text-lg font-bold text-ink">{priceDisplay}</p>
+                ) : null}
+                {canBuy ? (
+                  <form action="/api/checkout" method="post" className="mt-6">
+                    <input type="hidden" name="slug" value={product.slug} />
+                    <button
+                      type="submit"
+                      className="inline-flex min-h-14 w-full items-center justify-center rounded-xl bg-accent px-6 text-sm font-bold text-brand transition-colors hover:bg-accent-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-field motion-reduce:transition-none"
+                    >
+                      Buy now
+                    </button>
+                  </form>
+                ) : (
+                  <button
+                    type="button"
+                    disabled
+                    className="mt-6 inline-flex min-h-14 w-full items-center justify-center rounded-xl bg-actionDisabled px-6 text-sm font-bold text-muted"
+                  >
+                    Checkout coming soon
+                  </button>
+                )}
               </div>
             </div>
           </div>

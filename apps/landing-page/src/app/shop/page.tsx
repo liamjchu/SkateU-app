@@ -6,7 +6,7 @@ import { productsInCategory, SHOP_CATEGORIES } from "../../constants/products";
 
 export const metadata: Metadata = {
   title: "Shop — SkateU",
-  description: "SkateU stickers and merch. Checkout is coming soon.",
+  description: "SkateU stickers and merch.",
 };
 
 export default function ShopPage() {
@@ -30,7 +30,7 @@ export default function ShopPage() {
               Shop
             </h1>
             <p className="mx-auto mt-6 max-w-xl text-pretty text-base leading-7 text-muted sm:mt-7 sm:text-lg">
-              Stickers first. Clothing, griptape, and boards are next. Checkout is not open yet.
+              Stickers are live. Clothing, griptape, and boards are next.
             </p>
 
             <nav

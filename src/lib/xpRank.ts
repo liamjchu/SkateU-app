@@ -104,6 +104,16 @@ export function xpToNextRank(xp: number): { next: XpRank; remaining: number } | 
   };
 }
 
+export function formatXpToNextLabel(xp: number): string {
+  const total = clampXp(xp);
+  const upcoming = xpToNextRank(total);
+  if (!upcoming) {
+    return `${total} XP`;
+  }
+
+  return `${total}/${XP_RANK_MIN[upcoming.next]} XP to ${XP_RANK_LABELS[upcoming.next]}`;
+}
+
 export function rankProgress(xp: number): number {
   const total = clampXp(xp);
   const rank = rankFromXp(total);

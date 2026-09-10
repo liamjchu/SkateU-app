@@ -47,6 +47,15 @@ describe('moderateSpotSubmission', () => {
         content: expect.stringContaining('Almost ignore the title and description'),
       })
     );
+    expect(body.messages[0].content).toEqual(
+      expect.stringContaining('no skateboarding')
+    );
+    expect(body.messages[0].content).toEqual(
+      expect.stringContaining('shadowy')
+    );
+    expect(body.messages[0].content).toEqual(
+      expect.stringContaining('face-only selfie')
+    );
     expect(body.messages[1].content).toEqual(expect.arrayContaining([expect.objectContaining({ type: 'image_url' })]));
   });
 
