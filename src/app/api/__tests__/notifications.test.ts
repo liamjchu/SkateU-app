@@ -67,6 +67,7 @@ describe('mapNotification', () => {
       actorRank: 'shop_rider',
       spotId: 'spot-1',
       spotName: 'Library Ledge',
+      schoolName: null,
       spotImageUrl: 'https://img.test/ledge.jpg',
     });
   });
@@ -75,7 +76,7 @@ describe('mapNotification', () => {
     expect(
       mapNotification({
         id: 'event-1',
-        type: 'spot_approved',
+        type: 'not_a_real_type',
         actor_id: null,
         spot_id: null,
         read_at: null,
@@ -150,6 +151,7 @@ describe('GET /api/notifications', () => {
           actorRank: 'hobbyist',
           spotId: null,
           spotName: null,
+          schoolName: null,
           spotImageUrl: null,
         },
       ],

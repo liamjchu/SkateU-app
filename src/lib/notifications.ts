@@ -23,29 +23,73 @@ function quotedSpotName(spotName: string | null | undefined): string {
   return name ? ` “${name}”` : '';
 }
 
-function actorLabel(username: string | null | undefined): string {
+function actorLabel(
+  type: NotificationType,
+  username: string | null | undefined
+): string {
+  if (
+    type === 'spot_approved' ||
+    type === 'spot_under_review' ||
+    type === 'spot_removed'
+  ) {
+    return 'Your spot';
+  }
   const name = username?.trim();
   return name && name.length > 0 ? name : FALLBACK_ACTOR;
+}
+
+export function notificationCopy(input: {
+  type: NotificationType;
+  actorUsername: string | null;
+  spotName: string | null;
+  schoolName?: string | null;
+}): { actor: string; rest: string } {
+  const actor = actorLabel(input.type, input.actorUsername);
+  const spot = quotedSpotName(input.spotName);
+  const school = input.schoolName?.trim();
+
+  switch (input.type) {
+    case 'spot_like':
+      return { actor, rest: `liked your spot${spot || ''}` };
+    case 'spot_comment':
+      return { actor, rest: `commented on${spot || ' your spot'}` };
+    case 'comment_reply':
+      return { actor, rest: 'replied to your comment' };
+    case 'follow':
+      return { actor, rest: 'started following you' };
+    case 'saved_school_spot':
+      if (school) {
+        return {
+          actor,
+          rest: `added a new spot${spot || ''} at ${school}`,
+        };
+      }
+      return {
+        actor,
+        rest: `added a new spot${spot || ''} at a school you saved`,
+      };
+    case 'liked_spot_comment':
+      return { actor, rest: `commented on${spot || ' a spot you liked'}` };
+    case 'spot_approved':
+      return { actor, rest: `${spot ? `${spot.trim()} ` : ''}is live`.trim() };
+    case 'spot_under_review':
+      return {
+        actor,
+        rest: `${spot ? `${spot.trim()} ` : ''}is under review`.trim(),
+      };
+    case 'spot_removed':
+      return { actor, rest: `${spot ? `${spot.trim()} ` : ''}was removed`.trim() };
+  }
 }
 
 export function formatNotificationBody(input: {
   type: NotificationType;
   actorUsername: string | null;
   spotName: string | null;
+  schoolName?: string | null;
 }): string {
-  const actor = actorLabel(input.actorUsername);
-  const spot = quotedSpotName(input.spotName);
-
-  switch (input.type) {
-    case 'spot_like':
-      return `${actor} liked your spot${spot || ''}`;
-    case 'spot_comment':
-      return `${actor} commented on${spot || ' your spot'}`;
-    case 'comment_reply':
-      return `${actor} replied to your comment`;
-    case 'follow':
-      return `${actor} started following you`;
-  }
+  const { actor, rest } = notificationCopy(input);
+  return `${actor} ${rest}`;
 }
 
 export function formatUnreadBadge(count: number): string | null {
@@ -90,7 +134,7 @@ export function notificationRoute(
     return { kind: 'profile', userId: notification.actorId };
   }
 
-  if (!notification.spotId) {
+  if (notification.type === 'spot_removed' || !notification.spotId) {
     return { kind: 'none' };
   }
 
@@ -136,6 +180,7 @@ export function mapNotificationView(value: unknown): UserNotification | null {
     ...(actorRank ? { actorRank } : {}),
     spotId: readOptionalString(value.spotId),
     spotName: readOptionalString(value.spotName),
+    schoolName: readOptionalString(value.schoolName),
     spotImageUrl: readOptionalString(value.spotImageUrl),
   };
 }

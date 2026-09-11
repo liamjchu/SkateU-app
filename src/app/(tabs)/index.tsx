@@ -29,10 +29,12 @@ import IMAGES from '../../constants/images';
 import { colors } from '../../constants/colors';
 import { useHydrateFavoriteSchools } from '../../hooks/useHydrateFavoriteSchools';
 import { useNearbySchools } from '../../hooks/useNearbySchools';
+import { useFeedPrefetch } from '../../hooks/useFeedPrefetch';
 import { useRecentSpotsFeed } from '../../hooks/useRecentSpotsFeed';
 import { captureAnalyticsEvent } from '../../lib/analytics';
 import { getApiUrl } from '../../lib/api';
 import {
+    FEED_END_REACHED_THRESHOLD,
     HOME_RAIL_PAGE_SIZE,
 } from '../../lib/homeFeed';
 import {
@@ -83,6 +85,10 @@ export default function HomeScreen() {
     loadMore: loadMoreRecentSpots,
     retry: retryRecentSpots,
   } = useRecentSpotsFeed();
+  const { onViewableItemsChanged, viewabilityConfig } = useFeedPrefetch(
+    recentSpots.length,
+    loadMoreRecentSpots
+  );
   const {
     favoriteSchoolIds,
     hasHydrated: hasHydratedFavorites,
@@ -715,7 +721,9 @@ export default function HomeScreen() {
             trackFeedScroll(event.nativeEvent.contentOffset.y);
           }}
           onEndReached={loadMoreRecentSpots}
-          onEndReachedThreshold={0.6}
+          onEndReachedThreshold={FEED_END_REACHED_THRESHOLD}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
           initialNumToRender={3}
           maxToRenderPerBatch={3}
           windowSize={5}

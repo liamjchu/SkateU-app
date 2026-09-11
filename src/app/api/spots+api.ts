@@ -1,5 +1,6 @@
 import { deferTask } from 'expo-server';
-import { HOME_SPOTS_PAGE_SIZE, PROFILE_SPOTS_PAGE_SIZE, parseOffset } from '../../lib/homeFeed';
+import { FEED_CANDIDATE_LIMIT, HOME_SPOTS_PAGE_SIZE, PROFILE_SPOTS_PAGE_SIZE, parseOffset } from '../../lib/homeFeed';
+import { rankFeedSpots, sliceRankedFeedPage } from '../../lib/feedRanking';
 import {
     IMAGE_SANITIZE_ERROR,
     sanitizeSpotImage,
@@ -1241,13 +1242,9 @@ async function getRecentSpots(
       query.searchParams.set('select', SPOT_SELECT_COLUMNS);
     }
     query.searchParams.set('order', 'created_at.desc,id.desc');
-    query.searchParams.set('limit', String(HOME_SPOTS_PAGE_SIZE));
+    query.searchParams.set('limit', String(FEED_CANDIDATE_LIMIT));
     applyVisibleSpotFilter(query);
     applyBlockedUserFilter(query, 'created_by_user_id', viewer.blockedIds);
-    const offset = parseOffset(url.searchParams.get('offset'));
-    if (offset > 0) {
-      query.searchParams.set('offset', String(offset));
-    }
 
     const response = await fetch(query.toString(), {
       headers: {
@@ -1261,8 +1258,10 @@ async function getRecentSpots(
     }
 
     const rows = (await response.json()) as DatabaseSpot[];
+    const offset = parseOffset(url.searchParams.get('offset'));
+    const page = sliceRankedFeedPage(rankFeedSpots(rows), offset);
     return Response.json({
-      spots: await mapSpotsForUser(config, rows, viewer.userId),
+      spots: await mapSpotsForUser(config, page, viewer.userId),
     });
   } catch (error) {
     console.error('Loading recent spots failed:', error);

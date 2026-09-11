@@ -31,8 +31,9 @@ Values beginning with `EXPO_PUBLIC_` are embedded in the client bundle and must 
 | `RESEND_API_KEY` | API server | Optional email when a spot reaches two unique removal requests, and for Help & Support notifications. |
 | `RESEND_FROM_EMAIL` | API server | From address for moderation and Help & Support emails. |
 | `MODERATION_NOTIFY_EMAIL` | API server | Inbox that receives spot review emails and Help & Support submissions. |
+| `PUSH_DISPATCH_SECRET` | API server | Shared secret for the Supabase Database Webhook that calls `POST /api/push/dispatch`. |
 
-Never place `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, `RESEND_API_KEY`, `MODERATION_NOTIFY_EMAIL`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, or `SENTRY_PROJECT` in `.env.local` for a client build, an `EXPO_PUBLIC_*` value, or source control. `EXPO_PUBLIC_SENTRY_DSN` and `EXPO_PUBLIC_POSTHOG_API_KEY` are public client values and may live in the app build.
+Never place `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, `RESEND_API_KEY`, `MODERATION_NOTIFY_EMAIL`, `PUSH_DISPATCH_SECRET`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, or `SENTRY_PROJECT` in `.env.local` for a client build, an `EXPO_PUBLIC_*` value, or source control. `EXPO_PUBLIC_SENTRY_DSN` and `EXPO_PUBLIC_POSTHOG_API_KEY` are public client values and may live in the app build.
 
 ## 2. Create the Supabase data layer
 
@@ -66,6 +67,7 @@ In the Supabase SQL Editor, run the idempotent scripts in this order:
 17. `supabase/school_search_setup.sql`
 18. `supabase/nearest_school_setup.sql`
 19. `supabase/user_notifications_setup.sql`
+20. `supabase/push_notifications_setup.sql`
 
 Draft Terms of Use, Privacy Policy, and Community Guidelines live in `docs/`. They are product policies for later lawyer review, not legal advice.
 
@@ -94,6 +96,22 @@ select * from public.comment_reports order by created_at desc;
 ```
 
 Keep and remove snippets are documented at the top of the removal SQL file. If `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, and `MODERATION_NOTIFY_EMAIL` are set on the API server, crossing two unique removal requests also sends one email, and each Help & Support submission sends a notification to the same inbox.
+
+## Push notifications
+
+Apply `push_notifications_setup.sql` after `user_notifications_setup.sql`. It adds Expo push tokens, saved-school rows, profile preference columns, and extra inbox types (saved-school spots, liked-spot comments, and owner spot status).
+
+Create a Supabase Database Webhook on `public.user_notifications` for INSERT that `POST`s to your API origin:
+
+```text
+https://YOUR_API_ORIGIN/api/push/dispatch
+```
+
+Send header `x-push-dispatch-secret` with the same value as `PUSH_DISPATCH_SECRET` on the API server. The webhook body can be the default Supabase payload (`record.id`) or `{ "id": "<notification uuid>" }`.
+
+Push delivery requires a **native** build (`npx expo run:ios`, `npx expo run:android`, or EAS). Configure APNs and FCM credentials for `app.skateu.mobile` in the EAS dashboard (`eas credentials`). Expo Go will not receive these pushes for a custom-dev-client app.
+
+Users enable alerts in Settings → Notifications. The OS permission prompt runs only when they turn push on, not at launch.
 
 ## 3. Generate and seed schools
 

@@ -55,6 +55,10 @@ async function countFollows(
     },
   });
 
+  if (response.status === 416) {
+    return parseExactCount(response);
+  }
+
   if (!response.ok && response.status !== 206) {
     throw new Error(await response.text());
   }

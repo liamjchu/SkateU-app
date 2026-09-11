@@ -10,6 +10,7 @@ import {
     Text,
     View
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
     Easing,
     useAnimatedStyle,
@@ -22,7 +23,6 @@ import ProfileAvatar from '../../components/ProfileAvatar';
 import ProfileIdentityCard from '../../components/profile-identity-card';
 import ProfileSpotRow from '../../components/profile-spot-row';
 import ProfileXpPanel from '../../components/profile-xp-panel';
-import ScreenHeader from '../../components/screen-header';
 import StaleCacheBanner from '../../components/StaleCacheBanner';
 import SocialLinks from '../../components/social-links';
 import { colors } from '../../constants/colors';
@@ -43,7 +43,6 @@ import { toMutationError, toUserFacingError } from '../../lib/userFacingError';
 import { openSpotOnMap } from '../../lib/mapNavigation';
 import { guardedNavigate, useGuardedRouter } from '../../lib/navigationGuard';
 import { fetchPublicProfileView } from '../../lib/publicProfile';
-import { fetchXpEvents } from '../../lib/xpEvents';
 import { rankFromXp } from '../../lib/xpRank';
 import { useAuthStore } from '../../store/authStore';
 import { useDraftSpotsStore } from '../../store/draftSpotsStore';
@@ -51,7 +50,6 @@ import { useProfileStore } from '../../store/profileStore';
 import { useSpotsStore } from '../../store/spotsStore';
 import type { Spot } from '../../types/spot';
 import type { SpotDraft } from '../../types/spotDraft';
-import type { XpEventView } from '../../types/xp';
 
 type ProfileSpotTab = 'created' | 'liked' | 'drafts';
 const PROFILE_TAB_COUNT = 3;
@@ -183,6 +181,7 @@ function tabFromParam(value: string | string[] | undefined): ProfileSpotTab {
 
 export default function ProfileScreen() {
   const router = useGuardedRouter();
+  const insets = useSafeAreaInsets();
   const searchParams = useLocalSearchParams();
   const reduceMotion = useReducedMotion();
   const user = useAuthStore((state) => state.user);
@@ -231,7 +230,6 @@ export default function ProfileScreen() {
   const [updatingAvatar, setUpdatingAvatar] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
-  const [xpEvents, setXpEvents] = useState<XpEventView[]>([]);
   const spotToggleWidth = useSharedValue(0);
   const showingLikedSpots = spotTab === 'liked';
   const showingDrafts = spotTab === 'drafts';
@@ -269,11 +267,6 @@ export default function ProfileScreen() {
       if (accessToken) {
         fetchMySpots(accessToken);
         fetchLikedSpots(accessToken);
-        void fetchXpEvents(accessToken)
-          .then(setXpEvents)
-          .catch(() => {
-            // Keep the last loaded history if this refresh fails.
-          });
       }
       if (userId) {
         if (accessToken) {
@@ -518,28 +511,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <View className="flex-1 bg-surface">
-      <ScreenHeader
-        title="Profile"
-        rightAction={
-          user ? (
-            <FeedbackPressable
-              haptic="light"
-              onPress={() =>
-                guardedNavigate('settings', () => {
-                  router.push('/settings');
-                })
-              }
-              className="h-12 w-12 items-center justify-center rounded-full"
-              accessibilityLabel="Open settings"
-              accessibilityRole="button"
-            >
-              <Feather name="settings" size={23} color="#FFFFFF" />
-            </FeedbackPressable>
-          ) : undefined
-        }
-      />
-
+    <View className="flex-1 bg-surface" style={{ paddingTop: insets.top }}>
       {!user ? (
         <View className="flex-1 items-center justify-center px-8">
           <View className="w-full max-w-[400px] items-center rounded-2xl bg-field p-6">
@@ -672,7 +644,7 @@ export default function ProfileScreen() {
               </Text>
             </FeedbackPressable>
           )}
-          <ProfileXpPanel xpTotal={xpTotal} events={xpEvents} />
+          <ProfileXpPanel xpTotal={xpTotal} />
         </ProfileIdentityCard>
 
         <View

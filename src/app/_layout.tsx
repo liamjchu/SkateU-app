@@ -40,11 +40,15 @@ import { useBlocksStore } from '../store/blocksStore';
 import { useCommentsStore } from '../store/commentsStore';
 import { useDraftSpotsStore } from '../store/draftSpotsStore';
 import { useFavorites } from '../store/favoritesStore';
+import { useFeedSeenStore } from '../store/feedSeenStore';
+import { useNotificationPreferencesStore } from '../store/notificationPreferencesStore';
 import { useNotificationsStore } from '../store/notificationsStore';
 import { useProfileStore } from '../store/profileStore';
 import { useSchools } from '../store/schoolsStore';
 import { useSpotsStore } from '../store/spotsStore';
 import { useXpFeedbackStore } from '../store/xpFeedbackStore';
+import { usePushNotifications } from '../hooks/usePushNotifications';
+import { useSyncSavedSchools } from '../hooks/useSyncSavedSchools';
 import { useXpFeedback } from '../hooks/useXpFeedback';
 import {
     AnalyticsProvider,
@@ -132,6 +136,12 @@ function RootLayout() {
   const fetchBlocks = useBlocksStore((state) => state.fetchBlocks);
   const clearBlocks = useBlocksStore((state) => state.clear);
   const syncNotificationsUser = useNotificationsStore((state) => state.syncUser);
+  const fetchNotificationPreferences = useNotificationPreferencesStore(
+    (state) => state.fetchPreferences
+  );
+  const resetNotificationPreferences = useNotificationPreferencesStore(
+    (state) => state.reset
+  );
   const setSessionUserId = useSpotsStore((state) => state.setSessionUserId);
   const [cachesReady, setCachesReady] = useState(false);
   useXpFeedback();
@@ -169,6 +179,7 @@ function RootLayout() {
     // after client mounting instead of during the web server render.
     void Promise.all([
       useFavorites.persist.rehydrate(),
+      useFeedSeenStore.persist.rehydrate(),
       useDraftSpotsStore.persist.rehydrate(),
       useSpotsStore.persist.rehydrate(),
       useSchools.persist.rehydrate(),
@@ -203,6 +214,7 @@ function RootLayout() {
       fetchProfile(userId, accessToken);
       if (accessToken) {
         void fetchBlocks(accessToken);
+        void fetchNotificationPreferences(accessToken);
       }
       return;
     }
@@ -212,7 +224,8 @@ function RootLayout() {
     clearReportedSpotIds();
     clearProfile();
     clearBlocks();
-  }, [cachesReady, clearBlocks, clearLikedSpots, clearMySpots, clearReportedSpotIds, fetchBlocks, setSessionUserId, syncNotificationsUser, userId, accessToken, fetchProfile, clearProfile]);
+    resetNotificationPreferences();
+  }, [cachesReady, clearBlocks, clearLikedSpots, clearMySpots, clearReportedSpotIds, fetchBlocks, fetchNotificationPreferences, resetNotificationPreferences, setSessionUserId, syncNotificationsUser, userId, accessToken, fetchProfile, clearProfile]);
 
   useEffect(() => {
     // Supabase redirects OAuth and recovery emails to distinct native paths.
@@ -311,6 +324,15 @@ function RootLayout() {
   ];
   const startupProgress = bootSteps.filter(Boolean).length / bootSteps.length;
 
+  usePushNotifications({
+    enabled:
+      appReady &&
+      legalGate === 'none' &&
+      Boolean(userId) &&
+      Boolean(accessToken),
+  });
+  useSyncSavedSchools();
+
   useEffect(() => {
     if (!appReady) {
       return;
@@ -380,6 +402,7 @@ function RootLayout() {
         <Stack.Screen name="follow-list" />
         <Stack.Screen name="notifications" />
         <Stack.Screen name="settings" />
+        <Stack.Screen name="notification-settings" />
         <Stack.Screen name="blocked-accounts" />
         <Stack.Screen name="help" />
         <Stack.Screen name="change-username" />

@@ -1341,6 +1341,11 @@ export default function MapScreen() {
           upsertSchool(school);
           toggleFavoriteSchool(school);
         }}
+        onSearchActiveChange={(active) => {
+          if (active) {
+            clearSelectedSpot();
+          }
+        }}
       />
       <View
         className="absolute left-4 z-[999] gap-2.5"
@@ -1377,31 +1382,6 @@ export default function MapScreen() {
           }}
         >
           <Image source={images.layers} style={styles.mapControlIcon} />
-        </FeedbackPressable>
-        <FeedbackPressable
-          haptic="light"
-          onPress={() => {
-            webViewRef.current?.injectJavaScript(
-              `window.recenterMap(); true;`
-            );
-          }}
-          disabled={mapStatus !== 'ready'}
-          className="h-14 w-14 items-center justify-center rounded-full bg-white"
-          style={styles.mapControl}
-          accessibilityRole="button"
-          accessibilityLabel={
-            currentSchool
-              ? 'Recenter on campus'
-              : 'Recenter on this area'
-          }
-          accessibilityHint={
-            currentSchool
-              ? 'Moves the map back to the campus center'
-              : 'Moves the map back to the current focus'
-          }
-          accessibilityState={{ disabled: mapStatus !== 'ready' }}
-        >
-          <Feather name="crosshair" size={26} color={colors.brand} />
         </FeedbackPressable>
         <FeedbackPressable
           haptic="light"

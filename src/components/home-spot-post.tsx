@@ -1,6 +1,7 @@
 import { Feather, Octicons } from '@expo/vector-icons';
 import { useGuardedRouter } from '../lib/navigationGuard';
 import { Text, View, useWindowDimensions } from 'react-native';
+import { useState } from 'react';
 import { colors } from '../constants/colors';
 import { formatCompactRelativeTime } from '../lib/relativeTime';
 import { openUserProfile } from '../lib/userProfileNavigation';
@@ -20,6 +21,8 @@ type HomeSpotPostProps = {
   onOpenComments: (spot: Spot) => void;
   onOpenFullscreen: (spot: Spot, photoIndex: number) => void;
   layout?: HomeSpotPostLayout;
+  pageHeight?: number;
+  topInset?: number;
 };
 
 function spotAttributionSuffix(spot: Spot): string {
@@ -43,23 +46,37 @@ export default function HomeSpotPost({
   onOpenComments,
   onOpenFullscreen,
   layout = 'card',
+  pageHeight,
+  topInset = 0,
 }: HomeSpotPostProps) {
   const liked = spot.likedByUser === true;
   const imageUris = spot.imageUris.filter((uri) => uri.length > 0);
   const router = useGuardedRouter();
   const currentUserId = useAuthStore((state) => state.user?.id ?? null);
   const { width } = useWindowDimensions();
+  const [mediaBoxHeight, setMediaBoxHeight] = useState(0);
   const immersive = layout === 'immersive';
-  const mediaHeight = immersive
-    ? Math.min(Math.round(width * 1.15), 560)
-    : 224;
+  const fillPage =
+    immersive && typeof pageHeight === 'number' && pageHeight > 0;
+  const mediaHeight = fillPage
+    ? mediaBoxHeight
+    : immersive
+      ? Math.min(Math.round(width * 1.15), 560)
+      : 224;
 
   return (
     <View
       className={
-        immersive
+        fillPage
           ? 'bg-surface'
-          : 'overflow-hidden rounded-2xl bg-field'
+          : immersive
+            ? 'bg-surface'
+            : 'overflow-hidden rounded-2xl bg-field'
+      }
+      style={
+        fillPage
+          ? { height: pageHeight, paddingTop: topInset }
+          : undefined
       }
     >
       {immersive ? (
@@ -110,18 +127,38 @@ export default function HomeSpotPost({
       ) : null}
 
       {imageUris.length > 0 ? (
-        <SpotMediaPager
-          uris={imageUris}
-          height={mediaHeight}
-          onPressIndex={(index) => onOpenFullscreen(spot, index)}
-          accessibilityName={spot.name}
-        />
+        <View
+          className={fillPage ? 'min-h-0 flex-1' : undefined}
+          onLayout={
+            fillPage
+              ? (event) => {
+                  const nextHeight = Math.round(event.nativeEvent.layout.height);
+                  if (nextHeight !== mediaBoxHeight) {
+                    setMediaBoxHeight(nextHeight);
+                  }
+                }
+              : undefined
+          }
+        >
+          {mediaHeight > 0 ? (
+            <SpotMediaPager
+              uris={imageUris}
+              height={mediaHeight}
+              onPressIndex={(index) => onOpenFullscreen(spot, index)}
+              accessibilityName={spot.name}
+            />
+          ) : (
+            <View className="flex-1 bg-surface-soft" />
+          )}
+        </View>
       ) : (
         <FeedbackPressable
           haptic="light"
           disablePressScale
           onPress={() => onOpenFullscreen(spot, 0)}
-          className={`${immersive ? 'h-72' : 'h-56'} w-full items-center justify-center bg-surface-soft`}
+          className={`${
+            fillPage ? 'min-h-0 flex-1' : immersive ? 'h-72' : 'h-56'
+          } w-full items-center justify-center bg-surface-soft`}
           accessibilityRole="button"
           accessibilityLabel={`Open full screen view of ${spot.name}`}
         >
@@ -211,7 +248,9 @@ export default function HomeSpotPost({
       </View>
 
       <View
-        className={`flex-row items-center px-4 ${immersive ? 'pb-5 pt-3' : 'pb-4 pt-3'}`}
+        className={`flex-row items-center px-4 ${
+          fillPage ? 'pb-4 pt-3' : immersive ? 'pb-5 pt-3' : 'pb-4 pt-3'
+        }`}
       >
         <FeedbackPressable
           haptic="light"
@@ -267,7 +306,7 @@ export default function HomeSpotPost({
           </Text>
         </FeedbackPressable>
       </View>
-      {immersive ? <View className="h-px bg-borderSoft" /> : null}
+      {immersive && !fillPage ? <View className="h-px bg-borderSoft" /> : null}
     </View>
   );
 }

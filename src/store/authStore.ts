@@ -12,6 +12,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { useAgeEligibilityStore } from './ageEligibilityStore';
 import { useDraftSpotsStore } from './draftSpotsStore';
+import { unregisterStoredPushToken } from '../lib/pushRegistration';
 
 type AuthState = {
   session: Session | null;
@@ -393,6 +394,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   signOut: async () => {
+    const accessToken = get().session?.access_token ?? null;
+    await unregisterStoredPushToken(accessToken);
     const { error } = await supabase.auth.signOut();
 
     deleteAccountProof = null;
@@ -459,6 +462,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (!accessToken) {
       throw new Error('Log in to delete your account.');
     }
+
+    await unregisterStoredPushToken(accessToken);
     if (!deleteAccountAccessToken && !proof) {
       throw new Error('Enter a new email verification code to delete your account.');
     }

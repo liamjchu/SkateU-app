@@ -53,6 +53,72 @@ function isUniqueViolation(status: number, body: string): boolean {
   return status === 409 && (body.includes('23505') || /duplicate key/i.test(body));
 }
 
+function isMissingNotificationsTable(status: number, body: string): boolean {
+  if (status !== 404 && status !== 400) {
+    return false;
+  }
+  return (
+    body.includes('PGRST205') ||
+    body.includes("'public.user_notifications'")
+  );
+}
+
+async function syncFollowNotification(
+  config: SupabaseConfig,
+  recipientId: string,
+  actorId: string,
+  action: 'insert' | 'delete'
+): Promise<void> {
+  try {
+    if (action === 'insert') {
+      const response = await fetch(`${config.url}/rest/v1/user_notifications`, {
+        method: 'POST',
+        headers: {
+          ...supabaseHeaders(config),
+          'Content-Type': 'application/json',
+          Prefer: 'return=minimal',
+        },
+        body: JSON.stringify({
+          recipient_id: recipientId,
+          actor_id: actorId,
+          type: 'follow',
+        }),
+      });
+      if (response.ok || response.status === 409) {
+        return;
+      }
+      const body = await response.text();
+      if (
+        isUniqueViolation(response.status, body) ||
+        isMissingNotificationsTable(response.status, body)
+      ) {
+        return;
+      }
+      console.error('Creating follow notification failed:', body);
+      return;
+    }
+
+    const query = new URL(`${config.url}/rest/v1/user_notifications`);
+    query.searchParams.set('type', 'eq.follow');
+    query.searchParams.set('recipient_id', `eq.${recipientId}`);
+    query.searchParams.set('actor_id', `eq.${actorId}`);
+    const response = await fetch(query.toString(), {
+      method: 'DELETE',
+      headers: supabaseHeaders(config),
+    });
+    if (response.ok) {
+      return;
+    }
+    const body = await response.text();
+    if (isMissingNotificationsTable(response.status, body)) {
+      return;
+    }
+    console.error('Removing follow notification failed:', body);
+  } catch (error) {
+    console.error('Syncing follow notification failed:', error);
+  }
+}
+
 async function resolveOptionalViewer(
   request: Request,
   config: SupabaseConfig
@@ -174,11 +240,13 @@ export async function POST(request: Request): Promise<Response> {
     if (!response.ok) {
       const message = await response.text();
       if (isUniqueViolation(response.status, message)) {
+        await syncFollowNotification(config, followingId, user.userId, 'insert');
         return followStatsResponse(config, followingId, user.userId);
       }
       throw new Error(message);
     }
 
+    await syncFollowNotification(config, followingId, user.userId, 'insert');
     return followStatsResponse(config, followingId, user.userId, 201);
   } catch (error) {
     console.error('Following user failed:', error);
@@ -220,6 +288,7 @@ export async function DELETE(request: Request): Promise<Response> {
       throw new Error(await response.text());
     }
 
+    await syncFollowNotification(config, followingId, user.userId, 'delete');
     return followStatsResponse(config, followingId, user.userId);
   } catch (error) {
     console.error('Unfollowing user failed:', error);

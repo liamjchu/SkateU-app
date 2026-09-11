@@ -136,8 +136,10 @@ begin
     p_type,
     p_spot_id,
     p_comment_id
-  )
-  on conflict do nothing;
+  );
+exception
+  when unique_violation then
+    null;
 end;
 $$;
 

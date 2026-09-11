@@ -1,9 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { usePathname } from 'expo-router';
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../constants/colors';
 import { displayableAvatarUrl } from '../lib/avatarUrl';
+import { guardedNavigate, useGuardedRouter } from '../lib/navigationGuard';
 import { APP_TAB_BAR_CONTENT_HEIGHT } from '../lib/tabBar';
 import { rankFromXp } from '../lib/xpRank';
 import { useAuthStore } from '../store/authStore';
@@ -35,6 +37,9 @@ export default function AppTabBar({
   navigation,
 }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const router = useGuardedRouter();
+  const pathname = usePathname();
+  const settingsSelected = pathname === '/settings';
   const avatarUrl = useProfileStore((store) => store.profile?.avatar_url ?? null);
   const xpTotal = useProfileStore((store) => store.profile?.xp_total ?? 0);
   const signedIn = Boolean(useAuthStore((store) => store.user?.id));
@@ -110,6 +115,31 @@ export default function AppTabBar({
             </FeedbackPressable>
           );
         })}
+        <FeedbackPressable
+          haptic="selection"
+          disablePressScale
+          onPress={() => {
+            if (settingsSelected) {
+              if (router.canGoBack()) {
+                router.back();
+              }
+              return;
+            }
+            guardedNavigate('settings', () => {
+              router.push('/settings');
+            });
+          }}
+          className="min-w-0 flex-1 items-center justify-center"
+          accessibilityRole="button"
+          accessibilityState={{ selected: settingsSelected }}
+          accessibilityLabel="Settings"
+        >
+          <Ionicons
+            name={settingsSelected ? 'settings' : 'settings-outline'}
+            size={24}
+            color={settingsSelected ? colors.ink : colors.muted}
+          />
+        </FeedbackPressable>
       </View>
     </View>
   );

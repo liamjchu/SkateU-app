@@ -34,6 +34,7 @@ function makeNotification(
     actorAvatarUrl: null,
     spotId: 'spot-1',
     spotName: 'Rail',
+    schoolName: null,
     spotImageUrl: null,
     ...overrides,
   };

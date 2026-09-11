@@ -3,6 +3,7 @@ import {
   formatNotificationsA11yLabel,
   formatUnreadBadge,
   mapNotificationView,
+  notificationCopy,
   notificationRoute,
   parseNotificationType,
 } from '../notifications';
@@ -10,7 +11,7 @@ import {
 describe('parseNotificationType', () => {
   it('accepts known types and rejects unknown values', () => {
     expect(parseNotificationType('spot_like')).toBe('spot_like');
-    expect(parseNotificationType('follow')).toBe('follow');
+    expect(parseNotificationType('spot_approved')).toBe('spot_approved');
     expect(parseNotificationType('like_received')).toBeNull();
     expect(parseNotificationType(null)).toBeNull();
   });
@@ -58,11 +59,11 @@ describe('formatNotificationBody', () => {
     ).toBe('jay replied to your comment');
     expect(
       formatNotificationBody({
-        type: 'follow',
-        actorUsername: 'mina',
-        spotName: null,
+        type: 'spot_approved',
+        actorUsername: null,
+        spotName: 'Rail',
       })
-    ).toBe('mina started following you');
+    ).toBe('Your spot “Rail” is live');
   });
 });
 
@@ -86,11 +87,46 @@ describe('formatNotificationsA11yLabel', () => {
   });
 });
 
+describe('notificationCopy', () => {
+  it('splits the actor name from the rest of the sentence', () => {
+    expect(
+      notificationCopy({
+        type: 'spot_like',
+        actorUsername: 'alex',
+        spotName: 'Rail',
+      })
+    ).toEqual({ actor: 'alex', rest: 'liked your spot “Rail”' });
+    expect(
+      notificationCopy({
+        type: 'saved_school_spot',
+        actorUsername: 'sam',
+        spotName: 'Rail',
+        schoolName: 'Brown',
+      })
+    ).toEqual({ actor: 'sam', rest: 'added a new spot “Rail” at Brown' });
+    expect(
+      notificationCopy({
+        type: 'spot_approved',
+        actorUsername: null,
+        spotName: 'Rail',
+      })
+    ).toEqual({ actor: 'Your spot', rest: '“Rail” is live' });
+  });
+});
+
 describe('notificationRoute', () => {
-  it('opens comments for spot activity and profiles for follows', () => {
+  it('opens comments for comments, likes, and campus alerts, and profiles for follows', () => {
     expect(
       notificationRoute({
         type: 'spot_like',
+        actorId: 'user-2',
+        spotId: 'spot-1',
+        spotName: 'Rail',
+      })
+    ).toEqual({ kind: 'comments', spotId: 'spot-1', spotName: 'Rail' });
+    expect(
+      notificationRoute({
+        type: 'spot_comment',
         actorId: 'user-2',
         spotId: 'spot-1',
         spotName: 'Rail',
@@ -114,12 +150,20 @@ describe('notificationRoute', () => {
     ).toEqual({ kind: 'none' });
     expect(
       notificationRoute({
-        type: 'comment_reply',
-        actorId: 'user-2',
-        spotId: null,
+        type: 'spot_removed',
+        actorId: null,
+        spotId: 'spot-1',
         spotName: 'Rail',
       })
     ).toEqual({ kind: 'none' });
+    expect(
+      notificationRoute({
+        type: 'liked_spot_comment',
+        actorId: 'user-2',
+        spotId: 'spot-1',
+        spotName: 'Rail',
+      })
+    ).toEqual({ kind: 'comments', spotId: 'spot-1', spotName: 'Rail' });
   });
 });
 

@@ -3,7 +3,9 @@ import {
   HOME_SPOTS_PAGE_SIZE,
   PROFILE_SPOTS_PAGE_SIZE,
   MAX_HOME_FEED_OFFSET,
+  FEED_CANDIDATE_LIMIT,
   parseOffset,
+  shouldPrefetchMoreItems,
 } from '../homeFeed';
 
 describe('home feed page sizes', () => {
@@ -11,7 +13,17 @@ describe('home feed page sizes', () => {
     expect(HOME_SPOTS_PAGE_SIZE).toBe(6);
     expect(PROFILE_SPOTS_PAGE_SIZE).toBe(12);
     expect(HOME_RAIL_PAGE_SIZE).toBe(24);
+    expect(FEED_CANDIDATE_LIMIT).toBe(120);
     expect(HOME_SPOTS_PAGE_SIZE).toBeLessThan(HOME_RAIL_PAGE_SIZE);
+  });
+});
+
+describe('shouldPrefetchMoreItems', () => {
+  it('starts loading before the last item is on screen', () => {
+    expect(shouldPrefetchMoreItems(3, 6)).toBe(true);
+    expect(shouldPrefetchMoreItems(2, 6)).toBe(false);
+    expect(shouldPrefetchMoreItems(-1, 6)).toBe(false);
+    expect(shouldPrefetchMoreItems(0, 0)).toBe(false);
   });
 });
 

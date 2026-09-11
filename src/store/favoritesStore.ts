@@ -10,6 +10,7 @@ type FavoritesStore = {
   hasHydrated: boolean;
   setHasHydrated: (hasHydrated: boolean) => void;
   addFavoriteSchool: (school: School) => void;
+  addFavoriteSchoolId: (id: string) => void;
   removeFavoriteSchool: (id: string) => void;
   toggleFavoriteSchool: (school: School) => void;
   upsertFavoriteSchool: (school: School) => void;
@@ -40,6 +41,13 @@ export const useFavorites = create<FavoritesStore>()(
             ...state.favoriteSchools,
             school,
           ]),
+        }));
+      },
+      addFavoriteSchoolId: (id: string) => {
+        set((state) => ({
+          favoriteSchoolIds: state.favoriteSchoolIds.includes(id)
+            ? state.favoriteSchoolIds
+            : [...state.favoriteSchoolIds, id],
         }));
       },
       removeFavoriteSchool: (id: string) => {

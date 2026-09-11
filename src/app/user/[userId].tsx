@@ -1,3 +1,4 @@
+import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import {
@@ -7,10 +8,10 @@ import {
     Text,
     View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FeedbackPressable from '../../components/FeedbackPressable';
 import ProfileIdentityCard from '../../components/profile-identity-card';
 import ProfileSpotRow from '../../components/profile-spot-row';
-import ScreenHeader from '../../components/screen-header';
 import SocialLinks from '../../components/social-links';
 import { colors } from '../../constants/colors';
 import { captureAnalyticsEvent } from '../../lib/analytics';
@@ -40,6 +41,7 @@ function firstParam(value: string | string[] | undefined): string | undefined {
 
 export default function UserProfileScreen() {
   const router = useGuardedRouter();
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ userId?: string | string[] }>();
   const userId = firstParam(params.userId);
   const session = useAuthStore((state) => state.session);
@@ -193,18 +195,25 @@ export default function UserProfileScreen() {
     : 'A skater';
 
   return (
-    <View className="flex-1 bg-surface">
-      <ScreenHeader
-        title="Profile"
-        onBack={() => {
-          if (router.canGoBack()) {
-            router.back();
-            return;
-          }
+    <View className="flex-1 bg-surface" style={{ paddingTop: insets.top }}>
+      <View className="px-4">
+        <FeedbackPressable
+          haptic="light"
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+              return;
+            }
 
-          router.replace('/');
-        }}
-      />
+            router.replace('/');
+          }}
+          className="h-12 w-12 items-center justify-center rounded-full"
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
+        >
+          <Feather name="chevron-left" size={28} color={colors.ink} />
+        </FeedbackPressable>
+      </View>
 
       <FlatList
         className="flex-1"
@@ -380,7 +389,7 @@ export default function UserProfileScreen() {
             </View>
           </>
         }
-        contentContainerClassName="self-center w-full max-w-[720px] px-6 pb-10 pt-6"
+        contentContainerClassName="self-center w-full max-w-[720px] px-6 pb-10 pt-2"
         showsVerticalScrollIndicator={false}
         onEndReached={() => {
           if (hasMoreSpots) {

@@ -1,7 +1,7 @@
 import fc from 'fast-check';
 
 import { IMAGE_SANITIZE_ERROR } from '../../../lib/sanitizeImage';
-import { HOME_SPOTS_PAGE_SIZE } from '../../../lib/homeFeed';
+import { HOME_SPOTS_PAGE_SIZE, FEED_CANDIDATE_LIMIT } from '../../../lib/homeFeed';
 import {
     CAMERA_MAKE,
     CAPTURE_TIME,
@@ -588,8 +588,69 @@ describe('GET /api/spots', () => {
     expect(fetchMock).toHaveBeenCalled();
     const recentUrl = new URL(String(fetchMock.mock.calls[0][0]));
     expect(recentUrl.searchParams.get('order')).toBe('created_at.desc,id.desc');
-    expect(recentUrl.searchParams.get('limit')).toBe(String(HOME_SPOTS_PAGE_SIZE));
+    expect(recentUrl.searchParams.get('limit')).toBe(String(FEED_CANDIDATE_LIMIT));
     expect(recentUrl.searchParams.get('status')).toBe(VISIBLE_SPOT_STATUS_FILTER);
+    expect(recentUrl.searchParams.get('offset')).toBeNull();
+  });
+
+  it('ranks recent spots by recency and engagement then pages them', async () => {
+    setConfigured();
+    const now = Date.now();
+    const quiet: DatabaseSpot = {
+      id: 'spot-quiet',
+      school_id: 'school1',
+      name: 'Quiet',
+      description: 'New but unused',
+      latitude: 10,
+      longitude: 20,
+      image_urls: [],
+      created_at: new Date(now).toISOString(),
+      updated_at: new Date(now).toISOString(),
+      likes_count: 0,
+      comments_count: 0,
+      schools: { name: 'UT Austin', city: 'Austin', state: 'TX' },
+      creator: { username: 'skater_jane' },
+    };
+    const hot: DatabaseSpot = {
+      ...quiet,
+      id: 'spot-hot',
+      name: 'Hot',
+      created_at: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
+      likes_count: 40,
+      comments_count: 10,
+    };
+    const filler: DatabaseSpot[] = Array.from({ length: 6 }, (_, index) => ({
+      ...quiet,
+      id: `spot-fill-${index}`,
+      name: `Fill ${index}`,
+      created_at: new Date(now - (index + 8) * 60 * 60 * 1000).toISOString(),
+    }));
+    const fetchMock: FetchMock = jest.fn(async (_input: string | URL | Request) =>
+      jsonResponse([quiet, hot, ...filler])
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const firstPage = await GET(
+      new Request('https://app.test/api/spots?recent=1')
+    );
+    const firstBody = (await firstPage.json()) as { spots: Array<{ id: string }> };
+    expect(firstBody.spots[0]?.id).toBe('spot-hot');
+    expect(firstBody.spots).toHaveLength(HOME_SPOTS_PAGE_SIZE);
+
+    const secondPage = await GET(
+      new Request(
+        `https://app.test/api/spots?recent=1&offset=${HOME_SPOTS_PAGE_SIZE}`
+      )
+    );
+    const secondBody = (await secondPage.json()) as {
+      spots: Array<{ id: string }>;
+    };
+    expect(secondBody.spots).toHaveLength(2);
+    expect(secondBody.spots.map((spot) => spot.id)).not.toContain('spot-hot');
+
+    const recentUrl = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(recentUrl.searchParams.get('offset')).toBeNull();
+    expect(recentUrl.searchParams.get('limit')).toBe(String(FEED_CANDIDATE_LIMIT));
   });
 
   it('filters recent spots by school type and includes offset', async () => {
@@ -609,8 +670,8 @@ describe('GET /api/spots', () => {
 
     const recentUrl = new URL(String(fetchMock.mock.calls[0][0]));
     expect(recentUrl.searchParams.get('schools.type')).toBe('in.(k12_public)');
-    expect(recentUrl.searchParams.get('offset')).toBe(String(HOME_SPOTS_PAGE_SIZE));
-    expect(recentUrl.searchParams.get('limit')).toBe(String(HOME_SPOTS_PAGE_SIZE));
+    expect(recentUrl.searchParams.get('offset')).toBeNull();
+    expect(recentUrl.searchParams.get('limit')).toBe(String(FEED_CANDIDATE_LIMIT));
     expect(recentUrl.searchParams.get('order')).toBe('created_at.desc,id.desc');
   });
 

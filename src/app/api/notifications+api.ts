@@ -136,6 +136,8 @@ type DatabaseActor = {
 type DatabaseSpot = {
   name?: string | null;
   image_urls?: unknown;
+  school_id?: string | null;
+  school_name?: string | null;
 };
 
 export type DatabaseNotification = {
@@ -176,6 +178,10 @@ export function mapNotification(row: DatabaseNotification): UserNotification | n
       type,
       actorUsername,
       spotName,
+      schoolName:
+        typeof spot?.school_name === 'string' && spot.school_name.length > 0
+          ? spot.school_name
+          : null,
     }),
     createdAt: typeof row.created_at === 'string' ? row.created_at : '',
     readAt: typeof row.read_at === 'string' ? row.read_at : null,
@@ -185,6 +191,10 @@ export function mapNotification(row: DatabaseNotification): UserNotification | n
     ...(actorXp !== null ? { actorRank: rankFromXp(actorXp) } : {}),
     spotId: typeof row.spot_id === 'string' ? row.spot_id : null,
     spotName,
+    schoolName:
+      typeof spot?.school_name === 'string' && spot.school_name.length > 0
+        ? spot.school_name
+        : null,
     spotImageUrl: firstImageUrl(spot?.image_urls),
   };
 }
@@ -346,7 +356,7 @@ async function fetchSpotsById(
 
   const query = new URL(`${config.url}/rest/v1/spots`);
   query.searchParams.set('id', `in.(${ids.join(',')})`);
-  query.searchParams.set('select', 'id,name,image_urls');
+  query.searchParams.set('select', 'id,name,image_urls,school_id');
   const response = await supabaseFetch(query.toString(), {
     headers: supabaseHeaders(config),
   });
@@ -360,6 +370,33 @@ async function fetchSpotsById(
     }
   }
   return spots;
+}
+
+async function fetchSchoolNamesById(
+  config: SupabaseConfig,
+  ids: string[]
+): Promise<Map<string, string>> {
+  const names = new Map<string, string>();
+  if (ids.length === 0) {
+    return names;
+  }
+
+  const query = new URL(`${config.url}/rest/v1/schools`);
+  query.searchParams.set('id', `in.(${ids.join(',')})`);
+  query.searchParams.set('select', 'id,name');
+  const response = await supabaseFetch(query.toString(), {
+    headers: supabaseHeaders(config),
+  });
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+  const rows = (await response.json()) as Array<{ id?: string; name?: string }>;
+  for (const row of rows) {
+    if (typeof row.id === 'string' && typeof row.name === 'string' && row.name) {
+      names.set(row.id, row.name);
+    }
+  }
+  return names;
 }
 
 export async function GET(request: Request): Promise<Response> {
@@ -392,6 +429,15 @@ export async function GET(request: Request): Promise<Response> {
       fetchActorsById(config, actorIds),
       fetchSpotsById(config, spotIds),
     ]);
+    const schoolIds = uniqueIds(
+      [...spots.values()].map((spot) => spot.school_id ?? null)
+    );
+    const schoolNames = await fetchSchoolNamesById(config, schoolIds);
+    for (const spot of spots.values()) {
+      if (typeof spot.school_id === 'string') {
+        spot.school_name = schoolNames.get(spot.school_id) ?? null;
+      }
+    }
     const blocked = new Set(blockedIds);
 
     const notifications = rows

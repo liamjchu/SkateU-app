@@ -39,6 +39,7 @@ type MapExploreChromeProps = {
   onToggleFavorite: () => void;
   onDismissSchool: () => void;
   onToggleSaveResult: (school: School) => void;
+  onSearchActiveChange?: (active: boolean) => void;
 };
 
 export default function MapExploreChrome({
@@ -50,6 +51,7 @@ export default function MapExploreChrome({
   onToggleFavorite,
   onDismissSchool,
   onToggleSaveResult,
+  onSearchActiveChange,
 }: MapExploreChromeProps) {
   const searchInputRef = useRef<TextInput>(null);
   const schools = useSchools((state) => state.schools);
@@ -114,11 +116,12 @@ export default function MapExploreChrome({
     searchInputRef.current?.blur();
     Keyboard.dismiss();
     setIsSearchActive(false);
+    onSearchActiveChange?.(false);
     setSearchQuery('');
     setSearchResults([]);
     setSearchError('');
     setActiveFilter('all');
-  }, []);
+  }, [onSearchActiveChange]);
 
   const handleSelectSchool = (nextSchool: School) => {
     closeSearch();
@@ -238,7 +241,10 @@ export default function MapExploreChrome({
               ref={searchInputRef}
               value={searchQuery}
               onChangeText={setSearchQuery}
-              onFocus={() => setIsSearchActive(true)}
+              onFocus={() => {
+                setIsSearchActive(true);
+                onSearchActiveChange?.(true);
+              }}
               placeholder={schoolSearchCopy.placeholder}
               placeholderTextColor={colors.muted}
               accessibilityLabel={schoolSearchCopy.accessibilityLabel}
@@ -340,7 +346,8 @@ export default function MapExploreChrome({
         </View>
       ) : null}
 
-      {isSearchOpen ? (
+      {isSearchOpen &&
+      (activeFilter === 'saved' || trimmedQuery.length > 0) ? (
         <View className="mt-2 max-h-[50vh] overflow-hidden rounded-2xl bg-field">
           <ScrollView
             keyboardShouldPersistTaps="handled"
@@ -450,11 +457,7 @@ export default function MapExploreChrome({
               <Text className="pb-3 font-outfit-medium text-sm text-muted">
                 Keep typing a school, city, or 2-letter state.
               </Text>
-            ) : (
-              <Text className="pb-3 font-outfit-medium text-sm text-muted">
-                Type a school, city, or 2-letter state.
-              </Text>
-            )}
+            ) : null}
           </ScrollView>
         </View>
       ) : null}

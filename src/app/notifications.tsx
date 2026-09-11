@@ -80,6 +80,16 @@ export default function NotificationsScreen() {
     });
   };
 
+  const handleActorPress = (notification: UserNotification) => {
+    if (!notification.actorId) {
+      return;
+    }
+    captureAnalyticsEvent('notification_actor_opened', {
+      type: notification.type,
+    });
+    openUserProfile(router, notification.actorId, currentUserId);
+  };
+
   const handlePress = (notification: UserNotification) => {
     const route = notificationRoute(notification);
     captureAnalyticsEvent('notification_opened', { type: notification.type });
@@ -129,6 +139,7 @@ export default function NotificationsScreen() {
             <NotificationRow
               notification={item}
               onPress={handlePress}
+              onActorPress={handleActorPress}
               onHide={handleHide}
               showDivider={index > 0}
             />

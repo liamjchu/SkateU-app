@@ -201,6 +201,14 @@ export default function SettingsScreen() {
           />
           <View className="ml-16 h-px bg-border-soft" />
           <SettingsRow
+            icon="bell"
+            label="Notifications"
+            showChevron
+            onPress={() => router.push('/notification-settings')}
+            accessibilityHint="Opens notification settings"
+          />
+          <View className="ml-16 h-px bg-border-soft" />
+          <SettingsRow
             icon="slash"
             label="Blocked accounts"
             showChevron

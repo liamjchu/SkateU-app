@@ -47,9 +47,12 @@ OPENAI_API_KEY
 RESEND_API_KEY
 RESEND_FROM_EMAIL
 MODERATION_NOTIFY_EMAIL
+PUSH_DISPATCH_SECRET
 ```
 
-Set `EXPO_PUBLIC_API_URL` in the native app build environment to that HTTPS origin, without a trailing path. The mobile client requires an absolute URL outside local Expo development. Do not include service-role, OpenAI, or Resend keys in a native build, `.env.example`, source control, or any `EXPO_PUBLIC_*` variable.
+Set `EXPO_PUBLIC_API_URL` in the native app build environment to that HTTPS origin, without a trailing path. The mobile client requires an absolute URL outside local Expo development. Do not include service-role, OpenAI, Resend, or push-dispatch keys in a native build, `.env.example`, source control, or any `EXPO_PUBLIC_*` variable.
+
+Native push notifications need APNs (iOS) and FCM (Android) credentials in EAS for `app.skateu.mobile`. After adding `expo-notifications`, create a new native build. OTA JS updates cannot add the notification permission plugin.
 
 Optional crash reporting: set `EXPO_PUBLIC_SENTRY_DSN` on the native build. Native Sentry Gradle/Xcode upload is enabled only when `SENTRY_ORG`, `SENTRY_PROJECT`, and `SENTRY_AUTH_TOKEN` are all set in the EAS environment (or `SENTRY_DISABLE_AUTO_UPLOAD=true` with org and project). Preview builds can omit those secrets; missing `SENTRY_AUTH_TOKEN` previously failed Android Gradle during source-map upload. Leave the DSN empty to keep crash reporting off.
 
@@ -62,7 +65,7 @@ Optional product analytics: set `EXPO_PUBLIC_POSTHOG_API_KEY` on the native buil
 3. Build a preview artifact and validate authentication, password recovery deep links, map browsing, spot creation, image uploads, edits, likes, Help & Support submissions, and account deletion.
 4. Create the production build, then submit it through EAS after store metadata and signing credentials are complete.
 5. Confirm `https://skateu.app/privacy` resolves for store forms. Terms and Community Guidelines stay in the app.
-6. Inspect the production IPA/AAB permission list before App Privacy and Data Safety. The app may request when-in-use location to show the user on campus maps. GPS is not stored on SkateU servers. Camera and photo library are used to add skate-spot pictures. Unused native map SDKs must not add background location permission.
+6. Inspect the production IPA/AAB permission list before App Privacy and Data Safety. The app may request when-in-use location to show the user on campus maps. GPS is not stored on SkateU servers. Camera and photo library are used to add skate-spot pictures. Notifications are used for likes, comments, follows, and campus/spot alerts. Unused native map SDKs must not add background location permission.
 
 ## App icon verification
 

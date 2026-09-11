@@ -43,6 +43,9 @@ create index if not exists spots_school_id_idx
 create index if not exists spots_lat_lng_idx
   on public.spots (latitude, longitude);
 
+create index if not exists spots_created_at_idx
+  on public.spots (created_at desc);
+
 -- -----------------------------------------------------------------------------
 -- 3. updated_at trigger
 --    Keep `updated_at` current on every UPDATE. Only the updated row is touched.
