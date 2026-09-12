@@ -156,9 +156,6 @@ export async function sendFeedbackEmail(
 ): Promise<boolean> {
   const config = getModerationEmailConfig();
   if (!config) {
-    console.info(
-      'Skipping feedback email; RESEND_API_KEY, RESEND_FROM_EMAIL, or MODERATION_NOTIFY_EMAIL is unset.'
-    );
     return false;
   }
 

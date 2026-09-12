@@ -23,6 +23,7 @@ function profile(overrides: Partial<Profile> = {}): Profile {
     legal_version: LEGAL_VERSION,
     legal_accepted_at: '2026-08-20T00:00:00.000Z',
     age_attested_at: '2026-08-20T00:00:00.000Z',
+    xp_total: 0,
     ...overrides,
   };
 }
@@ -43,10 +44,10 @@ describe('account acceptance', () => {
 
   it('does not let public profile selects read legal timestamps', () => {
     expect(PROFILE_PUBLIC_SELECT_COLUMNS).toBe(
-      'id, username, avatar_url, bio, updated_at'
+      'id, username, avatar_url, bio, updated_at, xp_total'
     );
     expect(PROFILE_PUBLIC_SELECT_COLUMNS_WITHOUT_BIO).toBe(
-      'id, username, avatar_url, updated_at'
+      'id, username, avatar_url, updated_at, xp_total'
     );
     expect(PROFILE_PUBLIC_SELECT_COLUMNS).not.toMatch(/legal_version|age_attested_at/);
   });
@@ -189,6 +190,8 @@ describe('legal route lock', () => {
     expect(isSettledLegalRoute('accept-legal', 'index')).toBe(false);
     expect(isSettledLegalRoute('accept-legal', 'accept-legal')).toBe(true);
     expect(isSettledLegalRoute('none', 'index')).toBe(true);
+    expect(isSettledLegalRoute('none', '(tabs)')).toBe(true);
+    expect(isSettledLegalRoute('age-gate', '(tabs)')).toBe(false);
     expect(isSettledLegalRoute('none', 'legal')).toBe(true);
     expect(isSettledLegalRoute('none', 'age-gate')).toBe(true);
     expect(isSettledLegalRoute('none', 'onboarding')).toBe(false);

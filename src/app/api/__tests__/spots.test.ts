@@ -1,7 +1,7 @@
 import fc from 'fast-check';
 
 import { IMAGE_SANITIZE_ERROR } from '../../../lib/sanitizeImage';
-import { HOME_SPOTS_PAGE_SIZE } from '../../../lib/homeFeed';
+import { HOME_SPOTS_PAGE_SIZE, FEED_CANDIDATE_LIMIT } from '../../../lib/homeFeed';
 import {
     CAMERA_MAKE,
     CAPTURE_TIME,
@@ -21,6 +21,7 @@ import {
     mapSpot,
     MAX_IMAGE_BYTES,
     MAX_IMAGES,
+    MAP_SPOTS_LIMIT,
     MAX_SCHOOL_ID_LENGTH,
     NAME_MAX,
     PATCH,
@@ -427,13 +428,13 @@ describe('GET /api/spots', () => {
     const fetchMock: FetchMock = jest.fn(async (_input: string | URL | Request) => jsonResponse([]));
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    const response = await GET(
-      new Request('https://app.test/api/spots?schoolId=school1')
-    );
+    const response = await GET(new Request('https://app.test/api/spots'));
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ spots: [] });
     const spotsUrl = new URL(String(fetchMock.mock.calls[0][0]));
     expect(spotsUrl.searchParams.get('status')).toBe(VISIBLE_SPOT_STATUS_FILTER);
+    expect(spotsUrl.searchParams.get('school_id')).toBeNull();
+    expect(spotsUrl.searchParams.get('limit')).toBe(String(MAP_SPOTS_LIMIT));
   });
 
   it('filters blocked creators when a bearer token is present', async () => {
@@ -457,7 +458,7 @@ describe('GET /api/spots', () => {
     global.fetch = fetchMock as unknown as typeof fetch;
 
     const response = await GET(
-      new Request('https://app.test/api/spots?schoolId=school1', {
+      new Request('https://app.test/api/spots', {
         headers: { Authorization: 'Bearer good-token' },
       })
     );
@@ -491,9 +492,7 @@ describe('GET /api/spots', () => {
     };
     global.fetch = jest.fn(async () => jsonResponse([row])) as unknown as typeof fetch;
 
-    const response = await GET(
-      new Request('https://app.test/api/spots?schoolId=school1')
-    );
+    const response = await GET(new Request('https://app.test/api/spots'));
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       spots: [
@@ -509,6 +508,7 @@ describe('GET /api/spots', () => {
           schoolId: 'school1',
           creatorUsername: 'skater_jane',
           creatorAvatarUrl: null,
+          creatorRank: 'hobbyist',
           creatorUserId: null,
           createdAt: '2024-01-01T00:00:00.000Z',
           updatedAt: '2024-01-01T00:00:00.000Z',
@@ -521,10 +521,34 @@ describe('GET /api/spots', () => {
     });
   });
 
-  it('returns 400 when schoolId is missing', async () => {
+  it('returns all visible spots without requiring a schoolId', async () => {
     setConfigured();
+    const fetchMock: FetchMock = jest.fn(async (_input: string | URL | Request) =>
+      jsonResponse([])
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
     const response = await GET(new Request('https://app.test/api/spots'));
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ spots: [] });
+    const spotsUrl = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(spotsUrl.searchParams.get('school_id')).toBeNull();
+  });
+
+  it('ignores a leftover schoolId query param', async () => {
+    setConfigured();
+    const fetchMock: FetchMock = jest.fn(async (_input: string | URL | Request) =>
+      jsonResponse([])
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await GET(
+      new Request('https://app.test/api/spots?schoolId=school1')
+    );
+    expect(response.status).toBe(200);
+    const spotsUrl = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(spotsUrl.searchParams.get('school_id')).toBeNull();
+    expect(spotsUrl.searchParams.get('limit')).toBe(String(MAP_SPOTS_LIMIT));
   });
 
   it('returns recent spots without a schoolId', async () => {
@@ -564,8 +588,69 @@ describe('GET /api/spots', () => {
     expect(fetchMock).toHaveBeenCalled();
     const recentUrl = new URL(String(fetchMock.mock.calls[0][0]));
     expect(recentUrl.searchParams.get('order')).toBe('created_at.desc,id.desc');
-    expect(recentUrl.searchParams.get('limit')).toBe(String(HOME_SPOTS_PAGE_SIZE));
+    expect(recentUrl.searchParams.get('limit')).toBe(String(FEED_CANDIDATE_LIMIT));
     expect(recentUrl.searchParams.get('status')).toBe(VISIBLE_SPOT_STATUS_FILTER);
+    expect(recentUrl.searchParams.get('offset')).toBeNull();
+  });
+
+  it('ranks recent spots by recency and engagement then pages them', async () => {
+    setConfigured();
+    const now = Date.now();
+    const quiet: DatabaseSpot = {
+      id: 'spot-quiet',
+      school_id: 'school1',
+      name: 'Quiet',
+      description: 'New but unused',
+      latitude: 10,
+      longitude: 20,
+      image_urls: [],
+      created_at: new Date(now).toISOString(),
+      updated_at: new Date(now).toISOString(),
+      likes_count: 0,
+      comments_count: 0,
+      schools: { name: 'UT Austin', city: 'Austin', state: 'TX' },
+      creator: { username: 'skater_jane' },
+    };
+    const hot: DatabaseSpot = {
+      ...quiet,
+      id: 'spot-hot',
+      name: 'Hot',
+      created_at: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
+      likes_count: 40,
+      comments_count: 10,
+    };
+    const filler: DatabaseSpot[] = Array.from({ length: 6 }, (_, index) => ({
+      ...quiet,
+      id: `spot-fill-${index}`,
+      name: `Fill ${index}`,
+      created_at: new Date(now - (index + 8) * 60 * 60 * 1000).toISOString(),
+    }));
+    const fetchMock: FetchMock = jest.fn(async (_input: string | URL | Request) =>
+      jsonResponse([quiet, hot, ...filler])
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const firstPage = await GET(
+      new Request('https://app.test/api/spots?recent=1')
+    );
+    const firstBody = (await firstPage.json()) as { spots: Array<{ id: string }> };
+    expect(firstBody.spots[0]?.id).toBe('spot-hot');
+    expect(firstBody.spots).toHaveLength(HOME_SPOTS_PAGE_SIZE);
+
+    const secondPage = await GET(
+      new Request(
+        `https://app.test/api/spots?recent=1&offset=${HOME_SPOTS_PAGE_SIZE}`
+      )
+    );
+    const secondBody = (await secondPage.json()) as {
+      spots: Array<{ id: string }>;
+    };
+    expect(secondBody.spots).toHaveLength(2);
+    expect(secondBody.spots.map((spot) => spot.id)).not.toContain('spot-hot');
+
+    const recentUrl = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(recentUrl.searchParams.get('offset')).toBeNull();
+    expect(recentUrl.searchParams.get('limit')).toBe(String(FEED_CANDIDATE_LIMIT));
   });
 
   it('filters recent spots by school type and includes offset', async () => {
@@ -585,8 +670,8 @@ describe('GET /api/spots', () => {
 
     const recentUrl = new URL(String(fetchMock.mock.calls[0][0]));
     expect(recentUrl.searchParams.get('schools.type')).toBe('in.(k12_public)');
-    expect(recentUrl.searchParams.get('offset')).toBe(String(HOME_SPOTS_PAGE_SIZE));
-    expect(recentUrl.searchParams.get('limit')).toBe(String(HOME_SPOTS_PAGE_SIZE));
+    expect(recentUrl.searchParams.get('offset')).toBeNull();
+    expect(recentUrl.searchParams.get('limit')).toBe(String(FEED_CANDIDATE_LIMIT));
     expect(recentUrl.searchParams.get('order')).toBe('created_at.desc,id.desc');
   });
 
@@ -607,12 +692,19 @@ describe('GET /api/spots', () => {
     expect(recentUrl.searchParams.get('schools.type')).toBeNull();
   });
 
-  it('returns 400 when schoolId is invalid', async () => {
+  it('ignores an invalid leftover schoolId query param', async () => {
     setConfigured();
+    const fetchMock: FetchMock = jest.fn(async (_input: string | URL | Request) =>
+      jsonResponse([])
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
     const response = await GET(
       new Request('https://app.test/api/spots?schoolId=bad%20id')
     );
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(200);
+    const spotsUrl = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(spotsUrl.searchParams.get('school_id')).toBeNull();
   });
 
   it('returns 500 when Supabase is not configured', async () => {
@@ -838,6 +930,125 @@ describe('POST /api/spots', () => {
     expect(JSON.parse(String(statusPatch?.[1]?.body))).toEqual({
       status: 'active',
     });
+  });
+
+  it('saves the geographically closest school, not the selected schoolId', async () => {
+    setConfigured();
+    const createdRow: DatabaseSpot = {
+      id: 'spot1',
+      school_id: 'closest-school',
+      name: 'Rail',
+      description: 'A nice rail',
+      latitude: 41.82,
+      longitude: -71.41,
+      image_urls: [],
+      created_at: '2024-01-01T00:00:00.000Z',
+      updated_at: '2024-01-01T00:00:00.000Z',
+      schools: { name: 'RISD', city: 'Providence', state: 'RI' },
+      creator: { username: 'skater_jane' },
+    };
+    const fetchMock: FetchMock = jest.fn(async (input) => {
+      const requestUrl = input.toString();
+      if (requestUrl.includes('/auth/v1/user')) {
+        return jsonResponse({ id: 'user-1' });
+      }
+      if (requestUrl.includes('/rpc/nearest_school')) {
+        return jsonResponse([
+          {
+            id: 'closest-school',
+            name: 'RISD',
+            city: 'Providence',
+            state: 'RI',
+            latitude: 41.826,
+            longitude: -71.408,
+            numspots: 8,
+            type: 'higher_ed',
+          },
+        ]);
+      }
+      if (requestUrl.includes('api.openai.com')) {
+        return openAIApprovalResponse();
+      }
+      return jsonResponse([createdRow], 201);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const form = validForm();
+    const response = await POST(
+      makePostRequest(form, { Authorization: 'Bearer good-token' })
+    );
+    expect(response.status).toBe(201);
+
+    const insertCall = fetchMock.mock.calls.find(
+      (call) =>
+        call[0].toString().includes('/rest/v1/spots') &&
+        call[1]?.method === 'POST'
+    );
+    const inserted = JSON.parse(String(insertCall?.[1]?.body)) as {
+      school_id: string;
+    };
+    expect(inserted.school_id).toBe('closest-school');
+  });
+
+  it('overrides the selected schoolId when nearest_school RPC is unavailable', async () => {
+    setConfigured();
+    const createdRow: DatabaseSpot = {
+      id: 'spot1',
+      school_id: 'closest-school',
+      name: 'Rail',
+      description: 'A nice rail',
+      latitude: 41.82,
+      longitude: -71.41,
+      image_urls: [],
+      created_at: '2024-01-01T00:00:00.000Z',
+      updated_at: '2024-01-01T00:00:00.000Z',
+      schools: { name: 'RISD', city: 'Providence', state: 'RI' },
+      creator: { username: 'skater_jane' },
+    };
+    const fetchMock: FetchMock = jest.fn(async (input) => {
+      const requestUrl = input.toString();
+      if (requestUrl.includes('/auth/v1/user')) {
+        return jsonResponse({ id: 'user-1' });
+      }
+      if (requestUrl.includes('/rpc/nearest_school')) {
+        return new Response('missing', { status: 404 });
+      }
+      if (requestUrl.includes('/rest/v1/schools')) {
+        return jsonResponse([
+          {
+            id: 'closest-school',
+            name: 'RISD',
+            city: 'Providence',
+            state: 'RI',
+            latitude: 41.826,
+            longitude: -71.408,
+            numspots: 8,
+            type: 'higher_ed',
+          },
+        ]);
+      }
+      if (requestUrl.includes('api.openai.com')) {
+        return openAIApprovalResponse();
+      }
+      return jsonResponse([createdRow], 201);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await POST(
+      makePostRequest(validForm(), { Authorization: 'Bearer good-token' })
+    );
+    expect(response.status).toBe(201);
+
+    const insertCall = fetchMock.mock.calls.find(
+      (call) =>
+        call[0].toString().includes('/rest/v1/spots') &&
+        call[1]?.method === 'POST'
+    );
+    const inserted = JSON.parse(String(insertCall?.[1]?.body)) as {
+      school_id: string;
+    };
+    expect(inserted.school_id).toBe('closest-school');
+    expect(inserted.school_id).not.toBe('school1');
   });
 
   it('returns 422 with a gentle reason when moderation rejects the spot', async () => {
@@ -1259,6 +1470,7 @@ describe('mapSpot new fields', () => {
     expect(spot.schoolName).toBe('UT Austin');
     expect(spot.commentCount).toBe(0);
     expect(spot.creatorAvatarUrl).toBeNull();
+    expect(spot.creatorRank).toBe('hobbyist');
   });
 
   it('defaults schoolName and timestamps to empty string when absent', () => {
@@ -1280,6 +1492,7 @@ describe('mapSpot new fields', () => {
     expect(spot.updatedAt).toBe('');
     expect(spot.creatorUsername).toBeNull();
     expect(spot.creatorAvatarUrl).toBeNull();
+    expect(spot.creatorRank).toBeUndefined();
     expect(spot.commentCount).toBe(0);
   });
 
@@ -1318,6 +1531,23 @@ describe('mapSpot new fields', () => {
       },
     });
     expect(oauth.creatorAvatarUrl).toBeNull();
+  });
+
+  it('maps creator rank from live XP without exposing the number', () => {
+    const pro = mapSpot({
+      id: 'spot1',
+      school_id: 'school1',
+      name: 'Rail',
+      description: 'A rail',
+      latitude: 10,
+      longitude: 20,
+      image_urls: [],
+      created_at: '2024-01-01T00:00:00.000Z',
+      updated_at: '2024-01-01T00:00:00.000Z',
+      schools: { name: 'UT Austin', city: 'Austin', state: 'TX' },
+      creator: { username: 'skater_jane', xp_total: 5000 },
+    });
+    expect(pro.creatorRank).toBe('pro');
   });
 });
 
@@ -1438,6 +1668,12 @@ describe('GET /api/spots?creatorUserId=', () => {
     expect(String(listingCall?.[0])).toContain(`created_by_user_id=eq.${creatorId}`);
     expect(new URL(String(listingCall?.[0])).searchParams.get('status')).toBe(
       VISIBLE_SPOT_STATUS_FILTER
+    );
+    expect(new URL(String(listingCall?.[0])).searchParams.get('limit')).toBe('12');
+    expect(listingCall?.[1]).toEqual(
+      expect.objectContaining({
+        headers: expect.objectContaining({ Prefer: 'count=exact' }),
+      })
     );
   });
 
@@ -1992,9 +2228,40 @@ describe('DELETE /api/spots', () => {
 
     // The actual DELETE request must have been issued to the REST endpoint.
     const deleteCall = fetchMock.mock.calls.find(
-      (call) => call[1]?.method === 'DELETE'
+      (call) =>
+        call[1]?.method === 'DELETE' &&
+        call[0].toString().includes('/rest/v1/spots')
     );
     expect(deleteCall?.[0].toString()).toContain('id=eq.spot1');
+  });
+
+  it('lets the owner delete a spot that is still pending review', async () => {
+    setConfigured();
+    const fetchMock: FetchMock = jest.fn(async (input, init) => {
+      const url = input.toString();
+      if (url.includes('/auth/v1/user')) {
+        return jsonResponse({ id: 'user-1' });
+      }
+      if (init?.method === 'DELETE') {
+        return new Response(null, { status: 204 });
+      }
+      return jsonResponse([
+        {
+          created_by_user_id: 'user-1',
+          school_id: 'school1',
+          status: 'pending_moderation',
+        },
+      ]);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await DELETE(
+      new Request('https://app.test/api/spots?id=spot1', {
+        method: 'DELETE',
+        headers: { Authorization: 'Bearer good-token' },
+      })
+    );
+    expect(response.status).toBe(200);
   });
 });
 

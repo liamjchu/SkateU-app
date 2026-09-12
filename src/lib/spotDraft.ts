@@ -44,6 +44,29 @@ export function parseDraftStatus(value: unknown): SpotDraftStatus {
   return value === 'submitting' ? 'submitting' : 'draft';
 }
 
+export function isStaleSubmittingDraft(
+  draft: Pick<SpotDraft, 'status' | 'updatedAt'>,
+  options: {
+    nowMs: number;
+    timeoutMs: number;
+    inFlight: boolean;
+  }
+): boolean {
+  if (draft.status !== 'submitting') {
+    return false;
+  }
+  if (!options.inFlight) {
+    return true;
+  }
+
+  const startedAt = Date.parse(draft.updatedAt);
+  if (!Number.isFinite(startedAt)) {
+    return true;
+  }
+
+  return options.nowMs - startedAt > options.timeoutMs;
+}
+
 export function getDraftStatusHint(
   draft: Pick<SpotDraft, 'name' | 'description' | 'images' | 'status' | 'lastError'>
 ): string {

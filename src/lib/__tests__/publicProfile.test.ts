@@ -22,6 +22,7 @@ const profile: PublicProfileView = {
   username: 'skater_jane',
   avatarUrl: null,
   bio: null,
+  rank: 'hobbyist',
   followerCount: 1,
   followingCount: 2,
   isFollowing: false,
@@ -64,9 +65,27 @@ describe('mapPublicProfileView', () => {
       avatarUrl:
         'https://project.supabase.co/storage/v1/object/public/avatars/a.jpg',
       bio: 'Skater at State',
+      rank: 'hobbyist',
       followerCount: 3,
       followingCount: 8,
       isFollowing: true,
+    });
+  });
+
+  it('maps xpTotal when the payload includes it', () => {
+    expect(
+      mapPublicProfileView({
+        profile: { id: userId, username: 'skater_jane' },
+        rank: 'flow_rider',
+        xpTotal: 1000,
+        followerCount: 0,
+        followingCount: 0,
+        isFollowing: false,
+      })
+    ).toMatchObject({
+      id: userId,
+      rank: 'flow_rider',
+      xpTotal: 1000,
     });
   });
 
@@ -91,6 +110,7 @@ describe('mapPublicProfileView', () => {
       username: null,
       avatarUrl: null,
       bio: null,
+      rank: 'hobbyist',
       followerCount: 0,
       followingCount: 0,
       isFollowing: false,
@@ -138,6 +158,7 @@ describe('mapFollowListUsers', () => {
         username: 'skater_jane',
         avatarUrl:
           'https://project.supabase.co/storage/v1/object/public/avatars/a.jpg',
+        rank: 'hobbyist',
         isFollowing: true,
       },
     ]);
@@ -162,6 +183,7 @@ describe('mapFollowListUsers', () => {
         id: userId,
         username: null,
         avatarUrl: null,
+        rank: 'hobbyist',
         isFollowing: false,
       },
     ]);
@@ -175,6 +197,7 @@ describe('followListUserAsProfile', () => {
         id: userId,
         username: 'skater_jane',
         avatarUrl: null,
+        rank: 'hobbyist',
         isFollowing: true,
       })
     ).toEqual({
@@ -182,6 +205,7 @@ describe('followListUserAsProfile', () => {
       username: 'skater_jane',
       avatarUrl: null,
       bio: null,
+      rank: 'hobbyist',
       followerCount: 0,
       followingCount: 0,
       isFollowing: true,
@@ -254,6 +278,7 @@ describe('fetchFollowList', () => {
         id: userId,
         username: 'skater_jane',
         avatarUrl: null,
+        rank: 'hobbyist',
         isFollowing: false,
       },
     ]);
@@ -328,12 +353,27 @@ describe('fetchCreatorSpots', () => {
       },
     ];
     fetchMock.mockResolvedValue(jsonResponse({ spots }));
-    await expect(fetchCreatorSpots(userId, 'token')).resolves.toEqual(spots);
+    await expect(fetchCreatorSpots(userId, 'token')).resolves.toEqual({
+      spots,
+      total: 1,
+    });
   });
 
   it('returns an empty list when spots is missing', async () => {
     fetchMock.mockResolvedValue(jsonResponse({}));
-    await expect(fetchCreatorSpots(userId)).resolves.toEqual([]);
+    await expect(fetchCreatorSpots(userId)).resolves.toEqual({
+      spots: [],
+      total: 0,
+    });
+  });
+
+  it('requests the next page with an offset', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ spots: [], total: 24 }));
+    await fetchCreatorSpots(userId, 'token', 12);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `http://localhost:8081/api/spots?creatorUserId=${userId}&offset=12`,
+      expect.objectContaining({ method: 'GET' })
+    );
   });
 
   it('throws when the spots request fails', async () => {

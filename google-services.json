@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "864834430962",
+    "project_id": "skateu-e748d",
+    "storage_bucket": "skateu-e748d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:864834430962:android:4c0fc67a911236d3b06d6b",
+        "android_client_info": {
+          "package_name": "app.skateu.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD2dtAEWlWFENLAgGip6M8aW6cMRbjXxqo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

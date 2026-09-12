@@ -17,31 +17,17 @@ describe('isHomeFeedScrolled', () => {
 });
 
 describe('getHomeLogoTapAction', () => {
-  it('cancels search before scrolling or refreshing', () => {
-    expect(
-      getHomeLogoTapAction({ isSearchMode: true, isScrolled: true })
-    ).toBe('exit-search');
-    expect(
-      getHomeLogoTapAction({ isSearchMode: true, isScrolled: false })
-    ).toBe('exit-search');
-  });
-
   it('scrolls to top when the feed is scrolled', () => {
-    expect(
-      getHomeLogoTapAction({ isSearchMode: false, isScrolled: true })
-    ).toBe('scroll-to-top');
+    expect(getHomeLogoTapAction({ isScrolled: true })).toBe('scroll-to-top');
   });
 
   it('refreshes when already at the top', () => {
-    expect(
-      getHomeLogoTapAction({ isSearchMode: false, isScrolled: false })
-    ).toBe('refresh');
+    expect(getHomeLogoTapAction({ isScrolled: false })).toBe('refresh');
   });
 });
 
 describe('getHomeLogoTapHint', () => {
   it('describes each action', () => {
-    expect(getHomeLogoTapHint('exit-search')).toContain('Cancels search');
     expect(getHomeLogoTapHint('scroll-to-top')).toContain('top of home');
     expect(getHomeLogoTapHint('refresh')).toContain('Refreshes');
   });

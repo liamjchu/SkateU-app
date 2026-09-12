@@ -2,6 +2,10 @@ export const MAPLIBRE_CSS_URL =
   'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css';
 export const MAPLIBRE_JS_URL =
   'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js';
+export const MAPLIBRE_JS_FALLBACK_URL =
+  'https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js';
+// WKWebView html-string pages need a real https origin or CDN <script src> never runs.
+export const MAP_WEBVIEW_BASE_URL = 'https://unpkg.com';
 export const OPENFREEMAP_STYLE_URL =
   'https://tiles.openfreemap.org/styles/liberty';
 export const ESRI_SATELLITE_TILE_URL =
@@ -22,8 +26,46 @@ type CreateMapLibreMapOptions = {
 
 export function getMapLibreHeadTags(): string {
   return `
-    <link rel="stylesheet" href="${MAPLIBRE_CSS_URL}" />
-    <script src="${MAPLIBRE_JS_URL}"></script>`;
+    <link rel="stylesheet" href="${MAPLIBRE_CSS_URL}" />`;
+}
+
+export function getMapLibreLoaderScript(): string {
+  return `
+        window.loadMapLibre = function (onReady) {
+          if (typeof onReady !== 'function') return;
+          if (typeof maplibregl !== 'undefined') {
+            onReady();
+            return;
+          }
+
+          var urls = ['${MAPLIBRE_JS_URL}', '${MAPLIBRE_JS_FALLBACK_URL}'];
+          var loadNext = function (index) {
+            if (index >= urls.length) {
+              if (window.postToNative) {
+                window.postToNative({
+                  type: 'CONSOLE_ERROR',
+                  message: 'Couldn’t load the map library.',
+                });
+              }
+              return;
+            }
+            var script = document.createElement('script');
+            script.src = urls[index];
+            script.onload = function () {
+              if (typeof maplibregl === 'undefined') {
+                loadNext(index + 1);
+                return;
+              }
+              onReady();
+            };
+            script.onerror = function () {
+              loadNext(index + 1);
+            };
+            document.head.appendChild(script);
+          };
+          loadNext(0);
+        };
+`;
 }
 
 export function getMapLibreBaseCss(): string {

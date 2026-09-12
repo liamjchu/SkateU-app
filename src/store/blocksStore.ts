@@ -11,6 +11,7 @@ import {
 import { sanitizeErrorMessage } from '../lib/userFacingError';
 import type { BlockedUser } from '../types/userBlock';
 import { useCommentsStore } from './commentsStore';
+import { useNotificationsStore } from './notificationsStore';
 import { useSpotsStore } from './spotsStore';
 
 type BlocksState = {
@@ -67,6 +68,7 @@ async function readErrorMessage(response: Response): Promise<string> {
 function hideBlockedContent(userId: string): void {
   useSpotsStore.getState().hideCreatorSpots(userId);
   useCommentsStore.getState().hideUserComments(userId);
+  useNotificationsStore.getState().hideActorNotifications(userId);
 }
 
 export const useBlocksStore = create<BlocksState>()(

@@ -10,6 +10,7 @@ import {
     type CommentModerationVerdict,
 } from '../../lib/commentModeration';
 import { displayableAvatarUrl } from '../../lib/avatarUrl';
+import { rankFromXp } from '../../lib/xpRank';
 import type { SpotComment } from '../../types/comment';
 import {
     authUserMessage,
@@ -32,13 +33,17 @@ type DatabaseComment = {
   parent_comment_id: string | null;
   content: string;
   created_at: string;
-  creator: { username: string | null; avatar_url?: string | null } | null;
+  creator: {
+    username: string | null;
+    avatar_url?: string | null;
+    xp_total?: number | null;
+  } | null;
 };
 
 type SpotCountRow = { id: string; comments_count?: number; status?: string };
 
 export const COMMENT_SELECT_COLUMNS =
-  'id,spot_id,user_id,parent_comment_id,content,created_at,creator:profiles(username,avatar_url)';
+  'id,spot_id,user_id,parent_comment_id,content,created_at,creator:profiles(username,avatar_url,xp_total)';
 
 function readBearerToken(request: Request): string | null {
   const header =
@@ -85,6 +90,7 @@ export function mapComment(
     content: row.content,
     creatorUsername: row.creator?.username ?? null,
     creatorAvatarUrl: displayableAvatarUrl(row.creator?.avatar_url ?? null),
+    creatorRank: row.creator ? rankFromXp(row.creator.xp_total ?? 0) : undefined,
     createdAt: row.created_at ?? '',
     replies,
   };

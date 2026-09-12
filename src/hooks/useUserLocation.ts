@@ -1,4 +1,4 @@
-import * as Location from 'expo-location';
+import { getExpoLocation } from '../lib/expoLocation';
 import { useCallback, useEffect, useState } from 'react';
 
 export type UserLocationStatus =
@@ -20,12 +20,26 @@ type UseUserLocationResult = {
   requestPermission: () => Promise<boolean>;
 };
 
-export function useUserLocation(enabled: boolean): UseUserLocationResult {
+type UseUserLocationOptions = {
+  requestIfNeeded?: boolean;
+};
+
+export function useUserLocation(
+  enabled: boolean,
+  options: UseUserLocationOptions = {}
+): UseUserLocationResult {
+  const requestIfNeeded = options.requestIfNeeded !== false;
   const [status, setStatus] = useState<UserLocationStatus>('idle');
   const [coords, setCoords] = useState<UserLocationCoords | null>(null);
   const [watchKey, setWatchKey] = useState(0);
 
   const requestPermission = useCallback(async (): Promise<boolean> => {
+    const Location = getExpoLocation();
+    if (!Location) {
+      setStatus('unavailable');
+      return false;
+    }
+
     const servicesEnabled = await Location.hasServicesEnabledAsync();
     if (!servicesEnabled) {
       setStatus('unavailable');
@@ -48,8 +62,14 @@ export function useUserLocation(enabled: boolean): UseUserLocationResult {
       return;
     }
 
+    const Location = getExpoLocation();
+    if (!Location) {
+      setStatus('unavailable');
+      return;
+    }
+
     let cancelled = false;
-    let subscription: Location.LocationSubscription | null = null;
+    let subscription: { remove: () => void } | null = null;
 
     const watch = async () => {
       const servicesEnabled = await Location.hasServicesEnabledAsync();
@@ -67,6 +87,11 @@ export function useUserLocation(enabled: boolean): UseUserLocationResult {
       }
 
       if (!permission.granted) {
+        if (!requestIfNeeded) {
+          setStatus('denied');
+          return;
+        }
+
         setStatus('requesting');
         permission = await Location.requestForegroundPermissionsAsync();
         if (cancelled) {
@@ -111,7 +136,7 @@ export function useUserLocation(enabled: boolean): UseUserLocationResult {
       cancelled = true;
       subscription?.remove();
     };
-  }, [enabled, watchKey]);
+  }, [enabled, requestIfNeeded, watchKey]);
 
   return { coords, status, requestPermission };
 }

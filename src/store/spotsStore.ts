@@ -12,6 +12,11 @@ import {
   SPOTS_CACHE_KEY,
 } from '../lib/readCache';
 import { buildImageOrder } from '../lib/spotMedia';
+import {
+  isSpotSubmissionCancelledError,
+  SPOT_SUBMISSION_TIMEOUT_MS,
+  SpotSubmissionCancelledError,
+} from '../lib/spotSubmission';
 import { sanitizeErrorMessage } from '../lib/userFacingError';
 import type { SchoolTypeFilter } from '../types/school';
 import type { NewSpotInput, Spot, UpdateSpotInput } from '../types/spot';
@@ -45,8 +50,12 @@ type SpotsState = {
   setHasHydrated: (hasHydrated: boolean) => void;
   setSessionUserId: (userId: string | null) => void;
   setRecentFeed: (filter: SchoolTypeFilter, spots: Spot[]) => void;
-  fetchSpots: (schoolId: string, accessToken?: string) => Promise<void>;
-  addSpot: (input: NewSpotInput, accessToken: string) => Promise<Spot>;
+  fetchSpots: (accessToken?: string) => Promise<void>;
+  addSpot: (
+    input: NewSpotInput,
+    accessToken: string,
+    options?: { signal?: AbortSignal }
+  ) => Promise<Spot>;
   fetchMySpots: (accessToken: string) => Promise<void>;
   fetchLikedSpots: (accessToken: string) => Promise<void>;
   toggleSpotLike: (
@@ -86,11 +95,10 @@ function withReportedSpot(ids: string[], spotId: string): string[] {
 
 // Reads stay short, while mutations get enough time for moderation and image upload.
 const REQUEST_TIMEOUT_MS = 10_000;
-const MUTATION_TIMEOUT_MS = 60_000;
+const MUTATION_TIMEOUT_MS = SPOT_SUBMISSION_TIMEOUT_MS;
 const SAVE_TIMEOUT_ERROR = 'Saving this spot timed out. Please try again.';
 
-const INVALID_SCHOOL_ID_ERROR =
-  'A valid school identifier is required to load spots.';
+export const ALL_SPOTS_SCOPE = 'all';
 const LOAD_FAILED_ERROR = 'Couldn’t load spots right now.';
 const LOAD_TIMEOUT_ERROR = 'Loading spots timed out. Please try again.';
 const MY_SPOTS_LOAD_FAILED_ERROR = 'Couldn’t load your spots right now.';
@@ -100,6 +108,35 @@ let spotsRequestVersion = 0;
 let mySpotsRequestVersion = 0;
 let likedSpotsRequestVersion = 0;
 let spotLikeMutationVersion = 0;
+let likeIntentEpoch = 0;
+
+type SpotLikeResult = { likedByUser: boolean; likeCount: number };
+
+type SpotLikeWaiter = {
+  generation: number;
+  resolve: (value: SpotLikeResult) => void;
+  reject: (error: Error) => void;
+};
+
+type SpotLikeIntent = {
+  generation: number;
+  desiredLiked: boolean;
+  confirmedLiked: boolean;
+  confirmedCount: number;
+  confirmedSpot: Spot | null;
+  accessToken: string;
+  inFlight: boolean;
+  waiters: SpotLikeWaiter[];
+};
+
+type SpotCollections = {
+  spots: Spot[];
+  mySpots: Spot[];
+  likedSpots: Spot[];
+  recentSpots: Spot[];
+};
+
+const spotLikeIntents = new Map<string, SpotLikeIntent>();
 
 // React Native serializes an object of this shape as a multipart file part.
 type RNFile = { uri: string; name: string; type: string };
@@ -111,8 +148,13 @@ function appendFilePart(form: FormData, field: string, file: RNFile): void {
   form.append(field, file as unknown as Blob);
 }
 
-// Run a fetch with an AbortController-based timeout so a hung request rejects
-// instead of blocking the store's loading state indefinitely.
+// Time out hung fetches, and also abort when the caller provides a signal.
+function abortError(): Error {
+  const error = new Error('Aborted');
+  error.name = 'AbortError';
+  return error;
+}
+
 async function fetchWithTimeout(
   input: string,
   init: RequestInit,
@@ -120,6 +162,19 @@ async function fetchWithTimeout(
 ): Promise<Response> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const externalSignal = init.signal;
+
+  const onExternalAbort = () => {
+    controller.abort();
+  };
+
+  if (externalSignal) {
+    if (externalSignal.aborted) {
+      clearTimeout(timeout);
+      throw abortError();
+    }
+    externalSignal.addEventListener('abort', onExternalAbort);
+  }
 
   try {
     const response = await fetch(input, { ...init, signal: controller.signal });
@@ -137,6 +192,9 @@ async function fetchWithTimeout(
     return response;
   } finally {
     clearTimeout(timeout);
+    if (externalSignal) {
+      externalSignal.removeEventListener('abort', onExternalAbort);
+    }
   }
 }
 
@@ -147,7 +205,13 @@ async function fetchMutationWithTimeout(
   try {
     return await fetchWithTimeout(input, init, MUTATION_TIMEOUT_MS);
   } catch (error) {
+    if (isSpotSubmissionCancelledError(error)) {
+      throw error;
+    }
     if (error instanceof Error && error.name === 'AbortError') {
+      if (init.signal?.aborted) {
+        throw new SpotSubmissionCancelledError();
+      }
       throw new Error(SAVE_TIMEOUT_ERROR);
     }
     throw error;
@@ -243,6 +307,325 @@ function toFetchErrorMessage(error: unknown): string {
   return LOAD_FAILED_ERROR;
 }
 
+function findSpotById(state: SpotCollections, id: string): Spot | undefined {
+  return (
+    state.spots.find((spot) => spot.id === id) ??
+    state.mySpots.find((spot) => spot.id === id) ??
+    state.likedSpots.find((spot) => spot.id === id) ??
+    state.recentSpots.find((spot) => spot.id === id)
+  );
+}
+
+function applySpotLikeState(
+  id: string,
+  nextLiked: boolean,
+  nextCount: number,
+  fallbackSpot?: Spot | null
+): void {
+  spotLikeMutationVersion += 1;
+  useSpotsStore.setState((state) => {
+    const updateSpot = (spot: Spot): Spot =>
+      spot.id === id
+        ? { ...spot, likeCount: nextCount, likedByUser: nextLiked }
+        : spot;
+    const updatedSpots = state.spots.map(updateSpot);
+    const updatedMySpots = state.mySpots.map(updateSpot);
+    const updatedLikedSpots = state.likedSpots.map(updateSpot);
+    const updatedRecentSpots = state.recentSpots.map(updateSpot);
+
+    if (!nextLiked) {
+      return {
+        spots: updatedSpots,
+        mySpots: updatedMySpots,
+        likedSpots: updatedLikedSpots.filter((spot) => spot.id !== id),
+        recentSpots: updatedRecentSpots,
+      };
+    }
+
+    const likedSpot =
+      updatedSpots.find((spot) => spot.id === id) ??
+      updatedMySpots.find((spot) => spot.id === id) ??
+      updatedRecentSpots.find((spot) => spot.id === id) ??
+      updatedLikedSpots.find((spot) => spot.id === id) ??
+      (fallbackSpot
+        ? { ...fallbackSpot, likeCount: nextCount, likedByUser: true }
+        : undefined);
+
+    return {
+      spots: updatedSpots,
+      mySpots: updatedMySpots,
+      recentSpots: updatedRecentSpots,
+      likedSpots: likedSpot
+        ? [likedSpot, ...updatedLikedSpots.filter((spot) => spot.id !== id)]
+        : updatedLikedSpots,
+    };
+  });
+}
+
+function currentLikeResult(id: string, fallback: SpotLikeResult): SpotLikeResult {
+  const found = findSpotById(useSpotsStore.getState(), id);
+  if (!found) {
+    return fallback;
+  }
+
+  return {
+    likedByUser: found.likedByUser === true,
+    likeCount: found.likeCount ?? fallback.likeCount,
+  };
+}
+
+function resolveWaitersUpTo(
+  intent: SpotLikeIntent,
+  generation: number,
+  value: SpotLikeResult
+): void {
+  const remaining: SpotLikeWaiter[] = [];
+  for (const waiter of intent.waiters) {
+    if (waiter.generation <= generation) {
+      waiter.resolve(value);
+    } else {
+      remaining.push(waiter);
+    }
+  }
+  intent.waiters = remaining;
+}
+
+function settleAllWaiters(
+  intent: SpotLikeIntent,
+  outcome:
+    | { ok: true; value: SpotLikeResult }
+    | { ok: false; error: Error; failedGeneration: number; value: SpotLikeResult }
+): void {
+  const waiters = intent.waiters.splice(0);
+  for (const waiter of waiters) {
+    if (!outcome.ok && waiter.generation === outcome.failedGeneration) {
+      waiter.reject(outcome.error);
+    } else {
+      waiter.resolve(outcome.value);
+    }
+  }
+}
+
+function clearSpotLikeIntents(): void {
+  likeIntentEpoch += 1;
+  for (const intent of spotLikeIntents.values()) {
+    const value = {
+      likedByUser: intent.confirmedLiked,
+      likeCount: intent.confirmedCount,
+    };
+    for (const waiter of intent.waiters) {
+      waiter.resolve(value);
+    }
+  }
+  spotLikeIntents.clear();
+}
+
+function toLikeError(error: unknown): Error {
+  return error instanceof Error
+    ? error
+    : new Error('Unable to update this like right now.');
+}
+
+function spotSchoolId(id: string, fallback: Spot | null): string | undefined {
+  return findSpotById(useSpotsStore.getState(), id)?.schoolId ?? fallback?.schoolId;
+}
+
+async function requestSpotLikeChange(
+  id: string,
+  shouldLike: boolean,
+  accessToken: string
+): Promise<{ likeCount?: number; likedByUser?: boolean }> {
+  const response = await fetchMutationWithTimeout(
+    getApiUrl(`/api/spot-likes?id=${encodeURIComponent(id)}`),
+    {
+      method: shouldLike ? 'POST' : 'DELETE',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response));
+  }
+
+  return (await response.json()) as {
+    likeCount?: number;
+    likedByUser?: boolean;
+  };
+}
+
+async function flushSpotLikeIntent(id: string): Promise<void> {
+  const intent = spotLikeIntents.get(id);
+  if (!intent || intent.inFlight) {
+    return;
+  }
+
+  intent.inFlight = true;
+  const epoch = likeIntentEpoch;
+
+  try {
+    while (likeIntentEpoch === epoch) {
+      const current = spotLikeIntents.get(id);
+      if (!current) {
+        return;
+      }
+
+      if (current.desiredLiked === current.confirmedLiked) {
+        settleAllWaiters(current, {
+          ok: true,
+          value: currentLikeResult(id, {
+            likedByUser: current.confirmedLiked,
+            likeCount: current.confirmedCount,
+          }),
+        });
+        spotLikeIntents.delete(id);
+        return;
+      }
+
+      const snapshotDesired = current.desiredLiked;
+      const snapshotGeneration = current.generation;
+
+      try {
+        const data = await requestSpotLikeChange(
+          id,
+          snapshotDesired,
+          current.accessToken
+        );
+
+        if (likeIntentEpoch !== epoch) {
+          return;
+        }
+
+        const latest = spotLikeIntents.get(id);
+        if (!latest) {
+          return;
+        }
+
+        const serverLiked = data.likedByUser ?? snapshotDesired;
+        const serverCount =
+          typeof data.likeCount === 'number' ? data.likeCount : null;
+
+        latest.confirmedLiked = serverLiked;
+        if (serverCount !== null) {
+          latest.confirmedCount = serverCount;
+        } else {
+          const shown = findSpotById(useSpotsStore.getState(), id);
+          latest.confirmedCount =
+            shown?.likedByUser === serverLiked
+              ? (shown.likeCount ?? latest.confirmedCount)
+              : Math.max(0, latest.confirmedCount + (serverLiked ? 1 : -1));
+        }
+
+        const found = findSpotById(useSpotsStore.getState(), id);
+        latest.confirmedSpot = found
+          ? {
+              ...found,
+              likedByUser: serverLiked,
+              likeCount: latest.confirmedCount,
+            }
+          : latest.confirmedSpot
+            ? {
+                ...latest.confirmedSpot,
+                likedByUser: serverLiked,
+                likeCount: latest.confirmedCount,
+              }
+            : null;
+
+        const schoolId = spotSchoolId(id, latest.confirmedSpot);
+        captureAnalyticsEvent(serverLiked ? 'spot_liked' : 'spot_unliked', {
+          spot_id: id,
+          ...(schoolId ? { school_id: schoolId } : {}),
+        });
+
+        if (likeIntentEpoch !== epoch) {
+          return;
+        }
+
+        if (latest.generation !== snapshotGeneration) {
+          resolveWaitersUpTo(
+            latest,
+            snapshotGeneration,
+            currentLikeResult(id, {
+              likedByUser: latest.desiredLiked,
+              likeCount: latest.confirmedCount,
+            })
+          );
+          continue;
+        }
+
+        const shownCount = findSpotById(useSpotsStore.getState(), id)?.likeCount;
+        const nextCount = serverCount ?? shownCount ?? latest.confirmedCount;
+        applySpotLikeState(id, serverLiked, nextCount, latest.confirmedSpot);
+        settleAllWaiters(latest, {
+          ok: true,
+          value: { likedByUser: serverLiked, likeCount: nextCount },
+        });
+        spotLikeIntents.delete(id);
+        return;
+      } catch (error) {
+        if (likeIntentEpoch !== epoch) {
+          return;
+        }
+
+        const latest = spotLikeIntents.get(id);
+        if (!latest) {
+          return;
+        }
+
+        if (latest.generation !== snapshotGeneration) {
+          if (latest.desiredLiked === latest.confirmedLiked) {
+            settleAllWaiters(latest, {
+              ok: true,
+              value: currentLikeResult(id, {
+                likedByUser: latest.confirmedLiked,
+                likeCount: latest.confirmedCount,
+              }),
+            });
+            spotLikeIntents.delete(id);
+            return;
+          }
+
+          resolveWaitersUpTo(
+            latest,
+            snapshotGeneration,
+            currentLikeResult(id, {
+              likedByUser: latest.desiredLiked,
+              likeCount: latest.confirmedCount,
+            })
+          );
+          continue;
+        }
+
+        if (likeIntentEpoch !== epoch) {
+          return;
+        }
+
+        applySpotLikeState(
+          id,
+          latest.confirmedLiked,
+          latest.confirmedCount,
+          latest.confirmedSpot
+        );
+        settleAllWaiters(latest, {
+          ok: false,
+          error: toLikeError(error),
+          failedGeneration: snapshotGeneration,
+          value: {
+            likedByUser: latest.confirmedLiked,
+            likeCount: latest.confirmedCount,
+          },
+        });
+        spotLikeIntents.delete(id);
+        return;
+      }
+    }
+  } finally {
+    const leftover = spotLikeIntents.get(id);
+    if (leftover) {
+      leftover.inFlight = false;
+    }
+  }
+}
+
 export const useSpotsStore = create<SpotsState>()(
   persist(
     (set, get) => ({
@@ -275,6 +658,7 @@ export const useSpotsStore = create<SpotsState>()(
       mySpotsRequestVersion += 1;
       likedSpotsRequestVersion += 1;
       spotLikeMutationVersion += 1;
+      clearSpotLikeIntents();
       set((state) => ({
         sessionUserId: null,
         mySpots: [],
@@ -292,6 +676,9 @@ export const useSpotsStore = create<SpotsState>()(
     }
 
     const keepMine = get().mySpotsOwnerId === userId;
+    if (!keepMine) {
+      clearSpotLikeIntents();
+    }
     set((state) => ({
       sessionUserId: userId,
       ...(keepMine
@@ -316,37 +703,22 @@ export const useSpotsStore = create<SpotsState>()(
     set({ recentSpots: spots, recentFilter: filter });
   },
 
-  fetchSpots: async (schoolId: string, accessToken?: string) => {
+  fetchSpots: async (accessToken?: string) => {
     const requestVersion = ++spotsRequestVersion;
     const mutationVersion = spotLikeMutationVersion;
-    const trimmedSchoolId = schoolId?.trim() ?? '';
-
-    // Blank/whitespace ids never hit the network; expose an error and keep the
-    // previously loaded spots unchanged (Req 9.6).
-    if (trimmedSchoolId.length === 0) {
-      if (requestVersion === spotsRequestVersion) {
-        set({ error: INVALID_SCHOOL_ID_ERROR, loading: false });
-      }
-      return;
-    }
-
-    const hasCache =
-      get().schoolId === trimmedSchoolId && get().spotsFetchedAt !== null;
+    const hasCache = get().spotsFetchedAt !== null;
 
     if (requestVersion === spotsRequestVersion) {
       set({ loading: !hasCache, error: null });
     }
 
     try {
-      const response = await fetchGetWithRetry(
-        getApiUrl(`/api/spots?schoolId=${encodeURIComponent(trimmedSchoolId)}`),
-        {
-          method: 'GET',
-          headers: accessToken
-            ? { Authorization: `Bearer ${accessToken}` }
-            : undefined,
-        }
-      );
+      const response = await fetchGetWithRetry(getApiUrl('/api/spots'), {
+        method: 'GET',
+        headers: accessToken
+          ? { Authorization: `Bearer ${accessToken}` }
+          : undefined,
+      });
 
       if (!response.ok) {
         throw new Error(await readErrorMessage(response));
@@ -367,7 +739,7 @@ export const useSpotsStore = create<SpotsState>()(
       // An empty result is a success, not an error (Req 9.5).
       set({
         spots: data.spots ?? [],
-        schoolId: trimmedSchoolId,
+        schoolId: ALL_SPOTS_SCOPE,
         spotsFetchedAt: new Date().toISOString(),
         loading: false,
         error: null,
@@ -387,7 +759,11 @@ export const useSpotsStore = create<SpotsState>()(
     }
   },
 
-  addSpot: async (input: NewSpotInput, accessToken: string) => {
+  addSpot: async (
+    input: NewSpotInput,
+    accessToken: string,
+    options?: { signal?: AbortSignal }
+  ) => {
     const form = new FormData();
     form.append('schoolId', input.schoolId);
     form.append('name', input.name);
@@ -408,6 +784,7 @@ export const useSpotsStore = create<SpotsState>()(
       method: 'POST',
       headers: { Authorization: `Bearer ${accessToken}` },
       body: form,
+      signal: options?.signal,
     });
 
     if (!response.ok) {
@@ -534,76 +911,40 @@ export const useSpotsStore = create<SpotsState>()(
     }
   },
 
-  toggleSpotLike: async (id: string, likedByUser: boolean, accessToken: string) => {
-    // Invalidate reads when a like mutation starts so an older response cannot
-    // overwrite the mutation result when it arrives later.
-    spotLikeMutationVersion += 1;
+  toggleSpotLike: (id, likedByUser, accessToken) => {
+    const found = findSpotById(get(), id);
+    const currentLiked = found ? found.likedByUser === true : likedByUser;
+    const currentCount = found?.likeCount ?? 0;
+    const nextLiked = !currentLiked;
+    const nextCount = Math.max(0, currentCount + (nextLiked ? 1 : -1));
 
-    const response = await fetchMutationWithTimeout(
-      getApiUrl(`/api/spot-likes?id=${encodeURIComponent(id)}`),
-      {
-        method: likedByUser ? 'DELETE' : 'POST',
-        headers: { Authorization: `Bearer ${accessToken}` },
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(await readErrorMessage(response));
+    let intent = spotLikeIntents.get(id);
+    if (!intent) {
+      intent = {
+        generation: 0,
+        desiredLiked: nextLiked,
+        confirmedLiked: currentLiked,
+        confirmedCount: currentCount,
+        confirmedSpot: found ? { ...found } : null,
+        accessToken,
+        inFlight: false,
+        waiters: [],
+      };
+      spotLikeIntents.set(id, intent);
     }
 
-    const data = (await response.json()) as {
-      likeCount?: number;
-      likedByUser?: boolean;
-    };
-    const nextLiked = data.likedByUser ?? !likedByUser;
-    const nextCount = data.likeCount ?? 0;
-    const schoolId =
-      get().spots.find((spot) => spot.id === id)?.schoolId ??
-      get().mySpots.find((spot) => spot.id === id)?.schoolId ??
-      get().likedSpots.find((spot) => spot.id === id)?.schoolId ??
-      get().recentSpots.find((spot) => spot.id === id)?.schoolId;
-    captureAnalyticsEvent(nextLiked ? 'spot_liked' : 'spot_unliked', {
-      spot_id: id,
-      ...(schoolId ? { school_id: schoolId } : {}),
+    intent.generation += 1;
+    const generation = intent.generation;
+    intent.desiredLiked = nextLiked;
+    intent.accessToken = accessToken;
+
+    applySpotLikeState(id, nextLiked, nextCount, intent.confirmedSpot);
+
+    const pending = intent;
+    return new Promise((resolve, reject) => {
+      pending.waiters.push({ generation, resolve, reject });
+      void flushSpotLikeIntent(id);
     });
-    spotLikeMutationVersion += 1;
-
-    set((state) => {
-      const updateSpot = (spot: Spot): Spot =>
-        spot.id === id
-          ? { ...spot, likeCount: nextCount, likedByUser: nextLiked }
-          : spot;
-      const updatedSpots = state.spots.map(updateSpot);
-      const updatedMySpots = state.mySpots.map(updateSpot);
-      const updatedLikedSpots = state.likedSpots.map(updateSpot);
-      const updatedRecentSpots = state.recentSpots.map(updateSpot);
-
-      if (!nextLiked) {
-        return {
-          spots: updatedSpots,
-          mySpots: updatedMySpots,
-          likedSpots: updatedLikedSpots.filter((spot) => spot.id !== id),
-          recentSpots: updatedRecentSpots,
-        };
-      }
-
-      const likedSpot =
-        updatedSpots.find((spot) => spot.id === id) ??
-        updatedRecentSpots.find((spot) => spot.id === id);
-      return {
-        spots: updatedSpots,
-        mySpots: updatedMySpots,
-        recentSpots: updatedRecentSpots,
-        likedSpots: likedSpot
-          ? [
-              likedSpot,
-              ...updatedLikedSpots.filter((spot) => spot.id !== id),
-            ]
-          : updatedLikedSpots,
-      };
-    });
-
-    return { likedByUser: nextLiked, likeCount: nextCount };
   },
 
   updateSpot: async (id: string, input: UpdateSpotInput, accessToken: string) => {
@@ -686,7 +1027,8 @@ export const useSpotsStore = create<SpotsState>()(
       {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${accessToken}` },
-      }
+      },
+      20_000
     );
 
     if (!response.ok) {
@@ -828,6 +1170,7 @@ export const useSpotsStore = create<SpotsState>()(
   clearLikedSpots: () => {
     likedSpotsRequestVersion += 1;
     spotLikeMutationVersion += 1;
+    clearSpotLikeIntents();
     set((state) => ({
       spots: state.spots.map((spot) => ({ ...spot, likedByUser: false })),
       mySpots: state.mySpots.map((spot) => ({ ...spot, likedByUser: false })),
@@ -850,6 +1193,7 @@ export const useSpotsStore = create<SpotsState>()(
     mySpotsRequestVersion += 1;
     likedSpotsRequestVersion += 1;
     spotLikeMutationVersion += 1;
+    clearSpotLikeIntents();
     set({
       spots: [],
       loading: false,
@@ -894,6 +1238,7 @@ export const useSpotsStore = create<SpotsState>()(
           typeof persisted.schoolId === 'string' && persisted.schoolId.length > 0
             ? persisted.schoolId
             : null;
+        const isGlobalCache = schoolId === ALL_SPOTS_SCOPE;
         const spotsFetchedAt =
           typeof persisted.spotsFetchedAt === 'string' &&
           persisted.spotsFetchedAt.length > 0
@@ -907,9 +1252,9 @@ export const useSpotsStore = create<SpotsState>()(
 
         return {
           ...currentState,
-          spots: parseSpots(persisted.spots),
-          schoolId,
-          spotsFetchedAt: schoolId ? spotsFetchedAt : null,
+          spots: isGlobalCache ? parseSpots(persisted.spots) : [],
+          schoolId: isGlobalCache ? ALL_SPOTS_SCOPE : null,
+          spotsFetchedAt: isGlobalCache ? spotsFetchedAt : null,
           mySpots: parseSpots(persisted.mySpots),
           mySpotsOwnerId,
           likedSpots: parseSpots(persisted.likedSpots),

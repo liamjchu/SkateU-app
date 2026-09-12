@@ -1,6 +1,7 @@
 import fc from 'fast-check';
 import type { Spot } from '../../types/spot';
-import { useSpotsStore } from '../spotsStore';
+import { SpotSubmissionCancelledError } from '../../lib/spotSubmission';
+import { ALL_SPOTS_SCOPE, useSpotsStore } from '../spotsStore';
 
 // The AsyncStorage native module is unavailable under Jest; use the library's
 // official in-memory mock so we can assert the store never writes to it.
@@ -72,11 +73,6 @@ const spotArb: fc.Arbitrary<Spot> = fc.record({
   updatedAt: fc.date({ noInvalidDate: true }).map((d) => d.toISOString()),
 });
 
-// Whitespace-only strings, including the empty string.
-const blankSchoolIdArb: fc.Arbitrary<string> = fc
-  .array(fc.constantFrom(' ', '\t', '\n', '\r', '\f', '\v'), { maxLength: 12 })
-  .map((chars) => chars.join(''));
-
 describe('spotsStore', () => {
   // Feature: global-spots, Property 7: a failed fetch preserves previously
   // loaded spots
@@ -86,13 +82,13 @@ describe('spotsStore', () => {
       fc.asyncProperty(
         fc.array(spotArb),
         fc.constantFrom<'network' | 'abort' | 'non-ok'>('network', 'abort', 'non-ok'),
-        fc.string({ minLength: 1 }).filter((value) => value.trim().length > 0),
-        async (priorSpots, failureKind, schoolId) => {
+        async (priorSpots, failureKind) => {
           useSpotsStore.setState({
             spots: priorSpots,
             loading: false,
             error: null,
-            schoolId: 'prior-school',
+            schoolId: ALL_SPOTS_SCOPE,
+            spotsFetchedAt: '2026-08-25T00:00:00.000Z',
           });
 
           if (failureKind === 'non-ok') {
@@ -103,7 +99,7 @@ describe('spotsStore', () => {
             fetchMock.mockRejectedValue(rejectingFetch(failureKind));
           }
 
-          await useSpotsStore.getState().fetchSpots(schoolId);
+          await useSpotsStore.getState().fetchSpots();
 
           const state = useSpotsStore.getState();
           expect(state.error).not.toBeNull();
@@ -111,32 +107,6 @@ describe('spotsStore', () => {
           expect(state.spots).toEqual(priorSpots);
         }
       ),
-      { numRuns: 100 }
-    );
-  });
-
-  // Feature: global-spots, Property 8: blank schoolId is rejected without a
-  // fetch
-  // Validates: Requirements 9.6
-  it('rejects a blank schoolId without initiating a fetch', async () => {
-    await fc.assert(
-      fc.asyncProperty(fc.array(spotArb), blankSchoolIdArb, async (priorSpots, blankId) => {
-        fetchMock.mockReset();
-        useSpotsStore.setState({
-          spots: priorSpots,
-          loading: false,
-          error: null,
-          schoolId: 'prior-school',
-        });
-
-        await useSpotsStore.getState().fetchSpots(blankId);
-
-        const state = useSpotsStore.getState();
-        expect(fetchMock).not.toHaveBeenCalled();
-        expect(state.error).not.toBeNull();
-        expect(state.loading).toBe(false);
-        expect(state.spots).toEqual(priorSpots);
-      }),
       { numRuns: 100 }
     );
   });
@@ -161,19 +131,21 @@ describe('spotsStore', () => {
     ];
     fetchMock.mockResolvedValue(mockResponse({ spots }));
 
-    await useSpotsStore.getState().fetchSpots('school-1');
+    await useSpotsStore.getState().fetchSpots();
 
     const state = useSpotsStore.getState();
     expect(state.loading).toBe(false);
     expect(state.error).toBeNull();
     expect(state.spots).toEqual(spots);
-    expect(state.schoolId).toBe('school-1');
+    expect(state.schoolId).toBe(ALL_SPOTS_SCOPE);
+    expect(String(fetchMock.mock.calls[0][0])).toContain('/api/spots');
+    expect(String(fetchMock.mock.calls[0][0])).not.toContain('schoolId=');
   });
 
   it('clears loading when a fetch times out', async () => {
     fetchMock.mockRejectedValue(rejectingFetch('abort'));
 
-    await useSpotsStore.getState().fetchSpots('school-1');
+    await useSpotsStore.getState().fetchSpots();
 
     const state = useSpotsStore.getState();
     expect(state.loading).toBe(false);
@@ -183,7 +155,7 @@ describe('spotsStore', () => {
   it('exposes an empty collection with no error when zero records are returned', async () => {
     fetchMock.mockResolvedValue(mockResponse({ spots: [] }));
 
-    await useSpotsStore.getState().fetchSpots('school-1');
+    await useSpotsStore.getState().fetchSpots();
 
     const state = useSpotsStore.getState();
     expect(state.spots).toEqual([]);
@@ -191,11 +163,11 @@ describe('spotsStore', () => {
     expect(state.loading).toBe(false);
   });
 
-  it('persists last campus spots after a successful fetch', async () => {
+  it('persists map spots after a successful fetch', async () => {
     const setItemSpy = jest.spyOn(AsyncStorage, 'setItem');
 
     fetchMock.mockResolvedValue(mockResponse({ spots: [] }));
-    await useSpotsStore.getState().fetchSpots('school-1');
+    await useSpotsStore.getState().fetchSpots();
 
     expect(setItemSpy.mock.calls.some(([key]) => key === '@skateu:spots-cache')).toBe(
       true
@@ -398,7 +370,7 @@ describe('spotsStore GET retry behaviour', () => {
       .mockResolvedValueOnce(mockResponse({}, { ok: false, status: 503 }))
       .mockResolvedValueOnce(mockResponse({ spots: [makeSpot({ id: 'a' })] }));
 
-    await useSpotsStore.getState().fetchSpots('school-1');
+    await useSpotsStore.getState().fetchSpots();
 
     const state = useSpotsStore.getState();
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -411,7 +383,7 @@ describe('spotsStore GET retry behaviour', () => {
       .mockRejectedValueOnce(rejectingFetch('network'))
       .mockResolvedValueOnce(mockResponse({ spots: [] }));
 
-    await useSpotsStore.getState().fetchSpots('school-1');
+    await useSpotsStore.getState().fetchSpots();
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(useSpotsStore.getState().error).toBeNull();
@@ -422,7 +394,7 @@ describe('spotsStore GET retry behaviour', () => {
       mockResponse({ error: 'bad request' }, { ok: false, status: 400 })
     );
 
-    await useSpotsStore.getState().fetchSpots('school-1');
+    await useSpotsStore.getState().fetchSpots();
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(useSpotsStore.getState().error).toBe('bad request');
@@ -431,7 +403,7 @@ describe('spotsStore GET retry behaviour', () => {
   it('does not retry a timeout (abort)', async () => {
     fetchMock.mockRejectedValue(rejectingFetch('abort'));
 
-    await useSpotsStore.getState().fetchSpots('school-1');
+    await useSpotsStore.getState().fetchSpots();
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(useSpotsStore.getState().error).toMatch(/timed out/i);
@@ -440,7 +412,7 @@ describe('spotsStore GET retry behaviour', () => {
   it('gives up after the maximum attempts on a persistent 5xx', async () => {
     fetchMock.mockResolvedValue(mockResponse({}, { ok: false, status: 503 }));
 
-    await useSpotsStore.getState().fetchSpots('school-1');
+    await useSpotsStore.getState().fetchSpots();
 
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(useSpotsStore.getState().error).toMatch(/temporarily unavailable/i);
@@ -569,7 +541,7 @@ describe('spotsStore removal requests', () => {
 
 
 describe('spotsStore like response compatibility', () => {
-  it('uses safe defaults when a successful like response omits optional fields', async () => {
+  it('keeps the optimistic count when a successful like response omits likeCount', async () => {
     const spot = makeSpot({ id: 'a', likedByUser: false, likeCount: 8 });
     useSpotsStore.setState({ spots: [spot], mySpots: [spot] });
     fetchMock.mockResolvedValue(mockResponse({}));
@@ -577,9 +549,139 @@ describe('spotsStore like response compatibility', () => {
     await useSpotsStore.getState().toggleSpotLike('a', false, 'token-abc');
 
     const state = useSpotsStore.getState();
-    expect(state.spots[0]).toMatchObject({ likedByUser: true, likeCount: 0 });
-    expect(state.mySpots[0]).toMatchObject({ likedByUser: true, likeCount: 0 });
+    expect(state.spots[0]).toMatchObject({ likedByUser: true, likeCount: 9 });
+    expect(state.mySpots[0]).toMatchObject({ likedByUser: true, likeCount: 9 });
     expect(state.likedSpots[0]).toMatchObject({ id: 'a', likedByUser: true });
+  });
+});
+
+describe('spotsStore optimistic likes', () => {
+  function deferredFetch() {
+    let resolveRequest: (value: Response) => void = () => undefined;
+    const request = new Promise<Response>((resolve) => {
+      resolveRequest = resolve;
+    });
+    return {
+      request,
+      resolve(body: unknown, init?: { ok?: boolean; status?: number }) {
+        resolveRequest(mockResponse(body, init));
+      },
+    };
+  }
+
+  it('flips the heart and count before the request resolves', async () => {
+    const spot = makeSpot({ id: 'a', likedByUser: false, likeCount: 1 });
+    useSpotsStore.setState({ spots: [spot], mySpots: [spot], likedSpots: [] });
+    const first = deferredFetch();
+    fetchMock.mockImplementationOnce(() => first.request);
+
+    const pending = useSpotsStore.getState().toggleSpotLike('a', false, 'token-abc');
+
+    expect(useSpotsStore.getState().spots[0]).toMatchObject({
+      likedByUser: true,
+      likeCount: 2,
+    });
+    expect(useSpotsStore.getState().likedSpots).toHaveLength(1);
+
+    first.resolve({ likedByUser: true, likeCount: 5 });
+    await pending;
+
+    expect(useSpotsStore.getState().spots[0]).toMatchObject({
+      likedByUser: true,
+      likeCount: 5,
+    });
+  });
+
+  it('rolls back and rejects when the latest like fails', async () => {
+    const spot = makeSpot({ id: 'a', likedByUser: false, likeCount: 4 });
+    useSpotsStore.setState({ spots: [spot], likedSpots: [] });
+    fetchMock.mockResolvedValue(
+      mockResponse({ error: 'Unable to like this spot right now.' }, { ok: false, status: 500 })
+    );
+
+    await expect(
+      useSpotsStore.getState().toggleSpotLike('a', false, 'token-abc')
+    ).rejects.toThrow('Unable to like this spot right now.');
+
+    expect(useSpotsStore.getState().spots[0]).toMatchObject({
+      likedByUser: false,
+      likeCount: 4,
+    });
+    expect(useSpotsStore.getState().likedSpots).toEqual([]);
+  });
+
+  it('restores a profile liked spot when unlike fails', async () => {
+    const spot = makeSpot({ id: 'a', likedByUser: true, likeCount: 3 });
+    useSpotsStore.setState({ spots: [], likedSpots: [spot] });
+    fetchMock.mockResolvedValue(
+      mockResponse({ error: 'Unable to unlike this spot right now.' }, { ok: false, status: 500 })
+    );
+
+    await expect(
+      useSpotsStore.getState().toggleSpotLike('a', true, 'token-abc')
+    ).rejects.toThrow();
+
+    expect(useSpotsStore.getState().likedSpots).toHaveLength(1);
+    expect(useSpotsStore.getState().likedSpots[0]).toMatchObject({
+      id: 'a',
+      likedByUser: true,
+      likeCount: 3,
+    });
+  });
+
+  it('toggles from store state when the caller passes a stale liked flag', async () => {
+    const spot = makeSpot({ id: 'a', likedByUser: false, likeCount: 1 });
+    useSpotsStore.setState({ spots: [spot], likedSpots: [] });
+    const like = deferredFetch();
+    const unlike = deferredFetch();
+    fetchMock
+      .mockImplementationOnce(() => like.request)
+      .mockImplementationOnce(() => unlike.request);
+
+    const likePending = useSpotsStore.getState().toggleSpotLike('a', false, 'token-abc');
+    expect(useSpotsStore.getState().spots[0]?.likedByUser).toBe(true);
+
+    const unlikePending = useSpotsStore.getState().toggleSpotLike('a', false, 'token-abc');
+    expect(useSpotsStore.getState().spots[0]).toMatchObject({
+      likedByUser: false,
+      likeCount: 1,
+    });
+    expect(useSpotsStore.getState().likedSpots).toEqual([]);
+
+    like.resolve({ likedByUser: true, likeCount: 2 });
+    unlike.resolve({ likedByUser: false, likeCount: 1 });
+    await Promise.all([likePending, unlikePending]);
+
+    expect(useSpotsStore.getState().spots[0]).toMatchObject({
+      likedByUser: false,
+      likeCount: 1,
+    });
+    expect(fetchMock.mock.calls.map(([, init]) => init?.method)).toEqual([
+      'POST',
+      'DELETE',
+    ]);
+  });
+
+  it('ignores a failed like after the user has already unliked', async () => {
+    const spot = makeSpot({ id: 'a', likedByUser: false, likeCount: 2 });
+    useSpotsStore.setState({ spots: [spot], likedSpots: [] });
+    const like = deferredFetch();
+    fetchMock.mockImplementationOnce(() => like.request);
+
+    const likePending = useSpotsStore.getState().toggleSpotLike('a', false, 'token-abc');
+    const unlikePending = useSpotsStore.getState().toggleSpotLike('a', true, 'token-abc');
+
+    expect(useSpotsStore.getState().spots[0]?.likedByUser).toBe(false);
+
+    like.resolve({ error: 'Unable to like this spot right now.' }, { ok: false, status: 500 });
+    await expect(likePending).resolves.toMatchObject({ likedByUser: false });
+    await expect(unlikePending).resolves.toMatchObject({ likedByUser: false });
+
+    expect(useSpotsStore.getState().spots[0]).toMatchObject({
+      likedByUser: false,
+      likeCount: 2,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -711,11 +813,11 @@ describe('spotsStore mutations and session', () => {
     expect(useSpotsStore.getState().sessionUserId).toBeNull();
   });
 
-  it('merges persisted campus and profile lists', () => {
+  it('merges persisted global map spots and skips old campus caches', () => {
     const merge = useSpotsStore.persist.getOptions().merge;
     expect(merge).toBeDefined();
     const persistedSpot = makeSpot({ id: 'cached', schoolId: 'school-1' });
-    const merged = merge!(
+    const campusCache = merge!(
       {
         spots: [persistedSpot],
         schoolId: 'school-1',
@@ -728,9 +830,24 @@ describe('spotsStore mutations and session', () => {
       },
       useSpotsStore.getState()
     );
-    expect(merged.schoolId).toBe('school-1');
-    expect(merged.spots[0]?.id).toBe('cached');
-    expect(merged.recentFilter).toBe('college');
+    expect(campusCache.schoolId).toBeNull();
+    expect(campusCache.spots).toEqual([]);
+    expect(campusCache.spotsFetchedAt).toBeNull();
+    expect(campusCache.mySpots[0]?.id).toBe('cached');
+    expect(campusCache.recentFilter).toBe('college');
+
+    const globalCache = merge!(
+      {
+        spots: [persistedSpot],
+        schoolId: ALL_SPOTS_SCOPE,
+        spotsFetchedAt: '2026-08-25T00:00:00.000Z',
+      },
+      useSpotsStore.getState()
+    );
+    expect(globalCache.schoolId).toBe(ALL_SPOTS_SCOPE);
+    expect(globalCache.spots[0]?.id).toBe('cached');
+    expect(globalCache.spotsFetchedAt).toBe('2026-08-25T00:00:00.000Z');
+
     expect(merge!({ schoolId: '' }, useSpotsStore.getState()).schoolId).toBeNull();
     useSpotsStore.getState().setHasHydrated(true);
     expect(useSpotsStore.getState().hasHydrated).toBe(true);
@@ -822,5 +939,53 @@ describe('spotsStore mutations and session', () => {
         'token-abc'
       )
     ).rejects.toThrow(/timed out/i);
+
+    const cancelledController = new AbortController();
+    cancelledController.abort();
+    await expect(
+      useSpotsStore.getState().addSpot(
+        {
+          schoolId: 'school-1',
+          name: 'Rail',
+          description: 'A rail',
+          latitude: 10,
+          longitude: 20,
+          images: [],
+        },
+        'token-abc',
+        { signal: cancelledController.signal }
+      )
+    ).rejects.toBeInstanceOf(SpotSubmissionCancelledError);
+
+    const liveController = new AbortController();
+    fetchMock.mockImplementationOnce(
+      (_url: string | URL | Request, init?: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          const onAbort = () => {
+            const error = new Error('Aborted');
+            error.name = 'AbortError';
+            reject(error);
+          };
+          if (init?.signal?.aborted) {
+            onAbort();
+            return;
+          }
+          init?.signal?.addEventListener('abort', onAbort);
+        })
+    );
+    const pending = useSpotsStore.getState().addSpot(
+      {
+        schoolId: 'school-1',
+        name: 'Rail',
+        description: 'A rail',
+        latitude: 10,
+        longitude: 20,
+        images: [],
+      },
+      'token-abc',
+      { signal: liveController.signal }
+    );
+    liveController.abort();
+    await expect(pending).rejects.toBeInstanceOf(SpotSubmissionCancelledError);
   });
 });

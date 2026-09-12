@@ -2,6 +2,7 @@ import { getApiUrl } from './api';
 import { displayableAvatarUrl } from './avatarUrl';
 import { sanitizeErrorMessage } from './userFacingError';
 import type { FollowListKind } from './userFollows';
+import { parseXpRank } from './xpRank';
 import type { FollowListUser, PublicProfileView } from '../types/publicProfile';
 import type { Spot } from '../types/spot';
 
@@ -85,6 +86,10 @@ export function mapPublicProfileView(value: unknown): PublicProfileView | null {
       typeof value.profile.bio === 'string' && value.profile.bio.length > 0
         ? value.profile.bio
         : null,
+    rank: parseXpRank(value.rank) ?? 'hobbyist',
+    ...(typeof value.xpTotal === 'number' && Number.isFinite(value.xpTotal)
+      ? { xpTotal: Math.max(0, Math.floor(value.xpTotal)) }
+      : {}),
     followerCount: readCount(value.followerCount),
     followingCount: readCount(value.followingCount),
     isFollowing: value.isFollowing === true,
@@ -110,6 +115,7 @@ export function mapFollowListUser(value: unknown): FollowListUser | null {
     avatarUrl: displayableAvatarUrl(
       typeof value.avatarUrl === 'string' ? value.avatarUrl : null
     ),
+    rank: parseXpRank(value.rank) ?? 'hobbyist',
     isFollowing: value.isFollowing === true,
   };
 }
@@ -136,6 +142,7 @@ export function followListUserAsProfile(user: FollowListUser): PublicProfileView
     username: user.username,
     avatarUrl: user.avatarUrl,
     bio: null,
+    rank: user.rank,
     followerCount: 0,
     followingCount: 0,
     isFollowing: user.isFollowing,
@@ -256,12 +263,23 @@ export async function unfollowUser(
   });
 }
 
+export type CreatorSpotsPage = {
+  spots: Spot[];
+  total: number;
+};
+
 export async function fetchCreatorSpots(
   userId: string,
-  accessToken?: string | null
-): Promise<Spot[]> {
+  accessToken?: string | null,
+  offset = 0
+): Promise<CreatorSpotsPage> {
+  const params = new URLSearchParams({ creatorUserId: userId });
+  if (offset > 0) {
+    params.set('offset', String(offset));
+  }
+
   const response = await fetchWithTimeout(
-    getApiUrl(`/api/spots?creatorUserId=${encodeURIComponent(userId)}`),
+    getApiUrl(`/api/spots?${params.toString()}`),
     {
       method: 'GET',
       headers: authHeaders(accessToken),
@@ -272,6 +290,12 @@ export async function fetchCreatorSpots(
     throw new Error(await readErrorMessage(response, SPOTS_FAILED_ERROR));
   }
 
-  const data = (await response.json()) as { spots?: Spot[] };
-  return Array.isArray(data.spots) ? data.spots : [];
+  const data = (await response.json()) as { spots?: Spot[]; total?: unknown };
+  const spots = Array.isArray(data.spots) ? data.spots : [];
+  const total =
+    typeof data.total === 'number' && Number.isFinite(data.total)
+      ? Math.max(0, Math.floor(data.total))
+      : offset + spots.length;
+
+  return { spots, total };
 }

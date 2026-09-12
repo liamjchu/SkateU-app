@@ -51,10 +51,7 @@ describe('analytics', () => {
           createdAt: string | undefined,
           method: 'google' | 'apple'
         ) => void;
-        identifyAnalyticsUser: (
-          userId: string,
-          personProperties?: { email?: string }
-        ) => void;
+        identifyAnalyticsUser: (userId: string) => void;
         isAnalyticsEnabled: () => boolean;
       };
 
@@ -62,7 +59,7 @@ describe('analytics', () => {
       captureAnalyticsEvent('spot_created', { spot_id: 'spot-1' });
       captureAuthCompleted('signup', 'email');
       captureOauthAuthCompleted(new Date().toISOString(), 'google');
-      identifyAnalyticsUser('user-1', { email: 'skater@example.com' });
+      identifyAnalyticsUser('user-1');
 
       expect(PostHog).toHaveBeenCalledWith(
         'test-project-token',
@@ -84,9 +81,7 @@ describe('analytics', () => {
       expect(instance.capture).toHaveBeenCalledWith('signup_completed', {
         method: 'google',
       });
-      expect(instance.identify).toHaveBeenCalledWith('user-1', {
-        email: 'skater@example.com',
-      });
+      expect(instance.identify).toHaveBeenCalledWith('user-1');
     });
   });
 

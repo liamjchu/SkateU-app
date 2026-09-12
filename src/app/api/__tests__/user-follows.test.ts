@@ -103,6 +103,12 @@ describe('POST /api/user-follows', () => {
       if (init?.method === 'POST' && url.includes('/rest/v1/user_follows')) {
         return jsonResponse(null, 201);
       }
+      if (init?.method === 'POST' && url.includes('/rest/v1/user_notifications')) {
+        expect(String(init.body)).toContain('"type":"follow"');
+        expect(String(init.body)).toContain(`"recipient_id":"${followingId}"`);
+        expect(String(init.body)).toContain(`"actor_id":"${viewerId}"`);
+        return jsonResponse(null, 201);
+      }
       if (url.includes('following_id=eq.') && url.includes('follower_id=eq.')) {
         return jsonResponse([{ follower_id: viewerId }]);
       }
@@ -146,6 +152,9 @@ describe('POST /api/user-follows', () => {
           status: 409,
         });
       }
+      if (init?.method === 'POST' && url.includes('/rest/v1/user_notifications')) {
+        return jsonResponse(null, 201);
+      }
       if (url.includes('following_id=eq.') && url.includes('follower_id=eq.')) {
         return jsonResponse([{ follower_id: viewerId }]);
       }
@@ -180,6 +189,12 @@ describe('DELETE /api/user-follows', () => {
         return jsonResponse({ id: viewerId });
       }
       if (init?.method === 'DELETE' && url.includes('/rest/v1/user_follows')) {
+        return jsonResponse(null, 200);
+      }
+      if (init?.method === 'DELETE' && url.includes('/rest/v1/user_notifications')) {
+        expect(url).toContain('type=eq.follow');
+        expect(url).toContain(`recipient_id=eq.${followingId}`);
+        expect(url).toContain(`actor_id=eq.${viewerId}`);
         return jsonResponse(null, 200);
       }
       if (url.includes('following_id=eq.') && url.includes('follower_id=eq.')) {
@@ -320,6 +335,7 @@ describe('GET /api/user-follows', () => {
           id: followerId,
           username: 'campus_skater',
           avatarUrl,
+          rank: 'hobbyist',
           isFollowing: true,
         },
       ],
@@ -371,6 +387,7 @@ describe('GET /api/user-follows', () => {
           id: followerId,
           username: 'campus_skater',
           avatarUrl: null,
+          rank: 'hobbyist',
           isFollowing: false,
         },
       ],
@@ -406,6 +423,7 @@ describe('GET /api/user-follows', () => {
           id: followerId,
           username: null,
           avatarUrl: null,
+          rank: 'hobbyist',
           isFollowing: false,
         },
       ],

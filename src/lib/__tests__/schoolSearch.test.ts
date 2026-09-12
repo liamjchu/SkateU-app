@@ -1,6 +1,7 @@
 import type { School } from '../../types/school';
 import {
     MIN_SEARCH_LENGTH,
+    getSchoolSearchCopy,
     normalizeSchoolSearchText,
     schoolMatchesQuery,
     schoolMatchesTypeFilter,
@@ -87,5 +88,27 @@ describe('schoolMatchesTypeFilter', () => {
     expect(schoolMatchesTypeFilter(unknownType, 'k12')).toBe(false);
     expect(schoolMatchesTypeFilter(unknownType, 'college')).toBe(false);
     expect(schoolMatchesTypeFilter(unknownType, 'all')).toBe(true);
+  });
+});
+
+describe('getSchoolSearchCopy', () => {
+  it('matches each type pill', () => {
+    expect(getSchoolSearchCopy('all').placeholder).toBe('Search all schools...');
+    expect(getSchoolSearchCopy('k12').placeholder).toBe('Search K-12 schools...');
+    expect(getSchoolSearchCopy('college').placeholder).toBe(
+      'Search colleges...'
+    );
+    expect(getSchoolSearchCopy('saved').placeholder).toBe(
+      'Search saved schools...'
+    );
+  });
+
+  it('uses a saved-only hint for the saved pill', () => {
+    expect(getSchoolSearchCopy('saved').accessibilityHint).toContain(
+      'saved schools'
+    );
+    expect(getSchoolSearchCopy('all').accessibilityHint).toContain(
+      '2-letter state'
+    );
   });
 });

@@ -19,6 +19,7 @@ describe("Home", () => {
 
     expect(skipLink?.textContent).toBe("Skip to content");
     expect(container.querySelector('a[aria-label="SkateU home"]')?.getAttribute("href")).toBe("/");
+    expect(container.querySelector('header a[href="/shop"]')?.textContent).toBe("Shop");
     expect(container.textContent).toContain("Locals know the spots,");
     expect(container.textContent).toContain("Now you do too");
     expect(container.textContent).toContain("finding, liking, and sharing");
@@ -35,10 +36,15 @@ describe("Home", () => {
     ).not.toBeNull();
     const legalNav = container.querySelector('nav[aria-label="Legal"]');
     expect(legalNav).not.toBeNull();
-    expect(legalNav?.querySelectorAll("a")).toHaveLength(1);
+    expect(legalNav?.querySelectorAll("a")).toHaveLength(3);
     const privacyLink = legalNav?.querySelector('a[href="/privacy"]');
     expect(privacyLink?.textContent).toBe("Privacy Policy");
-    expect(legalNav?.querySelector('a[href="/terms"]')).toBeNull();
+    expect(legalNav?.querySelector('a[href="/terms"]')?.textContent).toBe(
+      "Terms of Use"
+    );
+    expect(legalNav?.querySelector('a[href="/support"]')?.textContent).toBe(
+      "Support"
+    );
     expect(legalNav?.querySelector('a[href="/community-guidelines"]')).toBeNull();
     const socialLinks = [
       ["Instagram", "https://www.instagram.com/skateuapp/"],

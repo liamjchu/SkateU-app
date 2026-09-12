@@ -13,8 +13,11 @@ function readRepoFile(relativePath: string): string {
 }
 
 describe('legal document copies stay in sync', () => {
-  it('keeps Terms of Use identical in docs and the app', () => {
+  it('keeps Terms of Use identical in docs, the app, and landing', () => {
     expect(readRepoFile('docs/terms-of-use.md')).toBe(TERMS_OF_USE_MARKDOWN);
+    expect(readRepoFile('apps/landing-page/content/legal/terms-of-use.md')).toBe(
+      TERMS_OF_USE_MARKDOWN
+    );
   });
 
   it('keeps the Privacy Policy identical across docs, app, and landing', () => {

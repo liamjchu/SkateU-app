@@ -61,7 +61,6 @@ export function guardedNavigate(
   const useGlobalLock = options.useGlobalLock !== false;
   const now = Date.now();
   if (useGlobalLock && now < globalLockUntil) {
-    globalLockUntil = now + GLOBAL_LOCK_MS;
     return false;
   }
 

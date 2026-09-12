@@ -1,4 +1,14 @@
 import { HOME_RAIL_PAGE_SIZE, parseOffset } from '../../lib/homeFeed';
+import {
+  boundingBoxFilter,
+  boundingBoxFor,
+  NEARBY_CANDIDATE_LIMIT,
+  NEARBY_SCHOOLS_LIMIT,
+  NEARBY_SEARCH_RADII_MI,
+  parseNearbyOrigin,
+  sortSchoolsByDistance,
+  type NearbyOrigin,
+} from '../../lib/nearbySchools';
 import { MIN_SEARCH_LENGTH } from '../../lib/schoolSearch';
 
 type SchoolType = 'k12_public' | 'k12_private' | 'higher_ed';
@@ -23,7 +33,7 @@ type SchoolSearchResult = {
   lng: number;
   numSpots: number;
   type: SchoolType;
-  // Present in "popular" responses: a photo from the school's most-liked spot.
+  // Present in "popular" responses: a photo from the school's most-liked public spot.
   spotImageUrl?: string | null;
 };
 
@@ -138,9 +148,19 @@ async function searchSchoolRows(
 type DatabaseSpotImageRow = {
   school_id: string;
   image_urls: string[] | null;
+  status?: string;
 };
 
-// Returns a photo from the most-liked spot per school, for school cards.
+// Matches spots+api VISIBLE_SPOT_STATUS_FILTER so pending and rejected
+// spots never become school-card photos.
+const SCHOOL_CARD_SPOT_STATUS_FILTER = 'in.(active,under_review)';
+const SCHOOL_CARD_SPOT_ORDER = 'likes_count.desc,comments_count.desc,id.asc';
+
+function isSchoolCardSpotStatus(status: unknown): boolean {
+  return status !== 'pending_moderation' && status !== 'removed';
+}
+
+// Returns a photo from the most-liked public spot per school, for school cards.
 async function fetchPopularSpotImageBySchool(
   config: { url: string; apiKey: string },
   schoolIds: string[]
@@ -152,10 +172,14 @@ async function fetchPopularSpotImageBySchool(
   }
 
   const query = new URL(`${config.url}/rest/v1/spots`);
-  query.searchParams.set('select', 'school_id,image_urls');
+  query.searchParams.set('select', 'school_id,image_urls,status');
   query.searchParams.set('school_id', `in.(${schoolIds.join(',')})`);
-  query.searchParams.set('order', 'likes_count.desc,created_at.desc');
-  query.searchParams.set('limit', String(SPOT_IMAGE_LOOKUP_LIMIT));
+  query.searchParams.set('status', SCHOOL_CARD_SPOT_STATUS_FILTER);
+  query.searchParams.set('order', SCHOOL_CARD_SPOT_ORDER);
+  query.searchParams.set(
+    'limit',
+    String(Math.max(SPOT_IMAGE_LOOKUP_LIMIT, schoolIds.length * 25))
+  );
 
   const response = await fetch(query.toString(), {
     headers: {
@@ -176,6 +200,10 @@ async function fetchPopularSpotImageBySchool(
       return;
     }
 
+    if (!isSchoolCardSpotStatus(row.status)) {
+      return;
+    }
+
     const firstImage = row.image_urls?.find(
       (imageUrl) => typeof imageUrl === 'string' && imageUrl.length > 0
     );
@@ -186,6 +214,145 @@ async function fetchPopularSpotImageBySchool(
   });
 
   return imageBySchoolId;
+}
+
+async function withSpotImages(
+  config: { url: string; apiKey: string },
+  schools: SchoolSearchResult[]
+): Promise<SchoolSearchResult[]> {
+  const imageBySchoolId = await fetchPopularSpotImageBySchool(
+    config,
+    schools.map((school) => school.id)
+  );
+
+  return schools.map((school) => ({
+    ...school,
+    spotImageUrl: imageBySchoolId.get(school.id) ?? null,
+  }));
+}
+
+// Walks the widening search rings and stops at the first one holding enough
+// schools. Rows are ordered by numspots so that when a dense metro overflows
+// the candidate limit, the truncated rows are still the useful ones.
+async function fetchNearbySchoolRows(
+  config: { url: string; apiKey: string },
+  origin: NearbyOrigin,
+  typeParams: Record<string, string>
+) {
+  let rows: DatabaseSchool[] = [];
+
+  for (const radiusMiles of NEARBY_SEARCH_RADII_MI) {
+    rows = await fetchSchoolRows(
+      config,
+      {
+        and: boundingBoxFilter(boundingBoxFor(origin, radiusMiles)),
+        ...typeParams,
+      },
+      NEARBY_CANDIDATE_LIMIT,
+      'numspots.desc,id.asc'
+    );
+
+    if (rows.length >= NEARBY_SCHOOLS_LIMIT) {
+      break;
+    }
+  }
+
+  return rows;
+}
+
+function parseNearestSchoolRow(value: unknown): DatabaseSchool | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+
+  const row = value as Partial<DatabaseSchool>;
+  if (
+    typeof row.id !== 'string' ||
+    row.id.length === 0 ||
+    typeof row.name !== 'string' ||
+    typeof row.city !== 'string' ||
+    typeof row.state !== 'string' ||
+    typeof row.latitude !== 'number' ||
+    typeof row.longitude !== 'number' ||
+    !Number.isFinite(row.latitude) ||
+    !Number.isFinite(row.longitude) ||
+    typeof row.numspots !== 'number' ||
+    !VALID_SCHOOL_TYPES.includes(row.type as SchoolType)
+  ) {
+    return null;
+  }
+
+  return {
+    id: row.id,
+    name: row.name,
+    city: row.city,
+    state: row.state,
+    latitude: row.latitude,
+    longitude: row.longitude,
+    numspots: row.numspots,
+    type: row.type as SchoolType,
+  };
+}
+
+async function fetchNearestSchoolByBoundingBox(
+  config: { url: string; apiKey: string },
+  origin: NearbyOrigin
+): Promise<SchoolSearchResult | null> {
+  for (const radiusMiles of NEARBY_SEARCH_RADII_MI) {
+    const rows = await fetchSchoolRows(
+      config,
+      { and: boundingBoxFilter(boundingBoxFor(origin, radiusMiles)) },
+      NEARBY_CANDIDATE_LIMIT,
+      'id.asc'
+    );
+    const schools = sortSchoolsByDistance(
+      origin,
+      rows
+        .map(parseNearestSchoolRow)
+        .filter((row): row is DatabaseSchool => row !== null)
+        .map(mapSchool)
+    );
+    if (schools[0]) {
+      return schools[0];
+    }
+  }
+
+  return null;
+}
+
+export async function fetchNearestSchool(
+  config: { url: string; apiKey: string },
+  origin: NearbyOrigin
+): Promise<SchoolSearchResult | null> {
+  const response = await fetch(`${config.url}/rest/v1/rpc/nearest_school`, {
+    method: 'POST',
+    headers: {
+      apikey: config.apiKey,
+      Authorization: `Bearer ${config.apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      p_lat: origin.latitude,
+      p_lng: origin.longitude,
+    }),
+  });
+
+  if (response.ok) {
+    const payload = (await response.json()) as unknown;
+    const row = Array.isArray(payload)
+      ? parseNearestSchoolRow(payload[0])
+      : parseNearestSchoolRow(payload);
+    if (row) {
+      return mapSchool(row);
+    }
+  }
+
+  try {
+    return await fetchNearestSchoolByBoundingBox(config, origin);
+  } catch (error) {
+    console.error('Nearest school lookup failed:', error);
+    return null;
+  }
 }
 
 export async function GET(request: Request) {
@@ -200,8 +367,30 @@ export async function GET(request: Request) {
     .map((id) => id.trim())
     .filter((id) => /^[A-Za-z0-9_-]+$/.test(id))
     .slice(0, IDS_LIMIT);
+  // Null when this is not a nearby request, or when the coordinates are
+  // missing or out of range; both fall through to the empty response below.
+  const nearbyOrigin =
+    url.searchParams.get('nearby') === '1'
+      ? parseNearbyOrigin(
+          url.searchParams.get('lat'),
+          url.searchParams.get('lng')
+        )
+      : null;
+  const nearestOrigin =
+    url.searchParams.get('nearest') === '1'
+      ? parseNearbyOrigin(
+          url.searchParams.get('lat'),
+          url.searchParams.get('lng')
+        )
+      : null;
 
-  if (!isPopularRequest && ids.length === 0 && search.length < MIN_SEARCH_LENGTH) {
+  if (
+    !isPopularRequest &&
+    nearbyOrigin === null &&
+    nearestOrigin === null &&
+    ids.length === 0 &&
+    search.length < MIN_SEARCH_LENGTH
+  ) {
     return Response.json({ schools: [] });
   }
 
@@ -224,16 +413,34 @@ export async function GET(request: Request) {
         'numspots.desc,id.asc',
         offset
       );
-      const imageBySchoolId = await fetchPopularSpotImageBySchool(
-        config,
-        schools.map((school) => school.id)
-      );
 
       return Response.json({
-        schools: schools.map((school) => ({
-          ...mapSchool(school),
-          spotImageUrl: imageBySchoolId.get(school.id) ?? null,
-        })),
+        schools: await withSpotImages(config, schools.map(mapSchool)),
+      });
+    }
+
+    if (nearestOrigin) {
+      const school = await fetchNearestSchool(config, nearestOrigin);
+      return Response.json({
+        schools: school ? await withSpotImages(config, [school]) : [],
+      });
+    }
+
+    if (nearbyOrigin) {
+      // Schools without spots are kept; the rail is about proximity, and the
+      // card falls back to a placeholder when there is no photo.
+      const candidates = await fetchNearbySchoolRows(
+        config,
+        nearbyOrigin,
+        typeParams
+      );
+      const closest = sortSchoolsByDistance(
+        nearbyOrigin,
+        candidates.map(mapSchool)
+      ).slice(0, NEARBY_SCHOOLS_LIMIT);
+
+      return Response.json({
+        schools: await withSpotImages(config, closest),
       });
     }
 
@@ -243,16 +450,9 @@ export async function GET(request: Request) {
         { id: `in.(${ids.join(',')})` },
         ids.length
       );
-      const imageBySchoolId = await fetchPopularSpotImageBySchool(
-        config,
-        schools.map((school) => school.id)
-      );
 
       return Response.json({
-        schools: schools.map((school) => ({
-          ...mapSchool(school),
-          spotImageUrl: imageBySchoolId.get(school.id) ?? null,
-        })),
+        schools: await withSpotImages(config, schools.map(mapSchool)),
       });
     }
 

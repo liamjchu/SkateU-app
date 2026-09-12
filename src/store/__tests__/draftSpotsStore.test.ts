@@ -1,6 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { SpotDraftInput } from '../../types/spotDraft';
 import { MAX_SPOT_DRAFTS } from '../../lib/spotDraft';
+import {
+  beginDraftSubmission,
+  resetDraftSubmissions,
+  SUBMISSION_CANCELLED_ERROR,
+  SUBMISSION_STALE_ERROR,
+} from '../../lib/spotSubmission';
 import { useDraftSpotsStore } from '../draftSpotsStore';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -38,6 +44,7 @@ describe('draftSpotsStore', () => {
   });
 
   afterEach(async () => {
+    resetDraftSubmissions();
     await AsyncStorage.clear();
     jest.clearAllMocks();
   });
@@ -119,7 +126,7 @@ describe('draftSpotsStore', () => {
     ).toHaveLength(1);
   });
 
-  it('does not create a second draft while one is submitting on that campus', async () => {
+  it('creates a second draft on the same campus while one is submitting', async () => {
     const draft = await useDraftSpotsStore.getState().upsertDraft(makeInput());
     useDraftSpotsStore.getState().setDraftStatus(draft.id, 'submitting');
 
@@ -127,11 +134,104 @@ describe('draftSpotsStore', () => {
       makeInput({ name: 'Duplicate rail' })
     );
 
-    expect(next.id).toBe(draft.id);
-    expect(useDraftSpotsStore.getState().drafts).toHaveLength(1);
+    expect(next.id).not.toBe(draft.id);
+    expect(useDraftSpotsStore.getState().drafts).toHaveLength(2);
     expect(useDraftSpotsStore.getState().getDraft(draft.id)?.status).toBe(
       'submitting'
     );
+    expect(useDraftSpotsStore.getState().getDraft(next.id)?.name).toBe(
+      'Duplicate rail'
+    );
+  });
+
+  it('does not overwrite a submitting draft in place', async () => {
+    const draft = await useDraftSpotsStore.getState().upsertDraft(makeInput());
+    useDraftSpotsStore.getState().setDraftStatus(draft.id, 'submitting');
+
+    const next = await useDraftSpotsStore.getState().upsertDraft(
+      makeInput({ id: draft.id, name: 'Changed' })
+    );
+
+    expect(next.id).toBe(draft.id);
+    expect(next.name).toBe(draft.name);
+    expect(useDraftSpotsStore.getState().getDraft(draft.id)?.status).toBe(
+      'submitting'
+    );
+  });
+
+  it('cancels an in-flight submission and restores the draft', async () => {
+    const draft = await useDraftSpotsStore.getState().upsertDraft(makeInput());
+    useDraftSpotsStore.getState().setDraftStatus(draft.id, 'submitting');
+    const signal = beginDraftSubmission(draft.id);
+
+    useDraftSpotsStore.getState().cancelDraftSubmission(draft.id);
+
+    expect(signal.aborted).toBe(true);
+    expect(useDraftSpotsStore.getState().getDraft(draft.id)?.status).toBe(
+      'draft'
+    );
+    expect(useDraftSpotsStore.getState().getDraft(draft.id)?.lastError).toBe(
+      SUBMISSION_CANCELLED_ERROR
+    );
+  });
+
+  it('recovers submitting drafts with no in-flight request', async () => {
+    const draft = await useDraftSpotsStore.getState().upsertDraft(makeInput());
+    useDraftSpotsStore.getState().setDraftStatus(draft.id, 'submitting');
+
+    useDraftSpotsStore.getState().recoverStaleSubmittingDrafts();
+
+    expect(useDraftSpotsStore.getState().getDraft(draft.id)?.status).toBe(
+      'draft'
+    );
+    expect(useDraftSpotsStore.getState().getDraft(draft.id)?.lastError).toBe(
+      SUBMISSION_STALE_ERROR
+    );
+  });
+
+  it('keeps a live submitting draft until the request times out', async () => {
+    const draft = await useDraftSpotsStore.getState().upsertDraft(makeInput());
+    useDraftSpotsStore.getState().setDraftStatus(draft.id, 'submitting');
+    beginDraftSubmission(draft.id);
+    const startedAt = Date.parse(
+      useDraftSpotsStore.getState().getDraft(draft.id)?.updatedAt ?? ''
+    );
+
+    useDraftSpotsStore.getState().recoverStaleSubmittingDrafts(startedAt + 30_000);
+
+    expect(useDraftSpotsStore.getState().getDraft(draft.id)?.status).toBe(
+      'submitting'
+    );
+
+    useDraftSpotsStore.getState().recoverStaleSubmittingDrafts(startedAt + 61_000);
+
+    expect(useDraftSpotsStore.getState().getDraft(draft.id)?.status).toBe(
+      'draft'
+    );
+    expect(useDraftSpotsStore.getState().getDraft(draft.id)?.lastError).toBe(
+      SUBMISSION_STALE_ERROR
+    );
+  });
+
+  it('restores a persisted submitting draft as retryable on rehydrate', async () => {
+    const created = await useDraftSpotsStore.getState().upsertDraft(makeInput());
+    useDraftSpotsStore.getState().setDraftStatus(created.id, 'submitting');
+    const persisted = await AsyncStorage.getItem('@skateu:spot-drafts');
+    expect(persisted).toContain('"status":"submitting"');
+
+    useDraftSpotsStore.setState({ drafts: [], hasHydrated: false });
+    if (persisted) {
+      await AsyncStorage.setItem('@skateu:spot-drafts', persisted);
+    }
+    await useDraftSpotsStore.persist.rehydrate();
+
+    expect(useDraftSpotsStore.getState().getDraft(created.id)?.status).toBe(
+      'draft'
+    );
+    expect(useDraftSpotsStore.getState().getDraft(created.id)?.lastError).toBe(
+      SUBMISSION_STALE_ERROR
+    );
+    expect(useDraftSpotsStore.getState().hasHydrated).toBe(true);
   });
 
   it('deletes a draft after a successful post', async () => {

@@ -115,6 +115,7 @@ describe('mapComment', () => {
       content: 'This spot is sick',
       creatorUsername: 'liam',
       creatorAvatarUrl: null,
+      creatorRank: 'hobbyist',
       createdAt: '2024-01-01T00:00:00.000Z',
       replies: [
         expect.objectContaining({

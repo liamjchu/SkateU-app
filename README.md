@@ -64,7 +64,18 @@ Do not include a path such as `/api` or a trailing slash. Changing an `EXPO_PUBL
 
 The Next.js landing page is a separate workspace. From `apps/landing-page`, run `npm ci` and `npm run dev` for local development; use `npm run build` followed by `npm run start` to run its production build.
 
-Create `apps/landing-page/.env.local` through a secure channel with the public `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`, plus the server-only `SUPABASE_SERVICE_ROLE_KEY` and `SUBSCRIPTION_DISPATCH_SECRET`. Set `NEXT_PUBLIC_TESTFLIGHT_URL` to your public TestFlight join URL (`https://testflight.apple.com/join/...`) so the iOS beta button appears. The subscription route limits each IP to five requests per 60 seconds by default; configure `WAITLIST_RATE_LIMIT_MAX_REQUESTS` and `WAITLIST_RATE_LIMIT_WINDOW_MS` to change that per-process limit. For the deployed `send-confirmation` Edge Function, configure `APP_URL`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `SUBSCRIPTION_DISPATCH_SECRET`, and its Supabase service credentials as deployment secrets. Never expose the service-role key, dispatch secret, or Resend key to the browser.
+Create `apps/landing-page/.env.local` through a secure channel with the public `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`, plus the server-only `SUPABASE_SERVICE_ROLE_KEY` and `SUBSCRIPTION_DISPATCH_SECRET`. Set `NEXT_PUBLIC_TESTFLIGHT_URL` to your public TestFlight join URL (`https://testflight.apple.com/join/...`) so the iOS beta button appears. Set `NEXT_PUBLIC_SITE_URL` to the landing-page origin (`http://localhost:3000` locally, `https://skateu.app` in production) so Stripe Checkout can return to `/shop/success`. The subscription route limits each IP to five requests per 60 seconds by default; configure `WAITLIST_RATE_LIMIT_MAX_REQUESTS` and `WAITLIST_RATE_LIMIT_WINDOW_MS` to change that per-process limit. For the deployed `send-confirmation` Edge Function, configure `APP_URL`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `SUBSCRIPTION_DISPATCH_SECRET`, and its Supabase service credentials as deployment secrets. Never expose the service-role key, dispatch secret, Resend key, or Stripe restricted key to the browser.
+
+Shop checkout uses Stripe-hosted Checkout. Create a [Stripe sandbox](https://docs.stripe.com/sandboxes.md) for local work (not the account’s shared test mode). Add a restricted API key (`rk_…`) with Checkout Sessions write and Products/Prices read, then set these server-only landing-page values as Vercel sensitive environment variables in production:
+
+```dotenv
+STRIPE_SECRET_KEY=rk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PRICE_ID=price_...
+STRIPE_SHIPPING_AMOUNT_CENTS=0
+```
+
+`STRIPE_PRICE_ID` is the one-time Price for the SkateU sticker. `STRIPE_SHIPPING_AMOUNT_CENTS` is a flat US shipping amount in cents; `0` is free shipping. Do not enable Stripe Tax until you have an active tax registration — `automatic_tax` collects nothing without one. Apply `supabase/shop_orders_setup.sql` (or `supabase/migrations/20260910120000_shop_orders.sql`) so paid sessions can be stored. Locally, forward webhooks with `stripe listen --forward-to localhost:3000/api/webhooks/stripe`. Production must receive `checkout.session.completed`, `checkout.session.async_payment_succeeded`, and `checkout.session.async_payment_failed`. Fulfill from the Stripe Dashboard or `shop_orders`; the success page does not record the order.
 
 To smoke-test Android beta email delivery, submit a test address on the landing page, check that the message arrives, open its confirmation link, and verify that the confirmation page succeeds. See the [Deployment guide](docs/deployment.md) for the Expo build and API deployment workflow.
 
@@ -104,8 +115,11 @@ Follow the complete [Backend setup](docs/backend-setup.md). Before this app can 
    supabase/spot_removal_requests_setup.sql
    supabase/user_feedback_setup.sql
    supabase/user_blocks_setup.sql
+   supabase/user_follows_setup.sql
    supabase/comment_reports_setup.sql
    supabase/school_search_setup.sql
+   supabase/nearest_school_setup.sql
+   supabase/user_notifications_setup.sql
    ```
 
 5. Create `spot-images` and `avatars` Storage buckets with public read enabled.

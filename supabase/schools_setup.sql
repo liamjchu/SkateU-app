@@ -37,6 +37,9 @@ create index if not exists schools_name_idx on public.schools (name);
 create index if not exists schools_city_idx on public.schools (city);
 create index if not exists schools_numspots_id_idx on public.schools (numspots desc, id asc);
 create index if not exists schools_type_idx on public.schools (type);
+-- Bounding-box lookups for the home "Nearby schools" rail
+-- (GET /api/schools?nearby=1&lat=..&lng=..).
+create index if not exists schools_lat_lng_idx on public.schools (latitude, longitude);
 
 alter table public.schools enable row level security;
 

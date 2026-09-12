@@ -110,6 +110,7 @@ describe('profileStore.fetchProfile', () => {
           legal_version: '2026-08-20',
           legal_accepted_at: '2026-08-21T00:00:00.000Z',
           age_attested_at: '2026-08-21T00:00:00.000Z',
+        xp_total: 0,
         },
       })
     );
@@ -154,6 +155,7 @@ describe('profileStore.fetchProfile', () => {
         legal_version: '2026-08-20',
         legal_accepted_at: '2026-08-21T00:00:00.000Z',
         age_attested_at: '2026-08-21T00:00:00.000Z',
+        xp_total: 0,
       },
       loaded: true,
       loading: false,
@@ -227,6 +229,7 @@ describe('profileStore.username', () => {
         legal_version: '2026-08-20',
         legal_accepted_at: '2026-08-21T00:00:00.000Z',
         age_attested_at: '2026-08-21T00:00:00.000Z',
+        xp_total: 0,
       },
       loaded: true,
       loading: false,
@@ -307,6 +310,7 @@ describe('profileStore.acceptLegal', () => {
           legal_version: '2026-08-20',
           legal_accepted_at: '2026-08-21T00:00:00.000Z',
           age_attested_at: '2026-08-21T00:00:00.000Z',
+        xp_total: 0,
         },
       })
     );
@@ -343,6 +347,7 @@ describe('profileStore.acceptLegal', () => {
         legal_version: null,
         legal_accepted_at: null,
         age_attested_at: null,
+        xp_total: 0,
       },
       loaded: true,
       loading: true,
@@ -389,6 +394,7 @@ describe('profileStore.acceptLegal', () => {
           legal_version: null,
           legal_accepted_at: null,
           age_attested_at: null,
+        xp_total: 0,
         },
       },
       useProfileStore.getState()
@@ -416,6 +422,7 @@ describe('profileStore.updateAvatar', () => {
         legal_version: '2026-08-20',
         legal_accepted_at: '2026-08-21T00:00:00.000Z',
         age_attested_at: '2026-08-21T00:00:00.000Z',
+        xp_total: 0,
       },
       loaded: true,
     });
@@ -463,6 +470,7 @@ describe('profileStore.updateAvatar', () => {
         legal_version: null,
         legal_accepted_at: null,
         age_attested_at: null,
+        xp_total: 0,
       },
       loaded: true,
     });
@@ -496,6 +504,7 @@ describe('profileStore.updateBio', () => {
         legal_version: '2026-08-20',
         legal_accepted_at: '2026-08-21T00:00:00.000Z',
         age_attested_at: '2026-08-21T00:00:00.000Z',
+        xp_total: 0,
       },
       loaded: true,
     });

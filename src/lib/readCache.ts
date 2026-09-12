@@ -4,6 +4,7 @@ import type { Profile } from '../types/profile';
 import type { School, SchoolType, SchoolTypeFilter } from '../types/school';
 import type { Spot } from '../types/spot';
 import type { BlockedUser } from '../types/userBlock';
+import { parseXpRank } from './xpRank';
 
 export const SPOTS_CACHE_KEY = '@skateu:spots-cache';
 export const SCHOOLS_CACHE_KEY = '@skateu:schools-cache';
@@ -122,6 +123,27 @@ export function parseSchoolFilter(value: unknown): SchoolTypeFilter | null {
   return SCHOOL_FILTERS.find((item) => item === value) ?? null;
 }
 
+export function parseCoordinates(
+  value: unknown
+): { latitude: number; longitude: number } | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const latitude = readFiniteNumber(value.latitude);
+  const longitude = readFiniteNumber(value.longitude);
+  if (
+    latitude === null ||
+    longitude === null ||
+    Math.abs(latitude) > 90 ||
+    Math.abs(longitude) > 180
+  ) {
+    return null;
+  }
+
+  return { latitude, longitude };
+}
+
 export function parseSpot(value: unknown): Spot | null {
   if (!isRecord(value)) {
     return null;
@@ -166,6 +188,7 @@ export function parseSpot(value: unknown): Spot | null {
       : readString(value.creatorUserId) ?? undefined;
   const likeCount = readFiniteNumber(value.likeCount);
   const commentCount = readFiniteNumber(value.commentCount);
+  const creatorRank = parseXpRank(value.creatorRank);
 
   return {
     id,
@@ -188,6 +211,7 @@ export function parseSpot(value: unknown): Spot | null {
       ? { likedByUser: value.likedByUser }
       : {}),
     ...(commentCount !== null ? { commentCount } : {}),
+    ...(creatorRank ? { creatorRank } : {}),
   };
 }
 
@@ -223,6 +247,8 @@ function parseComment(value: unknown): SpotComment | null {
         .filter((comment): comment is SpotComment => comment !== null)
     : [];
 
+  const creatorRank = parseXpRank(value.creatorRank);
+
   return {
     id,
     spotId,
@@ -237,6 +263,7 @@ function parseComment(value: unknown): SpotComment | null {
       value.creatorAvatarUrl === null
         ? null
         : readString(value.creatorAvatarUrl) ?? null,
+    ...(creatorRank ? { creatorRank } : {}),
     replies,
   };
 }
@@ -299,6 +326,10 @@ export function parseProfile(value: unknown): Profile | null {
         : readString(value.legal_accepted_at),
     age_attested_at:
       value.age_attested_at === null ? null : readString(value.age_attested_at),
+    xp_total:
+      typeof value.xp_total === 'number' && Number.isFinite(value.xp_total)
+        ? Math.max(0, Math.floor(value.xp_total))
+        : 0,
   };
 }
 

@@ -4,8 +4,7 @@ export function getSpotSelectionStatus(input: {
   requestedSpotId: string | undefined;
   selectedSpot: { id: string } | undefined;
   loading: boolean;
-  loadedSchoolId: string | null;
-  routeSchoolId: string | undefined;
+  spotsFetchedAt: string | null;
   error: string | null;
 }): SpotSelectionStatus {
   if (!input.requestedSpotId) {
@@ -16,10 +15,7 @@ export function getSpotSelectionStatus(input: {
     return 'ready';
   }
 
-  const schoolMatches =
-    Boolean(input.routeSchoolId) && input.loadedSchoolId === input.routeSchoolId;
-
-  if (!schoolMatches || input.loading) {
+  if (!input.spotsFetchedAt || input.loading) {
     return 'loading';
   }
 

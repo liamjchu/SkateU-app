@@ -4,6 +4,7 @@ import { useGuardedRouter } from '../lib/navigationGuard';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
+    Alert,
     Keyboard,
     ScrollView,
     Text,
@@ -28,6 +29,7 @@ import {
     SPOT_NAME_MAX,
 } from '../lib/addSpotForm';
 import { triggerHaptic } from '../lib/haptics';
+import { fetchNearestSchoolClient, nearestSchool } from '../lib/mapFocus';
 import {
     draftImagesToMedia,
     isMeaningfulDraftContent,
@@ -35,10 +37,20 @@ import {
 } from '../lib/spotDraft';
 import { filterExistingDraftImages } from '../lib/spotDraftFiles';
 import { mediaListsEqual } from '../lib/spotMedia';
+import {
+    beginDraftSubmission,
+    CANCEL_SUBMISSION_MESSAGE,
+    CANCEL_SUBMISSION_TITLE,
+    finishDraftSubmission,
+    isSpotSubmissionCancelledError,
+    SUBMISSION_CANCELLED_ERROR,
+} from '../lib/spotSubmission';
 import { toMutationError } from '../lib/userFacingError';
 import { useAuthStore } from '../store/authStore';
 import { useDraftSpotsStore } from '../store/draftSpotsStore';
 import { useMapViewStore } from '../store/mapViewStore';
+import { useProfileStore } from '../store/profileStore';
+import { useSchools } from '../store/schoolsStore';
 import { useSpotsStore } from '../store/spotsStore';
 import type { SpotMediaItem } from '../types/spot';
 
@@ -115,6 +127,7 @@ export default function AddSpotScreen() {
     useState<LocationPickerStatus>('loading');
   const [saving, setSaving] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [posted, setPosted] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [hasSubmitted, setHasSubmitted] = useState(false);
 
@@ -126,14 +139,22 @@ export default function AddSpotScreen() {
   const draftIdRef = useRef(draftIdParam);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const persistInFlightRef = useRef<Promise<void> | null>(null);
+  const activeSubmissionSignalRef = useRef<AbortSignal | null>(null);
+  const mountedRef = useRef(true);
 
   const addSpot = useSpotsStore((s) => s.addSpot);
   const session = useAuthStore((s) => s.session);
+  const userId = useAuthStore((s) => s.user?.id ?? null);
+  const fetchProfile = useProfileStore((s) => s.fetchProfile);
   const hasHydratedDrafts = useDraftSpotsStore((s) => s.hasHydrated);
   const getDraft = useDraftSpotsStore((s) => s.getDraft);
   const upsertDraft = useDraftSpotsStore((s) => s.upsertDraft);
   const setDraftStatus = useDraftSpotsStore((s) => s.setDraftStatus);
+  const cancelDraftSubmission = useDraftSpotsStore(
+    (s) => s.cancelDraftSubmission
+  );
   const deleteDraft = useDraftSpotsStore((s) => s.deleteDraft);
+  const upsertSchool = useSchools((s) => s.upsertSchool);
 
   const locationChanged = coordinatesDiffer(
     selectedLocation,
@@ -230,6 +251,51 @@ export default function AddSpotScreen() {
     };
   }, [draftIdParam, getDraft, hasHydratedDrafts]);
 
+  useEffect(() => {
+    if (!draftReady) {
+      return;
+    }
+
+    const catalogMatch = nearestSchool(useSchools.getState().schools, {
+      latitude: selectedLocation.latitude,
+      longitude: selectedLocation.longitude,
+    });
+    if (catalogMatch) {
+      setResolvedSchoolId(catalogMatch.id);
+      setResolvedSchoolName(catalogMatch.name);
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      void (async () => {
+        try {
+          const school = await fetchNearestSchoolClient(
+            selectedLocation.latitude,
+            selectedLocation.longitude
+          );
+          if (cancelled || !school) {
+            return;
+          }
+          upsertSchool(school);
+          setResolvedSchoolId(school.id);
+          setResolvedSchoolName(school.name);
+        } catch {
+          // Keep the last campus label; save still assigns the closest school.
+        }
+      })();
+    }, DRAFT_AUTOSAVE_MS);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [
+    draftReady,
+    selectedLocation.latitude,
+    selectedLocation.longitude,
+    upsertSchool,
+  ]);
+
   const persistDraftNow = useCallback(async () => {
     const previous = persistInFlightRef.current;
     const run = (async () => {
@@ -303,8 +369,8 @@ export default function AddSpotScreen() {
     persistInFlightRef.current = run;
     try {
       await run;
-    } catch (error) {
-      console.warn('Could not save the spot draft.', error);
+    } catch {
+      // Draft persist is best-effort; the form stays editable.
     } finally {
       if (persistInFlightRef.current === run) {
         persistInFlightRef.current = null;
@@ -336,6 +402,8 @@ export default function AddSpotScreen() {
     saving,
     selectedLocation.latitude,
     selectedLocation.longitude,
+    resolvedSchoolId,
+    resolvedSchoolName,
     submitted,
   ]);
 
@@ -414,6 +482,44 @@ export default function AddSpotScreen() {
     void flushDraftAndLeave();
   };
 
+  const revertSubmittedUi = (message: string | null) => {
+    submittedRef.current = false;
+    savingRef.current = false;
+    allowRemovalRef.current = false;
+    if (!mountedRef.current) {
+      return;
+    }
+    setSubmitted(false);
+    setPosted(false);
+    setSaving(false);
+    setSaveError(message);
+  };
+
+  const handleCancelSubmission = () => {
+    if (postedRef.current) {
+      return;
+    }
+
+    const draftId = draftIdRef.current;
+    triggerHaptic('warning');
+    Alert.alert(CANCEL_SUBMISSION_TITLE, CANCEL_SUBMISSION_MESSAGE, [
+      { text: 'Keep sending', style: 'cancel' },
+      {
+        text: 'Stop sending',
+        style: 'destructive',
+        onPress: () => {
+          if (postedRef.current) {
+            return;
+          }
+          if (draftId) {
+            cancelDraftSubmission(draftId);
+          }
+          revertSubmittedUi(SUBMISSION_CANCELLED_ERROR);
+        },
+      },
+    ]);
+  };
+
   const handlePost = async () => {
     if (savingRef.current || postedRef.current || submitted) {
       return;
@@ -430,14 +536,29 @@ export default function AddSpotScreen() {
       return;
     }
 
-    const schoolId = resolvedSchoolId;
+    let schoolId = resolvedSchoolId;
+    try {
+      const nearest = await fetchNearestSchoolClient(
+        selectedLocation.latitude,
+        selectedLocation.longitude
+      );
+      if (nearest) {
+        schoolId = nearest.id;
+        upsertSchool(nearest);
+        setResolvedSchoolId(nearest.id);
+        setResolvedSchoolName(nearest.name);
+      }
+    } catch {
+      // Save still sends the last campus; the API assigns the closest school.
+    }
     if (!schoolId) {
       setSaveError(MISSING_SCHOOL_ERROR);
       return;
     }
 
     const accessToken = session?.access_token;
-    if (!accessToken) {
+    const userId = session?.user?.id;
+    if (!accessToken || !userId) {
       setSaveError(AUTH_REQUIRED_ERROR);
       return;
     }
@@ -450,12 +571,41 @@ export default function AddSpotScreen() {
     await persistInFlightRef.current;
     await persistDraftNow();
 
+    let draftId = draftIdRef.current;
+    if (!draftId) {
+      try {
+        const draft = await upsertDraft({
+          userId,
+          schoolId,
+          schoolName: formRef.current.resolvedSchoolName || 'Campus map',
+          name: name.trim(),
+          description: description.trim(),
+          latitude: selectedLocation.latitude,
+          longitude: selectedLocation.longitude,
+          images: mediaToDraftImages(media),
+        });
+        draftId = draft.id;
+        draftIdRef.current = draft.id;
+        setActiveDraftId(draft.id);
+      } catch (error) {
+        savingRef.current = false;
+        const message = toMutationError(
+          error,
+          'We couldn’t save this draft. Please try again.'
+        );
+        setSaveError(message);
+        return;
+      }
+    }
+
+    const signal = beginDraftSubmission(draftId);
+    activeSubmissionSignalRef.current = signal;
+
     submittedRef.current = true;
     allowRemovalRef.current = true;
-    if (draftIdRef.current) {
-      setDraftStatus(draftIdRef.current, 'submitting', null);
-    }
+    setDraftStatus(draftId, 'submitting', null);
     setSubmitted(true);
+    setPosted(false);
     setSaving(false);
     setSaveError(null);
     triggerHaptic('success');
@@ -473,38 +623,47 @@ export default function AddSpotScreen() {
 
     void (async () => {
       try {
-        await addSpot(payload, accessToken);
+        await addSpot(payload, accessToken, { signal });
+        if (activeSubmissionSignalRef.current !== signal || signal.aborted) {
+          return;
+        }
         postedRef.current = true;
-        if (draftIdRef.current) {
-          try {
-            await deleteDraft(draftIdRef.current);
-          } catch (error) {
-            console.warn('Could not remove the local draft after posting.', error);
-          }
+        finishDraftSubmission(draftId, signal);
+        if (userId) {
+          void fetchProfile(userId, accessToken);
+        }
+        if (mountedRef.current) {
+          setPosted(true);
+        }
+        try {
+          await deleteDraft(draftId);
+        } catch {
+          // Posted spot is already live if local draft cleanup fails.
         }
       } catch (error) {
+        finishDraftSubmission(draftId, signal);
+        if (activeSubmissionSignalRef.current !== signal) {
+          return;
+        }
+        if (isSpotSubmissionCancelledError(error)) {
+          revertSubmittedUi(
+            getDraft(draftId)?.lastError ?? SUBMISSION_CANCELLED_ERROR
+          );
+          return;
+        }
         const message = toMutationError(
           error,
           'We couldn’t submit this spot. Please try again.'
         );
-        if (draftIdRef.current) {
-          setDraftStatus(draftIdRef.current, 'draft', message);
+        setDraftStatus(draftId, 'draft', message);
+        revertSubmittedUi(message);
+        if (mountedRef.current) {
+          triggerHaptic('warning');
         }
-        submittedRef.current = false;
-        savingRef.current = false;
-        allowRemovalRef.current = false;
-        if (!mountedRef.current) {
-          return;
-        }
-        setSubmitted(false);
-        setSaving(false);
-        setSaveError(message);
-        triggerHaptic('warning');
       }
     })();
   };
 
-  const mountedRef = useRef(true);
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -579,6 +738,18 @@ export default function AddSpotScreen() {
                 Come back later
               </Text>
             </FeedbackPressable>
+            {!posted ? (
+              <FeedbackPressable
+                onPress={handleCancelSubmission}
+                className="mt-3 min-h-12 w-full items-center justify-center px-5 py-3"
+                accessibilityRole="button"
+                accessibilityLabel="Cancel submission"
+              >
+                <Text className="font-outfit-bold text-base text-muted">
+                  Cancel submission
+                </Text>
+              </FeedbackPressable>
+            ) : null}
           </View>
         </View>
       ) : (

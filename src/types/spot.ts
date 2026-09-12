@@ -1,3 +1,5 @@
+import type { XpRank } from './xp'
+
 export type Spot = {
   id: string
   name: string
@@ -18,6 +20,9 @@ export type Spot = {
   // Moderated SkateU avatar URL, or null when the creator has none or the
   // account was deleted.
   creatorAvatarUrl: string | null
+  // Rank inferred from the creator's live XP. Absent when the creator row is
+  // missing (deleted account).
+  creatorRank?: XpRank
   // ISO timestamp of when the spot was created. Empty string when unknown.
   createdAt: string
   // ISO timestamp of the spot's last edit. Equals createdAt until edited.

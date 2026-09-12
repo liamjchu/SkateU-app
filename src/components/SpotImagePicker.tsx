@@ -146,13 +146,12 @@ export default function SpotImagePicker({
         }
       }
       onChange(nextItems);
-    } catch (exception) {
+    } catch {
       setError(
         source === 'camera'
           ? 'Couldn’t open the camera. Try again?'
           : 'Couldn’t open your photos. Try again?'
       );
-      console.error(exception);
     } finally {
       setLoading(false);
     }

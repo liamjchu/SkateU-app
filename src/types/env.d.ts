@@ -15,7 +15,7 @@ declare global {
       OPENAI_API_KEY?: string;
       RESEND_API_KEY?: string;
       RESEND_FROM_EMAIL?: string;
-      MODERATION_NOTIFY_EMAIL?: string;
+      PUSH_DISPATCH_SECRET?: string;
     }
   }
 }

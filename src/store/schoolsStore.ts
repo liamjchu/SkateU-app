@@ -2,8 +2,10 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { getClientStorage } from '../lib/clientStorage';
 import { HOME_RAIL_PAGE_SIZE } from '../lib/homeFeed';
+import { NEARBY_SCHOOLS_LIMIT, type NearbyOrigin } from '../lib/nearbySchools';
 import {
   capNewest,
+  parseCoordinates,
   parseSchoolFilter,
   parseSchools,
   readPersistedRecord,
@@ -16,10 +18,18 @@ type SchoolsStore = {
   schools: School[];
   popularSchools: School[];
   popularFilter: SchoolTypeFilter | null;
+  nearbySchools: School[];
+  nearbyFilter: SchoolTypeFilter | null;
+  nearbyOrigin: NearbyOrigin | null;
   hasHydrated: boolean;
   setHasHydrated: (hasHydrated: boolean) => void;
   upsertSchool: (school: School) => void;
   setPopularFeed: (filter: SchoolTypeFilter, schools: School[]) => void;
+  setNearbyFeed: (
+    filter: SchoolTypeFilter,
+    origin: NearbyOrigin,
+    schools: School[]
+  ) => void;
 };
 
 function withCatalogCap(schools: School[]): School[] {
@@ -32,6 +42,9 @@ export const useSchools = create<SchoolsStore>()(
       schools: [],
       popularSchools: [],
       popularFilter: null,
+      nearbySchools: [],
+      nearbyFilter: null,
+      nearbyOrigin: null,
       hasHydrated: false,
       setHasHydrated: (hasHydrated) => set({ hasHydrated }),
       upsertSchool: (school: School) => {
@@ -54,6 +67,19 @@ export const useSchools = create<SchoolsStore>()(
           ]),
         }));
       },
+      setNearbyFeed: (filter, origin, schools) => {
+        set((state) => ({
+          nearbySchools: schools,
+          nearbyFilter: filter,
+          nearbyOrigin: origin,
+          schools: withCatalogCap([
+            ...schools,
+            ...state.schools.filter(
+              (item) => !schools.some((school) => school.id === item.id)
+            ),
+          ]),
+        }));
+      },
     }),
     {
       name: SCHOOLS_CACHE_KEY,
@@ -66,6 +92,9 @@ export const useSchools = create<SchoolsStore>()(
         schools: withCatalogCap(state.schools),
         popularSchools: capNewest(state.popularSchools, HOME_RAIL_PAGE_SIZE),
         popularFilter: state.popularFilter,
+        nearbySchools: capNewest(state.nearbySchools, NEARBY_SCHOOLS_LIMIT),
+        nearbyFilter: state.nearbyFilter,
+        nearbyOrigin: state.nearbyOrigin,
       }),
       merge: (persistedState, currentState) => {
         const persisted = readPersistedRecord(persistedState);
@@ -77,6 +106,12 @@ export const useSchools = create<SchoolsStore>()(
             HOME_RAIL_PAGE_SIZE
           ),
           popularFilter: parseSchoolFilter(persisted.popularFilter),
+          nearbySchools: capNewest(
+            parseSchools(persisted.nearbySchools),
+            NEARBY_SCHOOLS_LIMIT
+          ),
+          nearbyFilter: parseSchoolFilter(persisted.nearbyFilter),
+          nearbyOrigin: parseCoordinates(persisted.nearbyOrigin),
         };
       },
     }

@@ -1,6 +1,8 @@
 import { displayableAvatarUrl } from '../../lib/avatarUrl';
+import { rankFromXp } from '../../lib/xpRank';
 import type { FollowListKind } from '../../lib/userFollows';
 import type { FollowListUser } from '../../types/publicProfile';
+import type { XpRank } from '../../types/xp';
 
 type SupabaseConfig = { url: string; apiKey: string };
 
@@ -52,6 +54,10 @@ async function countFollows(
       Range: '0-0',
     },
   });
+
+  if (response.status === 416) {
+    return parseExactCount(response);
+  }
 
   if (!response.ok && response.status !== 206) {
     throw new Error(await response.text());
@@ -162,10 +168,12 @@ async function fetchEitherWayBlockedUserIds(
 async function fetchFollowListProfiles(
   config: SupabaseConfig,
   userIds: string[]
-): Promise<Map<string, { username: string | null; avatarUrl: string | null }>> {
+): Promise<
+  Map<string, { username: string | null; avatarUrl: string | null; rank: XpRank }>
+> {
   const profiles = new Map<
     string,
-    { username: string | null; avatarUrl: string | null }
+    { username: string | null; avatarUrl: string | null; rank: XpRank }
   >();
   if (userIds.length === 0) {
     return profiles;
@@ -173,7 +181,7 @@ async function fetchFollowListProfiles(
 
   const query = new URL(`${config.url}/rest/v1/profiles`);
   query.searchParams.set('id', `in.(${userIds.join(',')})`);
-  query.searchParams.set('select', 'id,username,avatar_url');
+  query.searchParams.set('select', 'id,username,avatar_url,xp_total');
 
   const response = await fetch(query.toString(), {
     headers: supabaseHeaders(config),
@@ -186,6 +194,7 @@ async function fetchFollowListProfiles(
     id?: string;
     username?: string | null;
     avatar_url?: string | null;
+    xp_total?: number | null;
   }[];
   for (const row of rows) {
     if (typeof row.id !== 'string' || row.id.length === 0) {
@@ -199,6 +208,7 @@ async function fetchFollowListProfiles(
       avatarUrl: displayableAvatarUrl(
         typeof row.avatar_url === 'string' ? row.avatar_url : null
       ),
+      rank: rankFromXp(row.xp_total ?? 0),
     });
   }
   return profiles;
@@ -290,6 +300,7 @@ export async function fetchFollowListUsers(
       id,
       username: profile?.username ?? null,
       avatarUrl: profile?.avatarUrl ?? null,
+      rank: profile?.rank ?? 'hobbyist',
       isFollowing:
         viewerId !== null && id !== viewerId && followingSet.has(id),
     };

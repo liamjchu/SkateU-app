@@ -1,5 +1,6 @@
 import { deferTask } from 'expo-server';
-import { HOME_SPOTS_PAGE_SIZE, parseOffset } from '../../lib/homeFeed';
+import { FEED_CANDIDATE_LIMIT, HOME_SPOTS_PAGE_SIZE, PROFILE_SPOTS_PAGE_SIZE, parseOffset } from '../../lib/homeFeed';
+import { rankFeedSpots, sliceRankedFeedPage } from '../../lib/feedRanking';
 import {
     IMAGE_SANITIZE_ERROR,
     sanitizeSpotImage,
@@ -12,12 +13,14 @@ import {
     type SpotModerationVerdict,
 } from '../../lib/spotModeration';
 import { displayableAvatarUrl } from '../../lib/avatarUrl';
+import { rankFromXp } from '../../lib/xpRank';
 import type { Spot } from '../../types/spot';
 import {
     applyBlockedUserFilter,
     fetchBlockedUserIds,
 } from './blockedUsers';
 import { hasBlockEitherWay } from './followGraph';
+import { fetchNearestSchool } from './schools+api';
 
 // --- Configuration & constants (mirrors schools+api.ts) ---------------------
 
@@ -28,6 +31,7 @@ export const MAX_SCHOOL_ID_LENGTH = 64;
 export const NAME_MAX = 100;
 export const DESCRIPTION_MAX = 1000;
 export const MAX_IMAGES = 3;
+export const MAP_SPOTS_LIMIT = 5000;
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
 export const UPLOAD_TIMEOUT_MS = 30_000;
 export const AUTH_REQUEST_TIMEOUT_MS = 10_000;
@@ -42,9 +46,9 @@ const IMAGE_EXTENSIONS: Record<string, string> = {
 };
 
 export const SPOT_SELECT_COLUMNS =
-  'id,school_id,created_by_user_id,name,description,latitude,longitude,image_urls,created_at,updated_at,likes_count,comments_count,schools(name,city,state),creator:profiles(username,avatar_url)';
+  'id,school_id,created_by_user_id,name,description,latitude,longitude,image_urls,created_at,updated_at,likes_count,comments_count,schools(name,city,state),creator:profiles(username,avatar_url,xp_total)';
 const RECENT_SPOT_SELECT_COLUMNS =
-  'id,school_id,created_by_user_id,name,description,latitude,longitude,image_urls,created_at,updated_at,likes_count,comments_count,schools!inner(name,city,state,type),creator:profiles(username,avatar_url)';
+  'id,school_id,created_by_user_id,name,description,latitude,longitude,image_urls,created_at,updated_at,likes_count,comments_count,schools!inner(name,city,state,type),creator:profiles(username,avatar_url,xp_total)';
 const VALID_SCHOOL_TYPES = ['k12_public', 'k12_private', 'higher_ed'] as const;
 
 export const PENDING_SPOT_STATUS = 'pending_moderation';
@@ -290,6 +294,12 @@ export async function finalizePendingSpotEdit(
     }
 
     if (verdict.approved) {
+      const schoolId = await resolveSchoolIdForLocation(
+        config,
+        payload.latitude,
+        payload.longitude,
+        ''
+      );
       await patchSpotFields(config, spotId, {
         name: payload.name,
         description: payload.description,
@@ -297,6 +307,7 @@ export async function finalizePendingSpotEdit(
         longitude: payload.longitude,
         image_urls: payload.image_urls,
         pending_edit: null,
+        ...(schoolId ? { school_id: schoolId } : {}),
       });
       const dropped = latest.imageUrls.filter(
         (url) => !payload.image_urls.includes(url)
@@ -441,7 +452,11 @@ export type DatabaseSpot = {
   likes_count?: number;
   comments_count?: number;
   schools: { name: string; city: string; state: string } | null;
-  creator: { username: string | null; avatar_url?: string | null } | null;
+  creator: {
+    username: string | null;
+    avatar_url?: string | null;
+    xp_total?: number | null;
+  } | null;
 };
 
 export type DatabaseSpotInsert = {
@@ -474,6 +489,7 @@ export function mapSpot(row: DatabaseSpot, likedByUser = false): Spot {
     creatorUserId: row.created_by_user_id ?? null,
     creatorUsername: row.creator?.username ?? null,
     creatorAvatarUrl: displayableAvatarUrl(row.creator?.avatar_url ?? null),
+    creatorRank: row.creator ? rankFromXp(row.creator.xp_total ?? 0) : undefined,
     createdAt: row.created_at ?? '',
     updatedAt: row.updated_at ?? '',
     likeCount: row.likes_count ?? 0,
@@ -582,7 +598,8 @@ export type ValidatedPatchBody = {
 
 /**
  * Validates the trimmed fields of an edit-spot request. Name, description, and
- * location are editable; the school a spot belongs to is fixed after creation.
+ * location are editable. After an approved location change, the spot is
+ * reassigned to the geographically closest school.
  */
 export function validatePatchBody(
   fields: Record<string, string>
@@ -1040,6 +1057,23 @@ function isFilePart(value: FormDataEntryValue): value is File {
   return typeof value !== 'string';
 }
 
+function parseExactCount(response: Response): number {
+  const range =
+    response.headers.get('content-range') ??
+    response.headers.get('Content-Range');
+  if (!range) {
+    return 0;
+  }
+
+  const match = /\/(\d+|\*)$/.exec(range.trim());
+  if (!match || match[1] === '*') {
+    return 0;
+  }
+
+  const count = Number(match[1]);
+  return Number.isFinite(count) ? count : 0;
+}
+
 async function fetchLikedSpotIds(
   config: SupabaseConfig,
   userId: string,
@@ -1151,17 +1185,13 @@ export async function GET(request: Request): Promise<Response> {
     return getCreatorSpots(request, config, creatorUserIdParam);
   }
 
-  const validation = validateSchoolId(url.searchParams.get('schoolId'));
-  if (!validation.ok) {
-    return Response.json({ error: validation.message }, { status: 400 });
-  }
-
+  // Default map list: every visible spot. A leftover schoolId query param is ignored.
   try {
     const viewer = await resolveViewerAndBlocks(request, config);
     const query = new URL(`${config.url}/rest/v1/spots`);
-    query.searchParams.set('school_id', `eq.${validation.value}`);
     query.searchParams.set('select', SPOT_SELECT_COLUMNS);
     query.searchParams.set('order', 'created_at.asc');
+    query.searchParams.set('limit', String(MAP_SPOTS_LIMIT));
     applyVisibleSpotFilter(query);
     applyBlockedUserFilter(query, 'created_by_user_id', viewer.blockedIds);
 
@@ -1212,13 +1242,9 @@ async function getRecentSpots(
       query.searchParams.set('select', SPOT_SELECT_COLUMNS);
     }
     query.searchParams.set('order', 'created_at.desc,id.desc');
-    query.searchParams.set('limit', String(HOME_SPOTS_PAGE_SIZE));
+    query.searchParams.set('limit', String(FEED_CANDIDATE_LIMIT));
     applyVisibleSpotFilter(query);
     applyBlockedUserFilter(query, 'created_by_user_id', viewer.blockedIds);
-    const offset = parseOffset(url.searchParams.get('offset'));
-    if (offset > 0) {
-      query.searchParams.set('offset', String(offset));
-    }
 
     const response = await fetch(query.toString(), {
       headers: {
@@ -1232,8 +1258,10 @@ async function getRecentSpots(
     }
 
     const rows = (await response.json()) as DatabaseSpot[];
+    const offset = parseOffset(url.searchParams.get('offset'));
+    const page = sliceRankedFeedPage(rankFeedSpots(rows), offset);
     return Response.json({
-      spots: await mapSpotsForUser(config, rows, viewer.userId),
+      spots: await mapSpotsForUser(config, page, viewer.userId),
     });
   } catch (error) {
     console.error('Loading recent spots failed:', error);
@@ -1306,6 +1334,7 @@ async function getCreatorSpots(
   }
 
   const creatorUserId = creatorValidation.value;
+  const url = new URL(request.url);
 
   try {
     const viewer = await resolveViewerAndBlocks(request, config);
@@ -1326,14 +1355,20 @@ async function getCreatorSpots(
     const query = new URL(`${config.url}/rest/v1/spots`);
     query.searchParams.set('created_by_user_id', `eq.${creatorUserId}`);
     query.searchParams.set('select', SPOT_SELECT_COLUMNS);
-    query.searchParams.set('order', 'created_at.desc');
+    query.searchParams.set('order', 'created_at.desc,id.desc');
+    query.searchParams.set('limit', String(PROFILE_SPOTS_PAGE_SIZE));
     applyVisibleSpotFilter(query);
     applyBlockedUserFilter(query, 'created_by_user_id', viewer.blockedIds);
+    const offset = parseOffset(url.searchParams.get('offset'));
+    if (offset > 0) {
+      query.searchParams.set('offset', String(offset));
+    }
 
     const response = await fetch(query.toString(), {
       headers: {
         apikey: config.apiKey,
         Authorization: `Bearer ${config.apiKey}`,
+        Prefer: 'count=exact',
       },
     });
 
@@ -1342,8 +1377,10 @@ async function getCreatorSpots(
     }
 
     const rows = (await response.json()) as DatabaseSpot[];
+    const total = Math.max(parseExactCount(response), offset + rows.length);
     return Response.json({
       spots: await mapSpotsForUser(config, rows, viewer.userId),
+      total,
     });
   } catch (error) {
     console.error('Loading creator spots failed:', error);
@@ -1355,6 +1392,27 @@ async function getCreatorSpots(
 }
 
 // --- POST /api/spots --------------------------------------------------------
+
+async function resolveSchoolIdForLocation(
+  config: SupabaseConfig,
+  latitude: number,
+  longitude: number,
+  fallbackSchoolId: string
+): Promise<string> {
+  try {
+    const nearest = await fetchNearestSchool(config, { latitude, longitude });
+    if (nearest?.id) {
+      // Ignore the school the user had open. Pins always belong to the
+      // geographically closest campus so older clients cannot attach a DC
+      // spot to a school they selected miles away.
+      return nearest.id;
+    }
+  } catch (error) {
+    console.error('Resolving nearest school failed:', error);
+  }
+
+  return fallbackSchoolId;
+}
 
 export async function POST(request: Request): Promise<Response> {
   const accessToken = readBearerToken(request);
@@ -1422,11 +1480,18 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: sanitizedImages.message }, { status: 400 });
   }
 
+  const schoolId = await resolveSchoolIdForLocation(
+    config,
+    bodyValidation.value.latitude,
+    bodyValidation.value.longitude,
+    bodyValidation.value.schoolId
+  );
+
   let imageUrls: string[];
   try {
     imageUrls = await uploadImages(
       config,
-      bodyValidation.value.schoolId,
+      schoolId,
       sanitizedImages.value
     );
   } catch (error) {
@@ -1438,7 +1503,11 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
-    const record = buildInsertRecord(bodyValidation.value, auth.userId, imageUrls);
+    const record = buildInsertRecord(
+      { ...bodyValidation.value, schoolId },
+      auth.userId,
+      imageUrls
+    );
     const insertUrl = new URL(`${config.url}/rest/v1/spots`);
     insertUrl.searchParams.set('select', SPOT_SELECT_COLUMNS);
 
@@ -1737,7 +1806,7 @@ export async function DELETE(request: Request): Promise<Response> {
     // Already gone — treat as success so the client can drop it locally.
     return Response.json({ success: true });
   }
-  if (isHiddenSpotStatus(ownership.status)) {
+  if (isRemovedSpotStatus(ownership.status)) {
     return Response.json({ error: 'That spot no longer exists.' }, { status: 404 });
   }
   if (ownership.ownerId !== auth.userId) {
@@ -1748,6 +1817,23 @@ export async function DELETE(request: Request): Promise<Response> {
   }
 
   try {
+    const feedbackUrl = new URL(`${config.url}/rest/v1/user_feedback`);
+    feedbackUrl.searchParams.set('spot_id', `eq.${idValidation.value}`);
+    const feedbackResponse = await fetch(feedbackUrl.toString(), {
+      method: 'DELETE',
+      headers: {
+        apikey: config.apiKey,
+        Authorization: `Bearer ${config.apiKey}`,
+        Prefer: 'return=minimal',
+      },
+    });
+    if (!feedbackResponse.ok) {
+      console.error(
+        'Detaching spot feedback failed:',
+        await feedbackResponse.text()
+      );
+    }
+
     const deleteUrl = new URL(`${config.url}/rest/v1/spots`);
     deleteUrl.searchParams.set('id', `eq.${idValidation.value}`);
 
@@ -1756,6 +1842,7 @@ export async function DELETE(request: Request): Promise<Response> {
       headers: {
         apikey: config.apiKey,
         Authorization: `Bearer ${config.apiKey}`,
+        Prefer: 'return=minimal',
       },
     });
 

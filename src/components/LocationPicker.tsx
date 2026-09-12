@@ -21,6 +21,7 @@ import {
     CLEAR_USER_LOCATION_JAVASCRIPT,
 } from '../lib/leafletUserLocation';
 import { buildLocationPickerHtml } from '../lib/locationPickerMap';
+import { MAP_WEBVIEW_BASE_URL } from '../lib/openFreeMap';
 import type { MapLayer } from '../store/mapViewStore';
 import FeedbackPressable from './FeedbackPressable';
 import MapCompassButton from './MapCompassButton';
@@ -138,7 +139,7 @@ export default function LocationPicker({
   );
 
   const webViewSource = useMemo(
-    () => ({ html, baseUrl: 'https://localhost' }),
+    () => ({ html, baseUrl: MAP_WEBVIEW_BASE_URL }),
     [html]
   );
 
@@ -209,8 +210,8 @@ export default function LocationPicker({
       if (data.type === 'INTERACTION_END') {
         onInteractionChange?.(false);
       }
-    } catch (error) {
-      console.error('LocationPicker message parse error', error);
+    } catch {
+      // Ignore malformed WebView messages.
     }
   };
 

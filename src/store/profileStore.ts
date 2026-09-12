@@ -5,6 +5,8 @@ import { getClientStorage } from '../lib/clientStorage';
 import {
   PROFILE_PUBLIC_SELECT_COLUMNS,
   PROFILE_PUBLIC_SELECT_COLUMNS_WITHOUT_BIO,
+  PROFILE_PUBLIC_SELECT_COLUMNS_WITHOUT_BIO_AND_XP,
+  PROFILE_PUBLIC_SELECT_COLUMNS_WITHOUT_XP,
 } from '../lib/legalAcceptance';
 import {
   parseProfile,
@@ -118,20 +120,31 @@ export const useProfileStore = create<ProfileState>()(
       error: null,
     });
 
-    let { data, error } = await supabase
-      .from('profiles')
-      .select(PROFILE_PUBLIC_SELECT_COLUMNS)
-      .eq('id', userId)
-      .maybeSingle();
+    const profileSelects = [
+      PROFILE_PUBLIC_SELECT_COLUMNS,
+      PROFILE_PUBLIC_SELECT_COLUMNS_WITHOUT_XP,
+      PROFILE_PUBLIC_SELECT_COLUMNS_WITHOUT_BIO,
+      PROFILE_PUBLIC_SELECT_COLUMNS_WITHOUT_BIO_AND_XP,
+    ];
 
-    if (error?.message?.includes('profiles.bio does not exist')) {
-      const fallback = await supabase
+    let data: Record<string, unknown> | null = null;
+    let error: { message: string } | null = null;
+    for (const selectColumns of profileSelects) {
+      const result = await supabase
         .from('profiles')
-        .select(PROFILE_PUBLIC_SELECT_COLUMNS_WITHOUT_BIO)
+        .select(selectColumns)
         .eq('id', userId)
         .maybeSingle();
-      data = fallback.data ? { ...fallback.data, bio: null } : null;
-      error = fallback.error;
+      data = (result.data as Record<string, unknown> | null) ?? null;
+      error = result.error;
+      if (!error) {
+        break;
+      }
+      const missingBio = error.message.includes('profiles.bio does not exist');
+      const missingXp = error.message.includes('profiles.xp_total does not exist');
+      if (!missingBio && !missingXp) {
+        break;
+      }
     }
 
     if (requestVersion !== profileRequestVersion) {
@@ -139,7 +152,6 @@ export const useProfileStore = create<ProfileState>()(
     }
 
     if (error) {
-      console.warn('Failed to load profile', error.message);
       set({
         profile: cached,
         loading: false,
@@ -149,14 +161,16 @@ export const useProfileStore = create<ProfileState>()(
       return;
     }
 
-    const publicProfile = data
-      ? mapProfile({
-          ...data,
-          legal_version: null,
-          legal_accepted_at: null,
-          age_attested_at: null,
-        })
-      : null;
+    const publicProfile =
+      data && typeof data.id === 'string'
+        ? mapProfile({
+            ...data,
+            id: data.id,
+            legal_version: null,
+            legal_accepted_at: null,
+            age_attested_at: null,
+          })
+        : null;
 
     if (!publicProfile || !accessToken) {
       set({
@@ -193,12 +207,11 @@ export const useProfileStore = create<ProfileState>()(
         loaded: true,
         error: null,
       });
-    } catch (legalError) {
+    } catch {
       if (requestVersion !== profileRequestVersion) {
         return;
       }
 
-      console.warn('Failed to load legal acceptance', legalError);
       set({
         profile: publicProfile,
         loading: false,

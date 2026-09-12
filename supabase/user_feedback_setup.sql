@@ -124,19 +124,9 @@ begin
 end;
 $$;
 
-do $$
-begin
-  if not exists (
-    select 1 from pg_constraint
-    where conname = 'user_feedback_spot_problem_requires_spot'
-      and conrelid = 'public.user_feedback'::regclass
-  ) then
-    alter table public.user_feedback
-      add constraint user_feedback_spot_problem_requires_spot
-      check (type <> 'spot_problem' or spot_id is not null);
-  end if;
-end;
-$$;
+-- spot_problem rows may keep a null spot_id after the pin is deleted.
+alter table public.user_feedback
+  drop constraint if exists user_feedback_spot_problem_requires_spot;
 
 create index if not exists user_feedback_user_id_created_at_idx
   on public.user_feedback (user_id, created_at desc);

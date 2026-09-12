@@ -6,6 +6,7 @@ process.env.EXPO_PUBLIC_API_URL = 'http://localhost:8081';
 
 const mockHideCreatorSpots = jest.fn();
 const mockHideUserComments = jest.fn();
+const mockHideActorNotifications = jest.fn();
 
 jest.mock('../spotsStore', () => ({
   useSpotsStore: {
@@ -16,6 +17,12 @@ jest.mock('../spotsStore', () => ({
 jest.mock('../commentsStore', () => ({
   useCommentsStore: {
     getState: () => ({ hideUserComments: mockHideUserComments }),
+  },
+}));
+
+jest.mock('../notificationsStore', () => ({
+  useNotificationsStore: {
+    getState: () => ({ hideActorNotifications: mockHideActorNotifications }),
   },
 }));
 
@@ -42,6 +49,7 @@ beforeEach(() => {
   fetchMock.mockReset();
   mockHideCreatorSpots.mockReset();
   mockHideUserComments.mockReset();
+  mockHideActorNotifications.mockReset();
   useBlocksStore.getState().clear();
 });
 
@@ -74,6 +82,7 @@ describe('blocksStore', () => {
     await useBlocksStore.getState().blockUser('blocked-1', 'token', 'blocked_skater');
     expect(mockHideCreatorSpots).toHaveBeenCalledWith('blocked-1');
     expect(mockHideUserComments).toHaveBeenCalledWith('blocked-1');
+    expect(mockHideActorNotifications).toHaveBeenCalledWith('blocked-1');
     expect(useBlocksStore.getState().isBlocked('blocked-1')).toBe(true);
   });
 

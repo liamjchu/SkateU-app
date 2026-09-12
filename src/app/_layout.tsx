@@ -21,6 +21,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import '../../global.css';
 import AuthNoticeBanner from '../components/AuthNoticeBanner';
+import XpRankUpOverlay from '../components/XpRankUpOverlay';
+import XpToastBanner from '../components/XpToastBanner';
 import StartupLoadingOverlay from '../components/startup-loading-overlay';
 import { colors } from '../constants/colors';
 import { checkAppleCredentialStatus } from '../lib/appleAuthentication';
@@ -31,6 +33,7 @@ import {
     legalGateRedirectPath,
 } from '../lib/legalAcceptance';
 import { shouldLeaveAuthEntryRoute } from '../lib/authNavigation';
+import { releaseNavigationLock } from '../lib/navigationGuard';
 import { toUserFacingError } from '../lib/userFacingError';
 import { useAuthNoticeStore } from '../store/authNoticeStore';
 import { useAuthStore } from '../store/authStore';
@@ -38,9 +41,16 @@ import { useBlocksStore } from '../store/blocksStore';
 import { useCommentsStore } from '../store/commentsStore';
 import { useDraftSpotsStore } from '../store/draftSpotsStore';
 import { useFavorites } from '../store/favoritesStore';
+import { useFeedSeenStore } from '../store/feedSeenStore';
+import { useNotificationPreferencesStore } from '../store/notificationPreferencesStore';
+import { useNotificationsStore } from '../store/notificationsStore';
 import { useProfileStore } from '../store/profileStore';
 import { useSchools } from '../store/schoolsStore';
 import { useSpotsStore } from '../store/spotsStore';
+import { useXpFeedbackStore } from '../store/xpFeedbackStore';
+import { usePushNotifications } from '../hooks/usePushNotifications';
+import { useSyncSavedSchools } from '../hooks/useSyncSavedSchools';
+import { useXpFeedback } from '../hooks/useXpFeedback';
 import {
     AnalyticsProvider,
     captureAnalyticsScreen,
@@ -109,7 +119,6 @@ function RootLayout() {
 
   // --- Auth + profile state that drives the username gate ---
   const userId = useAuthStore((state) => state.user?.id ?? null);
-  const userEmail = useAuthStore((state) => state.user?.email ?? undefined);
   const accessToken = useAuthStore((state) => state.session?.access_token ?? null);
   const authInitializing = useAuthStore((state) => state.initializing);
   const passwordRecovery = useAuthStore((state) => state.passwordRecovery);
@@ -126,8 +135,16 @@ function RootLayout() {
   );
   const fetchBlocks = useBlocksStore((state) => state.fetchBlocks);
   const clearBlocks = useBlocksStore((state) => state.clear);
+  const syncNotificationsUser = useNotificationsStore((state) => state.syncUser);
+  const fetchNotificationPreferences = useNotificationPreferencesStore(
+    (state) => state.fetchPreferences
+  );
+  const resetNotificationPreferences = useNotificationPreferencesStore(
+    (state) => state.reset
+  );
   const setSessionUserId = useSpotsStore((state) => state.setSessionUserId);
   const [cachesReady, setCachesReady] = useState(false);
+  useXpFeedback();
 
   const router = useRouter();
   const pathname = usePathname();
@@ -144,17 +161,21 @@ function RootLayout() {
 
   useEffect(() => {
     if (userId) {
-      identifyAnalyticsUser(userId, { email: userEmail });
+      identifyAnalyticsUser(userId);
       setCrashReportingUser(userId);
       return;
     }
 
     resetAnalyticsUser();
     clearCrashReportingUser();
-  }, [userEmail, userId]);
+  }, [userId]);
 
   useEffect(() => {
     captureAnalyticsScreen(pathname);
+  }, [pathname]);
+
+  useEffect(() => {
+    releaseNavigationLock();
   }, [pathname]);
 
   useEffect(() => {
@@ -162,12 +183,14 @@ function RootLayout() {
     // after client mounting instead of during the web server render.
     void Promise.all([
       useFavorites.persist.rehydrate(),
+      useFeedSeenStore.persist.rehydrate(),
       useDraftSpotsStore.persist.rehydrate(),
       useSpotsStore.persist.rehydrate(),
       useSchools.persist.rehydrate(),
       useCommentsStore.persist.rehydrate(),
       useProfileStore.persist.rehydrate(),
       useBlocksStore.persist.rehydrate(),
+      useXpFeedbackStore.persist.rehydrate(),
     ]).finally(() => {
       setCachesReady(true);
     });
@@ -176,9 +199,7 @@ function RootLayout() {
   useEffect(() => {
     // Apple only returns an ID token during sign-in, so retain its stable user
     // ID and verify that Apple still considers that credential authorized.
-    void checkAppleCredentialStatus().catch((error: unknown) => {
-      console.warn('Could not verify the Apple credential status.', error);
-    });
+    void checkAppleCredentialStatus().catch(() => undefined);
   }, []);
 
   // Load (or clear) the profile whenever the signed-in user changes. Keyed on
@@ -189,11 +210,13 @@ function RootLayout() {
     }
 
     setSessionUserId(userId);
+    syncNotificationsUser(userId);
 
     if (userId) {
       fetchProfile(userId, accessToken);
       if (accessToken) {
         void fetchBlocks(accessToken);
+        void fetchNotificationPreferences(accessToken);
       }
       return;
     }
@@ -203,7 +226,8 @@ function RootLayout() {
     clearReportedSpotIds();
     clearProfile();
     clearBlocks();
-  }, [cachesReady, clearBlocks, clearLikedSpots, clearMySpots, clearReportedSpotIds, fetchBlocks, setSessionUserId, userId, accessToken, fetchProfile, clearProfile]);
+    resetNotificationPreferences();
+  }, [cachesReady, clearBlocks, clearLikedSpots, clearMySpots, clearReportedSpotIds, fetchBlocks, fetchNotificationPreferences, resetNotificationPreferences, setSessionUserId, syncNotificationsUser, userId, accessToken, fetchProfile, clearProfile]);
 
   useEffect(() => {
     // Supabase redirects OAuth and recovery emails to distinct native paths.
@@ -302,6 +326,15 @@ function RootLayout() {
   ];
   const startupProgress = bootSteps.filter(Boolean).length / bootSteps.length;
 
+  usePushNotifications({
+    enabled:
+      appReady &&
+      legalGate === 'none' &&
+      Boolean(userId) &&
+      Boolean(accessToken),
+  });
+  useSyncSavedSchools();
+
   useEffect(() => {
     if (!appReady) {
       return;
@@ -361,16 +394,16 @@ function RootLayout() {
           <FocusedTouchGate>{children}</FocusedTouchGate>
         )}
       >
-        <Stack.Screen name="index" options={{ animation: 'none' }} />
+        <Stack.Screen name="(tabs)" options={{ animation: 'none' }} />
         <Stack.Screen name="onboarding" />
         <Stack.Screen name="age-gate" />
         <Stack.Screen name="age-restricted" />
         <Stack.Screen name="accept-legal" />
         <Stack.Screen name="legal" />
-        <Stack.Screen name="profile" />
         <Stack.Screen name="user/[userId]" />
         <Stack.Screen name="follow-list" />
-        <Stack.Screen name="settings" />
+        <Stack.Screen name="notifications" />
+        <Stack.Screen name="notification-settings" />
         <Stack.Screen name="blocked-accounts" />
         <Stack.Screen name="help" />
         <Stack.Screen name="change-username" />
@@ -391,11 +424,11 @@ function RootLayout() {
         <Stack.Screen name="update-password" />
         <Stack.Screen name="verify-otp" />
         <Stack.Screen name="verify-delete-account" />
-        <Stack.Screen name="map" options={{ contentStyle: { backgroundColor: colors.brand } }} />
         <Stack.Screen name="add-spot" options={{ contentStyle: { backgroundColor: colors.surface } }} />
         <Stack.Screen name="edit-spot" options={{ contentStyle: { backgroundColor: colors.surface } }} />
         <Stack.Screen name="request-spot-removal" options={{ contentStyle: { backgroundColor: colors.surface } }} />
         <Stack.Screen name="report-comment" options={{ contentStyle: { backgroundColor: colors.surface } }} />
+        <Stack.Screen name="report-profile" options={{ contentStyle: { backgroundColor: colors.surface } }} />
         <Stack.Screen name="spot-comments" options={{ contentStyle: { backgroundColor: colors.surface } }} />
       </Stack>
 
@@ -424,6 +457,8 @@ function RootLayout() {
         />
       ) : null}
       <AuthNoticeBanner />
+      <XpToastBanner />
+      <XpRankUpOverlay />
         </GestureHandlerRootView>
       </PostHogErrorBoundary>
     </AnalyticsProvider>

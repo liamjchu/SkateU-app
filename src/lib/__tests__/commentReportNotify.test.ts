@@ -45,12 +45,10 @@ describe('buildCommentReportEmail', () => {
 describe('sendCommentReportEmail', () => {
   it('skips sending when Resend env vars are missing', async () => {
     delete process.env.RESEND_API_KEY;
-    const infoSpy = jest.spyOn(console, 'info').mockImplementation(() => undefined);
     const fetchImpl = jest.fn();
 
     await expect(sendCommentReportEmail(report, fetchImpl)).resolves.toBe(false);
     expect(fetchImpl).not.toHaveBeenCalled();
-    expect(infoSpy).toHaveBeenCalled();
   });
 
   it('sends through Resend when configured', async () => {
