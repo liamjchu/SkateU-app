@@ -1,1 +1,0 @@
-{"sessionId":"018d0a","runId":"pre-fix","hypothesisId":"B","location":"profileStore.ts:fetchProfile:public","message":"own profile row mapped","data":{"hasProfile":true,"hasBio":true,"bioLength":10,"hasToken":true},"timestamp":1788985169390}

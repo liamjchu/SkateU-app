@@ -57,7 +57,7 @@ describe('mapNotification', () => {
     ).toEqual({
       id: 'event-1',
       type: 'spot_like',
-      body: 'alex liked your spot “Library Ledge”',
+      body: 'alex liked your spot “Library Ledge” · +5 XP',
       createdAt: '2026-09-10T00:00:00.000Z',
       readAt: null,
       actorId: 'user-2',

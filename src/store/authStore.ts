@@ -156,7 +156,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       .getSession()
       .then(({ data, error }) => {
         if (error) {
-          console.warn('Could not restore the saved session.', error);
           set({ session: null, user: null, initializing: false });
           return;
         }
@@ -167,8 +166,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           initializing: false,
         });
       })
-      .catch((error: unknown) => {
-        console.warn('Could not restore the saved session.', error);
+      .catch(() => {
         set({ session: null, user: null, initializing: false });
       });
 

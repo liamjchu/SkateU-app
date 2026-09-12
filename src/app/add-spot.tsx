@@ -21,7 +21,6 @@ import ScreenHeader from '../components/screen-header';
 import SpotImagePicker from '../components/SpotImagePicker';
 import SpotSocialNotice from '../components/spot-social-notice';
 import { colors } from '../constants/colors';
-import { getApiUrl } from '../lib/api';
 import {
     getSpotFormErrors,
     getSpotFormMissingSummary,
@@ -30,8 +29,7 @@ import {
     SPOT_NAME_MAX,
 } from '../lib/addSpotForm';
 import { triggerHaptic } from '../lib/haptics';
-import { nearestSchool } from '../lib/mapFocus';
-import { parseSchools } from '../lib/readCache';
+import { fetchNearestSchoolClient, nearestSchool } from '../lib/mapFocus';
 import {
     draftImagesToMedia,
     isMeaningfulDraftContent,
@@ -271,16 +269,10 @@ export default function AddSpotScreen() {
     const timer = setTimeout(() => {
       void (async () => {
         try {
-          const response = await fetch(
-            getApiUrl(
-              `/api/schools?nearest=1&lat=${selectedLocation.latitude}&lng=${selectedLocation.longitude}`
-            )
+          const school = await fetchNearestSchoolClient(
+            selectedLocation.latitude,
+            selectedLocation.longitude
           );
-          if (!response.ok) {
-            return;
-          }
-          const body = (await response.json()) as { schools?: unknown };
-          const school = parseSchools(body.schools)[0];
           if (cancelled || !school) {
             return;
           }
@@ -377,8 +369,8 @@ export default function AddSpotScreen() {
     persistInFlightRef.current = run;
     try {
       await run;
-    } catch (error) {
-      console.warn('Could not save the spot draft.', error);
+    } catch {
+      // Draft persist is best-effort; the form stays editable.
     } finally {
       if (persistInFlightRef.current === run) {
         persistInFlightRef.current = null;
@@ -544,7 +536,21 @@ export default function AddSpotScreen() {
       return;
     }
 
-    const schoolId = resolvedSchoolId;
+    let schoolId = resolvedSchoolId;
+    try {
+      const nearest = await fetchNearestSchoolClient(
+        selectedLocation.latitude,
+        selectedLocation.longitude
+      );
+      if (nearest) {
+        schoolId = nearest.id;
+        upsertSchool(nearest);
+        setResolvedSchoolId(nearest.id);
+        setResolvedSchoolName(nearest.name);
+      }
+    } catch {
+      // Save still sends the last campus; the API assigns the closest school.
+    }
     if (!schoolId) {
       setSaveError(MISSING_SCHOOL_ERROR);
       return;
@@ -631,8 +637,8 @@ export default function AddSpotScreen() {
         }
         try {
           await deleteDraft(draftId);
-        } catch (error) {
-          console.warn('Could not remove the local draft after posting.', error);
+        } catch {
+          // Posted spot is already live if local draft cleanup fails.
         }
       } catch (error) {
         finishDraftSubmission(draftId, signal);

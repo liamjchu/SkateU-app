@@ -1,10 +1,12 @@
 import type { School } from '../types/school';
 import type { Spot } from '../types/spot';
+import { getApiUrl } from './api';
 import {
   schoolDistanceMeters,
   sortSchoolsByDistance,
   type NearbyOrigin,
 } from './nearbySchools';
+import { parseSchools } from './readCache';
 
 export const DEFAULT_MAP_CENTER = {
   latitude: 41.8268,
@@ -49,6 +51,23 @@ export function nearestSchool(
   origin: NearbyOrigin
 ): School | null {
   return sortSchoolsByDistance(origin, schools)[0] ?? null;
+}
+
+export async function fetchNearestSchoolClient(
+  latitude: number,
+  longitude: number
+): Promise<School | null> {
+  const response = await fetch(
+    getApiUrl(
+      `/api/schools?nearest=1&lat=${encodeURIComponent(String(latitude))}&lng=${encodeURIComponent(String(longitude))}`
+    )
+  );
+  if (!response.ok) {
+    return null;
+  }
+
+  const body = (await response.json()) as { schools?: unknown };
+  return parseSchools(body.schools)[0] ?? null;
 }
 
 export function nearestSchoolWithin(

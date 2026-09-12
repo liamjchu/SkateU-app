@@ -1027,7 +1027,8 @@ export const useSpotsStore = create<SpotsState>()(
       {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${accessToken}` },
-      }
+      },
+      20_000
     );
 
     if (!response.ok) {

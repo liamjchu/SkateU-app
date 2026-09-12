@@ -210,8 +210,8 @@ export default function LocationPicker({
       if (data.type === 'INTERACTION_END') {
         onInteractionChange?.(false);
       }
-    } catch (error) {
-      console.error('LocationPicker message parse error', error);
+    } catch {
+      // Ignore malformed WebView messages.
     }
   };
 

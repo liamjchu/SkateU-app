@@ -259,7 +259,7 @@ export default function NotificationSettingsScreen() {
           <SettingsSwitchRow
             icon="flag"
             label="Your spots"
-            description="When a spot you added is approved, under review, or removed"
+            description="When a spot you added is uploaded, approved, under review, or removed"
             value={preferences.notifySpotUpdates}
             disabled={categoriesDisabled}
             onValueChange={(value) => {

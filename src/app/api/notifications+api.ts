@@ -1,6 +1,6 @@
 import { displayableAvatarUrl } from '../../lib/avatarUrl';
 import {
-  formatNotificationBody,
+  formatNotificationPushBody,
   parseNotificationType,
 } from '../../lib/notifications';
 import { rankFromXp } from '../../lib/xpRank';
@@ -174,7 +174,7 @@ export function mapNotification(row: DatabaseNotification): UserNotification | n
   return {
     id: row.id,
     type,
-    body: formatNotificationBody({
+    body: formatNotificationPushBody({
       type,
       actorUsername,
       spotName,

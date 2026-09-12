@@ -131,8 +131,8 @@ export async function unregisterStoredPushToken(
         headers: { Authorization: `Bearer ${accessToken}` },
       }
     );
-  } catch (error) {
-    console.warn('Could not unregister push token', error);
+  } catch {
+    // Logout should continue even if token cleanup fails.
   }
 }
 

@@ -8,6 +8,7 @@ export const NOTIFICATION_TYPES = [
   'saved_school_spot',
   'liked_spot_comment',
   'spot_approved',
+  'spot_uploaded',
   'spot_under_review',
   'spot_removed',
 ] as const;

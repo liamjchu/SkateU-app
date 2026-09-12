@@ -1,4 +1,4 @@
-export const FEED_SEEN_CAP = 150;
+export const FEED_SEEN_CAP = 2000;
 
 export function rememberSeenSpotIds(
   seenIds: readonly string[],
@@ -36,27 +36,16 @@ export function parseSeenSpotIds(value: unknown): string[] {
   return unique;
 }
 
-export function orderUnseenFirst<T extends { id: string }>(
+export function excludeSeenSpots<T extends { id: string }>(
   spots: T[],
   seenIds: readonly string[]
 ): T[] {
-  const seen = new Set(seenIds);
-  const unseen: T[] = [];
-  const watched: T[] = [];
-
-  for (const spot of spots) {
-    if (seen.has(spot.id)) {
-      watched.push(spot);
-    } else {
-      unseen.push(spot);
-    }
-  }
-
-  if (unseen.length === 0) {
+  if (seenIds.length === 0) {
     return spots;
   }
 
-  return [...unseen, ...watched];
+  const seen = new Set(seenIds);
+  return spots.filter((spot) => !seen.has(spot.id));
 }
 
 export function isFeedSessionAppend<T extends { id: string }>(
@@ -77,14 +66,14 @@ export function syncFeedSessionSpots<T extends { id: string }>(
   seenIds: readonly string[]
 ): T[] {
   if (!isFeedSessionAppend(session, incoming)) {
-    return orderUnseenFirst(incoming, seenIds);
+    return excludeSeenSpots(incoming, seenIds);
   }
 
   const incomingById = new Map(incoming.map((spot) => [spot.id, spot]));
   const refreshed = session.map((spot) => incomingById.get(spot.id) ?? spot);
   const have = new Set(session.map((spot) => spot.id));
   const added = incoming.filter((spot) => !have.has(spot.id));
-  return [...refreshed, ...orderUnseenFirst(added, seenIds)];
+  return [...refreshed, ...excludeSeenSpots(added, seenIds)];
 }
 
 export function unseenSpotCount<T extends { id: string }>(

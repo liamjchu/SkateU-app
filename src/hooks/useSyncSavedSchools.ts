@@ -67,7 +67,6 @@ export function useSyncSavedSchools(): void {
         if (error instanceof Error && error.name === 'AbortError') {
           return;
         }
-        console.warn('Could not sync saved schools', error);
       }
     };
 

@@ -45,6 +45,14 @@ export default function TabsLayout() {
           tabBarAccessibilityLabel: 'Profile',
         }}
       />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: 'Settings',
+          href: null,
+          tabBarAccessibilityLabel: 'Settings',
+        }}
+      />
     </Tabs>
   );
 }

@@ -2,7 +2,12 @@ import { Feather } from '@expo/vector-icons';
 import { Platform, Text, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { colors } from '../constants/colors';
-import { notificationCopy, notificationRoute } from '../lib/notifications';
+import {
+  formatXpDeltaLabel,
+  notificationCopy,
+  notificationRoute,
+  notificationXpDelta,
+} from '../lib/notifications';
 import { formatCompactRelativeTime } from '../lib/relativeTime';
 import type { UserNotification } from '../types/notification';
 import CachedRemoteImage from './CachedRemoteImage';
@@ -42,6 +47,7 @@ export default function NotificationRow({
   const timeLabel = formatCompactRelativeTime(notification.createdAt);
   const showWebHide = Platform.OS === 'web';
   const { actor, rest } = notificationCopy(notification);
+  const xpDelta = notificationXpDelta(notification.type);
   const canOpenActor = Boolean(notification.actorId);
   const canOpenActivity =
     notificationRoute(notification).kind !== 'none';
@@ -109,11 +115,20 @@ export default function NotificationRow({
             </Text>
           </FeedbackPressable>
         </View>
-        {timeLabel ? (
-          <Text className="mt-1 font-outfit-medium text-sm text-muted">
-            {timeLabel}
-          </Text>
-        ) : null}
+        <View className="mt-1 flex-row flex-wrap items-center">
+          {timeLabel ? (
+            <Text className="font-outfit-medium text-sm text-muted">
+              {timeLabel}
+            </Text>
+          ) : null}
+          {xpDelta != null ? (
+            <View className="ml-2 rounded-full bg-surface-soft px-2 py-0.5">
+              <Text className="font-outfit-bold text-xs text-accent">
+                {formatXpDeltaLabel(xpDelta)}
+              </Text>
+            </View>
+          ) : null}
+        </View>
       </View>
       {notification.spotImageUrl ? (
         <FeedbackPressable

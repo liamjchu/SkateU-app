@@ -39,7 +39,10 @@ export default function AppTabBar({
   const insets = useSafeAreaInsets();
   const router = useGuardedRouter();
   const pathname = usePathname();
-  const settingsSelected = pathname === '/settings';
+  const settingsRoute = state.routes.find((route) => route.name === 'settings');
+  const settingsSelected =
+    pathname === '/settings' ||
+    state.routes[state.index]?.name === 'settings';
   const avatarUrl = useProfileStore((store) => store.profile?.avatar_url ?? null);
   const xpTotal = useProfileStore((store) => store.profile?.xp_total ?? 0);
   const signedIn = Boolean(useAuthStore((store) => store.user?.id));
@@ -54,7 +57,11 @@ export default function AppTabBar({
         style={{ height: APP_TAB_BAR_CONTENT_HEIGHT }}
       >
         {state.routes.map((route, index) => {
-          const focused = state.index === index;
+          if (route.name === 'settings') {
+            return null;
+          }
+
+          const focused = !settingsSelected && state.index === index;
           const { options } = descriptors[route.key];
           const label = TAB_LABELS[route.name] ?? options.title ?? route.name;
           const icons = TAB_ICONS[route.name as keyof typeof TAB_ICONS];
@@ -120,12 +127,18 @@ export default function AppTabBar({
           disablePressScale
           onPress={() => {
             if (settingsSelected) {
-              if (router.canGoBack()) {
-                router.back();
+              if (navigation.canGoBack()) {
+                navigation.goBack();
+                return;
               }
+              navigation.navigate('index');
               return;
             }
             guardedNavigate('settings', () => {
+              if (settingsRoute) {
+                navigation.navigate(settingsRoute.name, settingsRoute.params);
+                return;
+              }
               router.push('/settings');
             });
           }}

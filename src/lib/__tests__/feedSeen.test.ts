@@ -1,7 +1,7 @@
 import {
   FEED_SEEN_CAP,
   isFeedSessionAppend,
-  orderUnseenFirst,
+  excludeSeenSpots,
   parseSeenSpotIds,
   rememberSeenSpotIds,
   syncFeedSessionSpots,
@@ -31,41 +31,54 @@ describe('parseSeenSpotIds', () => {
   });
 });
 
-describe('orderUnseenFirst', () => {
+describe('excludeSeenSpots', () => {
   const spots = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
 
-  it('puts unseen spots ahead of seen ones', () => {
-    expect(orderUnseenFirst(spots, ['b']).map((spot) => spot.id)).toEqual([
+  it('drops spots the user has already viewed', () => {
+    expect(excludeSeenSpots(spots, ['b']).map((spot) => spot.id)).toEqual([
       'a',
       'c',
-      'b',
     ]);
   });
 
-  it('keeps the original order when every spot was seen', () => {
-    expect(orderUnseenFirst(spots, ['a', 'b', 'c'])).toEqual(spots);
+  it('returns an empty list when every spot was seen', () => {
+    expect(excludeSeenSpots(spots, ['a', 'b', 'c'])).toEqual([]);
+  });
+
+  it('keeps the incoming order when nothing was seen', () => {
+    expect(excludeSeenSpots(spots, [])).toEqual(spots);
   });
 });
 
 describe('syncFeedSessionSpots', () => {
-  it('starts a new unseen-first session when the list is replaced', () => {
+  it('starts a new session with only unseen spots when the list is replaced', () => {
     expect(
       syncFeedSessionSpots(
         [{ id: 'old' }],
         [{ id: 'a' }, { id: 'b' }],
         ['a']
       ).map((spot) => spot.id)
-    ).toEqual(['b', 'a']);
+    ).toEqual(['b']);
   });
 
-  it('appends newly loaded spots without reshuffling the current session', () => {
+  it('appends newly loaded unseen spots without reshuffling the current session', () => {
     expect(
       syncFeedSessionSpots(
         [{ id: 'a' }, { id: 'b' }],
         [{ id: 'x' }, { id: 'a' }, { id: 'b' }, { id: 'c' }],
         ['c']
       ).map((spot) => spot.id)
-    ).toEqual(['a', 'b', 'x', 'c']);
+    ).toEqual(['a', 'b', 'x']);
+  });
+
+  it('keeps spots already in the session after they are marked seen', () => {
+    expect(
+      syncFeedSessionSpots(
+        [{ id: 'a' }],
+        [{ id: 'a' }, { id: 'b' }],
+        ['a']
+      ).map((spot) => spot.id)
+    ).toEqual(['a', 'b']);
   });
 
   it('refreshes session spot objects when the incoming list updates', () => {

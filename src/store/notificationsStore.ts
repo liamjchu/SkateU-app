@@ -164,10 +164,8 @@ export const useNotificationsStore = create<NotificationsState>()((set, get) => 
           return;
         }
         set({ unreadCount: parseNotificationsPayload(payload).unreadCount });
-      } catch (error) {
-        if (!isAbortError(error)) {
-          console.error('Loading unread notifications failed:', error);
-        }
+      } catch {
+        // Keep the last known unread count on a failed refresh.
       }
     })();
 

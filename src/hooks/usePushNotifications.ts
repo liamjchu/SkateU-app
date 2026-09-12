@@ -73,8 +73,8 @@ export function usePushNotifications(options: {
       }
       try {
         await registerPushToken(accessToken);
-      } catch (error) {
-        console.warn('Could not register push token', error);
+      } catch {
+        // Registration retries on the next granted session.
       }
     })();
 

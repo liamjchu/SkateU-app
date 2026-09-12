@@ -85,9 +85,6 @@ export async function sendSpotReviewEmail(
 ): Promise<boolean> {
   const config = getModerationEmailConfig();
   if (!config) {
-    console.info(
-      'Skipping spot review email; RESEND_API_KEY, RESEND_FROM_EMAIL, or MODERATION_NOTIFY_EMAIL is unset.'
-    );
     return false;
   }
 

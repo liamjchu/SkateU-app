@@ -152,7 +152,6 @@ export const useProfileStore = create<ProfileState>()(
     }
 
     if (error) {
-      console.warn('Failed to load profile', error.message);
       set({
         profile: cached,
         loading: false,
@@ -208,12 +207,11 @@ export const useProfileStore = create<ProfileState>()(
         loaded: true,
         error: null,
       });
-    } catch (legalError) {
+    } catch {
       if (requestVersion !== profileRequestVersion) {
         return;
       }
 
-      console.warn('Failed to load legal acceptance', legalError);
       set({
         profile: publicProfile,
         loading: false,

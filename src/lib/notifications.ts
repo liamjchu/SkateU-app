@@ -4,7 +4,12 @@ import {
   type UserNotification,
 } from '../types/notification';
 import { isRecord } from './readCache';
-import { parseXpRank } from './xpRank';
+import {
+  parseXpRank,
+  XP_PER_APPROVED_SPOT,
+  XP_PER_COMMENT_RECEIVED,
+  XP_PER_LIKE_RECEIVED,
+} from './xpRank';
 
 const FALLBACK_ACTOR = 'Someone';
 const UNREAD_BADGE_CAP = 9;
@@ -29,6 +34,7 @@ function actorLabel(
 ): string {
   if (
     type === 'spot_approved' ||
+    type === 'spot_uploaded' ||
     type === 'spot_under_review' ||
     type === 'spot_removed'
   ) {
@@ -72,6 +78,11 @@ export function notificationCopy(input: {
       return { actor, rest: `commented on${spot || ' a spot you liked'}` };
     case 'spot_approved':
       return { actor, rest: `${spot ? `${spot.trim()} ` : ''}is live`.trim() };
+    case 'spot_uploaded':
+      return {
+        actor,
+        rest: `${spot ? `${spot.trim()} ` : ''}was uploaded`.trim(),
+      };
     case 'spot_under_review':
       return {
         actor,
@@ -90,6 +101,37 @@ export function formatNotificationBody(input: {
 }): string {
   const { actor, rest } = notificationCopy(input);
   return `${actor} ${rest}`;
+}
+
+export function notificationXpDelta(type: NotificationType): number | null {
+  switch (type) {
+    case 'spot_like':
+      return XP_PER_LIKE_RECEIVED;
+    case 'spot_comment':
+      return XP_PER_COMMENT_RECEIVED;
+    case 'spot_approved':
+      return XP_PER_APPROVED_SPOT;
+    default:
+      return null;
+  }
+}
+
+export function formatXpDeltaLabel(delta: number): string {
+  return `+${Math.max(0, Math.floor(delta))} XP`;
+}
+
+export function formatNotificationPushBody(input: {
+  type: NotificationType;
+  actorUsername: string | null;
+  spotName: string | null;
+  schoolName?: string | null;
+}): string {
+  const body = formatNotificationBody(input);
+  const xp = notificationXpDelta(input.type);
+  if (xp == null) {
+    return body;
+  }
+  return `${body} · ${formatXpDeltaLabel(xp)}`;
 }
 
 export function formatUnreadBadge(count: number): string | null {

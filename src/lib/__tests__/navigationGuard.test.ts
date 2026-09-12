@@ -11,6 +11,10 @@ describe('navigation guard', () => {
     resetNavigationGuard();
   });
 
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('allows the first navigation and blocks a duplicate key', () => {
     const navigate = jest.fn();
     expect(guardedNavigate('map:school-1', navigate)).toBe(true);
@@ -66,11 +70,17 @@ describe('navigation guard', () => {
     expect(navigate).toHaveBeenCalledTimes(2);
   });
 
-  it('extends the global lock when a duplicate push is blocked', () => {
+  it('does not extend the global lock when a push is blocked', () => {
+    let now = 1_000;
+    jest.spyOn(Date, 'now').mockImplementation(() => now);
+
     const navigate = jest.fn();
     expect(guardedNavigate('map', navigate)).toBe(true);
+
+    now = 1_400;
     expect(guardedNavigate('profile', navigate)).toBe(false);
-    releaseNavigationLock();
+
+    now = 3_500;
     expect(guardedNavigate('profile', navigate)).toBe(true);
     expect(navigate).toHaveBeenCalledTimes(2);
   });

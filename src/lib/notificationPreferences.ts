@@ -28,6 +28,7 @@ const CAMPUS_TYPES: NotificationType[] = [
 
 const SPOT_UPDATE_TYPES: NotificationType[] = [
   'spot_approved',
+  'spot_uploaded',
   'spot_under_review',
   'spot_removed',
 ];

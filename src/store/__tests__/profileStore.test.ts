@@ -132,11 +132,7 @@ describe('profileStore.fetchProfile', () => {
       loading: false,
       error: null,
     });
-    expect(
-      fetchMock.mock.calls.filter(
-        (call) => !String(call[0]).includes('127.0.0.1:7351')
-      )
-    ).toHaveLength(0);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('surfaces a supabase load failure', async () => {
@@ -383,11 +379,7 @@ describe('profileStore.acceptLegal', () => {
     );
     await useProfileStore.getState().fetchProfile('user-1');
     expect(useProfileStore.getState().profile?.username).toBe('liam');
-    expect(
-      fetchMock.mock.calls.filter(
-        (call) => !String(call[0]).includes('127.0.0.1:7351')
-      )
-    ).toHaveLength(0);
+    expect(fetchMock).not.toHaveBeenCalled();
 
     const merge = useProfileStore.persist.getOptions().merge;
     expect(merge).toBeDefined();

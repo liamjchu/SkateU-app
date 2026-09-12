@@ -1402,6 +1402,9 @@ async function resolveSchoolIdForLocation(
   try {
     const nearest = await fetchNearestSchool(config, { latitude, longitude });
     if (nearest?.id) {
+      // Ignore the school the user had open. Pins always belong to the
+      // geographically closest campus so older clients cannot attach a DC
+      // spot to a school they selected miles away.
       return nearest.id;
     }
   } catch (error) {
@@ -1803,7 +1806,7 @@ export async function DELETE(request: Request): Promise<Response> {
     // Already gone — treat as success so the client can drop it locally.
     return Response.json({ success: true });
   }
-  if (isHiddenSpotStatus(ownership.status)) {
+  if (isRemovedSpotStatus(ownership.status)) {
     return Response.json({ error: 'That spot no longer exists.' }, { status: 404 });
   }
   if (ownership.ownerId !== auth.userId) {
@@ -1814,6 +1817,23 @@ export async function DELETE(request: Request): Promise<Response> {
   }
 
   try {
+    const feedbackUrl = new URL(`${config.url}/rest/v1/user_feedback`);
+    feedbackUrl.searchParams.set('spot_id', `eq.${idValidation.value}`);
+    const feedbackResponse = await fetch(feedbackUrl.toString(), {
+      method: 'DELETE',
+      headers: {
+        apikey: config.apiKey,
+        Authorization: `Bearer ${config.apiKey}`,
+        Prefer: 'return=minimal',
+      },
+    });
+    if (!feedbackResponse.ok) {
+      console.error(
+        'Detaching spot feedback failed:',
+        await feedbackResponse.text()
+      );
+    }
+
     const deleteUrl = new URL(`${config.url}/rest/v1/spots`);
     deleteUrl.searchParams.set('id', `eq.${idValidation.value}`);
 
@@ -1822,6 +1842,7 @@ export async function DELETE(request: Request): Promise<Response> {
       headers: {
         apikey: config.apiKey,
         Authorization: `Bearer ${config.apiKey}`,
+        Prefer: 'return=minimal',
       },
     });
 

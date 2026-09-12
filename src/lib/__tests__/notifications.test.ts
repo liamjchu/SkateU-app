@@ -1,10 +1,13 @@
 import {
   formatNotificationBody,
+  formatNotificationPushBody,
   formatNotificationsA11yLabel,
   formatUnreadBadge,
+  formatXpDeltaLabel,
   mapNotificationView,
   notificationCopy,
   notificationRoute,
+  notificationXpDelta,
   parseNotificationType,
 } from '../notifications';
 
@@ -12,6 +15,7 @@ describe('parseNotificationType', () => {
   it('accepts known types and rejects unknown values', () => {
     expect(parseNotificationType('spot_like')).toBe('spot_like');
     expect(parseNotificationType('spot_approved')).toBe('spot_approved');
+    expect(parseNotificationType('spot_uploaded')).toBe('spot_uploaded');
     expect(parseNotificationType('like_received')).toBeNull();
     expect(parseNotificationType(null)).toBeNull();
   });
@@ -64,6 +68,30 @@ describe('formatNotificationBody', () => {
         spotName: 'Rail',
       })
     ).toBe('Your spot “Rail” is live');
+    expect(
+      formatNotificationBody({
+        type: 'spot_uploaded',
+        actorUsername: null,
+        spotName: 'Rail',
+      })
+    ).toBe('Your spot “Rail” was uploaded');
+  });
+});
+
+describe('notification XP labels', () => {
+  it('adds XP only for rewards that change XP', () => {
+    expect(notificationXpDelta('spot_like')).toBe(5);
+    expect(notificationXpDelta('spot_comment')).toBe(1);
+    expect(notificationXpDelta('spot_approved')).toBe(10);
+    expect(notificationXpDelta('spot_uploaded')).toBeNull();
+    expect(formatXpDeltaLabel(5)).toBe('+5 XP');
+    expect(
+      formatNotificationPushBody({
+        type: 'spot_like',
+        actorUsername: 'alex',
+        spotName: 'Rail',
+      })
+    ).toBe('alex liked your spot “Rail” · +5 XP');
   });
 });
 

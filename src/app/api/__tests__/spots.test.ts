@@ -990,6 +990,67 @@ describe('POST /api/spots', () => {
     expect(inserted.school_id).toBe('closest-school');
   });
 
+  it('overrides the selected schoolId when nearest_school RPC is unavailable', async () => {
+    setConfigured();
+    const createdRow: DatabaseSpot = {
+      id: 'spot1',
+      school_id: 'closest-school',
+      name: 'Rail',
+      description: 'A nice rail',
+      latitude: 41.82,
+      longitude: -71.41,
+      image_urls: [],
+      created_at: '2024-01-01T00:00:00.000Z',
+      updated_at: '2024-01-01T00:00:00.000Z',
+      schools: { name: 'RISD', city: 'Providence', state: 'RI' },
+      creator: { username: 'skater_jane' },
+    };
+    const fetchMock: FetchMock = jest.fn(async (input) => {
+      const requestUrl = input.toString();
+      if (requestUrl.includes('/auth/v1/user')) {
+        return jsonResponse({ id: 'user-1' });
+      }
+      if (requestUrl.includes('/rpc/nearest_school')) {
+        return new Response('missing', { status: 404 });
+      }
+      if (requestUrl.includes('/rest/v1/schools')) {
+        return jsonResponse([
+          {
+            id: 'closest-school',
+            name: 'RISD',
+            city: 'Providence',
+            state: 'RI',
+            latitude: 41.826,
+            longitude: -71.408,
+            numspots: 8,
+            type: 'higher_ed',
+          },
+        ]);
+      }
+      if (requestUrl.includes('api.openai.com')) {
+        return openAIApprovalResponse();
+      }
+      return jsonResponse([createdRow], 201);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await POST(
+      makePostRequest(validForm(), { Authorization: 'Bearer good-token' })
+    );
+    expect(response.status).toBe(201);
+
+    const insertCall = fetchMock.mock.calls.find(
+      (call) =>
+        call[0].toString().includes('/rest/v1/spots') &&
+        call[1]?.method === 'POST'
+    );
+    const inserted = JSON.parse(String(insertCall?.[1]?.body)) as {
+      school_id: string;
+    };
+    expect(inserted.school_id).toBe('closest-school');
+    expect(inserted.school_id).not.toBe('school1');
+  });
+
   it('returns 422 with a gentle reason when moderation rejects the spot', async () => {
     setConfigured();
     const createdRow: DatabaseSpot = {
@@ -2167,9 +2228,40 @@ describe('DELETE /api/spots', () => {
 
     // The actual DELETE request must have been issued to the REST endpoint.
     const deleteCall = fetchMock.mock.calls.find(
-      (call) => call[1]?.method === 'DELETE'
+      (call) =>
+        call[1]?.method === 'DELETE' &&
+        call[0].toString().includes('/rest/v1/spots')
     );
     expect(deleteCall?.[0].toString()).toContain('id=eq.spot1');
+  });
+
+  it('lets the owner delete a spot that is still pending review', async () => {
+    setConfigured();
+    const fetchMock: FetchMock = jest.fn(async (input, init) => {
+      const url = input.toString();
+      if (url.includes('/auth/v1/user')) {
+        return jsonResponse({ id: 'user-1' });
+      }
+      if (init?.method === 'DELETE') {
+        return new Response(null, { status: 204 });
+      }
+      return jsonResponse([
+        {
+          created_by_user_id: 'user-1',
+          school_id: 'school1',
+          status: 'pending_moderation',
+        },
+      ]);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await DELETE(
+      new Request('https://app.test/api/spots?id=spot1', {
+        method: 'DELETE',
+        headers: { Authorization: 'Bearer good-token' },
+      })
+    );
+    expect(response.status).toBe(200);
   });
 });
 

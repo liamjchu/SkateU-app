@@ -33,6 +33,7 @@ import {
     legalGateRedirectPath,
 } from '../lib/legalAcceptance';
 import { shouldLeaveAuthEntryRoute } from '../lib/authNavigation';
+import { releaseNavigationLock } from '../lib/navigationGuard';
 import { toUserFacingError } from '../lib/userFacingError';
 import { useAuthNoticeStore } from '../store/authNoticeStore';
 import { useAuthStore } from '../store/authStore';
@@ -175,6 +176,10 @@ function RootLayout() {
   }, [pathname]);
 
   useEffect(() => {
+    releaseNavigationLock();
+  }, [pathname]);
+
+  useEffect(() => {
     // Persistent saved schools are browser/device state, so restore them only
     // after client mounting instead of during the web server render.
     void Promise.all([
@@ -195,9 +200,7 @@ function RootLayout() {
   useEffect(() => {
     // Apple only returns an ID token during sign-in, so retain its stable user
     // ID and verify that Apple still considers that credential authorized.
-    void checkAppleCredentialStatus().catch((error: unknown) => {
-      console.warn('Could not verify the Apple credential status.', error);
-    });
+    void checkAppleCredentialStatus().catch(() => undefined);
   }, []);
 
   // Load (or clear) the profile whenever the signed-in user changes. Keyed on
@@ -401,7 +404,6 @@ function RootLayout() {
         <Stack.Screen name="user/[userId]" />
         <Stack.Screen name="follow-list" />
         <Stack.Screen name="notifications" />
-        <Stack.Screen name="settings" />
         <Stack.Screen name="notification-settings" />
         <Stack.Screen name="blocked-accounts" />
         <Stack.Screen name="help" />

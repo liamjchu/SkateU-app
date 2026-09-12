@@ -2,6 +2,7 @@ import type { Spot } from '../../types/spot';
 import {
     formatDistanceFromMeters,
     metersBetween,
+    nearbySpotsForSheet,
     sortSpotsByDistanceFrom,
 } from '../spotDistance';
 
@@ -70,6 +71,19 @@ describe('sortSpotsByDistanceFrom', () => {
     expect(sortSpotsByDistanceFrom([far, near], origin).map((s) => s.id)).toEqual([
       'near',
       'far',
+    ]);
+  });
+});
+
+describe('nearbySpotsForSheet', () => {
+  const origin = makeSpot('origin', 40.0, -74.0);
+  const near = makeSpot('near', 40.001, -74.0);
+  const far = makeSpot('far', 40.02, -74.0);
+
+  it('keeps the tapped spot and nearby neighbors only', () => {
+    expect(nearbySpotsForSheet([far, origin, near], origin).map((s) => s.id)).toEqual([
+      'origin',
+      'near',
     ]);
   });
 });

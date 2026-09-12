@@ -37,6 +37,8 @@ function compareDistanceThenId(origin: LatLng) {
   };
 }
 
+export const MAP_SHEET_NEARBY_MAX_METERS = 400;
+
 export function sortSpotsByDistanceFrom(spots: Spot[], origin: Spot): Spot[] {
   const originSpot = spots.find((spot) => spot.id === origin.id);
   if (originSpot) {
@@ -46,6 +48,19 @@ export function sortSpotsByDistanceFrom(spots: Spot[], origin: Spot): Spot[] {
   }
 
   return [...spots].sort(compareDistanceThenId(origin));
+}
+
+export function nearbySpotsForSheet(
+  spots: Spot[],
+  origin: Spot,
+  maxMeters: number = MAP_SHEET_NEARBY_MAX_METERS
+): Spot[] {
+  return sortSpotsByDistanceFrom(spots, origin).filter((spot) => {
+    if (spot.id === origin.id) {
+      return true;
+    }
+    return metersBetween(origin, spot) <= maxMeters;
+  });
 }
 
 export function formatDistanceFromMeters(meters: number): string {

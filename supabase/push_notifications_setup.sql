@@ -23,7 +23,7 @@ comment on column public.profiles.notify_social is
 comment on column public.profiles.notify_campus is
   'Push for new spots at saved schools and comments on liked spots.';
 comment on column public.profiles.notify_spot_updates is
-  'Push when the user’s spot is approved, under review, or removed.';
+  'Push when the user’s spot is uploaded, approved, under review, or removed.';
 
 create table if not exists public.push_tokens (
   id uuid primary key default gen_random_uuid(),
@@ -84,6 +84,7 @@ alter table public.user_notifications
       'saved_school_spot',
       'liked_spot_comment',
       'spot_approved',
+      'spot_uploaded',
       'spot_under_review',
       'spot_removed'
     )
@@ -101,7 +102,7 @@ create unique index if not exists user_notifications_saved_school_spot_unique
 
 create unique index if not exists user_notifications_spot_status_unique
   on public.user_notifications (recipient_id, spot_id, type)
-  where type in ('spot_approved', 'spot_under_review', 'spot_removed');
+  where type in ('spot_approved', 'spot_uploaded', 'spot_under_review', 'spot_removed');
 
 create or replace function public.insert_user_notification(
   p_recipient_id uuid,
@@ -124,6 +125,7 @@ begin
 
   is_system := p_type in (
     'spot_approved',
+    'spot_uploaded',
     'spot_under_review',
     'spot_removed'
   );
@@ -294,7 +296,22 @@ set search_path = ''
 as $$
 begin
   if tg_op = 'INSERT' then
-    if new.status = 'active' then
+    if new.status = 'pending_moderation' then
+      perform public.insert_user_notification(
+        new.created_by_user_id,
+        null,
+        'spot_uploaded',
+        new.id,
+        null
+      );
+    elsif new.status = 'active' then
+      perform public.insert_user_notification(
+        new.created_by_user_id,
+        null,
+        'spot_approved',
+        new.id,
+        null
+      );
       perform public.notify_saved_school_spot(new);
     end if;
     return new;

@@ -22,7 +22,7 @@ import { useFeedPrefetch } from '../../hooks/useFeedPrefetch';
 import { captureAnalyticsEvent } from '../../lib/analytics';
 import { feedPageHeight } from '../../lib/feedPaging';
 import {
-  orderUnseenFirst,
+  excludeSeenSpots,
   syncFeedSessionSpots,
   unseenSpotCount,
 } from '../../lib/feedSeen';
@@ -45,6 +45,7 @@ export default function FeedScreen() {
   const toggleSpotLike = useSpotsStore((state) => state.toggleSpotLike);
   const commentCounts = useCommentsStore((state) => state.commentCounts);
   const seenSpotIds = useFeedSeenStore((state) => state.seenSpotIds);
+  const hasHydratedSeen = useFeedSeenStore((state) => state.hasHydrated);
   const markSeen = useFeedSeenStore((state) => state.markSeen);
   const {
     recentSpots,
@@ -61,7 +62,7 @@ export default function FeedScreen() {
   const recentSpotsRef = useRef(recentSpots);
   recentSpotsRef.current = recentSpots;
   const [sessionSpots, setSessionSpots] = useState<Spot[]>(() =>
-    orderUnseenFirst(recentSpots, useFeedSeenStore.getState().seenSpotIds)
+    excludeSeenSpots(recentSpots, useFeedSeenStore.getState().seenSpotIds)
   );
   const [listHeight, setListHeight] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -96,11 +97,21 @@ export default function FeedScreen() {
     );
   }, [recentSpots]);
 
+  useEffect(() => {
+    if (!hasHydratedSeen) {
+      return;
+    }
+
+    setSessionSpots(
+      excludeSeenSpots(recentSpotsRef.current, seenSpotIdsRef.current)
+    );
+  }, [hasHydratedSeen]);
+
   useFocusEffect(
     useCallback(() => {
       setCommentsCoveringViewer(false);
       setSessionSpots(
-        orderUnseenFirst(recentSpotsRef.current, seenSpotIdsRef.current)
+        excludeSeenSpots(recentSpotsRef.current, seenSpotIdsRef.current)
       );
       const frame = requestAnimationFrame(() => {
         listRef.current?.scrollToOffset({ offset: 0, animated: false });
@@ -228,6 +239,14 @@ export default function FeedScreen() {
           </FeedbackPressable>
         </View>
       </View>
+    ) : hasMore && !error ? (
+      <View
+        accessibilityLabel="Loading latest spots"
+        className="flex-1 items-center justify-center bg-surface-soft"
+        style={{ height: pageHeight }}
+      >
+        <ActivityIndicator color={colors.accent} />
+      </View>
     ) : recentSpots.length === 0 ? (
       <View
         className="flex-1 items-center justify-center px-6"
@@ -243,7 +262,22 @@ export default function FeedScreen() {
           When someone adds a spot, it’ll show up here.
         </Text>
       </View>
-    ) : null;
+    ) : (
+      <View
+        className="flex-1 items-center justify-center px-6"
+        style={{ paddingTop: insets.top }}
+      >
+        <View className="h-14 w-14 items-center justify-center rounded-2xl bg-accent">
+          <Feather name="check" size={26} color={colors.brand} />
+        </View>
+        <Text className="mt-3 font-outfit-bold text-lg text-ink">
+          You’re all caught up
+        </Text>
+        <Text className="mt-1 text-center font-outfit-medium text-base leading-5 text-muted">
+          New spots will show up here when they’re added.
+        </Text>
+      </View>
+    );
 
   return (
     <View className="flex-1 bg-surface">
