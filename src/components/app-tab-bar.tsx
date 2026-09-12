@@ -53,7 +53,7 @@ export default function AppTabBar({
       style={{ paddingBottom: insets.bottom }}
     >
       <View
-        className="flex-row items-stretch"
+        className="w-full max-w-[720px] flex-row items-stretch self-center"
         style={{ height: APP_TAB_BAR_CONTENT_HEIGHT }}
       >
         {state.routes.map((route, index) => {

@@ -196,25 +196,12 @@ begin
     return new;
   end if;
 
-  if new.parent_comment_id is not null then
-    select c.user_id into recipient_id
-    from public.spot_comments c
-    where c.id = new.parent_comment_id;
-
-    perform public.insert_user_notification(
-      recipient_id,
-      new.user_id,
-      'comment_reply',
-      new.spot_id,
-      new.id
-    );
-    return new;
-  end if;
-
   select s.created_by_user_id into owner_id
   from public.spots s
   where s.id = new.spot_id;
 
+  -- Spot owners earn +1 XP per comment, including replies. Always give them
+  -- the spot_comment inbox item so that boost can render.
   perform public.insert_user_notification(
     owner_id,
     new.user_id,
@@ -222,6 +209,23 @@ begin
     new.spot_id,
     new.id
   );
+
+  if new.parent_comment_id is not null then
+    select c.user_id into recipient_id
+    from public.spot_comments c
+    where c.id = new.parent_comment_id;
+
+    if recipient_id is distinct from owner_id then
+      perform public.insert_user_notification(
+        recipient_id,
+        new.user_id,
+        'comment_reply',
+        new.spot_id,
+        new.id
+      );
+    end if;
+    return new;
+  end if;
 
   for liker_id in
     select sl.user_id

@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: August 26, 2026
+Last updated: September 12, 2026
 
 This Privacy Policy explains what information SkateU collects, how it is used, and the choices you have. It covers the SkateU mobile app and the SkateU website at skateu.app.
 
@@ -39,6 +39,12 @@ If you use account features, we store:
 - Likes
 - Spot removal requests, including the reason and any details you write
 - Comment reports, including the reason and any details you write
+- Profile reports, including the reason and any details you write
+- Accounts you follow, and accounts that follow you
+- An experience total (XP) used to show a public rank on your profile
+- Schools you save (favorites), which are stored on your device and synced to your account when you are signed in
+- Notification preferences and in-app notification records
+- A push-notification token for each device where you turn push alerts on
 - Accounts you block
 - Help & Support messages (contact, bug reports, feature ideas, and spot-problem reports) and any screenshot you attach
 
@@ -62,7 +68,7 @@ Those pin coordinates are part of the public spot. They come from the pin you pl
 The app stores some information on your device, including:
 
 - Your sign-in session
-- Schools you mark as favorites, which are saved on that device and are not synced to your SkateU account
+- A local copy of schools you save, which is also synced to your SkateU account when you are signed in so the list can appear on other devices
 - Unpublished spot drafts, including the name, description, map pin, and photos you started adding. Drafts stay on that device until you post or delete them. They are not uploaded to SkateU until you post. Logging out does not necessarily delete them. You can delete a draft from Profile. Deleting your account clears drafts for that account on that device. Removing the app from a device also removes local drafts.
 - On iOS, a stored Apple user identifier used only to check whether Apple Sign In is still authorized.
 
@@ -87,11 +93,11 @@ The SkateU mobile app does not currently collect:
 If a product-analytics SDK is configured for the app build you are using (currently PostHog), we may collect:
 
 - Screen names you visit in the app
-- Feature events such as signing in, opening a campus map, viewing or adding a spot, liking a spot, posting a comment, and submitting Help & Support
+- Feature events such as signing in, opening a campus map, viewing or adding a spot, liking a spot, posting a comment, following someone, and submitting Help & Support
 - An anonymous device identifier, and your account id if you are signed in
 - App version and technical information such as platform and OS version
 
-We use this to understand how SkateU is used and to improve it. We do not use this for advertising. We do not send your email, username, message text, photos, or GPS to PostHog. Analytics can be left unconfigured in development builds.
+We use this to understand how SkateU is used and to improve it. We do not use this for advertising. We identify signed-in analytics events with your account id only. We do not send your email, username, message text, photos, or GPS to PostHog. Analytics can be left unconfigured in development builds.
 
 ### Crash reports
 
@@ -110,8 +116,10 @@ We use this information to:
 - Confirm that you are eligible to have an account
 - Show schools, maps, spots, photos, comments, and likes
 - Show your location on campus maps on your device when you allow location access
-- Let you add, edit, like, comment on, request removal of spots, report comments, and block other accounts
+- Let you add, edit, like, comment on, follow, save schools, request removal of spots, report comments or profiles, and block other accounts
 - Hide spots and comments from people you blocked
+- Send in-app and push notifications you opted into
+- Show a public rank based on XP you earn in the app
 - Moderate usernames, profile photos, profile bios, spots, photos, comments, and Help & Support submissions
 - Email you a confirmation or account-deletion code when you request one
 - Email our team when a spot needs review, when a comment is reported, and when you send Help & Support
@@ -140,7 +148,7 @@ We do this to help keep SkateU usable for a campus community. Help & Support mes
 
 We share information in these limited ways:
 
-- **Public in the app.** Usernames, profile photos, profile bios, spots, photos, comments, like counts, and school information are visible to people using SkateU, including people who are not signed in. Your 13+ confirmation and Terms acceptance are not public.
+- **Public in the app.** Usernames, profile photos, profile bios, spots, photos, comments, like counts, follower and following counts, XP rank, and school information are visible to people using SkateU, including people who are not signed in. Your 13+ confirmation, Terms acceptance, email, saved-school list, push token, and notification preferences are not public.
 - **SkateU social accounts.** We may post public spots, photos, descriptions, campus names, and usernames on Instagram, TikTok, and YouTube. Those platforms receive whatever we post and have their own terms. This is featuring content you already made public in the app. It is not selling your information and it is not advertising targeting.
 - **Service providers.** We use companies that help us run SkateU. They receive information needed to provide their service:
   - Supabase, for accounts, database storage, and photo storage
@@ -164,7 +172,7 @@ We keep account and content information while your account is open and as needed
 
 - Spots and comments may remain after an account is deleted, without being tied to your username, as described below
 - Spot removal requests associated with your account are deleted when the account is deleted
-- Comment reports and account blocks associated with your account are deleted when the account is deleted
+- Comment reports, profile reports, follows, saved schools, XP, notification records, notification preferences, push tokens, and account blocks associated with your account are deleted when the account is deleted
 - Short-lived verification records used to confirm account deletion expire quickly and are then deleted
 - Android beta confirmation links expire after a limited time
 
@@ -177,17 +185,20 @@ You can:
 - Browse much of SkateU without creating an account
 - Edit or delete spots you added, while signed in
 - Delete comments you posted
-- Report comments and block other accounts
+- Report comments or profiles and block other accounts
 - Unlike spots you liked
+- Unfollow accounts and change who you follow
+- Save or unsave schools
+- Turn push notifications off in Settings
 - Change your username, profile photo, or profile bio
 - Log out
 - Delete your account from Settings in the app
 
-Deleting your account permanently removes your sign-in, profile, likes, spot removal requests, comment reports, and account blocks. Spots you added stay in SkateU and are no longer linked to you. Comments you posted stay in SkateU and are shown without your username. Unpublished spot drafts for that account are deleted from the device.
+Deleting your account permanently removes your sign-in, profile, likes, follows, saved schools, XP, notification records, notification preferences, push tokens, spot removal requests, comment reports, profile reports, and account blocks. Spots you added stay in SkateU and are no longer linked to you. Comments you posted stay in SkateU and are shown without your username. Unpublished spot drafts for that account are deleted from the device.
 
-School favorites saved on your device are not part of your account. Removing the app from a device removes that local data.
+A local copy of saved schools also remains on a device until you remove the app or clear that list. After you delete your account, that list is no longer tied to an account and is not synced.
 
-To delete your account, go to Profile, then Settings, then Delete account, and confirm with the code we email you. You can also email [support@skateu.app](mailto:support@skateu.app) if you need help.
+To delete your account, open Settings, tap Delete account, and confirm with the code we email you. If you signed in with Apple and hid your email, we send that code to Apple’s private relay address. You can also email [support@skateu.app](mailto:support@skateu.app) if you need help.
 
 ## 7. Children
 

@@ -82,6 +82,7 @@ describe('notification XP labels', () => {
   it('adds XP only for rewards that change XP', () => {
     expect(notificationXpDelta('spot_like')).toBe(5);
     expect(notificationXpDelta('spot_comment')).toBe(1);
+    expect(notificationXpDelta('comment_reply')).toBeNull();
     expect(notificationXpDelta('spot_approved')).toBe(10);
     expect(notificationXpDelta('spot_uploaded')).toBeNull();
     expect(formatXpDeltaLabel(5)).toBe('+5 XP');
@@ -92,6 +93,13 @@ describe('notification XP labels', () => {
         spotName: 'Rail',
       })
     ).toBe('alex liked your spot “Rail” · +5 XP');
+    expect(
+      formatNotificationPushBody({
+        type: 'spot_comment',
+        actorUsername: 'sam',
+        spotName: 'Stairs',
+      })
+    ).toBe('sam commented on “Stairs” · +1 XP');
   });
 });
 

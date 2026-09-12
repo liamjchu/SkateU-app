@@ -72,6 +72,29 @@ describe('mapNotification', () => {
     });
   });
 
+  it('maps a comment with the +1 XP boost', () => {
+    expect(
+      mapNotification({
+        id: 'event-2',
+        type: 'spot_comment',
+        actor_id: 'user-3',
+        spot_id: 'spot-1',
+        comment_id: 'comment-1',
+        read_at: null,
+        created_at: '2026-09-12T00:00:00.000Z',
+        actor: {
+          username: 'sam',
+          avatar_url: null,
+          xp_total: 0,
+        },
+        spot: { name: 'Stairs', image_urls: [] },
+      })
+    ).toMatchObject({
+      type: 'spot_comment',
+      body: 'sam commented on “Stairs” · +1 XP',
+    });
+  });
+
   it('ignores unknown types', () => {
     expect(
       mapNotification({

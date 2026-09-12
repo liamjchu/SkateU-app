@@ -119,7 +119,6 @@ function RootLayout() {
 
   // --- Auth + profile state that drives the username gate ---
   const userId = useAuthStore((state) => state.user?.id ?? null);
-  const userEmail = useAuthStore((state) => state.user?.email ?? undefined);
   const accessToken = useAuthStore((state) => state.session?.access_token ?? null);
   const authInitializing = useAuthStore((state) => state.initializing);
   const passwordRecovery = useAuthStore((state) => state.passwordRecovery);
@@ -162,14 +161,14 @@ function RootLayout() {
 
   useEffect(() => {
     if (userId) {
-      identifyAnalyticsUser(userId, { email: userEmail });
+      identifyAnalyticsUser(userId);
       setCrashReportingUser(userId);
       return;
     }
 
     resetAnalyticsUser();
     clearCrashReportingUser();
-  }, [userEmail, userId]);
+  }, [userId]);
 
   useEffect(() => {
     captureAnalyticsScreen(pathname);
@@ -429,6 +428,7 @@ function RootLayout() {
         <Stack.Screen name="edit-spot" options={{ contentStyle: { backgroundColor: colors.surface } }} />
         <Stack.Screen name="request-spot-removal" options={{ contentStyle: { backgroundColor: colors.surface } }} />
         <Stack.Screen name="report-comment" options={{ contentStyle: { backgroundColor: colors.surface } }} />
+        <Stack.Screen name="report-profile" options={{ contentStyle: { backgroundColor: colors.surface } }} />
         <Stack.Screen name="spot-comments" options={{ contentStyle: { backgroundColor: colors.surface } }} />
       </Stack>
 

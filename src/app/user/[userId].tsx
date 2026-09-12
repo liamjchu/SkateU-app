@@ -10,11 +10,13 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FeedbackPressable from '../../components/FeedbackPressable';
+import LoginRequiredModal from '../../components/LoginRequiredModal';
 import ProfileIdentityCard from '../../components/profile-identity-card';
 import ProfileSpotRow from '../../components/profile-spot-row';
 import SocialLinks from '../../components/social-links';
 import { colors } from '../../constants/colors';
 import { captureAnalyticsEvent } from '../../lib/analytics';
+import { triggerHaptic } from '../../lib/haptics';
 import { PROFILE_SPOTS_PAGE_SIZE } from '../../lib/homeFeed';
 import { openSpotOnMap } from '../../lib/mapNavigation';
 import { guardedNavigate, useGuardedRouter } from '../../lib/navigationGuard';
@@ -26,6 +28,7 @@ import {
 } from '../../lib/publicProfile';
 import { toMutationError, toUserFacingError } from '../../lib/userFacingError';
 import { useAuthStore } from '../../store/authStore';
+import { useBlocksStore } from '../../store/blocksStore';
 import type { PublicProfileView } from '../../types/publicProfile';
 import type { Spot } from '../../types/spot';
 
@@ -55,7 +58,11 @@ export default function UserProfileScreen() {
   const [error, setError] = useState<string | null>(null);
   const [spotsError, setSpotsError] = useState<string | null>(null);
   const [followBusy, setFollowBusy] = useState(false);
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const loadingMoreLock = useRef(false);
+  const blockUser = useBlocksStore((state) => state.blockUser);
+  const isBlockedUser = useBlocksStore((state) => state.isBlocked);
+  const blocked = userId ? isBlockedUser(userId) : false;
 
   const hasMoreSpots = spots.length < spotTotal;
 
@@ -155,6 +162,60 @@ export default function UserProfileScreen() {
         'This spot is not tied to a campus, so there is no map to open.'
       );
     }
+  };
+
+  const requireAuth = (): boolean => {
+    if (session?.access_token) {
+      return true;
+    }
+    setShowLoginPrompt(true);
+    return false;
+  };
+
+  const handleReportPress = () => {
+    if (!userId || !requireAuth()) {
+      return;
+    }
+    router.push({
+      pathname: '/report-profile',
+      params: {
+        userId,
+        username: profile?.username ?? '',
+      },
+    });
+  };
+
+  const handleBlockPress = () => {
+    if (!userId || !requireAuth()) {
+      return;
+    }
+    const accessToken = session?.access_token;
+    if (!accessToken || blocked) {
+      return;
+    }
+    const label = profile?.username ? `@${profile.username}` : 'this account';
+    Alert.alert(
+      `Block ${label}?`,
+      'You won’t see their spots or comments. You can undo this in Settings.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block user',
+          onPress: () => {
+            void blockUser(userId, accessToken, profile?.username)
+              .then(() => {
+                triggerHaptic('success');
+              })
+              .catch((caught: unknown) => {
+                Alert.alert(
+                  'Couldn’t block that user',
+                  toMutationError(caught, 'Try again in a sec.')
+                );
+              });
+          },
+        },
+      ]
+    );
   };
 
   const handleFollowPress = async () => {
@@ -319,6 +380,32 @@ export default function UserProfileScreen() {
                     </Text>
                   )}
                 </FeedbackPressable>
+                <View className="mt-3 flex-row gap-3">
+                  <FeedbackPressable
+                    haptic="selection"
+                    onPress={handleReportPress}
+                    className="h-12 flex-1 items-center justify-center rounded-2xl bg-surface-soft"
+                    accessibilityRole="button"
+                    accessibilityLabel="Report profile"
+                  >
+                    <Text className="font-outfit-bold text-sm text-ink">
+                      Report
+                    </Text>
+                  </FeedbackPressable>
+                  <FeedbackPressable
+                    haptic="warning"
+                    onPress={handleBlockPress}
+                    disabled={blocked}
+                    className="h-12 flex-1 items-center justify-center rounded-2xl bg-surface-soft"
+                    accessibilityRole="button"
+                    accessibilityLabel={blocked ? 'Account blocked' : 'Block account'}
+                    accessibilityState={{ disabled: blocked }}
+                  >
+                    <Text className="font-outfit-bold text-sm text-ink">
+                      {blocked ? 'Blocked' : 'Block'}
+                    </Text>
+                  </FeedbackPressable>
+                </View>
               </ProfileIdentityCard>
               {spotsError && spots.length === 0 ? (
                 <View className="mt-4 items-center rounded-2xl border border-errorBorder bg-errorSurface p-5">
@@ -401,6 +488,12 @@ export default function UserProfileScreen() {
         maxToRenderPerBatch={6}
         windowSize={7}
         removeClippedSubviews
+      />
+      <LoginRequiredModal
+        visible={showLoginPrompt}
+        onCancel={() => setShowLoginPrompt(false)}
+        title="Sign up to report or block"
+        message="You can still browse profiles. Sign up to report a profile or block an account. Already have an account? You can log in from the next screen."
       />
     </View>
   );

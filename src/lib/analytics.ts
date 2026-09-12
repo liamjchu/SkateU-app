@@ -72,15 +72,12 @@ export function captureAnalyticsScreen(name: string): void {
   getAnalyticsClient()?.screen(name);
 }
 
-export function identifyAnalyticsUser(
-  userId: string,
-  personProperties?: { email?: string }
-): void {
+export function identifyAnalyticsUser(userId: string): void {
   if (!userId) {
     return;
   }
 
-  getAnalyticsClient()?.identify(userId, personProperties);
+  getAnalyticsClient()?.identify(userId);
 }
 
 export function resetAnalyticsUser(): void {

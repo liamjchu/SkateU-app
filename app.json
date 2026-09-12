@@ -10,16 +10,28 @@
     "ios": {
       "icon": "./assets/images/app-icon.png",
       "bundleIdentifier": "app.skateu.mobile",
+      "supportsTablet": true,
+      "requireFullScreen": true,
       "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "UIViewControllerBasedStatusBarAppearance": true,
         "NSLocationWhenInUseUsageDescription": "SkateU uses your location to show where you are on the campus map so you can place spots.",
-        "NSUserNotificationsUsageDescription": "SkateU sends notifications about likes, comments, follows, and spots at schools you save."
+        "NSUserNotificationsUsageDescription": "SkateU sends notifications about likes, comments, follows, and spots at schools you save.",
+        "UISupportedInterfaceOrientations": [
+          "UIInterfaceOrientationPortrait"
+        ],
+        "UISupportedInterfaceOrientations~ipad": [
+          "UIInterfaceOrientationPortrait",
+          "UIInterfaceOrientationPortraitUpsideDown",
+          "UIInterfaceOrientationLandscapeLeft",
+          "UIInterfaceOrientationLandscapeRight"
+        ]
       }
     },
     "android": {
       "package": "app.skateu.mobile",
+      "googleServicesFile": "./google-services.json",
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",

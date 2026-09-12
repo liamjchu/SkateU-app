@@ -102,9 +102,9 @@ export default function NotificationRow({
             disabled={!canOpenActivity}
             className="min-w-0"
             accessibilityRole={canOpenActivity ? 'button' : 'text'}
-            accessibilityLabel={`${rest}${timeLabel ? `, ${timeLabel}` : ''}${
-              unread ? ', unread' : ''
-            }`}
+            accessibilityLabel={`${rest}${
+              xpDelta != null ? `, ${formatXpDeltaLabel(xpDelta)}` : ''
+            }${timeLabel ? `, ${timeLabel}` : ''}${unread ? ', unread' : ''}`}
             accessibilityHint={
               canOpenActivity ? 'Opens this activity' : undefined
             }

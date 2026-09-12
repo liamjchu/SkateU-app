@@ -36,10 +36,15 @@ describe("Home", () => {
     ).not.toBeNull();
     const legalNav = container.querySelector('nav[aria-label="Legal"]');
     expect(legalNav).not.toBeNull();
-    expect(legalNav?.querySelectorAll("a")).toHaveLength(1);
+    expect(legalNav?.querySelectorAll("a")).toHaveLength(3);
     const privacyLink = legalNav?.querySelector('a[href="/privacy"]');
     expect(privacyLink?.textContent).toBe("Privacy Policy");
-    expect(legalNav?.querySelector('a[href="/terms"]')).toBeNull();
+    expect(legalNav?.querySelector('a[href="/terms"]')?.textContent).toBe(
+      "Terms of Use"
+    );
+    expect(legalNav?.querySelector('a[href="/support"]')?.textContent).toBe(
+      "Support"
+    );
     expect(legalNav?.querySelector('a[href="/community-guidelines"]')).toBeNull();
     const socialLinks = [
       ["Instagram", "https://www.instagram.com/skateuapp/"],
