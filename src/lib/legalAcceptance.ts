@@ -1,4 +1,3 @@
-import { LEGAL_VERSION } from '../content/legal';
 import type { Profile } from '../types/profile';
 
 export const LEGAL_APP_ROUTES = {
@@ -37,6 +36,8 @@ export function hasAgeAttestation(
   );
 }
 
+// Used to keep a cached acceptance when a later profile refresh has no legal
+// row. The app does not block accounts that already have a username.
 export function hasCurrentLegalAcceptance(
   profile: Pick<
     Profile,
@@ -44,8 +45,7 @@ export function hasCurrentLegalAcceptance(
   > | null
 ): boolean {
   return (
-    profile?.legal_version === LEGAL_VERSION &&
-    typeof profile.legal_accepted_at === 'string' &&
+    typeof profile?.legal_accepted_at === 'string' &&
     profile.legal_accepted_at.length > 0 &&
     typeof profile.age_attested_at === 'string' &&
     profile.age_attested_at.length > 0
@@ -63,10 +63,6 @@ export function getLegalGate(args: {
 
   if (!args.profile?.username) {
     return 'onboarding';
-  }
-
-  if (!hasCurrentLegalAcceptance(args.profile)) {
-    return 'accept-legal';
   }
 
   return 'none';

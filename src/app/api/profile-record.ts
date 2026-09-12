@@ -64,6 +64,16 @@ function isMissingXpColumn(status: number, body: string): boolean {
   return status === 400 && body.includes('profiles.xp_total does not exist');
 }
 
+function isMissingRelation(status: number, body: string): boolean {
+  return (
+    status === 404 ||
+    ((status === 400 || status === 406) &&
+      (body.includes('PGRST205') ||
+        body.includes('schema cache') ||
+        body.includes('does not exist')))
+  );
+}
+
 async function fetchLegalRowFromProfiles(
   config: SupabaseConfig,
   userId: string,
@@ -168,7 +178,8 @@ export async function fetchLegalRow(
     return asLegalRow(firstRow((await response.json()) as unknown));
   }
 
-  if (response.status === 404) {
+  const body = await response.text().catch(() => '');
+  if (isMissingRelation(response.status, body)) {
     return fetchLegalRowFromProfiles(config, userId, signal);
   }
 
@@ -238,7 +249,8 @@ export async function upsertProfileLegal(
     return fetchMergedProfile(config, userId, signal);
   }
 
-  if (response.status !== 404) {
+  const body = await response.text().catch(() => '');
+  if (!isMissingRelation(response.status, body)) {
     throw new Error(`Legal upsert failed: ${response.status}`);
   }
 

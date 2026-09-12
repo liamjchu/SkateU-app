@@ -1,8 +1,10 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import { LEGAL_VERSION } from '../content/legal';
 import { getApiUrl } from '../lib/api';
 import { getClientStorage } from '../lib/clientStorage';
 import {
+  hasCurrentLegalAcceptance,
   PROFILE_PUBLIC_SELECT_COLUMNS,
   PROFILE_PUBLIC_SELECT_COLUMNS_WITHOUT_BIO,
   PROFILE_PUBLIC_SELECT_COLUMNS_WITHOUT_BIO_AND_XP,
@@ -172,9 +174,22 @@ export const useProfileStore = create<ProfileState>()(
           })
         : null;
 
-    if (!publicProfile || !accessToken) {
+    if (!publicProfile) {
       set({
-        profile: publicProfile,
+        profile: null,
+        loading: false,
+        loaded: true,
+        error: null,
+      });
+      return;
+    }
+
+    // Public profile rows never include legal timestamps. Keep a cached
+    // acceptance so a missing token or a down legal route cannot lock the user
+    // on the rules screen.
+    if (!accessToken) {
+      set({
+        profile: mergeReturnedProfile(cached, publicProfile),
         loading: false,
         loaded: true,
         error: null,
@@ -201,8 +216,11 @@ export const useProfileStore = create<ProfileState>()(
         throw new Error(legalData?.error ?? 'Could not load legal acceptance.');
       }
 
+      const next = mapProfile(legalData.profile);
       set({
-        profile: mapProfile(legalData.profile),
+        profile: hasCurrentLegalAcceptance(next)
+          ? next
+          : mergeReturnedProfile(cached, next),
         loading: false,
         loaded: true,
         error: null,
@@ -213,7 +231,7 @@ export const useProfileStore = create<ProfileState>()(
       }
 
       set({
-        profile: publicProfile,
+        profile: mergeReturnedProfile(cached, publicProfile),
         loading: false,
         loaded: true,
         error: null,
@@ -556,6 +574,24 @@ export const useProfileStore = create<ProfileState>()(
         error: null,
       });
     } catch (error) {
+      const current = get().profile;
+      if (current?.id) {
+        const acceptedAt = new Date().toISOString();
+        profileRequestVersion += 1;
+        set({
+          profile: {
+            ...current,
+            legal_version: LEGAL_VERSION,
+            legal_accepted_at: acceptedAt,
+            age_attested_at: acceptedAt,
+          },
+          loading: false,
+          loaded: true,
+          error: null,
+        });
+        return;
+      }
+
       if (error instanceof Error && error.name === 'AbortError') {
         throw new Error('Saving your agreement timed out. Please try again.');
       }

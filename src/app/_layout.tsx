@@ -299,10 +299,9 @@ function RootLayout() {
   const appReady = fontsReady && sessionReady && profileReady && cachesReady;
 
   // Signed-in users without a username stay on onboarding until they pick one
-  // and agree. Users who already have a username but have not accepted the
-  // current Terms stay on accept-legal. Anonymous browsing is unchanged. Legal
-  // documents stay reachable. Delete-account OTP stays reachable during
-  // accept-legal.
+  // and agree. Accounts that already have a username go through, including
+  // older ones that never recorded Terms acceptance. Anonymous browsing is
+  // unchanged. Legal documents stay reachable.
   const legalGate = getLegalGate({
     userId,
     profileLoaded,

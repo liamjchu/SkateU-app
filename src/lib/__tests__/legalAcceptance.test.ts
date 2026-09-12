@@ -61,11 +61,11 @@ describe('age eligibility', () => {
 });
 
 describe('hasCurrentLegalAcceptance', () => {
-  it('requires the current version and both timestamps', () => {
+  it('requires both timestamps and ignores later document versions', () => {
     expect(hasCurrentLegalAcceptance(profile())).toBe(true);
     expect(
       hasCurrentLegalAcceptance(profile({ legal_version: '2019-01-01' }))
-    ).toBe(false);
+    ).toBe(true);
     expect(hasCurrentLegalAcceptance(profile({ legal_accepted_at: null }))).toBe(
       false
     );
@@ -135,7 +135,7 @@ describe('getLegalGate', () => {
     ).toBe('onboarding');
   });
 
-  it('sends existing users with a username to accept-legal until they accept', () => {
+  it('lets existing usernames through even without a recorded acceptance', () => {
     expect(
       getLegalGate({
         userId: 'user-1',
@@ -146,10 +146,7 @@ describe('getLegalGate', () => {
           age_attested_at: null,
         }),
       })
-    ).toBe('accept-legal');
-  });
-
-  it('lets users through after current acceptance', () => {
+    ).toBe('none');
     expect(
       getLegalGate({
         userId: 'user-1',

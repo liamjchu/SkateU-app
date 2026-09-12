@@ -1,17 +1,18 @@
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useGuardedRouter } from '../lib/navigationGuard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FeedbackPressable from '../components/FeedbackPressable';
 import LegalAcceptCheckbox from '../components/legal-accept-checkbox';
 import { StickerStripe } from '../components/sticker';
-import { canAcceptLegalTerms } from '../lib/legalAcceptance';
 import { toUserFacingError } from '../lib/userFacingError';
 import { useAuthStore } from '../store/authStore';
 import { useProfileStore } from '../store/profileStore';
 
 export default function AcceptLegalScreen() {
   const router = useGuardedRouter();
+  const rootRouter = useRouter();
   const insets = useSafeAreaInsets();
   const email = useAuthStore((state) => state.user?.email ?? '');
   const accessToken = useAuthStore((state) => state.session?.access_token);
@@ -27,19 +28,10 @@ export default function AcceptLegalScreen() {
   const [closingAccount, setClosingAccount] = useState(false);
   const [error, setError] = useState('');
 
-  const canSubmit =
-    canAcceptLegalTerms(agreed) &&
-    Boolean(accessToken) &&
-    !submitting &&
-    !closingAccount;
+  const canSubmit = Boolean(accessToken) && !submitting && !closingAccount;
 
   const handleAccept = async () => {
     if (submitting || closingAccount) {
-      return;
-    }
-
-    if (!agreed) {
-      setError('Agree to continue.');
       return;
     }
 
@@ -48,11 +40,13 @@ export default function AcceptLegalScreen() {
       return;
     }
 
+    setAgreed(true);
     setSubmitting(true);
     setError('');
 
     try {
       await acceptLegal(accessToken);
+      rootRouter.replace('/');
     } catch (submitError) {
       setError(
         toUserFacingError(
