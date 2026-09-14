@@ -202,7 +202,7 @@ function VerifyOtpContent({ email }: { email: string }) {
                 return (
                   <View
                     key={index}
-                    className={`h-14 flex-1 items-center justify-center rounded-2xl bg-field ${
+                    className={`min-h-14 flex-1 items-center justify-center rounded-2xl bg-field py-2 ${
                       isActive ? 'border-2 border-accent' : 'border border-border-soft'
                     }`}
                   >
@@ -260,7 +260,7 @@ function VerifyOtpContent({ email }: { email: string }) {
             haptic="light"
             onPress={() => submitCode(code)}
             disabled={submitting}
-            className={`mt-2 h-14 flex-row items-center justify-center rounded-2xl ${
+            className={`mt-2 min-h-14 flex-row items-center justify-center rounded-2xl py-3 ${
               submitting ? 'bg-actionDisabled' : 'bg-accent'
             }`}
             accessibilityLabel={submitting ? 'Verifying code' : 'Verify code'}

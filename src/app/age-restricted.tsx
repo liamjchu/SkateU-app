@@ -19,7 +19,6 @@ export default function AgeRestrictedScreen() {
         >
           <Text
             className="font-outfit-bold text-2xl text-white"
-            numberOfLines={1}
           >
             Age restriction
           </Text>
@@ -31,10 +30,10 @@ export default function AgeRestrictedScreen() {
         className="w-full max-w-[640px] flex-1 self-center px-6 pt-8"
         style={{ paddingBottom: Math.max(insets.bottom, 24) + 16 }}
       >
-        <Text className="font-outfit-black text-2xl leading-8 text-ink">
+        <Text className="font-outfit-black text-2xl text-ink">
           SkateU is for people 13 and older
         </Text>
-        <Text className="mt-2 font-outfit-medium text-base leading-6 text-muted">
+        <Text className="mt-2 font-outfit-medium text-base text-muted">
           We can’t create an account for you. You can still browse SkateU
           without an account.
         </Text>

@@ -55,7 +55,7 @@ export default function XpRankUpOverlay() {
         <Text className="mt-5 text-center font-outfit-black text-2xl text-ink">
           You’re a {label} now
         </Text>
-        <Text className="mt-2 text-center font-outfit-medium text-sm leading-5 text-muted">
+        <Text className="mt-2 text-center font-outfit-medium text-sm text-muted">
           Keep adding spots people actually skate.
         </Text>
         <FeedbackPressable

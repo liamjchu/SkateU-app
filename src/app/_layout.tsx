@@ -29,6 +29,7 @@ import { checkAppleCredentialStatus } from '../lib/appleAuthentication';
 import {
     getLegalGate,
     isAllowedDuringLegalGate,
+    isRetiredAcceptLegalPath,
     isSettledLegalRoute,
     legalGateRedirectPath,
 } from '../lib/legalAcceptance';
@@ -247,7 +248,11 @@ function RootLayout() {
 
       const { path } = Linking.parse(url);
       const isRecoveryLink = path === recoveryCallbackPath;
-      const isAuthCallback = path === oauthCallbackPath || isRecoveryLink;
+      const isAuthCallback =
+        path === oauthCallbackPath ||
+        isRecoveryLink ||
+        isRetiredAcceptLegalPath(path) ||
+        isRetiredAcceptLegalPath(url);
 
       if (!isAuthCallback) {
         return;
@@ -299,9 +304,8 @@ function RootLayout() {
   const appReady = fontsReady && sessionReady && profileReady && cachesReady;
 
   // Signed-in users without a username stay on onboarding until they pick one
-  // and agree. Accounts that already have a username go through, including
-  // older ones that never recorded Terms acceptance. Anonymous browsing is
-  // unchanged. Legal documents stay reachable.
+  // and agree. Accounts that already have a username go through. Anonymous
+  // browsing is unchanged. Legal documents stay reachable.
   const legalGate = getLegalGate({
     userId,
     profileLoaded,
@@ -352,7 +356,7 @@ function RootLayout() {
 
     if (
       legalGate === 'none' &&
-      (routeRoot === 'onboarding' || routeRoot === 'accept-legal')
+      (routeRoot === 'onboarding' || routeRoot === 'age-gate')
     ) {
       router.replace('/');
     }
@@ -397,7 +401,6 @@ function RootLayout() {
         <Stack.Screen name="onboarding" />
         <Stack.Screen name="age-gate" />
         <Stack.Screen name="age-restricted" />
-        <Stack.Screen name="accept-legal" />
         <Stack.Screen name="legal" />
         <Stack.Screen name="user/[userId]" />
         <Stack.Screen name="follow-list" />

@@ -85,7 +85,7 @@ export default function SpotCommentRow({
           />
           <ExpandableText
             collapsedLines={4}
-            className="mt-1 font-outfit-medium text-base leading-5 text-ink"
+            className="mt-1 font-outfit-medium text-base text-ink"
           >
             {comment.content}
           </ExpandableText>

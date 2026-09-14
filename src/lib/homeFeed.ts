@@ -17,6 +17,27 @@ export function shouldPrefetchMoreItems(
   return highestVisibleIndex >= itemCount - FEED_PREFETCH_REMAINING_ITEMS;
 }
 
+export function isNearFeedEnd(
+  contentHeight: number,
+  viewportHeight: number,
+  offsetY: number,
+  threshold = FEED_END_REACHED_THRESHOLD
+): boolean {
+  if (contentHeight <= 0 || viewportHeight <= 0) {
+    return false;
+  }
+
+  const distanceFromEnd = contentHeight - viewportHeight - offsetY;
+  return distanceFromEnd <= viewportHeight * threshold;
+}
+
+export function hasMoreFeedPage(
+  pageLength: number,
+  pageSize = HOME_SPOTS_PAGE_SIZE
+): boolean {
+  return pageLength === pageSize;
+}
+
 export function parseOffset(raw: string | null): number {
   if (raw == null || raw.trim() === '') {
     return 0;

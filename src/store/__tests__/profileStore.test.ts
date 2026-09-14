@@ -202,6 +202,45 @@ describe('profileStore.fetchProfile', () => {
     });
   });
 
+  it('keeps supabase xp_total when the legal payload omits or zeros it', async () => {
+    mockFrom.mockReturnValue(
+      createQuery({
+        data: {
+          id: 'user-1',
+          username: 'liam',
+          avatar_url: null,
+          bio: null,
+          updated_at: '2026-08-21T00:00:00.000Z',
+          xp_total: 343,
+        },
+        error: null,
+      })
+    );
+    fetchMock.mockResolvedValue(
+      mockResponse({
+        profile: {
+          id: 'user-1',
+          username: 'liam',
+          avatar_url: null,
+          bio: null,
+          updated_at: '2026-08-21T00:00:00.000Z',
+          legal_version: '2026-08-20',
+          legal_accepted_at: '2026-08-21T00:00:00.000Z',
+          age_attested_at: '2026-08-21T00:00:00.000Z',
+          xp_total: 0,
+        },
+      })
+    );
+
+    await useProfileStore.getState().fetchProfile('user-1', 'token');
+
+    expect(useProfileStore.getState().profile).toMatchObject({
+      username: 'liam',
+      legal_version: '2026-08-20',
+      xp_total: 343,
+    });
+  });
+
   it('keeps cached legal acceptance when the server has no legal row yet', async () => {
     useProfileStore.setState({
       profile: {
@@ -662,6 +701,34 @@ describe('profileStore.updateBio', () => {
     ).resolves.toEqual({
       ok: false,
       message: 'Let’s keep this one school-friendly and try again.',
+    });
+  });
+
+  it('falls back when PostgREST reports a missing xp_total column', async () => {
+    const first = createQuery({
+      data: null,
+      error: {
+        message:
+          "Could not find the 'xp_total' column of 'profiles' in the schema cache",
+      },
+    });
+    const second = createQuery({
+      data: {
+        id: 'user-1',
+        username: 'liam',
+        avatar_url: null,
+        bio: null,
+        updated_at: '2026-08-21T00:00:00.000Z',
+      },
+      error: null,
+    });
+    mockFrom.mockReturnValueOnce(first).mockReturnValueOnce(second);
+
+    await useProfileStore.getState().fetchProfile('user-1');
+    expect(useProfileStore.getState().profile).toMatchObject({
+      id: 'user-1',
+      username: 'liam',
+      xp_total: 0,
     });
   });
 

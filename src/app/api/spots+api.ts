@@ -1,5 +1,5 @@
 import { deferTask } from 'expo-server';
-import { FEED_CANDIDATE_LIMIT, HOME_SPOTS_PAGE_SIZE, PROFILE_SPOTS_PAGE_SIZE, parseOffset } from '../../lib/homeFeed';
+import { HOME_SPOTS_PAGE_SIZE, PROFILE_SPOTS_PAGE_SIZE, parseOffset } from '../../lib/homeFeed';
 import { rankFeedSpots, sliceRankedFeedPage } from '../../lib/feedRanking';
 import {
     IMAGE_SANITIZE_ERROR,
@@ -1241,8 +1241,12 @@ async function getRecentSpots(
     } else {
       query.searchParams.set('select', SPOT_SELECT_COLUMNS);
     }
+    const offset = parseOffset(url.searchParams.get('offset'));
     query.searchParams.set('order', 'created_at.desc,id.desc');
-    query.searchParams.set('limit', String(FEED_CANDIDATE_LIMIT));
+    query.searchParams.set('limit', String(HOME_SPOTS_PAGE_SIZE));
+    if (offset > 0) {
+      query.searchParams.set('offset', String(offset));
+    }
     applyVisibleSpotFilter(query);
     applyBlockedUserFilter(query, 'created_by_user_id', viewer.blockedIds);
 
@@ -1258,8 +1262,7 @@ async function getRecentSpots(
     }
 
     const rows = (await response.json()) as DatabaseSpot[];
-    const offset = parseOffset(url.searchParams.get('offset'));
-    const page = sliceRankedFeedPage(rankFeedSpots(rows), offset);
+    const page = sliceRankedFeedPage(rankFeedSpots(rows), 0);
     return Response.json({
       spots: await mapSpotsForUser(config, page, viewer.userId),
     });
@@ -1339,16 +1342,20 @@ async function getCreatorSpots(
   try {
     const viewer = await resolveViewerAndBlocks(request, config);
     if (viewer.userId && viewer.userId !== creatorUserId) {
-      const blocked = await hasBlockEitherWay(
-        config,
-        viewer.userId,
-        creatorUserId
-      );
-      if (blocked) {
-        return Response.json(
-          { error: 'This profile isn’t available.' },
-          { status: 403 }
+      try {
+        const blocked = await hasBlockEitherWay(
+          config,
+          viewer.userId,
+          creatorUserId
         );
+        if (blocked) {
+          return Response.json(
+            { error: 'This profile isn’t available.' },
+            { status: 403 }
+          );
+        }
+      } catch (error) {
+        console.error('Checking creator profile blocks failed:', error);
       }
     }
 
@@ -1817,15 +1824,17 @@ export async function DELETE(request: Request): Promise<Response> {
   }
 
   try {
+    const restHeaders = {
+      apikey: config.apiKey,
+      Authorization: `Bearer ${config.apiKey}`,
+      Prefer: 'return=minimal',
+    };
+
     const feedbackUrl = new URL(`${config.url}/rest/v1/user_feedback`);
     feedbackUrl.searchParams.set('spot_id', `eq.${idValidation.value}`);
     const feedbackResponse = await fetch(feedbackUrl.toString(), {
       method: 'DELETE',
-      headers: {
-        apikey: config.apiKey,
-        Authorization: `Bearer ${config.apiKey}`,
-        Prefer: 'return=minimal',
-      },
+      headers: restHeaders,
     });
     if (!feedbackResponse.ok) {
       console.error(
@@ -1834,16 +1843,31 @@ export async function DELETE(request: Request): Promise<Response> {
       );
     }
 
+    // XP sync on DELETE inserts xp_events with the removed spot id and fails
+    // the FK. Marking the pin removed first lets that trigger run while the
+    // row still exists; the following DELETE then has nothing left to award.
+    if (isPublicSpotStatus(ownership.status)) {
+      const unapproveUrl = new URL(`${config.url}/rest/v1/spots`);
+      unapproveUrl.searchParams.set('id', `eq.${idValidation.value}`);
+      const unapproveResponse = await fetch(unapproveUrl.toString(), {
+        method: 'PATCH',
+        headers: {
+          ...restHeaders,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: HIDDEN_SPOT_STATUS }),
+      });
+      if (!unapproveResponse.ok) {
+        throw new Error(await unapproveResponse.text());
+      }
+    }
+
     const deleteUrl = new URL(`${config.url}/rest/v1/spots`);
     deleteUrl.searchParams.set('id', `eq.${idValidation.value}`);
 
     const response = await fetch(deleteUrl.toString(), {
       method: 'DELETE',
-      headers: {
-        apikey: config.apiKey,
-        Authorization: `Bearer ${config.apiKey}`,
-        Prefer: 'return=minimal',
-      },
+      headers: restHeaders,
     });
 
     if (!response.ok) {

@@ -86,6 +86,8 @@ const PROFILE_LOAD_FAILED =
 
 function mergeReturnedProfile(current: Profile | null, next: Profile): Profile {
   const profile = mapProfile(next);
+  const nextHasXp =
+    typeof next.xp_total === 'number' && Number.isFinite(next.xp_total);
   return {
     ...profile,
     legal_version: profile.legal_version ?? current?.legal_version ?? null,
@@ -93,7 +95,21 @@ function mergeReturnedProfile(current: Profile | null, next: Profile): Profile {
       profile.legal_accepted_at ?? current?.legal_accepted_at ?? null,
     age_attested_at:
       profile.age_attested_at ?? current?.age_attested_at ?? null,
+    xp_total: nextHasXp
+      ? profile.xp_total
+      : (current?.xp_total ?? profile.xp_total),
   };
+}
+
+function withPublicXp(
+  profile: Profile,
+  publicProfile: Profile,
+  publicHadXp: boolean
+): Profile {
+  if (!publicHadXp) {
+    return profile;
+  }
+  return { ...profile, xp_total: publicProfile.xp_total };
 }
 
 function syncAvatarCaches(profile: Profile): void {
@@ -131,6 +147,7 @@ export const useProfileStore = create<ProfileState>()(
 
     let data: Record<string, unknown> | null = null;
     let error: { message: string } | null = null;
+    let usedSelect: string | null = null;
     for (const selectColumns of profileSelects) {
       const result = await supabase
         .from('profiles')
@@ -140,10 +157,15 @@ export const useProfileStore = create<ProfileState>()(
       data = (result.data as Record<string, unknown> | null) ?? null;
       error = result.error;
       if (!error) {
+        usedSelect = selectColumns;
         break;
       }
-      const missingBio = error.message.includes('profiles.bio does not exist');
-      const missingXp = error.message.includes('profiles.xp_total does not exist');
+      const missingBio =
+        error.message.includes('profiles.bio does not exist') ||
+        error.message.includes("'bio' column of 'profiles'");
+      const missingXp =
+        error.message.includes('profiles.xp_total does not exist') ||
+        error.message.includes("'xp_total' column of 'profiles'");
       if (!missingBio && !missingXp) {
         break;
       }
@@ -163,6 +185,7 @@ export const useProfileStore = create<ProfileState>()(
       return;
     }
 
+    const publicHadXp = Boolean(usedSelect?.includes('xp_total'));
     const publicProfile =
       data && typeof data.id === 'string'
         ? mapProfile({
@@ -217,10 +240,11 @@ export const useProfileStore = create<ProfileState>()(
       }
 
       const next = mapProfile(legalData.profile);
+      const withLegal = hasCurrentLegalAcceptance(next)
+        ? next
+        : mergeReturnedProfile(cached, next);
       set({
-        profile: hasCurrentLegalAcceptance(next)
-          ? next
-          : mergeReturnedProfile(cached, next),
+        profile: withPublicXp(withLegal, publicProfile, publicHadXp),
         loading: false,
         loaded: true,
         error: null,
@@ -568,7 +592,7 @@ export const useProfileStore = create<ProfileState>()(
 
       profileRequestVersion += 1;
       set({
-        profile: mapProfile(data.profile),
+        profile: mergeReturnedProfile(get().profile, data.profile),
         loading: false,
         loaded: true,
         error: null,

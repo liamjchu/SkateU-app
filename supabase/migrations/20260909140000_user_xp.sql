@@ -240,10 +240,11 @@ begin
 
   if tg_op = 'DELETE' then
     if old.created_by_user_id is not null then
+      -- AFTER DELETE: old.id is already gone, so xp_events cannot reference it.
       perform public.sync_user_xp(
         old.created_by_user_id,
         'spot_unapproved',
-        old.id,
+        null,
         old.created_by_user_id
       );
     end if;

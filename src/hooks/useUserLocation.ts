@@ -1,18 +1,12 @@
-import { getExpoLocation } from '../lib/expoLocation';
 import { useCallback, useEffect, useState } from 'react';
+import { getExpoLocation } from '../lib/expoLocation';
+import {
+  useLocationStore,
+  type UserLocationCoords,
+  type UserLocationStatus,
+} from '../store/locationStore';
 
-export type UserLocationStatus =
-  | 'idle'
-  | 'requesting'
-  | 'ready'
-  | 'denied'
-  | 'unavailable';
-
-export type UserLocationCoords = {
-  latitude: number;
-  longitude: number;
-  accuracy: number | null;
-};
+export type { UserLocationCoords, UserLocationStatus };
 
 type UseUserLocationResult = {
   coords: UserLocationCoords | null;
@@ -29,8 +23,10 @@ export function useUserLocation(
   options: UseUserLocationOptions = {}
 ): UseUserLocationResult {
   const requestIfNeeded = options.requestIfNeeded !== false;
-  const [status, setStatus] = useState<UserLocationStatus>('idle');
-  const [coords, setCoords] = useState<UserLocationCoords | null>(null);
+  const coords = useLocationStore((state) => state.coords);
+  const status = useLocationStore((state) => state.status);
+  const setLocation = useLocationStore((state) => state.setLocation);
+  const setStatus = useLocationStore((state) => state.setStatus);
   const [watchKey, setWatchKey] = useState(0);
 
   const requestPermission = useCallback(async (): Promise<boolean> => {
@@ -46,7 +42,9 @@ export function useUserLocation(
       return false;
     }
 
-    setStatus('requesting');
+    if (!useLocationStore.getState().coords) {
+      setStatus('requesting');
+    }
     const permission = await Location.requestForegroundPermissionsAsync();
     if (!permission.granted) {
       setStatus('denied');
@@ -55,7 +53,7 @@ export function useUserLocation(
 
     setWatchKey((key) => key + 1);
     return true;
-  }, []);
+  }, [setStatus]);
 
   useEffect(() => {
     if (!enabled) {
@@ -92,7 +90,9 @@ export function useUserLocation(
           return;
         }
 
-        setStatus('requesting');
+        if (!useLocationStore.getState().coords) {
+          setStatus('requesting');
+        }
         permission = await Location.requestForegroundPermissionsAsync();
         if (cancelled) {
           return;
@@ -103,7 +103,9 @@ export function useUserLocation(
         }
       }
 
-      setStatus('requesting');
+      if (!useLocationStore.getState().coords) {
+        setStatus('requesting');
+      }
       try {
         subscription = await Location.watchPositionAsync(
           {
@@ -115,12 +117,11 @@ export function useUserLocation(
             if (cancelled) {
               return;
             }
-            setCoords({
+            setLocation({
               latitude: position.coords.latitude,
               longitude: position.coords.longitude,
               accuracy: position.coords.accuracy,
             });
-            setStatus('ready');
           }
         );
       } catch {
@@ -136,7 +137,7 @@ export function useUserLocation(
       cancelled = true;
       subscription?.remove();
     };
-  }, [enabled, requestIfNeeded, watchKey]);
+  }, [enabled, requestIfNeeded, setLocation, setStatus, watchKey]);
 
   return { coords, status, requestPermission };
 }

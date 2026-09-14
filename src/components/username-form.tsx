@@ -133,7 +133,7 @@ export function UsernameForm({
 
   return (
     <View className="mt-8">
-      <View className="min-h-14 flex-row items-center rounded-2xl border border-border-soft bg-field pl-5 pr-3">
+      <View className="min-h-14 flex-row items-center rounded-2xl border border-border-soft bg-field py-1 pl-5 pr-3">
         <Text className="font-outfit-bold text-base text-muted">@</Text>
         <TextInput
           value={value}

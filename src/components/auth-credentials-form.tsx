@@ -11,6 +11,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getPasswordRequirementStatus, validatePassword } from '../lib/password';
 import { colors } from '../constants/colors';
+import { useFontScale } from '../hooks/useFontScale';
 import { captureAuthCompleted } from '../lib/analytics';
 import { toUserFacingError } from '../lib/userFacingError';
 import { useAuthStore } from '../store/authStore';
@@ -43,6 +44,7 @@ export default function AuthCredentialsForm({
 
   const isSignup = mode === 'signup';
   const isIOS = Platform.OS === 'ios';
+  const { isExtraLarge } = useFontScale();
   const passwordRequirementStatus = getPasswordRequirementStatus(password);
   const passwordRequirements = [
     {
@@ -129,7 +131,7 @@ export default function AuthCredentialsForm({
       <Text className="font-outfit-black text-2xl text-ink">
         {isSignup ? 'Create your account' : 'Welcome back'}
       </Text>
-      <Text className="mt-1 font-outfit-medium text-base leading-5 text-muted">
+      <Text className="mt-1 font-outfit-medium text-base text-muted">
         {isSignup
           ? 'Sign up to like spots, add your own, and use your profile.'
           : 'Log in to like spots, add your own, and use your profile.'}
@@ -158,7 +160,7 @@ export default function AuthCredentialsForm({
         </View>
 
         <View>
-          <View className="min-h-14 flex-row items-center rounded-2xl border border-border-soft bg-field pl-5 pr-2">
+          <View className="min-h-14 flex-row items-center rounded-2xl border border-border-soft bg-field py-1 pl-5 pr-2">
             <TextInput
               ref={passwordInputRef}
               value={password}
@@ -296,7 +298,7 @@ export default function AuthCredentialsForm({
             isSignup ? 'Switch to log in' : 'Switch to sign up'
           }
         >
-          <Text className="font-outfit-semibold text-sm text-muted">
+          <Text className="text-center font-outfit-semibold text-sm text-muted">
             {isSignup
               ? 'Already have an account? Log in'
               : "Don't have an account? Sign up"}
@@ -311,15 +313,15 @@ export default function AuthCredentialsForm({
           <View className="h-px flex-1 bg-border-soft" />
         </View>
 
-        <View className={isIOS ? 'flex-row gap-3' : 'gap-3'}>
+        <View className={isIOS && !isExtraLarge ? 'flex-row gap-3' : 'gap-3'}>
           <GoogleSignInButton
-            compact={isIOS}
+            compact={isIOS && !isExtraLarge}
             disabled={submitting}
             onSuccess={finishAuth}
             onError={(message) => setError(message)}
           />
           <AppleSignInButton
-            compact={isIOS}
+            compact={isIOS && !isExtraLarge}
             disabled={submitting}
             onSuccess={finishAuth}
             onError={(message) => setError(message)}

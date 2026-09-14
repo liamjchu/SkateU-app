@@ -55,7 +55,7 @@ export default function NotificationRow({
 
   const row = (
     <View
-      className={`flex-row items-center bg-surface px-6 py-3 ${
+      className={`flex-row items-start bg-surface px-6 py-3 ${
         showDivider ? 'border-t border-border-soft' : ''
       }`}
     >

@@ -36,6 +36,7 @@ import { getApiUrl } from '../../lib/api';
 import {
     FEED_END_REACHED_THRESHOLD,
     HOME_RAIL_PAGE_SIZE,
+    isNearFeedEnd,
 } from '../../lib/homeFeed';
 import {
     getHomeLogoTapAction,
@@ -99,6 +100,7 @@ export default function HomeScreen() {
 
   const feedListRef = useRef<FlatList<Spot>>(null);
   const feedScrollOffsetRef = useRef(0);
+  const feedNearEndRef = useRef(false);
   const [isFeedScrolled, setIsFeedScrolled] = useState(false);
   const [isLoadingPopular, setIsLoadingPopular] = useState(true);
   const [popularError, setPopularError] = useState('');
@@ -134,6 +136,10 @@ export default function HomeScreen() {
     enableLocation: enableNearbyLocation,
     retry: retryNearbySchools,
   } = useNearbySchools(POPULAR_FILTER);
+
+  useEffect(() => {
+    feedNearEndRef.current = false;
+  }, [recentSpots.length]);
 
   useFocusEffect(
     useCallback(() => {
@@ -494,7 +500,7 @@ export default function HomeScreen() {
               <Text className="mt-3 text-lg text-ink font-outfit-bold">
                 No popular schools yet
               </Text>
-              <Text className="mt-1 text-center text-base leading-5 text-muted font-outfit-medium">
+              <Text className="mt-1 text-center text-base text-muted font-outfit-medium">
                 Schools with the most skate spots will show up here.
               </Text>
             </View>
@@ -563,7 +569,7 @@ export default function HomeScreen() {
               ))}
             </View>
           ) : recentError && recentSpots.length === 0 ? (
-            <View className="flex-row items-center rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2.5">
+            <View className="flex-row items-start rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2.5">
               <Text className="flex-1 pr-2 font-outfit-medium text-sm text-errorText">
                 {recentError}
               </Text>
@@ -586,7 +592,7 @@ export default function HomeScreen() {
               <Text className="mt-3 text-lg text-ink font-outfit-bold">
                 No spots yet
               </Text>
-              <Text className="mt-1 text-center text-base leading-5 text-muted font-outfit-medium">
+              <Text className="mt-1 text-center text-base text-muted font-outfit-medium">
                 When someone adds a spot, it’ll show up here to like or
                 open on the map.
               </Text>
@@ -627,7 +633,7 @@ export default function HomeScreen() {
             paddingTop: insets.top + 24,
           }}
         >
-          <View className="h-11 flex-row items-center justify-between">
+          <View className="min-h-11 flex-row items-center justify-between">
             <FeedbackPressable
               haptic="light"
               disablePressScale
@@ -718,7 +724,18 @@ export default function HomeScreen() {
           refreshControl={feedRefreshControl}
           scrollEventThrottle={16}
           onScroll={(event) => {
-            trackFeedScroll(event.nativeEvent.contentOffset.y);
+            const { contentOffset, layoutMeasurement, contentSize } =
+              event.nativeEvent;
+            trackFeedScroll(contentOffset.y);
+            const nearEnd = isNearFeedEnd(
+              contentSize.height,
+              layoutMeasurement.height,
+              contentOffset.y
+            );
+            if (nearEnd && !feedNearEndRef.current) {
+              loadMoreRecentSpots();
+            }
+            feedNearEndRef.current = nearEnd;
           }}
           onEndReached={loadMoreRecentSpots}
           onEndReachedThreshold={FEED_END_REACHED_THRESHOLD}
@@ -726,8 +743,8 @@ export default function HomeScreen() {
           viewabilityConfig={viewabilityConfig}
           initialNumToRender={3}
           maxToRenderPerBatch={3}
-          windowSize={5}
-          removeClippedSubviews
+          windowSize={9}
+          removeClippedSubviews={false}
         />
       </View>
 

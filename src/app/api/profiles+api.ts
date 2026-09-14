@@ -48,12 +48,16 @@ export async function GET(request: Request): Promise<Response> {
   try {
     const viewerId = await resolveOptionalViewer(request, config);
     if (viewerId && viewerId !== userId) {
-      const blocked = await hasBlockEitherWay(config, viewerId, userId);
-      if (blocked) {
-        return Response.json(
-          { error: 'This profile isn’t available.' },
-          { status: 403 }
-        );
+      try {
+        const blocked = await hasBlockEitherWay(config, viewerId, userId);
+        if (blocked) {
+          return Response.json(
+            { error: 'This profile isn’t available.' },
+            { status: 403 }
+          );
+        }
+      } catch (error) {
+        console.error('Checking profile blocks failed:', error);
       }
     }
 
@@ -62,7 +66,12 @@ export async function GET(request: Request): Promise<Response> {
       return Response.json({ error: 'This profile isn’t available.' }, { status: 404 });
     }
 
-    const stats = await fetchFollowStats(config, userId, viewerId);
+    let stats = { followerCount: 0, followingCount: 0, isFollowing: false };
+    try {
+      stats = await fetchFollowStats(config, userId, viewerId);
+    } catch (error) {
+      console.error('Loading follow stats failed:', error);
+    }
     const xpTotal = typeof profile.xp_total === 'number' ? profile.xp_total : 0;
     const rank = rankFromXp(xpTotal);
 

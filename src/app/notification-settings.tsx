@@ -12,6 +12,7 @@ import {
 import FeedbackPressable from '../components/FeedbackPressable';
 import ScreenHeader from '../components/screen-header';
 import { colors } from '../constants/colors';
+import { useFontScale } from '../hooks/useFontScale';
 import { useGuardedRouter } from '../lib/navigationGuard';
 import {
   getOsNotificationPermission,
@@ -41,9 +42,19 @@ function SettingsSwitchRow({
   onValueChange: (value: boolean) => void;
   disabled?: boolean;
 }) {
+  const { isLarge } = useFontScale();
+
   return (
-    <View className="min-h-14 flex-row items-center px-4 py-3">
-      <View className="h-9 w-9 items-center justify-center rounded-full bg-surface-soft">
+    <View
+      className={`min-h-14 flex-row px-4 py-3 ${
+        isLarge ? 'items-start' : 'items-center'
+      }`}
+    >
+      <View
+        className={`h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-soft ${
+          isLarge ? 'mt-0.5' : ''
+        }`}
+      >
         <Feather name={icon} size={16} color={colors.ink} />
       </View>
       <View className="ml-3 min-w-0 flex-1 pr-3">

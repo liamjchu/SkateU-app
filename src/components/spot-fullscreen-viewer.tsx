@@ -225,7 +225,7 @@ function OverlayAction({
     <FeedbackPressable
       haptic="light"
       onPress={onPress}
-      className={`min-h-11 flex-1 flex-row items-center justify-center rounded-full px-3.5 ${
+      className={`min-h-11 flex-1 flex-row flex-wrap items-center justify-center rounded-full px-3.5 py-2 ${
         selected ? 'bg-accent' : 'bg-white/20'
       }`}
       accessibilityRole="button"
@@ -387,6 +387,14 @@ function SpotDetailsOverlay({
       >
         {spot.name}
       </Text>
+      {variant === 'map' && spot.schoolName.trim().length > 0 ? (
+        <Text
+          numberOfLines={1}
+          className="mt-0.5 font-outfit-medium text-sm text-white/70"
+        >
+          {spot.schoolName.trim()}
+        </Text>
+      ) : null}
       <View className="mt-1 flex-row items-center">
         {spot.creatorUserId ? (
           <FeedbackPressable
@@ -425,7 +433,7 @@ function SpotDetailsOverlay({
           username={spot.creatorUsername}
           fallback={creatorFallback(variant)}
           suffix={attributionSuffix(spot, variant)}
-          numberOfLines={1}
+          numberOfLines={2}
           className="ml-1.5 min-w-0 flex-1 font-outfit-medium text-sm text-white/75"
         />
       </View>
@@ -433,13 +441,13 @@ function SpotDetailsOverlay({
       {description.length > 0 ? (
         <Text
           numberOfLines={variant === 'map' ? 2 : 3}
-          className="mt-2.5 font-outfit-medium text-[15px] leading-5 text-white/90"
+          className="mt-2.5 font-outfit-medium text-[15px] text-white/90"
         >
           {description}
         </Text>
       ) : null}
 
-      <View className="mt-4 flex-row items-center gap-2">
+      <View className="mt-4 flex-row flex-wrap items-center gap-2">
         <OverlayAction
           label="Like"
           count={spot.likeCount ?? 0}
@@ -470,12 +478,12 @@ function SpotDetailsOverlay({
       </View>
 
       {isOwned ? (
-        <View className="mt-3 flex-row gap-2">
+        <View className="mt-3 flex-row flex-wrap gap-2">
           <FeedbackPressable
             haptic="light"
             onPress={onEdit}
             disabled={deletingSpotId !== null}
-            className="h-11 flex-1 flex-row items-center justify-center rounded-full bg-accent"
+            className="min-h-11 min-w-[120px] flex-1 flex-row items-center justify-center rounded-full bg-accent px-3 py-2"
             accessibilityRole="button"
             accessibilityLabel={`Edit ${spot.name}`}
           >
@@ -487,7 +495,7 @@ function SpotDetailsOverlay({
           <FeedbackPressable
             onPress={onDelete}
             disabled={deletingSpotId !== null}
-            className="h-11 flex-1 flex-row items-center justify-center rounded-full bg-white/15"
+            className="min-h-11 min-w-[120px] flex-1 flex-row items-center justify-center rounded-full bg-white/15 px-3 py-2"
             accessibilityRole="button"
             accessibilityLabel={`Delete ${spot.name}`}
           >
@@ -502,11 +510,11 @@ function SpotDetailsOverlay({
           </FeedbackPressable>
         </View>
       ) : canShowRemoval ? (
-        <View className="mt-3 flex-row gap-2">
+        <View className="mt-3 flex-row flex-wrap gap-2">
           <FeedbackPressable
             haptic="selection"
             onPress={onReportProblem}
-            className="h-11 flex-1 flex-row items-center justify-center rounded-full bg-white/15 px-3"
+            className="min-h-11 min-w-[120px] flex-1 flex-row items-center justify-center rounded-full bg-white/15 px-3 py-2"
             accessibilityRole="button"
             accessibilityLabel={`Report a problem with ${spot.name}`}
           >
@@ -517,7 +525,7 @@ function SpotDetailsOverlay({
           </FeedbackPressable>
           {wasReported ? (
             <View
-              className="h-11 flex-1 flex-row items-center justify-center rounded-full bg-white/10 px-3"
+              className="min-h-11 min-w-[120px] flex-1 flex-row items-center justify-center rounded-full bg-white/10 px-3 py-2"
               accessibilityRole="text"
               accessibilityLabel="Removal request submitted"
             >
@@ -530,7 +538,7 @@ function SpotDetailsOverlay({
             <FeedbackPressable
               haptic="selection"
               onPress={onRequestRemoval}
-              className="h-11 flex-1 flex-row items-center justify-center rounded-full bg-white/15 px-3"
+              className="min-h-11 min-w-[120px] flex-1 flex-row items-center justify-center rounded-full bg-white/15 px-3 py-2"
               accessibilityRole="button"
               accessibilityLabel={`Request removal of ${spot.name}`}
             >
@@ -892,7 +900,7 @@ export default function SpotFullscreenViewer({
           ref={listRef}
           style={styles.list}
           data={spots}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item, index) => `${item.id}:${index}`}
           horizontal
           pagingEnabled
           nestedScrollEnabled

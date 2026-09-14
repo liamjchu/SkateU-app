@@ -58,16 +58,17 @@ In the Supabase SQL Editor, run the idempotent scripts in this order:
 8. `supabase/spot_likes_setup.sql`
 9. `supabase/spot_comments_setup.sql`
 10. `supabase/spots_count_trigger.sql`
-11. `supabase/account_deletion_proofs_setup.sql`
-12. `supabase/spot_removal_requests_setup.sql`
-13. `supabase/user_feedback_setup.sql`
-14. `supabase/user_blocks_setup.sql`
-15. `supabase/user_follows_setup.sql`
-16. `supabase/comment_reports_setup.sql`
-17. `supabase/school_search_setup.sql`
-18. `supabase/nearest_school_setup.sql`
-19. `supabase/user_notifications_setup.sql`
-20. `supabase/push_notifications_setup.sql`
+11. `supabase/user_xp_setup.sql`
+12. `supabase/account_deletion_proofs_setup.sql`
+13. `supabase/spot_removal_requests_setup.sql`
+14. `supabase/user_feedback_setup.sql`
+15. `supabase/user_blocks_setup.sql`
+16. `supabase/user_follows_setup.sql`
+17. `supabase/comment_reports_setup.sql`
+18. `supabase/school_search_setup.sql`
+19. `supabase/nearest_school_setup.sql`
+20. `supabase/user_notifications_setup.sql`
+21. `supabase/push_notifications_setup.sql`
 
 Draft Terms of Use, Privacy Policy, and Community Guidelines live in `docs/`. They are product policies for later lawyer review, not legal advice.
 
@@ -96,6 +97,8 @@ select * from public.comment_reports order by created_at desc;
 ```
 
 Keep and remove snippets are documented at the top of the removal SQL file. If `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, and `MODERATION_NOTIFY_EMAIL` are set on the API server, crossing two unique removal requests also sends one email, and each Help & Support submission sends a notification to the same inbox.
+
+Apply every file in `supabase/migrations/` on the production project as well, including `20260914120000_fix_spot_delete_xp_and_user_blocks.sql`. That migration lets owners delete live spots after XP shipped, and creates `user_blocks` if it was never applied from the setup script.
 
 ## Push notifications
 

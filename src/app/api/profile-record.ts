@@ -56,12 +56,19 @@ function supabaseRestHeaders(config: SupabaseConfig): HeadersInit {
   };
 }
 
+function isMissingProfileColumn(body: string, column: 'bio' | 'xp_total'): boolean {
+  return (
+    body.includes(`profiles.${column} does not exist`) ||
+    body.includes(`'${column}' column of 'profiles'`)
+  );
+}
+
 function isMissingBioColumn(status: number, body: string): boolean {
-  return status === 400 && body.includes('profiles.bio does not exist');
+  return status === 400 && isMissingProfileColumn(body, 'bio');
 }
 
 function isMissingXpColumn(status: number, body: string): boolean {
-  return status === 400 && body.includes('profiles.xp_total does not exist');
+  return status === 400 && isMissingProfileColumn(body, 'xp_total');
 }
 
 function isMissingRelation(status: number, body: string): boolean {

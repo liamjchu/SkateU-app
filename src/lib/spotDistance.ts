@@ -37,7 +37,8 @@ function compareDistanceThenId(origin: LatLng) {
   };
 }
 
-export const MAP_SHEET_NEARBY_MAX_METERS = 400;
+/** Caps the map sheet pager. School is display-only and never groups this list. */
+export const MAP_SHEET_NEARBY_MAX_COUNT = 80;
 
 export function sortSpotsByDistanceFrom(spots: Spot[], origin: Spot): Spot[] {
   const originSpot = spots.find((spot) => spot.id === origin.id);
@@ -53,14 +54,18 @@ export function sortSpotsByDistanceFrom(spots: Spot[], origin: Spot): Spot[] {
 export function nearbySpotsForSheet(
   spots: Spot[],
   origin: Spot,
-  maxMeters: number = MAP_SHEET_NEARBY_MAX_METERS
+  maxCount: number = MAP_SHEET_NEARBY_MAX_COUNT
 ): Spot[] {
-  return sortSpotsByDistanceFrom(spots, origin).filter((spot) => {
-    if (spot.id === origin.id) {
-      return true;
-    }
-    return metersBetween(origin, spot) <= maxMeters;
-  });
+  const ranked = sortSpotsByDistanceFrom(spots, origin);
+  const limit = Math.max(1, maxCount);
+  if (ranked[0]?.id === origin.id) {
+    return ranked.slice(0, limit);
+  }
+
+  return [origin, ...ranked.filter((spot) => spot.id !== origin.id)].slice(
+    0,
+    limit
+  );
 }
 
 export function formatDistanceFromMeters(meters: number): string {

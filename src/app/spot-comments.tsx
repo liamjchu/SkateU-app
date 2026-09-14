@@ -298,7 +298,7 @@ export default function SpotCommentsScreen() {
         {spotName ? (
           <Text
             className="px-6 pt-3 font-outfit-semibold text-sm text-muted"
-            numberOfLines={1}
+            numberOfLines={2}
           >
             {spotName}
           </Text>
@@ -380,7 +380,7 @@ export default function SpotCommentsScreen() {
             <View className="min-h-12 min-w-0 flex-1 rounded-2xl border border-border-soft bg-field px-4 py-3">
               <TextInput
                 ref={inputRef}
-                className="max-h-28 w-full p-0 font-outfit-medium text-base text-ink"
+            className="max-h-40 w-full p-0 font-outfit-medium text-base text-ink"
                 placeholder={
                   replyTo ? 'Write a reply…' : 'Add a comment…'
                 }
@@ -410,7 +410,7 @@ export default function SpotCommentsScreen() {
                 void handleSubmit();
               }}
               disabled={!canSubmit}
-              className={`ml-2 h-12 items-center justify-center rounded-2xl px-4 ${
+              className={`ml-2 min-h-12 items-center justify-center rounded-2xl px-4 py-2 ${
                 canSubmit ? 'bg-accent' : 'bg-actionDisabled'
               }`}
               accessibilityRole="button"

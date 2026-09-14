@@ -37,7 +37,7 @@ function PasswordField({
   editable,
 }: PasswordFieldProps) {
   return (
-    <View className="flex-row items-center rounded-2xl border border-border-soft bg-field pl-5 pr-2">
+    <View className="min-h-14 flex-row items-center rounded-2xl border border-border-soft bg-field py-1 pl-5 pr-2">
       <TextInput
         value={value}
         onChangeText={onChangeText}

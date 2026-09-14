@@ -18,6 +18,11 @@ export const ADD_SPOT_NEAREST_SCHOOL_MAX_METERS = 50_000;
 /** Search pill plus campus chip below the safe area. Offsets banners and camera padding. */
 export const MAP_EXPLORE_CHROME_CONTENT_HEIGHT = 108;
 
+export function mapExploreChromeContentHeight(fontScale = 1): number {
+  const scale = Math.min(Math.max(fontScale, 1), 2.2);
+  return Math.round(MAP_EXPLORE_CHROME_CONTENT_HEIGHT * (0.35 + 0.65 * scale));
+}
+
 export function firstSearchParam(
   value: string | string[] | undefined
 ): string | undefined {

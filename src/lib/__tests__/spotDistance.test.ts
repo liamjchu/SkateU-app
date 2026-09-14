@@ -9,7 +9,8 @@ import {
 function makeSpot(
   id: string,
   latitude: number,
-  longitude: number
+  longitude: number,
+  schoolId?: string
 ): Spot {
   return {
     id,
@@ -20,7 +21,8 @@ function makeSpot(
     imageUris: [],
     city: '',
     state: '',
-    schoolName: '',
+    schoolName: schoolId ?? '',
+    ...(schoolId ? { schoolId } : {}),
     creatorUsername: null,
     creatorAvatarUrl: null,
     createdAt: '',
@@ -76,15 +78,25 @@ describe('sortSpotsByDistanceFrom', () => {
 });
 
 describe('nearbySpotsForSheet', () => {
-  const origin = makeSpot('origin', 40.0, -74.0);
-  const near = makeSpot('near', 40.001, -74.0);
-  const far = makeSpot('far', 40.02, -74.0);
+  const origin = makeSpot('origin', 40.0, -74.0, 'school-a');
+  const near = makeSpot('near', 40.001, -74.0, 'school-b');
+  const farther = makeSpot('farther', 40.02, -74.0, 'school-c');
+  const farthest = makeSpot('farthest', 41.0, -74.0, 'school-a');
 
-  it('keeps the tapped spot and nearby neighbors only', () => {
-    expect(nearbySpotsForSheet([far, origin, near], origin).map((s) => s.id)).toEqual([
-      'origin',
-      'near',
-    ]);
+  it('ranks every school together by distance from the tapped spot', () => {
+    expect(
+      nearbySpotsForSheet([farthest, origin, farther, near], origin).map(
+        (s) => s.id
+      )
+    ).toEqual(['origin', 'near', 'farther', 'farthest']);
+  });
+
+  it('caps the pager without dropping closer spots from other schools', () => {
+    expect(
+      nearbySpotsForSheet([farthest, origin, farther, near], origin, 3).map(
+        (s) => s.id
+      )
+    ).toEqual(['origin', 'near', 'farther']);
   });
 });
 

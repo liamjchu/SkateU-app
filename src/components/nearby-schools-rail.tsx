@@ -68,19 +68,22 @@ function EmptyRailCard({
   onAction?: () => void;
 }) {
   return (
-    <View className="h-52 items-center justify-center rounded-2xl bg-field px-4">
+    <View
+      className="min-h-52 items-center justify-center rounded-2xl bg-field px-4 py-4"
+      style={{ minHeight: 208 }}
+    >
       <View className="h-10 w-10 items-center justify-center rounded-xl bg-accent">
         <Feather name="navigation" size={18} color={colors.brand} />
       </View>
       <Text
-        numberOfLines={1}
+        numberOfLines={2}
         className="mt-2 text-center font-outfit-bold text-base text-ink"
       >
         {title}
       </Text>
       <Text
-        numberOfLines={2}
-        className="mt-0.5 text-center font-outfit-medium text-sm leading-5 text-muted"
+        numberOfLines={4}
+        className="mt-0.5 text-center font-outfit-medium text-sm text-muted"
       >
         {message}
       </Text>
@@ -178,7 +181,11 @@ export default function NearbySchoolsRail({
                       size={12}
                       color={colors.muted}
                     />
-                    <Text className="ml-1 font-outfit-medium text-sm text-muted">
+                    <Text
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                      className="ml-1 font-outfit-medium text-sm text-muted"
+                    >
                       {formatDistanceFromMeters(
                         schoolDistanceMeters(origin, school)
                       )}

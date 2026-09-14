@@ -137,6 +137,50 @@ describe('GET /api/profiles', () => {
     });
   });
 
+  it('loads a signed-in profile when user_blocks is missing', async () => {
+    setConfigured();
+    global.fetch = jest.fn(async (input) => {
+      const url = String(input);
+      if (url.includes('/auth/v1/user')) {
+        return jsonResponse({ id: viewerId });
+      }
+      if (url.includes('/rest/v1/user_blocks')) {
+        return new Response(
+          JSON.stringify({
+            code: 'PGRST205',
+            message: "Could not find the table 'public.user_blocks' in the schema cache",
+          }),
+          { status: 404, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      if (url.includes('/rest/v1/profiles')) {
+        return jsonResponse([
+          { id: profileId, username: 'skater_jane', avatar_url: null },
+        ]);
+      }
+      if (url.includes('following_id=eq.') && url.includes('follower_id=eq.')) {
+        return jsonResponse([]);
+      }
+      if (url.includes('following_id=eq.')) {
+        return countResponse(0);
+      }
+      if (url.includes('follower_id=eq.')) {
+        return countResponse(0);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as unknown as typeof fetch;
+
+    const response = await GET(
+      new Request(`https://app.test/api/profiles?userId=${profileId}`, {
+        headers: { Authorization: 'Bearer good-token' },
+      })
+    );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      profile: { id: profileId, username: 'skater_jane' },
+    });
+  });
+
   it('includes xpTotal when another signed-in user views the profile', async () => {
     setConfigured();
     global.fetch = jest.fn(async (input) => {
@@ -215,6 +259,45 @@ describe('GET /api/profiles', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       profile: { id: profileId, username: 'skater_jane', bio: null },
+    });
+  });
+
+  it('loads a profile when xp_total is missing from the schema cache', async () => {
+    setConfigured();
+    const fetchMock: FetchMock = jest.fn(async (input) => {
+      const url = String(input);
+      if (url.includes('/rest/v1/profiles') && url.includes('xp_total')) {
+        return new Response(
+          JSON.stringify({
+            code: 'PGRST204',
+            message:
+              "Could not find the 'xp_total' column of 'profiles' in the schema cache",
+          }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      if (url.includes('/rest/v1/profiles')) {
+        return jsonResponse([
+          { id: profileId, username: 'skater_jane', avatar_url: null },
+        ]);
+      }
+      if (url.includes('following_id=eq.')) {
+        return countResponse(0);
+      }
+      if (url.includes('follower_id=eq.')) {
+        return countResponse(0);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await GET(
+      new Request(`https://app.test/api/profiles?userId=${profileId}`)
+    );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      profile: { id: profileId, username: 'skater_jane' },
+      xpTotal: 0,
     });
   });
 

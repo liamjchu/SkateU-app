@@ -1,11 +1,73 @@
 import { Feather } from '@expo/vector-icons';
 import { useRef, type ReactNode } from 'react';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  ScrollView,
+  Text,
+  View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native';
 import { colors } from '../constants/colors';
+import { useFontScale } from '../hooks/useFontScale';
+import { scaledMinHeight } from '../lib/fontScale';
 import CachedRemoteImage from './CachedRemoteImage';
 import FeedbackPressable from './FeedbackPressable';
 
-const RAIL_MEDIA_HEIGHT = 128;
+export const RAIL_MEDIA_HEIGHT = 128;
+export const RAIL_CARD_WIDTH = 188;
+export const RAIL_BODY_MIN_HEIGHT = 208;
+
+type HomeRailScrollerProps = {
+  children: ReactNode;
+  accessibilityLabel?: string;
+  onEndReached?: () => void;
+};
+
+export function HomeRailScroller({
+  children,
+  accessibilityLabel,
+  onEndReached,
+}: HomeRailScrollerProps) {
+  const { fontScale } = useFontScale();
+  const minHeight = scaledMinHeight(RAIL_BODY_MIN_HEIGHT, fontScale);
+  const wasNearEndRef = useRef(false);
+
+  const handleScroll = onEndReached
+    ? (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+        const { contentOffset, layoutMeasurement, contentSize } =
+          event.nativeEvent;
+        const remaining =
+          contentSize.width - (contentOffset.x + layoutMeasurement.width);
+        const isNearEnd = remaining < 180;
+        if (isNearEnd && !wasNearEndRef.current) {
+          onEndReached();
+        }
+        wasNearEndRef.current = isNearEnd;
+      }
+    : undefined;
+
+  return (
+    <View className="-mx-6" style={{ minHeight }}>
+      <ScrollView
+        horizontal
+        nestedScrollEnabled
+        keyboardShouldPersistTaps="handled"
+        showsHorizontalScrollIndicator={false}
+        style={{ flexGrow: 0, minHeight }}
+        contentContainerStyle={{
+          gap: 12,
+          paddingHorizontal: 24,
+        }}
+        accessibilityLabel={accessibilityLabel}
+        scrollEventThrottle={16}
+        onScroll={handleScroll}
+      >
+        {children}
+      </ScrollView>
+    </View>
+  );
+}
 
 type HomeRailCardProps = {
   imageUrl?: string | null;
@@ -27,7 +89,11 @@ export default function HomeRailCard({
   accessory,
 }: HomeRailCardProps) {
   return (
-    <View className="w-[188px]" pointerEvents="box-none">
+    <View
+      className="w-[188px]"
+      style={{ width: RAIL_CARD_WIDTH }}
+      pointerEvents="box-none"
+    >
       <View className="overflow-hidden rounded-2xl bg-field">
         <FeedbackPressable
           haptic="light"
@@ -54,12 +120,14 @@ export default function HomeRailCard({
           <View className="px-3.5 py-3.5">
             <Text
               numberOfLines={1}
+              ellipsizeMode="tail"
               className="font-outfit-bold text-base text-ink"
             >
               {title}
             </Text>
             <Text
               numberOfLines={1}
+              ellipsizeMode="tail"
               className="mt-0.5 font-outfit-medium text-sm text-muted-soft"
             >
               {subtitle}
@@ -67,6 +135,7 @@ export default function HomeRailCard({
             {typeof meta === 'string' || typeof meta === 'number' ? (
               <Text
                 numberOfLines={1}
+                ellipsizeMode="tail"
                 className="mt-1 font-outfit-medium text-sm text-muted"
               >
                 {meta}
@@ -116,7 +185,6 @@ export function HomeFeedRail({
   onEndReached,
   isLoadingMore = false,
 }: HomeFeedRailProps) {
-  const wasNearEndRef = useRef(false);
   return (
     <View>
       <View className="mb-4">
@@ -128,24 +196,17 @@ export function HomeFeedRail({
         ) : null}
       </View>
       {isLoading ? (
-        <ScrollView
-          horizontal
-          nestedScrollEnabled
-          keyboardShouldPersistTaps="handled"
-          showsHorizontalScrollIndicator={false}
-          className="-mx-6"
-          contentContainerClassName="gap-3 px-6"
-          accessibilityLabel={loadingAccessibilityLabel}
-        >
+        <HomeRailScroller accessibilityLabel={loadingAccessibilityLabel}>
           {[0, 1, 2].map((placeholder) => (
             <View
               key={placeholder}
               className="h-52 w-[188px] rounded-2xl bg-field"
+              style={{ height: RAIL_BODY_MIN_HEIGHT, width: RAIL_CARD_WIDTH }}
             />
           ))}
-        </ScrollView>
+        </HomeRailScroller>
       ) : error && isEmpty ? (
-        <View className="flex-row items-center rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2.5">
+        <View className="flex-row items-start rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2.5">
           <Text className="flex-1 pr-2 font-outfit-medium text-sm text-errorText">
             {error}
           </Text>
@@ -161,33 +222,13 @@ export function HomeFeedRail({
       ) : isEmpty ? (
         empty
       ) : (
-        <ScrollView
-          horizontal
-          nestedScrollEnabled
-          keyboardShouldPersistTaps="handled"
-          showsHorizontalScrollIndicator={false}
-          className="-mx-6"
-          contentContainerClassName="items-center gap-3 px-6"
-          scrollEventThrottle={16}
-          onScroll={(event) => {
-            if (!onEndReached) {
-              return;
-            }
-
-            const { contentOffset, layoutMeasurement, contentSize } =
-              event.nativeEvent;
-            const remaining =
-              contentSize.width - (contentOffset.x + layoutMeasurement.width);
-            const isNearEnd = remaining < 180;
-            if (isNearEnd && !wasNearEndRef.current) {
-              onEndReached();
-            }
-            wasNearEndRef.current = isNearEnd;
-          }}
-        >
+        <HomeRailScroller onEndReached={onEndReached}>
           {children}
           {error ? (
-            <View className="w-[188px] justify-center rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2.5">
+            <View
+              className="w-[188px] justify-center rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2.5"
+              style={{ width: RAIL_CARD_WIDTH }}
+            >
               <Text className="font-outfit-medium text-sm text-errorText">
                 {error}
               </Text>
@@ -205,7 +246,7 @@ export function HomeFeedRail({
               <ActivityIndicator color={colors.accent} />
             </View>
           ) : null}
-        </ScrollView>
+        </HomeRailScroller>
       )}
     </View>
   );

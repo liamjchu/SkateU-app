@@ -1,12 +1,15 @@
 import { Tabs } from 'expo-router';
 import AppTabBar from '../../components/app-tab-bar';
 import { colors } from '../../constants/colors';
+import { usePrefetchUserLocation } from '../../hooks/usePrefetchUserLocation';
 
 export const unstable_settings = {
   initialRouteName: 'index',
 };
 
 export default function TabsLayout() {
+  usePrefetchUserLocation();
+
   return (
     <Tabs
       tabBar={(props) => <AppTabBar {...props} />}

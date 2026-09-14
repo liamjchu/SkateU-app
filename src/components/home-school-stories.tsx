@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import { ScrollView, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { colors } from '../constants/colors';
 import type { School } from '../types/school';
 import FeedbackPressable from './FeedbackPressable';
-import HomeRailCard from './home-rail-card';
+import HomeRailCard, { HomeRailScroller } from './home-rail-card';
 import { SchoolSpotCount } from './PopularSchoolCard';
 
 type HomeSchoolStoriesProps = {
@@ -33,14 +33,7 @@ export default function HomeSchoolStories({
           </Text>
         </View>
       ) : null}
-      <ScrollView
-        horizontal
-        nestedScrollEnabled
-        keyboardShouldPersistTaps="handled"
-        showsHorizontalScrollIndicator={false}
-        className="-mx-6"
-        contentContainerClassName="items-center gap-3 px-6"
-      >
+      <HomeRailScroller>
         {schools.map((school) => (
           <HomeRailCard
             key={school.id}
@@ -66,7 +59,7 @@ export default function HomeSchoolStories({
             }
           />
         ))}
-      </ScrollView>
+      </HomeRailScroller>
     </View>
   );
 }

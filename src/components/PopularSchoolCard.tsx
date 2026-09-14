@@ -2,6 +2,7 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import { Text, View } from 'react-native';
 import CachedRemoteImage from './CachedRemoteImage';
 import { colors } from '../constants/colors';
+import { useFontScale } from '../hooks/useFontScale';
 import { formatSpotCount } from '../lib/formatSpotCount';
 import type { School, SchoolType } from '../types/school';
 import FeedbackPressable from './FeedbackPressable';
@@ -35,7 +36,11 @@ export function SchoolSpotCount({
   return (
     <View className="flex-row items-center">
       <Feather name="map-pin" size={12} color={colors.muted} />
-      <Text className="ml-1 font-outfit-medium text-sm text-muted">
+      <Text
+        numberOfLines={1}
+        ellipsizeMode="tail"
+        className="ml-1 font-outfit-medium text-sm text-muted"
+      >
         {typeLabel
           ? `${formatSpotCount(count)} · ${typeLabel}`
           : formatSpotCount(count)}
@@ -50,9 +55,13 @@ export default function PopularSchoolCard({
   onPress,
   onToggleSave,
 }: PopularSchoolCardProps) {
+  const { isLarge } = useFontScale();
+
   return (
     <View className="mb-4 overflow-hidden rounded-2xl bg-field">
-        <View className="flex-row items-center p-4">
+        <View
+          className={`flex-row p-4 ${isLarge ? 'items-start' : 'items-center'}`}
+        >
           <FeedbackPressable
             haptic="light"
             onPress={() => onPress(school)}
@@ -76,13 +85,13 @@ export default function PopularSchoolCard({
 
             <View className="ml-3 min-w-0 flex-1">
               <Text
-                numberOfLines={1}
+                numberOfLines={2}
                 className="font-outfit-bold text-base text-ink"
               >
                 {school.name}
               </Text>
               <Text
-                numberOfLines={1}
+                numberOfLines={2}
                 className="mt-0.5 font-outfit-medium text-sm text-muted-soft"
               >
                 {school.city}, {school.state}
@@ -97,7 +106,7 @@ export default function PopularSchoolCard({
           <FeedbackPressable
             haptic="selection"
             onPress={() => onToggleSave(school)}
-            className={`h-11 w-11 items-center justify-center rounded-xl ${
+            className={`ml-2 h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
               isSaved ? 'bg-accent' : 'bg-surface-soft'
             }`}
             accessibilityRole="button"

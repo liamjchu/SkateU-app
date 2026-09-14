@@ -5,6 +5,7 @@ import {
     DEFAULT_MAP_CENTER,
     densestSchool,
     MAP_EXPLORE_CHROME_CONTENT_HEIGHT,
+    mapExploreChromeContentHeight,
     nearestSchool,
     nearestSchoolWithin,
     parseMapRouteFocus,
@@ -51,6 +52,7 @@ function makeSpot(overrides: Partial<Spot> = {}): Spot {
 describe('MAP_EXPLORE_CHROME_CONTENT_HEIGHT', () => {
   it('leaves room for the search pill and campus chip', () => {
     expect(MAP_EXPLORE_CHROME_CONTENT_HEIGHT).toBe(108);
+    expect(mapExploreChromeContentHeight(1)).toBe(108);
   });
 });
 

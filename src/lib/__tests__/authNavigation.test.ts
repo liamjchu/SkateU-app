@@ -20,7 +20,7 @@ describe('auth entry redirect', () => {
     ).toBe(true);
   });
 
-  it('does not interrupt onboarding, legal acceptance, or password recovery', () => {
+  it('does not interrupt onboarding or password recovery', () => {
     expect(
       shouldLeaveAuthEntryRoute({
         userId: 'user-1',

@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { colors } from '../constants/colors';
+import { useFontScale } from '../hooks/useFontScale';
 import { useHydrateFavoriteSchools } from '../hooks/useHydrateFavoriteSchools';
 import { getApiUrl } from '../lib/api';
 import {
@@ -53,6 +54,7 @@ export default function MapExploreChrome({
   onToggleSaveResult,
   onSearchActiveChange,
 }: MapExploreChromeProps) {
+  const { isLarge } = useFontScale();
   const searchInputRef = useRef<TextInput>(null);
   const schools = useSchools((state) => state.schools);
   const upsertSchool = useSchools((state) => state.upsertSchool);
@@ -231,9 +233,9 @@ export default function MapExploreChrome({
         className="absolute left-0 right-0 px-4"
         style={{ top: topInset + 8 }}
       >
-      <View className="flex-row items-center">
+      <View className={isLarge ? 'gap-2' : 'flex-row items-center'}>
         <View className="min-w-0 flex-1 overflow-hidden rounded-full bg-field">
-          <View className="relative justify-center">
+          <View className="relative min-h-12 justify-center py-1">
             <View className="absolute left-4 z-10">
               <Ionicons name="search" size={18} color={colors.ink} />
             </View>
@@ -253,7 +255,7 @@ export default function MapExploreChrome({
               autoCorrect={false}
               autoCapitalize="none"
               returnKeyType="search"
-              className="h-12 pl-11 pr-11 font-outfit-medium text-base text-ink"
+              className="min-h-12 pl-11 pr-11 font-outfit-medium text-base text-ink"
             />
             {trimmedQuery.length > 0 ? (
               <FeedbackPressable
@@ -277,7 +279,7 @@ export default function MapExploreChrome({
           <FeedbackPressable
             haptic="light"
             onPress={closeSearch}
-            className="ml-2 h-12 items-center justify-center rounded-full bg-field px-3.5"
+            className={`${isLarge ? 'mt-2 self-start' : 'ml-2'} min-h-12 items-center justify-center rounded-full bg-field px-3.5 py-2`}
             accessibilityRole="button"
             accessibilityLabel="Cancel school search"
           >
@@ -299,17 +301,17 @@ export default function MapExploreChrome({
       ) : null}
 
       {school && !isSearchOpen ? (
-        <View className="mt-2 flex-row items-center rounded-full bg-field px-2 py-1.5">
-          <View className="min-w-0 flex-1 px-2">
+        <View className="mt-2 flex-row items-start rounded-3xl bg-field px-2 py-1.5">
+          <View className="min-w-0 flex-1 px-2 py-1">
             <Text
-              numberOfLines={1}
+              numberOfLines={2}
               className="font-outfit-bold text-sm text-ink"
             >
               {school.name}
             </Text>
             {school.city && school.state ? (
               <Text
-                numberOfLines={1}
+                numberOfLines={2}
                 className="font-outfit-medium text-xs text-muted"
               >
                 {school.city}, {school.state}
@@ -319,7 +321,7 @@ export default function MapExploreChrome({
           <FeedbackPressable
             haptic="selection"
             onPress={onToggleFavorite}
-            className="h-10 w-10 items-center justify-center rounded-full"
+            className="h-10 w-10 shrink-0 items-center justify-center rounded-full"
             accessibilityRole="button"
             accessibilityLabel={
               isFavorite
@@ -337,7 +339,7 @@ export default function MapExploreChrome({
           <FeedbackPressable
             haptic="light"
             onPress={onDismissSchool}
-            className="h-10 w-10 items-center justify-center rounded-full"
+            className="h-10 w-10 shrink-0 items-center justify-center rounded-full"
             accessibilityRole="button"
             accessibilityLabel="Leave this campus"
           >
@@ -356,7 +358,7 @@ export default function MapExploreChrome({
             {activeFilter === 'saved' ? (
               <>
                 {favoriteHydrateError ? (
-                  <View className="mb-3 flex-row items-center rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2.5">
+                  <View className="mb-3 flex-row items-start rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2.5">
                     <Text className="flex-1 pr-2 font-outfit-medium text-sm text-errorText">
                       {favoriteHydrateError}
                     </Text>
@@ -411,7 +413,7 @@ export default function MapExploreChrome({
                   {searchStatusText}
                 </Text>
                 {searchError ? (
-                  <View className="mb-3 flex-row items-center rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2.5">
+                  <View className="mb-3 flex-row items-start rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2.5">
                     <Text className="flex-1 pr-2 font-outfit-medium text-sm text-errorText">
                       {searchError}
                     </Text>

@@ -1,5 +1,6 @@
 import { useGuardedRouter } from '../lib/navigationGuard';
-import { Modal, Pressable, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { useFontScale } from '../hooks/useFontScale';
 import FeedbackPressable from './FeedbackPressable';
 
 type LoginRequiredModalProps = {
@@ -16,6 +17,7 @@ export default function LoginRequiredModal({
   message = 'You can still browse campuses, view spots, and read comments. Sign up to like spots, add your own, or report content. Already have an account? You can log in from the next screen.',
 }: LoginRequiredModalProps) {
   const router = useGuardedRouter();
+  const { isExtraLarge } = useFontScale();
 
   const handleLoginPress = () => {
     onCancel();
@@ -47,6 +49,11 @@ export default function LoginRequiredModal({
           className="flex-1 items-center justify-center px-6"
         >
           <View className="w-full max-w-[480px] rounded-2xl bg-field p-6">
+            <ScrollView
+              bounces={false}
+              showsVerticalScrollIndicator={false}
+              className="max-h-[70vh]"
+            >
             <Text className="text-2xl text-ink font-outfit-black">
               {title}
             </Text>
@@ -54,14 +61,14 @@ export default function LoginRequiredModal({
               {message}
             </Text>
 
-            <View className="mt-6 flex-row gap-3">
+            <View className={`mt-6 gap-3 ${isExtraLarge ? '' : 'flex-row'}`}>
               <FeedbackPressable
                 onPress={onCancel}
                 className="min-h-12 flex-1 items-center justify-center rounded-xl bg-surface-soft py-4"
                 accessibilityLabel="Cancel sign up prompt"
                 accessibilityRole="button"
               >
-                <Text className="text-base text-ink font-outfit-bold">
+                <Text className="text-center text-base text-ink font-outfit-bold">
                   Not now
                 </Text>
               </FeedbackPressable>
@@ -72,11 +79,12 @@ export default function LoginRequiredModal({
                 accessibilityLabel="Go to sign up"
                 accessibilityRole="button"
               >
-                <Text className="text-base text-brand font-outfit-bold">
+                <Text className="text-center text-base text-brand font-outfit-bold">
                   Sign up
                 </Text>
               </FeedbackPressable>
             </View>
+            </ScrollView>
           </View>
         </View>
       </View>

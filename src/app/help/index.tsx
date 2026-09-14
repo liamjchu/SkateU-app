@@ -5,6 +5,7 @@ import { ScrollView, Text, View } from 'react-native';
 import FeedbackPressable from '../../components/FeedbackPressable';
 import ScreenHeader from '../../components/screen-header';
 import { colors } from '../../constants/colors';
+import { useFontScale } from '../../hooks/useFontScale';
 
 type HelpRow = {
   href: Href;
@@ -42,6 +43,7 @@ const HELP_ROWS: HelpRow[] = [
 
 export default function HelpSupportScreen() {
   const router = useGuardedRouter();
+  const { isLarge } = useFontScale();
 
   const goBack = () => {
     if (router.canGoBack()) {
@@ -73,15 +75,21 @@ export default function HelpSupportScreen() {
                 haptic="selection"
                 onPress={() => router.push(row.href)}
                 pressLockMs={700}
-                className="min-h-16 flex-row items-center px-4 py-4"
+                className={`min-h-16 flex-row px-4 py-4 ${
+                  isLarge ? 'items-start' : 'items-center'
+                }`}
                 accessibilityRole="button"
                 accessibilityLabel={row.title}
                 accessibilityHint={row.subtitle}
               >
-                <View className="h-9 w-9 items-center justify-center rounded-full bg-surface-soft">
+                <View
+                  className={`h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-soft ${
+                    isLarge ? 'mt-0.5' : ''
+                  }`}
+                >
                   <Feather name={row.icon} size={16} color={colors.ink} />
                 </View>
-                <View className="ml-3 flex-1">
+                <View className="ml-3 min-w-0 flex-1">
                   <Text className="font-outfit-semibold text-base text-ink">
                     {row.title}
                   </Text>
@@ -89,7 +97,12 @@ export default function HelpSupportScreen() {
                     {row.subtitle}
                   </Text>
                 </View>
-                <Feather name="chevron-right" size={18} color={colors.muted} />
+                <Feather
+                  name="chevron-right"
+                  size={18}
+                  color={colors.muted}
+                  style={isLarge ? { marginTop: 8 } : undefined}
+                />
               </FeedbackPressable>
             </View>
           ))}

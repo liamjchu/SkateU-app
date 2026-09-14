@@ -26,8 +26,8 @@ function ProfileStat({
         {value}
       </Text>
       <Text
-        className="mt-0.5 text-center font-outfit-medium text-[11px] leading-3 text-muted"
-        numberOfLines={1}
+        className="mt-0.5 text-center font-outfit-medium text-[11px] text-muted"
+        numberOfLines={2}
       >
         {label}
       </Text>
@@ -124,20 +124,20 @@ export default function ProfileIdentityCard({
 
         <View className="ml-4 min-w-0 flex-1 justify-center pt-0.5">
           <Text
-            className="font-outfit-black text-2xl leading-7 text-ink"
-            numberOfLines={1}
+            className="font-outfit-black text-2xl text-ink"
+            numberOfLines={2}
             ellipsizeMode="tail"
           >
             {displayName}
           </Text>
           <Text
-            className="mt-0.5 font-outfit-bold text-base leading-5 text-ink"
-            numberOfLines={1}
+            className="mt-0.5 font-outfit-bold text-base text-ink"
+            numberOfLines={2}
           >
             {XP_RANK_LABELS[rank]}
           </Text>
 
-          <View className="mt-3 flex-row">
+          <View className="mt-3 flex-row items-start">
             <ProfileStat
               value={spotCount}
               label="spots"
@@ -163,7 +163,7 @@ export default function ProfileIdentityCard({
         <View className="mt-4">
           <ProfileBioText
             bio={bio}
-            className="text-left font-outfit-medium text-sm leading-5 text-muted"
+            className="text-left font-outfit-medium text-sm text-muted"
           />
         </View>
       ) : null}

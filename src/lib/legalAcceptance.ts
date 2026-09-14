@@ -25,7 +25,60 @@ export const PROFILE_PUBLIC_SELECT_COLUMNS_WITHOUT_BIO_AND_XP =
 export const PROFILE_LEGAL_TABLE_COLUMNS =
   'id, legal_version, legal_accepted_at, age_attested_at';
 
-export type LegalGate = 'none' | 'age-gate' | 'onboarding' | 'accept-legal';
+export type LegalGate = 'none' | 'age-gate' | 'onboarding';
+
+const RETIRED_ACCEPT_LEGAL_SEGMENT = 'accept-legal';
+
+function pathSegments(path: string): string[] {
+  let pathname = path.trim();
+  let hostname = '';
+
+  try {
+    if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(pathname)) {
+      const url = new URL(pathname);
+      hostname = url.hostname;
+      pathname = url.pathname || pathname;
+    }
+  } catch {
+    // Keep the original string when it is not a parseable URL.
+  }
+
+  const segments = pathname
+    .split(/[?#]/, 1)[0]
+    .split('/')
+    .filter((segment) => segment.length > 0 && segment !== '--');
+
+  // skateu://accept-legal stores the route in the host, not the path.
+  if (
+    hostname.length > 0 &&
+    !hostname.includes('.') &&
+    hostname !== 'localhost'
+  ) {
+    segments.unshift(hostname);
+  }
+
+  return segments;
+}
+
+// Old TestFlight/App Store builds and Google OAuth still open /accept-legal.
+export function isRetiredAcceptLegalPath(
+  path: string | null | undefined
+): boolean {
+  if (!path) {
+    return false;
+  }
+
+  const segments = pathSegments(path);
+  return segments[segments.length - 1] === RETIRED_ACCEPT_LEGAL_SEGMENT;
+}
+
+export function rewriteRetiredAcceptLegalPath(path: string): string {
+  if (!isRetiredAcceptLegalPath(path)) {
+    return path;
+  }
+
+  return '/';
+}
 
 export function hasAgeAttestation(
   profile: Pick<Profile, 'age_attested_at'> | null
@@ -84,28 +137,18 @@ export function isAllowedDuringLegalGate(
     return routeRoot === 'age-gate' || routeRoot === 'age-restricted';
   }
 
-  if (gate === 'onboarding') {
-    return routeRoot === 'onboarding' || routeRoot === 'age-gate';
-  }
-
-  return (
-    routeRoot === 'accept-legal' || routeRoot === 'verify-delete-account'
-  );
+  return routeRoot === 'onboarding' || routeRoot === 'age-gate';
 }
 
 export function legalGateRedirectPath(
   gate: LegalGate
-): '/age-gate' | '/onboarding' | '/accept-legal' | null {
+): '/age-gate' | '/onboarding' | null {
   if (gate === 'age-gate') {
     return '/age-gate';
   }
 
   if (gate === 'onboarding') {
     return '/onboarding';
-  }
-
-  if (gate === 'accept-legal') {
-    return '/accept-legal';
   }
 
   return null;
@@ -116,7 +159,7 @@ export function isSettledLegalRoute(
   routeRoot: string | undefined
 ): boolean {
   if (gate === 'none') {
-    return routeRoot !== 'onboarding' && routeRoot !== 'accept-legal';
+    return routeRoot !== 'onboarding';
   }
 
   return isAllowedDuringLegalGate(gate, routeRoot);

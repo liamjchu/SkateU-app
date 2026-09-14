@@ -4,12 +4,14 @@ import { useGuardedRouter } from '../lib/navigationGuard';
 import FeedbackPressable from '../components/FeedbackPressable';
 import ScreenHeader from '../components/screen-header';
 import { colors } from '../constants/colors';
+import { useFontScale } from '../hooks/useFontScale';
 import { toUserFacingError } from '../lib/userFacingError';
 import { useAuthStore } from '../store/authStore';
 import { useBlocksStore } from '../store/blocksStore';
 
 export default function BlockedAccountsScreen() {
   const router = useGuardedRouter();
+  const { isLarge } = useFontScale();
   const accessToken = useAuthStore((state) => state.session?.access_token ?? null);
   const users = useBlocksStore((state) => state.users);
   const loading = useBlocksStore((state) => state.loading);
@@ -93,11 +95,11 @@ export default function BlockedAccountsScreen() {
             {users.map((user, index) => (
               <View
                 key={user.userId}
-                className={`min-h-14 flex-row items-center px-4 py-3 ${
-                  index > 0 ? 'border-t border-border-soft' : ''
-                }`}
+                className={`min-h-14 flex-row px-4 py-3 ${
+                  isLarge ? 'items-start' : 'items-center'
+                } ${index > 0 ? 'border-t border-border-soft' : ''}`}
               >
-                <Text className="flex-1 font-outfit-semibold text-base text-ink">
+                <Text className="min-w-0 flex-1 pr-3 font-outfit-semibold text-base text-ink">
                   {user.username ? `@${user.username}` : 'Deleted User'}
                 </Text>
                 <FeedbackPressable

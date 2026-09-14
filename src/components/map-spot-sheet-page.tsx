@@ -2,6 +2,7 @@ import { Feather, Octicons } from '@expo/vector-icons';
 import { useGuardedRouter } from '../lib/navigationGuard';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { colors } from '../constants/colors';
+import { useFontScale } from '../hooks/useFontScale';
 import { openSpotDirections } from '../lib/openSpotDirections';
 import { formatRelativeTime } from '../lib/relativeTime';
 import { openUserProfile } from '../lib/userProfileNavigation';
@@ -91,8 +92,8 @@ export default function MapSpotSheetPage({
 
   return (
     <View style={{ width }} className={fill ? 'flex-1' : undefined}>
-      <View className="flex-row items-start px-5">
-        <View className="min-w-0 flex-1 pr-3">
+      <View className="flex-row flex-wrap items-start gap-2 px-5">
+        <View className="min-w-0 flex-1 pr-1">
           <FeedbackPressable
             haptic="light"
             disablePressScale
@@ -102,7 +103,7 @@ export default function MapSpotSheetPage({
           >
             <View className="flex-row items-center">
               <Text
-                numberOfLines={1}
+                numberOfLines={2}
                 className="min-w-0 flex-1 font-outfit-bold text-xl text-ink"
               >
                 {spot.name}
@@ -110,6 +111,14 @@ export default function MapSpotSheetPage({
               <Feather name="chevron-right" size={18} color={colors.mutedSoft} />
             </View>
           </FeedbackPressable>
+          {spot.schoolName.trim().length > 0 ? (
+            <Text
+              numberOfLines={1}
+              className="mt-0.5 font-outfit-medium text-sm text-muted"
+            >
+              {spot.schoolName.trim()}
+            </Text>
+          ) : null}
           <View className="mt-1 flex-row items-center">
             {spot.creatorUserId ? (
               <FeedbackPressable
@@ -148,7 +157,7 @@ export default function MapSpotSheetPage({
               username={spot.creatorUsername}
               fallback="Deleted User"
               suffix={timeLabel ? ` · ${timeLabel}` : ''}
-              numberOfLines={1}
+              numberOfLines={2}
               className="ml-1.5 min-w-0 flex-1 font-outfit-medium text-sm text-muted"
             />
           </View>
@@ -239,6 +248,7 @@ function MapSpotSheetBody({
   onRequestRemoval: () => void;
   onBlockCreator?: () => void;
 }) {
+  const { isLarge } = useFontScale();
   return (
     <>
         {imageUris.length > 0 ? (
@@ -275,7 +285,7 @@ function MapSpotSheetBody({
             accessibilityRole="button"
             accessibilityLabel={`Open full screen view of ${spot.name}`}
           >
-            <Text className="mt-3 font-outfit-medium text-base text-muted-strong" numberOfLines={1}>
+            <Text className="mt-3 font-outfit-medium text-base text-muted-strong" numberOfLines={4}>
               {spot.description.trim()}
             </Text>
           </FeedbackPressable>
@@ -286,7 +296,7 @@ function MapSpotSheetBody({
           onPress={() => {
             void openSpotDirections(spot);
           }}
-          className="mt-4 h-12 flex-row items-center justify-center rounded-2xl bg-surface-soft"
+          className="mt-4 min-h-12 flex-row flex-wrap items-center justify-center rounded-2xl bg-surface-soft px-3 py-3"
           accessibilityRole="button"
           accessibilityLabel={`Get walking directions to ${spot.name}`}
           accessibilityHint="Opens Apple Maps or Google Maps"
@@ -298,12 +308,12 @@ function MapSpotSheetBody({
         </FeedbackPressable>
 
         {isOwned ? (
-          <View className="mt-3 flex-row gap-3">
+          <View className={`mt-3 gap-3 ${isLarge ? '' : 'flex-row'}`}>
             <FeedbackPressable
               haptic="light"
               onPress={onEdit}
               disabled={deletingSpotId !== null}
-              className="h-12 flex-1 flex-row items-center justify-center rounded-2xl bg-accent"
+              className="min-h-12 flex-1 flex-row flex-wrap items-center justify-center rounded-2xl bg-accent px-3 py-3"
               accessibilityLabel={`Edit ${spot.name}`}
               accessibilityRole="button"
             >
@@ -315,7 +325,7 @@ function MapSpotSheetBody({
             <FeedbackPressable
               onPress={onDelete}
               disabled={deletingSpotId !== null}
-              className="h-12 flex-1 flex-row items-center justify-center rounded-2xl bg-errorSurface"
+              className="min-h-12 flex-1 flex-row flex-wrap items-center justify-center rounded-2xl bg-errorSurface px-3 py-3"
               accessibilityLabel={`Delete ${spot.name}`}
               accessibilityRole="button"
             >
@@ -335,15 +345,15 @@ function MapSpotSheetBody({
               <FeedbackPressable
                 haptic="selection"
                 onPress={onReportProblem}
-                className="h-10 w-full items-center justify-center rounded-xl bg-surface-soft"
+                className="min-h-10 w-full items-center justify-center rounded-xl bg-surface-soft py-2"
                 accessibilityRole="button"
                 accessibilityLabel={`Report a problem with ${spot.name}`}
               >
                 <Feather name="alert-circle" size={16} color={colors.ink} />
               </FeedbackPressable>
               <Text
-                numberOfLines={1}
-                className="mt-1 font-outfit-semibold text-[11px] text-ink"
+                numberOfLines={2}
+                className="mt-1 text-center font-outfit-semibold text-[11px] text-ink"
               >
                 Report
               </Text>
@@ -351,7 +361,7 @@ function MapSpotSheetBody({
             <View className="min-w-0 flex-1 items-center">
               {wasReported ? (
                 <View
-                  className="h-10 w-full items-center justify-center rounded-xl bg-surface-soft"
+                  className="min-h-10 w-full items-center justify-center rounded-xl bg-surface-soft py-2"
                   accessibilityRole="text"
                   accessibilityLabel="Removal request submitted"
                 >
@@ -361,7 +371,7 @@ function MapSpotSheetBody({
                 <FeedbackPressable
                   haptic="selection"
                   onPress={onRequestRemoval}
-                  className="h-10 w-full items-center justify-center rounded-xl bg-surface-soft"
+                  className="min-h-10 w-full items-center justify-center rounded-xl bg-surface-soft py-2"
                   accessibilityRole="button"
                   accessibilityLabel={`Request removal of ${spot.name}`}
                 >
@@ -369,8 +379,8 @@ function MapSpotSheetBody({
                 </FeedbackPressable>
               )}
               <Text
-                numberOfLines={1}
-                className={`mt-1 font-outfit-semibold text-[11px] ${
+                numberOfLines={2}
+                className={`mt-1 text-center font-outfit-semibold text-[11px] ${
                   wasReported ? 'text-muted' : 'text-ink'
                 }`}
               >
@@ -382,7 +392,7 @@ function MapSpotSheetBody({
                 <FeedbackPressable
                   haptic="selection"
                   onPress={onBlockCreator}
-                  className="h-10 w-full items-center justify-center rounded-xl bg-surface-soft"
+                  className="min-h-10 w-full items-center justify-center rounded-xl bg-surface-soft py-2"
                   accessibilityRole="button"
                   accessibilityLabel={
                     spot.creatorUsername
@@ -393,8 +403,8 @@ function MapSpotSheetBody({
                   <Feather name="eye-off" size={16} color={colors.ink} />
                 </FeedbackPressable>
                 <Text
-                  numberOfLines={1}
-                  className="mt-1 font-outfit-semibold text-[11px] text-ink"
+                  numberOfLines={2}
+                  className="mt-1 text-center font-outfit-semibold text-[11px] text-ink"
                 >
                   Block user
                 </Text>

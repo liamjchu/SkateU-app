@@ -17,7 +17,7 @@ export default function LegalAuthNotice() {
 
   return (
     <View className="mt-6">
-      <Text className="text-center font-outfit-medium text-sm leading-5 text-muted">
+      <Text className="text-center font-outfit-medium text-sm text-muted">
         By continuing, you agree to SkateU’s terms. You must be 13 or older.
       </Text>
       <View className="mt-3 flex-row flex-wrap items-center justify-center gap-x-4 gap-y-2">

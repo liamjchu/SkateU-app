@@ -1,12 +1,24 @@
 import {
   FEED_SEEN_CAP,
+  extendFeedSession,
   isFeedSessionAppend,
   excludeSeenSpots,
   parseSeenSpotIds,
+  recycleFeedSpots,
   rememberSeenSpotIds,
+  shuffleFeedSpots,
+  startFeedSession,
   syncFeedSessionSpots,
   unseenSpotCount,
 } from '../feedSeen';
+
+function idsOf<T extends { id: string }>(spots: T[]): string[] {
+  return spots.map((spot) => spot.id);
+}
+
+function sortedIds(ids: string[]): string[] {
+  return [...ids].sort();
+}
 
 describe('rememberSeenSpotIds', () => {
   it('appends new ids and moves repeats to the end', () => {
@@ -50,15 +62,136 @@ describe('excludeSeenSpots', () => {
   });
 });
 
+describe('startFeedSession', () => {
+  const spots = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+
+  it('opens on the last viewed spot, then remaining unseen spots', () => {
+    expect(startFeedSession(spots, ['a', 'c']).map((spot) => spot.id)).toEqual([
+      'c',
+      'b',
+    ]);
+  });
+
+  it('continues through remaining unique spots when everything loaded so far was seen', () => {
+    expect(
+      startFeedSession(spots, ['a', 'b', 'c']).map((spot) => spot.id)
+    ).toEqual(['c', 'a', 'b']);
+  });
+
+  it('keeps ranking order when nothing has been viewed', () => {
+    expect(startFeedSession(spots, []).map((spot) => spot.id)).toEqual([
+      'a',
+      'b',
+      'c',
+    ]);
+  });
+});
+
+describe('shuffleFeedSpots', () => {
+  const spots = [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }];
+
+  it('returns a permutation without mutating the input', () => {
+    const original = [...spots];
+    const shuffled = shuffleFeedSpots(spots, 7);
+    expect(sortedIds(idsOf(shuffled))).toEqual(sortedIds(idsOf(spots)));
+    expect(spots).toEqual(original);
+  });
+
+  it('changes order for a non-trivial seed', () => {
+    expect(idsOf(shuffleFeedSpots(spots, 11))).not.toEqual(idsOf(spots));
+  });
+});
+
+describe('recycleFeedSpots', () => {
+  const spots = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+
+  it('does not recycle until every unique pool spot is already queued', () => {
+    expect(recycleFeedSpots([{ id: 'a' }, { id: 'b' }], spots, 1)).toEqual([
+      { id: 'a' },
+      { id: 'b' },
+    ]);
+  });
+
+  it('queues a shuffled extra cycle before the last unique spots run out', () => {
+    const session = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+    const next = recycleFeedSpots(session, spots, 1);
+    expect(idsOf(next).slice(0, 3)).toEqual(['a', 'b', 'c']);
+    expect(next).toHaveLength(6);
+    expect(sortedIds(idsOf(next).slice(3))).toEqual(['a', 'b', 'c']);
+    expect(next[3].id).not.toBe('c');
+  });
+
+  it('does not recycle while a full extra cycle is already queued', () => {
+    const pool = [
+      { id: 'a' },
+      { id: 'b' },
+      { id: 'c' },
+      { id: 'd' },
+      { id: 'e' },
+      { id: 'f' },
+    ];
+    const session = [...pool, ...pool];
+    expect(recycleFeedSpots(session, pool, 0)).toBe(session);
+  });
+});
+
+describe('extendFeedSession', () => {
+  it('appends unseen spots that are not already in the session', () => {
+    const pool = [{ id: 'a' }, { id: 'b' }];
+    const next = extendFeedSession([{ id: 'a' }], pool, [], false);
+    expect(next[0].id).toBe('a');
+    expect(next[1].id).toBe('b');
+    expect(next.length).toBeGreaterThan(pool.length);
+    expect(sortedIds(idsOf(next).slice(0, 2))).toEqual(['a', 'b']);
+  });
+
+  it('recycles the pool when there is nothing new to load', () => {
+    const pool = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+    const next = extendFeedSession(pool, pool, ['a', 'b', 'c'], false, 2);
+    expect(idsOf(next).slice(0, 3)).toEqual(['a', 'b', 'c']);
+    expect(next).toHaveLength(6);
+    expect(sortedIds(idsOf(next).slice(3))).toEqual(['a', 'b', 'c']);
+  });
+
+  it('appends already-loaded seen spots before recycling once paging is done', () => {
+    const pool = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+    const next = extendFeedSession([{ id: 'b' }], pool, ['a', 'b', 'c'], false);
+    expect(idsOf(next).slice(0, 3)).toEqual(['b', 'a', 'c']);
+    expect(next.length).toBeGreaterThan(3);
+  });
+
+  it('queues remaining unique spots without looping while another page could still load', () => {
+    const pool = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+    const next = extendFeedSession([{ id: 'b' }], pool, ['a', 'b', 'c'], true);
+    expect(idsOf(next)).toEqual(['b', 'a', 'c']);
+    expect(next).toHaveLength(3);
+  });
+
+  it('does not recycle while another page could still load', () => {
+    const pool = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+    expect(extendFeedSession(pool, pool, ['a', 'b', 'c'], true, 2)).toEqual(
+      pool
+    );
+  });
+});
+
 describe('syncFeedSessionSpots', () => {
-  it('starts a new session with only unseen spots when the list is replaced', () => {
+  it('keeps the current session when the incoming list is replaced', () => {
     expect(
       syncFeedSessionSpots(
         [{ id: 'old' }],
         [{ id: 'a' }, { id: 'b' }],
         ['a']
       ).map((spot) => spot.id)
-    ).toEqual(['b']);
+    ).toEqual(['old', 'b']);
+  });
+
+  it('starts from the last viewed spot when the session is empty', () => {
+    expect(
+      syncFeedSessionSpots([], [{ id: 'a' }, { id: 'b' }], ['a']).map(
+        (spot) => spot.id
+      )
+    ).toEqual(['a', 'b']);
   });
 
   it('appends newly loaded unseen spots without reshuffling the current session', () => {
