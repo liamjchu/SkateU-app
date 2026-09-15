@@ -124,7 +124,7 @@ export default function NoticeBanner({
 
           <View className="ml-3 min-w-0 flex-1">
             <Text className="font-outfit-bold text-sm text-ink">{title}</Text>
-            <Text className="mt-0.5 font-outfit-medium text-xs leading-4 text-muted">
+            <Text className="mt-0.5 font-outfit-medium text-xs text-muted">
               {message}
             </Text>
 

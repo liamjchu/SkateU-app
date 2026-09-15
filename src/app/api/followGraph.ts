@@ -21,6 +21,16 @@ function supabaseHeaders(config: SupabaseConfig): HeadersInit {
   };
 }
 
+function isMissingRelation(status: number, body: string): boolean {
+  return (
+    status === 404 ||
+    ((status === 400 || status === 406) &&
+      (body.includes('PGRST205') ||
+        body.includes('schema cache') ||
+        body.includes('does not exist')))
+  );
+}
+
 function parseExactCount(response: Response): number {
   const range =
     response.headers.get('content-range') ??
@@ -60,7 +70,11 @@ async function countFollows(
   }
 
   if (!response.ok && response.status !== 206) {
-    throw new Error(await response.text());
+    const body = await response.text();
+    if (isMissingRelation(response.status, body)) {
+      return 0;
+    }
+    throw new Error(body);
   }
 
   return parseExactCount(response);
@@ -87,7 +101,11 @@ export async function hasBlockEitherWay(
     headers: supabaseHeaders(config),
   });
   if (!response.ok) {
-    throw new Error(await response.text());
+    const body = await response.text();
+    if (isMissingRelation(response.status, body)) {
+      return false;
+    }
+    throw new Error(body);
   }
 
   const rows = (await response.json()) as unknown[];
@@ -109,7 +127,11 @@ export async function isFollowingUser(
     headers: supabaseHeaders(config),
   });
   if (!response.ok) {
-    throw new Error(await response.text());
+    const body = await response.text();
+    if (isMissingRelation(response.status, body)) {
+      return false;
+    }
+    throw new Error(body);
   }
 
   const rows = (await response.json()) as unknown[];
@@ -147,7 +169,11 @@ async function fetchEitherWayBlockedUserIds(
     headers: supabaseHeaders(config),
   });
   if (!response.ok) {
-    throw new Error(await response.text());
+    const body = await response.text();
+    if (isMissingRelation(response.status, body)) {
+      return new Set();
+    }
+    throw new Error(body);
   }
 
   const rows = (await response.json()) as {

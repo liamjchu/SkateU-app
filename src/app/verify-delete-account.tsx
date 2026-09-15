@@ -23,9 +23,8 @@ const RESEND_COOLDOWN = 60;
 // deletion instead of confirming a new signup.
 export default function VerifyDeleteAccountScreen() {
   const router = useGuardedRouter();
-  const params = useLocalSearchParams<{ email?: string; from?: string }>();
+  const params = useLocalSearchParams<{ email?: string }>();
   const email = typeof params.email === 'string' ? params.email : '';
-  const fromAcceptLegal = params.from === 'accept-legal';
 
   const verifyDeleteAccountOtp = useAuthStore(
     (state) => state.verifyDeleteAccountOtp
@@ -54,11 +53,6 @@ export default function VerifyDeleteAccountScreen() {
   }, [cooldown]);
 
   const goBack = () => {
-    if (fromAcceptLegal) {
-      router.replace('/accept-legal');
-      return;
-    }
-
     if (router.canGoBack()) {
       router.back();
       return;
@@ -176,7 +170,7 @@ export default function VerifyDeleteAccountScreen() {
                 return (
                   <View
                     key={index}
-                    className={`h-14 flex-1 items-center justify-center rounded-2xl bg-field ${
+                    className={`min-h-14 flex-1 items-center justify-center rounded-2xl bg-field py-2 ${
                       isActive ? 'border-2 border-accent' : 'border border-border-soft'
                     }`}
                   >
@@ -231,7 +225,7 @@ export default function VerifyDeleteAccountScreen() {
             haptic="warning"
             onPress={() => submitCode(code)}
             disabled={submitting}
-            className={`mt-2 h-14 flex-row items-center justify-center rounded-2xl ${
+            className={`mt-2 min-h-14 flex-row items-center justify-center rounded-2xl px-3 py-3 ${
               submitting ? 'bg-actionDisabled' : 'bg-errorText'
             }`}
             accessibilityLabel={submitting ? 'Verifying and deleting account' : 'Confirm account deletion'}

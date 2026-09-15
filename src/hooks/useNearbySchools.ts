@@ -3,14 +3,16 @@ import { Alert, Linking } from 'react-native';
 import { getSchoolTypesParam } from '../components/SchoolTypePills';
 import { getApiUrl } from '../lib/api';
 import { getExpoLocation } from '../lib/expoLocation';
-import { shouldRefetchNearby, type NearbyOrigin } from '../lib/nearbySchools';
+import {
+  shouldUseNearbyCache,
+  type NearbyOrigin,
+} from '../lib/nearbySchools';
+import { prefetchUserLocation } from '../lib/prefetchUserLocation';
+import { readUserCoordinates } from '../lib/readUserCoordinates';
 import { toUserFacingError } from '../lib/userFacingError';
 import { useSchools } from '../store/schoolsStore';
 import type { School, SchoolTypeFilter } from '../types/school';
 
-// A fix from the last few minutes is close enough for a "schools near you"
-// rail, and it avoids waiting on a fresh GPS lock.
-const LAST_KNOWN_MAX_AGE_MS = 5 * 60 * 1000;
 // Shared so a filter mismatch does not hand the home feed a new array, which
 // would rebuild its memoized list header on every render.
 const NO_SCHOOLS: School[] = [];
@@ -52,26 +54,14 @@ function showSettingsAlert(title: string, message: string): void {
 }
 
 async function readCoordinates(): Promise<NearbyOrigin | null> {
-  const Location = getExpoLocation();
-  if (!Location) {
-    return null;
-  }
-
-  const position =
-    (await Location.getLastKnownPositionAsync({
-      maxAge: LAST_KNOWN_MAX_AGE_MS,
-    })) ??
-    (await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Balanced,
-    }));
-
-  if (!position) {
+  const coords = await readUserCoordinates();
+  if (!coords) {
     return null;
   }
 
   return {
-    latitude: position.coords.latitude,
-    longitude: position.coords.longitude,
+    latitude: coords.latitude,
+    longitude: coords.longitude,
   };
 }
 
@@ -96,8 +86,13 @@ export function useNearbySchools(
   // would restart the load every time the feed is written.
   const cachedFilterRef = useRef(nearbyFilter);
   const cachedOriginRef = useRef(nearbyOrigin);
+  const cachedSchoolCountRef = useRef(
+    nearbyFilter === filter ? nearbySchools.length : 0
+  );
   cachedFilterRef.current = nearbyFilter;
   cachedOriginRef.current = nearbyOrigin;
+  cachedSchoolCountRef.current =
+    nearbyFilter === filter ? nearbySchools.length : 0;
 
   const isEnabled = filter !== 'saved';
 
@@ -148,9 +143,13 @@ export function useNearbySchools(
           return;
         }
 
-        const isCacheFresh =
-          cachedFilterRef.current === filter &&
-          !shouldRefetchNearby(cachedOriginRef.current, origin);
+        const isCacheFresh = shouldUseNearbyCache(
+          cachedFilterRef.current,
+          filter,
+          cachedOriginRef.current,
+          origin,
+          cachedSchoolCountRef.current
+        );
         if (!force && isCacheFresh) {
           setError('');
           setStatus('ready');
@@ -163,7 +162,7 @@ export function useNearbySchools(
           : '';
         const response = await fetch(
           getApiUrl(
-            `/api/schools?nearby=1&lat=${origin.latitude}&lng=${origin.longitude}${typeQuery}`
+            `/api/schools?nearby=1&lat=${encodeURIComponent(String(origin.latitude))}&lng=${encodeURIComponent(String(origin.longitude))}${typeQuery}`
           ),
           { signal: controller.signal }
         );
@@ -235,6 +234,7 @@ export function useNearbySchools(
 
     const permission = await Location.getForegroundPermissionsAsync();
     if (permission.granted) {
+      void prefetchUserLocation();
       setLoadNonce((nonce) => nonce + 1);
       return;
     }
@@ -254,6 +254,7 @@ export function useNearbySchools(
       return;
     }
 
+    void prefetchUserLocation();
     setLoadNonce((nonce) => nonce + 1);
   }, []);
 

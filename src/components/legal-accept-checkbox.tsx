@@ -26,13 +26,13 @@ export default function LegalAcceptCheckbox({
         haptic="selection"
         onPress={() => onCheckedChange(!checked)}
         disabled={disabled}
-        className="mt-4 min-h-14 flex-row items-center rounded-2xl border border-border-soft bg-field px-4 py-3"
+        className="mt-4 min-h-14 flex-row items-start rounded-2xl border border-border-soft bg-field px-4 py-3"
         accessibilityRole="checkbox"
         accessibilityState={{ checked, disabled }}
         accessibilityLabel="Agree to SkateU Terms, Community Guidelines, Privacy Policy, that SkateU may feature spots you post on Instagram, TikTok, and YouTube, and that you are 13 or older"
       >
         <View
-          className={`h-7 w-7 shrink-0 items-center justify-center rounded-md border ${
+          className={`mt-0.5 h-7 w-7 shrink-0 items-center justify-center rounded-md border ${
             checked ? 'border-accent bg-accent' : 'border-border-soft bg-surface'
           }`}
         >
@@ -40,7 +40,7 @@ export default function LegalAcceptCheckbox({
             <Feather name="check" size={16} color={colors.brand} />
           ) : null}
         </View>
-        <Text className="ml-3 min-w-0 flex-1 font-outfit-medium text-base leading-6 text-ink">
+        <Text className="ml-3 min-w-0 flex-1 font-outfit-medium text-base text-ink">
           I agree, including that SkateU may feature spots I post on Instagram,
           TikTok, and YouTube. I am 13 or older.
         </Text>

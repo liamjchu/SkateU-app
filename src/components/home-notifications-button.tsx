@@ -52,7 +52,7 @@ export default function HomeNotificationsButton({
             className="absolute right-0 top-0 min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-1"
             accessible={false}
           >
-            <Text className="font-outfit-bold text-[10px] leading-[14px] text-brand">
+            <Text className="px-0.5 font-outfit-bold text-[10px] text-brand">
               {badge}
             </Text>
           </View>

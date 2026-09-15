@@ -61,7 +61,7 @@ import {
     DEFAULT_MAP_CENTER,
     densestSchool,
     fetchNearestSchoolClient,
-    MAP_EXPLORE_CHROME_CONTENT_HEIGHT,
+    mapExploreChromeContentHeight,
     nearestSchool,
     parseMapRouteFocus,
 } from '../../lib/mapFocus';
@@ -121,7 +121,8 @@ export default function MapScreen() {
     ? searchParams.spotId[0]
     : searchParams.spotId;
   const insets = useSafeAreaInsets();
-  const { height, width } = useWindowDimensions();
+  const { height, width, fontScale } = useWindowDimensions();
+  const exploreChromeHeight = mapExploreChromeContentHeight(fontScale);
   const isTabletLayout = width >= 768 && height >= 600;
   const tabletSheetWidth = Math.min(width - 48, 520);
   const session = useAuthStore((state) => state.session);
@@ -282,15 +283,15 @@ export default function MapScreen() {
       return;
     }
 
+    if (userLocation) {
+      setCoordinateFocus(userLocation.latitude, userLocation.longitude);
+      return;
+    }
+
     if (
       userLocationStatus === 'idle' ||
       userLocationStatus === 'requesting'
     ) {
-      return;
-    }
-
-    if (userLocationStatus === 'ready' && userLocation) {
-      setCoordinateFocus(userLocation.latitude, userLocation.longitude);
       return;
     }
 
@@ -576,7 +577,7 @@ export default function MapScreen() {
               ${initialCenterRef.current.latitude},
               ${initialCenterRef.current.longitude},
               ${EXPANDED_SHEET_CONTENT_HEIGHT + 16},
-              ${insets.top + MAP_EXPLORE_CHROME_CONTENT_HEIGHT}
+              ${insets.top + exploreChromeHeight}
             );
           }
           if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
@@ -837,13 +838,14 @@ export default function MapScreen() {
       return;
     }
 
-    const topPadding = insets.top + MAP_EXPLORE_CHROME_CONTENT_HEIGHT;
+    const topPadding = insets.top + exploreChromeHeight;
     const sheetCover =
       (sheetLayoutHeight > 0 ? sheetLayoutHeight : sheetBodyHeight) + 16;
     webViewRef.current?.injectJavaScript(
       `window.focusLatLng(${selectedSpot.latitude},${selectedSpot.longitude},${sheetCover},${topPadding}); true;`
     );
   }, [
+    exploreChromeHeight,
     insets.top,
     mapStatus,
     selectedSpot?.id,
@@ -1639,8 +1641,8 @@ export default function MapScreen() {
             style={[styles.attributionSheet, { paddingBottom: Math.max(insets.bottom, 16) }]}
           >
             <View className="mb-4 h-1.5 w-12 self-center rounded-full bg-accent" />
-            <View className="min-h-12 flex-row items-center justify-between">
-              <Text className="font-outfit-bold text-xl text-ink">
+            <View className="min-h-12 flex-row items-start justify-between gap-3">
+              <Text className="min-w-0 flex-1 font-outfit-bold text-xl text-ink">
                 Map attribution
               </Text>
               <FeedbackPressable
@@ -1654,7 +1656,7 @@ export default function MapScreen() {
               </FeedbackPressable>
             </View>
             <View className="mt-4 pb-6">
-              <Text className="font-outfit-medium text-sm leading-5 text-muted-strong">
+              <Text className="font-outfit-medium text-sm text-muted-strong">
                 {MAP_ATTRIBUTIONS[mapLayer]}
               </Text>
             </View>
@@ -1665,7 +1667,7 @@ export default function MapScreen() {
       {mapStatus === 'loading' ? (
         <View
           className="absolute inset-0 z-40 items-center justify-center bg-brand/90 px-8"
-          style={{ top: insets.top + MAP_EXPLORE_CHROME_CONTENT_HEIGHT }}
+          style={{ top: insets.top + exploreChromeHeight }}
         >
           <ActivityIndicator color="#FFFFFF" />
           <Text className="mt-3 text-center font-outfit-medium text-base text-white">
@@ -1697,7 +1699,7 @@ export default function MapScreen() {
       {mapStatus === 'ready' && error && spots.length > 0 && spotsFetchedAt ? (
         <View
           className="absolute left-4 right-4 z-40"
-          style={{ top: insets.top + MAP_EXPLORE_CHROME_CONTENT_HEIGHT }}
+          style={{ top: insets.top + exploreChromeHeight }}
         >
           <StaleCacheBanner
             message={STALE_SPOTS_MESSAGE}
@@ -1708,9 +1710,9 @@ export default function MapScreen() {
       ) : mapStatus === 'ready' && error ? (
         <View
           className="absolute left-4 right-4 z-40 rounded-2xl border border-errorBorder bg-field px-4 py-3"
-          style={{ top: insets.top + MAP_EXPLORE_CHROME_CONTENT_HEIGHT }}
+          style={{ top: insets.top + exploreChromeHeight }}
         >
-          <View className="flex-row items-center justify-between">
+            <View className="flex-row items-start justify-between">
             <View className="flex-1 pr-3">
               <Text
                 accessibilityRole="alert"
@@ -1736,7 +1738,7 @@ export default function MapScreen() {
       ) : mapStatus === 'ready' && loading ? (
         <View
           className="absolute left-0 right-0 z-40 items-center"
-          style={{ top: insets.top + MAP_EXPLORE_CHROME_CONTENT_HEIGHT }}
+          style={{ top: insets.top + exploreChromeHeight }}
         >
           <View className="flex-row items-center rounded-full bg-white px-3 py-1.5">
             <ActivityIndicator size="small" color={colors.brand} />
@@ -1768,7 +1770,7 @@ export default function MapScreen() {
             <Text className="mt-3 text-center font-outfit-bold text-xl text-ink">
               No skate spots here yet
             </Text>
-            <Text className="mt-1.5 text-center font-outfit-medium text-sm leading-5 text-muted-strong">
+            <Text className="mt-1.5 text-center font-outfit-medium text-sm text-muted-strong">
               Be the first to drop a spot.
             </Text>
             <FeedbackPressable

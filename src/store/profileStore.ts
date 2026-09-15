@@ -1,8 +1,10 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import { LEGAL_VERSION } from '../content/legal';
 import { getApiUrl } from '../lib/api';
 import { getClientStorage } from '../lib/clientStorage';
 import {
+  hasCurrentLegalAcceptance,
   PROFILE_PUBLIC_SELECT_COLUMNS,
   PROFILE_PUBLIC_SELECT_COLUMNS_WITHOUT_BIO,
   PROFILE_PUBLIC_SELECT_COLUMNS_WITHOUT_BIO_AND_XP,
@@ -84,6 +86,8 @@ const PROFILE_LOAD_FAILED =
 
 function mergeReturnedProfile(current: Profile | null, next: Profile): Profile {
   const profile = mapProfile(next);
+  const nextHasXp =
+    typeof next.xp_total === 'number' && Number.isFinite(next.xp_total);
   return {
     ...profile,
     legal_version: profile.legal_version ?? current?.legal_version ?? null,
@@ -91,7 +95,21 @@ function mergeReturnedProfile(current: Profile | null, next: Profile): Profile {
       profile.legal_accepted_at ?? current?.legal_accepted_at ?? null,
     age_attested_at:
       profile.age_attested_at ?? current?.age_attested_at ?? null,
+    xp_total: nextHasXp
+      ? profile.xp_total
+      : (current?.xp_total ?? profile.xp_total),
   };
+}
+
+function withPublicXp(
+  profile: Profile,
+  publicProfile: Profile,
+  publicHadXp: boolean
+): Profile {
+  if (!publicHadXp) {
+    return profile;
+  }
+  return { ...profile, xp_total: publicProfile.xp_total };
 }
 
 function syncAvatarCaches(profile: Profile): void {
@@ -129,6 +147,7 @@ export const useProfileStore = create<ProfileState>()(
 
     let data: Record<string, unknown> | null = null;
     let error: { message: string } | null = null;
+    let usedSelect: string | null = null;
     for (const selectColumns of profileSelects) {
       const result = await supabase
         .from('profiles')
@@ -138,10 +157,15 @@ export const useProfileStore = create<ProfileState>()(
       data = (result.data as Record<string, unknown> | null) ?? null;
       error = result.error;
       if (!error) {
+        usedSelect = selectColumns;
         break;
       }
-      const missingBio = error.message.includes('profiles.bio does not exist');
-      const missingXp = error.message.includes('profiles.xp_total does not exist');
+      const missingBio =
+        error.message.includes('profiles.bio does not exist') ||
+        error.message.includes("'bio' column of 'profiles'");
+      const missingXp =
+        error.message.includes('profiles.xp_total does not exist') ||
+        error.message.includes("'xp_total' column of 'profiles'");
       if (!missingBio && !missingXp) {
         break;
       }
@@ -161,6 +185,7 @@ export const useProfileStore = create<ProfileState>()(
       return;
     }
 
+    const publicHadXp = Boolean(usedSelect?.includes('xp_total'));
     const publicProfile =
       data && typeof data.id === 'string'
         ? mapProfile({
@@ -172,9 +197,22 @@ export const useProfileStore = create<ProfileState>()(
           })
         : null;
 
-    if (!publicProfile || !accessToken) {
+    if (!publicProfile) {
       set({
-        profile: publicProfile,
+        profile: null,
+        loading: false,
+        loaded: true,
+        error: null,
+      });
+      return;
+    }
+
+    // Public profile rows never include legal timestamps. Keep a cached
+    // acceptance so a missing token or a down legal route cannot lock the user
+    // on the rules screen.
+    if (!accessToken) {
+      set({
+        profile: mergeReturnedProfile(cached, publicProfile),
         loading: false,
         loaded: true,
         error: null,
@@ -201,8 +239,12 @@ export const useProfileStore = create<ProfileState>()(
         throw new Error(legalData?.error ?? 'Could not load legal acceptance.');
       }
 
+      const next = mapProfile(legalData.profile);
+      const withLegal = hasCurrentLegalAcceptance(next)
+        ? next
+        : mergeReturnedProfile(cached, next);
       set({
-        profile: mapProfile(legalData.profile),
+        profile: withPublicXp(withLegal, publicProfile, publicHadXp),
         loading: false,
         loaded: true,
         error: null,
@@ -213,7 +255,7 @@ export const useProfileStore = create<ProfileState>()(
       }
 
       set({
-        profile: publicProfile,
+        profile: mergeReturnedProfile(cached, publicProfile),
         loading: false,
         loaded: true,
         error: null,
@@ -550,12 +592,30 @@ export const useProfileStore = create<ProfileState>()(
 
       profileRequestVersion += 1;
       set({
-        profile: mapProfile(data.profile),
+        profile: mergeReturnedProfile(get().profile, data.profile),
         loading: false,
         loaded: true,
         error: null,
       });
     } catch (error) {
+      const current = get().profile;
+      if (current?.id) {
+        const acceptedAt = new Date().toISOString();
+        profileRequestVersion += 1;
+        set({
+          profile: {
+            ...current,
+            legal_version: LEGAL_VERSION,
+            legal_accepted_at: acceptedAt,
+            age_attested_at: acceptedAt,
+          },
+          loading: false,
+          loaded: true,
+          error: null,
+        });
+        return;
+      }
+
       if (error instanceof Error && error.name === 'AbortError') {
         throw new Error('Saving your agreement timed out. Please try again.');
       }

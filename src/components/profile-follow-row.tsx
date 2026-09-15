@@ -1,4 +1,5 @@
 import { ActivityIndicator, Text, View } from 'react-native';
+import { useFontScale } from '../hooks/useFontScale';
 import { useGuardedRouter } from '../lib/navigationGuard';
 import { colors } from '../constants/colors';
 import { openUserProfile } from '../lib/userProfileNavigation';
@@ -24,27 +25,30 @@ export default function ProfileFollowRow({
   onFollowPress,
 }: ProfileFollowRowProps) {
   const router = useGuardedRouter();
+  const { isLarge } = useFontScale();
   const label = user.username ? `@${user.username}` : 'A skater';
 
   return (
     <View
-      className={`min-h-14 flex-row items-center px-4 py-3 ${
-        showDivider ? 'border-t border-border-soft' : ''
-      }`}
+      className={`min-h-14 flex-row px-4 py-3 ${
+        isLarge ? 'items-start' : 'items-center'
+      } ${showDivider ? 'border-t border-border-soft' : ''}`}
     >
       <FeedbackPressable
         haptic="selection"
         onPress={() => {
           openUserProfile(router, user.id, currentUserId);
         }}
-        className="min-w-0 flex-1 flex-row items-center"
+        className={`min-w-0 flex-1 flex-row ${
+          isLarge ? 'items-start' : 'items-center'
+        }`}
         accessibilityRole="link"
         accessibilityLabel={`Open ${label}'s profile`}
       >
         <ProfileAvatar uri={user.avatarUrl} size={40} iconSize={18} rank={user.rank} />
         <Text
           className="ml-3 min-w-0 flex-1 font-outfit-semibold text-base text-ink"
-          numberOfLines={1}
+          numberOfLines={2}
         >
           {label}
         </Text>
@@ -56,7 +60,7 @@ export default function ProfileFollowRow({
             onFollowPress(user);
           }}
           disabled={followBusy}
-          className={`ml-3 h-9 min-w-[88px] items-center justify-center rounded-xl px-3 ${
+          className={`ml-3 min-h-9 min-w-[88px] items-center justify-center rounded-xl px-3 py-2 ${
             user.isFollowing ? 'bg-surface-soft' : 'bg-brand'
           }`}
           accessibilityRole="button"

@@ -56,12 +56,29 @@ function supabaseRestHeaders(config: SupabaseConfig): HeadersInit {
   };
 }
 
+function isMissingProfileColumn(body: string, column: 'bio' | 'xp_total'): boolean {
+  return (
+    body.includes(`profiles.${column} does not exist`) ||
+    body.includes(`'${column}' column of 'profiles'`)
+  );
+}
+
 function isMissingBioColumn(status: number, body: string): boolean {
-  return status === 400 && body.includes('profiles.bio does not exist');
+  return status === 400 && isMissingProfileColumn(body, 'bio');
 }
 
 function isMissingXpColumn(status: number, body: string): boolean {
-  return status === 400 && body.includes('profiles.xp_total does not exist');
+  return status === 400 && isMissingProfileColumn(body, 'xp_total');
+}
+
+function isMissingRelation(status: number, body: string): boolean {
+  return (
+    status === 404 ||
+    ((status === 400 || status === 406) &&
+      (body.includes('PGRST205') ||
+        body.includes('schema cache') ||
+        body.includes('does not exist')))
+  );
 }
 
 async function fetchLegalRowFromProfiles(
@@ -168,7 +185,8 @@ export async function fetchLegalRow(
     return asLegalRow(firstRow((await response.json()) as unknown));
   }
 
-  if (response.status === 404) {
+  const body = await response.text().catch(() => '');
+  if (isMissingRelation(response.status, body)) {
     return fetchLegalRowFromProfiles(config, userId, signal);
   }
 
@@ -238,7 +256,8 @@ export async function upsertProfileLegal(
     return fetchMergedProfile(config, userId, signal);
   }
 
-  if (response.status !== 404) {
+  const body = await response.text().catch(() => '');
+  if (!isMissingRelation(response.status, body)) {
     throw new Error(`Legal upsert failed: ${response.status}`);
   }
 

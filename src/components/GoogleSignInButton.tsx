@@ -94,7 +94,7 @@ export default function GoogleSignInButton({
       {loading ? (
         <ActivityIndicator color={colors.brand} />
       ) : (
-        <View className="flex-row items-center gap-2">
+        <View className="flex-row flex-wrap items-center justify-center gap-2">
           <Ionicons name="logo-google" size={20} color={colors.brand} />
           <Text className="text-base text-brand font-outfit-bold">
             {compact ? 'Google' : 'Sign in with Google'}

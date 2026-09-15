@@ -59,7 +59,9 @@ export default function SchoolTypePills({
             haptic="selection"
             onPress={() => onSelect(option.key)}
             className={`flex-row items-center ${
-              compact ? 'h-9 rounded-full px-3' : 'h-10 rounded-xl px-4'
+              compact
+                ? 'min-h-9 rounded-full px-3 py-1.5'
+                : 'min-h-10 rounded-xl px-4 py-2'
             } ${isSelected ? 'bg-accent' : 'bg-field'}`}
             accessibilityRole="button"
             accessibilityLabel={

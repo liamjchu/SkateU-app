@@ -177,3 +177,34 @@ export function shouldRefetchNearby(
 
   return metersBetween(previous, next) > NEARBY_REFETCH_METERS;
 }
+
+// iOS Simulator and some failed CLLocation reads report exactly 0,0.
+// There are no US campuses in that box, and it is never a real user fix.
+const NULL_ISLAND_MAX_ABS_DEGREES = 0.5;
+
+export function isUsableGpsOrigin(
+  origin: NearbyOrigin | null | undefined
+): origin is NearbyOrigin {
+  if (!origin) {
+    return false;
+  }
+
+  return (
+    Math.abs(origin.latitude) >= NULL_ISLAND_MAX_ABS_DEGREES ||
+    Math.abs(origin.longitude) >= NULL_ISLAND_MAX_ABS_DEGREES
+  );
+}
+
+export function shouldUseNearbyCache(
+  cachedFilter: string | null,
+  filter: string,
+  cachedOrigin: NearbyOrigin | null,
+  origin: NearbyOrigin,
+  cachedSchoolCount: number
+): boolean {
+  if (cachedSchoolCount <= 0 || cachedFilter !== filter) {
+    return false;
+  }
+
+  return !shouldRefetchNearby(cachedOrigin, origin);
+}

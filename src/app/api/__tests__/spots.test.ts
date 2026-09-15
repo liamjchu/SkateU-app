@@ -1,7 +1,7 @@
 import fc from 'fast-check';
 
 import { IMAGE_SANITIZE_ERROR } from '../../../lib/sanitizeImage';
-import { HOME_SPOTS_PAGE_SIZE, FEED_CANDIDATE_LIMIT } from '../../../lib/homeFeed';
+import { HOME_SPOTS_PAGE_SIZE } from '../../../lib/homeFeed';
 import {
     CAMERA_MAKE,
     CAPTURE_TIME,
@@ -588,7 +588,7 @@ describe('GET /api/spots', () => {
     expect(fetchMock).toHaveBeenCalled();
     const recentUrl = new URL(String(fetchMock.mock.calls[0][0]));
     expect(recentUrl.searchParams.get('order')).toBe('created_at.desc,id.desc');
-    expect(recentUrl.searchParams.get('limit')).toBe(String(FEED_CANDIDATE_LIMIT));
+    expect(recentUrl.searchParams.get('limit')).toBe(String(HOME_SPOTS_PAGE_SIZE));
     expect(recentUrl.searchParams.get('status')).toBe(VISIBLE_SPOT_STATUS_FILTER);
     expect(recentUrl.searchParams.get('offset')).toBeNull();
   });
@@ -625,9 +625,15 @@ describe('GET /api/spots', () => {
       name: `Fill ${index}`,
       created_at: new Date(now - (index + 8) * 60 * 60 * 1000).toISOString(),
     }));
-    const fetchMock: FetchMock = jest.fn(async (_input: string | URL | Request) =>
-      jsonResponse([quiet, hot, ...filler])
-    );
+    const allRows = [quiet, hot, ...filler];
+    const fetchMock: FetchMock = jest.fn(async (input: string | URL | Request) => {
+      const requestUrl = new URL(String(input));
+      const offset = Number(requestUrl.searchParams.get('offset') ?? '0');
+      const limit = Number(
+        requestUrl.searchParams.get('limit') ?? HOME_SPOTS_PAGE_SIZE
+      );
+      return jsonResponse(allRows.slice(offset, offset + limit));
+    });
     global.fetch = fetchMock as unknown as typeof fetch;
 
     const firstPage = await GET(
@@ -648,9 +654,12 @@ describe('GET /api/spots', () => {
     expect(secondBody.spots).toHaveLength(2);
     expect(secondBody.spots.map((spot) => spot.id)).not.toContain('spot-hot');
 
-    const recentUrl = new URL(String(fetchMock.mock.calls[0][0]));
-    expect(recentUrl.searchParams.get('offset')).toBeNull();
-    expect(recentUrl.searchParams.get('limit')).toBe(String(FEED_CANDIDATE_LIMIT));
+    const firstUrl = new URL(String(fetchMock.mock.calls[0][0]));
+    const secondUrl = new URL(String(fetchMock.mock.calls[1][0]));
+    expect(firstUrl.searchParams.get('offset')).toBeNull();
+    expect(firstUrl.searchParams.get('limit')).toBe(String(HOME_SPOTS_PAGE_SIZE));
+    expect(secondUrl.searchParams.get('offset')).toBe(String(HOME_SPOTS_PAGE_SIZE));
+    expect(secondUrl.searchParams.get('limit')).toBe(String(HOME_SPOTS_PAGE_SIZE));
   });
 
   it('filters recent spots by school type and includes offset', async () => {
@@ -670,8 +679,8 @@ describe('GET /api/spots', () => {
 
     const recentUrl = new URL(String(fetchMock.mock.calls[0][0]));
     expect(recentUrl.searchParams.get('schools.type')).toBe('in.(k12_public)');
-    expect(recentUrl.searchParams.get('offset')).toBeNull();
-    expect(recentUrl.searchParams.get('limit')).toBe(String(FEED_CANDIDATE_LIMIT));
+    expect(recentUrl.searchParams.get('offset')).toBe(String(HOME_SPOTS_PAGE_SIZE));
+    expect(recentUrl.searchParams.get('limit')).toBe(String(HOME_SPOTS_PAGE_SIZE));
     expect(recentUrl.searchParams.get('order')).toBe('created_at.desc,id.desc');
   });
 
@@ -2233,6 +2242,13 @@ describe('DELETE /api/spots', () => {
         call[0].toString().includes('/rest/v1/spots')
     );
     expect(deleteCall?.[0].toString()).toContain('id=eq.spot1');
+
+    const unapproveCall = fetchMock.mock.calls.find(
+      (call) =>
+        call[1]?.method === 'PATCH' &&
+        call[0].toString().includes('/rest/v1/spots')
+    );
+    expect(unapproveCall?.[1]?.body).toBe(JSON.stringify({ status: 'removed' }));
   });
 
   it('lets the owner delete a spot that is still pending review', async () => {
@@ -2262,6 +2278,9 @@ describe('DELETE /api/spots', () => {
       })
     );
     expect(response.status).toBe(200);
+    expect(
+      fetchMock.mock.calls.some((call) => call[1]?.method === 'PATCH')
+    ).toBe(false);
   });
 });
 

@@ -9,8 +9,10 @@ import {
   getLegalGate,
   hasCurrentLegalAcceptance,
   isAllowedDuringLegalGate,
+  isRetiredAcceptLegalPath,
   isSettledLegalRoute,
   legalGateRedirectPath,
+  rewriteRetiredAcceptLegalPath,
 } from '../legalAcceptance';
 
 function profile(overrides: Partial<Profile> = {}): Profile {
@@ -61,11 +63,11 @@ describe('age eligibility', () => {
 });
 
 describe('hasCurrentLegalAcceptance', () => {
-  it('requires the current version and both timestamps', () => {
+  it('requires both timestamps and ignores later document versions', () => {
     expect(hasCurrentLegalAcceptance(profile())).toBe(true);
     expect(
       hasCurrentLegalAcceptance(profile({ legal_version: '2019-01-01' }))
-    ).toBe(false);
+    ).toBe(true);
     expect(hasCurrentLegalAcceptance(profile({ legal_accepted_at: null }))).toBe(
       false
     );
@@ -135,7 +137,7 @@ describe('getLegalGate', () => {
     ).toBe('onboarding');
   });
 
-  it('sends existing users with a username to accept-legal until they accept', () => {
+  it('lets existing usernames through even without a recorded acceptance', () => {
     expect(
       getLegalGate({
         userId: 'user-1',
@@ -146,10 +148,7 @@ describe('getLegalGate', () => {
           age_attested_at: null,
         }),
       })
-    ).toBe('accept-legal');
-  });
-
-  it('lets users through after current acceptance', () => {
+    ).toBe('none');
     expect(
       getLegalGate({
         userId: 'user-1',
@@ -169,14 +168,8 @@ describe('legal route lock', () => {
     expect(isAllowedDuringLegalGate('onboarding', 'onboarding')).toBe(true);
     expect(isAllowedDuringLegalGate('onboarding', 'age-gate')).toBe(true);
     expect(isAllowedDuringLegalGate('onboarding', 'index')).toBe(false);
-    expect(isAllowedDuringLegalGate('accept-legal', 'legal')).toBe(true);
-    expect(isAllowedDuringLegalGate('accept-legal', 'verify-delete-account')).toBe(
-      true
-    );
-    expect(isAllowedDuringLegalGate('accept-legal', 'settings')).toBe(false);
     expect(legalGateRedirectPath('age-gate')).toBe('/age-gate');
     expect(legalGateRedirectPath('onboarding')).toBe('/onboarding');
-    expect(legalGateRedirectPath('accept-legal')).toBe('/accept-legal');
     expect(legalGateRedirectPath('none')).toBeNull();
   });
 
@@ -187,14 +180,29 @@ describe('legal route lock', () => {
     expect(isSettledLegalRoute('onboarding', 'onboarding')).toBe(true);
     expect(isSettledLegalRoute('onboarding', 'age-gate')).toBe(true);
     expect(isSettledLegalRoute('onboarding', 'legal')).toBe(true);
-    expect(isSettledLegalRoute('accept-legal', 'index')).toBe(false);
-    expect(isSettledLegalRoute('accept-legal', 'accept-legal')).toBe(true);
     expect(isSettledLegalRoute('none', 'index')).toBe(true);
     expect(isSettledLegalRoute('none', '(tabs)')).toBe(true);
     expect(isSettledLegalRoute('age-gate', '(tabs)')).toBe(false);
     expect(isSettledLegalRoute('none', 'legal')).toBe(true);
     expect(isSettledLegalRoute('none', 'age-gate')).toBe(true);
     expect(isSettledLegalRoute('none', 'onboarding')).toBe(false);
-    expect(isSettledLegalRoute('none', 'accept-legal')).toBe(false);
+  });
+});
+
+describe('retired accept-legal path', () => {
+  it('rewrites leftover Google and deep-link paths home', () => {
+    expect(isRetiredAcceptLegalPath('/accept-legal')).toBe(true);
+    expect(isRetiredAcceptLegalPath('accept-legal')).toBe(true);
+    expect(isRetiredAcceptLegalPath('skateu://accept-legal?code=abc')).toBe(
+      true
+    );
+    expect(isRetiredAcceptLegalPath('/auth/callback')).toBe(false);
+    expect(isRetiredAcceptLegalPath('skateu://auth/callback?code=abc')).toBe(
+      false
+    );
+    expect(rewriteRetiredAcceptLegalPath('/accept-legal?code=abc')).toBe('/');
+    expect(rewriteRetiredAcceptLegalPath('/auth/callback?code=abc')).toBe(
+      '/auth/callback?code=abc'
+    );
   });
 });

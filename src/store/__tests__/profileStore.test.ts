@@ -201,6 +201,139 @@ describe('profileStore.fetchProfile', () => {
       },
     });
   });
+
+  it('keeps supabase xp_total when the legal payload omits or zeros it', async () => {
+    mockFrom.mockReturnValue(
+      createQuery({
+        data: {
+          id: 'user-1',
+          username: 'liam',
+          avatar_url: null,
+          bio: null,
+          updated_at: '2026-08-21T00:00:00.000Z',
+          xp_total: 343,
+        },
+        error: null,
+      })
+    );
+    fetchMock.mockResolvedValue(
+      mockResponse({
+        profile: {
+          id: 'user-1',
+          username: 'liam',
+          avatar_url: null,
+          bio: null,
+          updated_at: '2026-08-21T00:00:00.000Z',
+          legal_version: '2026-08-20',
+          legal_accepted_at: '2026-08-21T00:00:00.000Z',
+          age_attested_at: '2026-08-21T00:00:00.000Z',
+          xp_total: 0,
+        },
+      })
+    );
+
+    await useProfileStore.getState().fetchProfile('user-1', 'token');
+
+    expect(useProfileStore.getState().profile).toMatchObject({
+      username: 'liam',
+      legal_version: '2026-08-20',
+      xp_total: 343,
+    });
+  });
+
+  it('keeps cached legal acceptance when the server has no legal row yet', async () => {
+    useProfileStore.setState({
+      profile: {
+        id: 'user-1',
+        username: 'liam',
+        avatar_url: null,
+        bio: null,
+        updated_at: '2026-08-21T00:00:00.000Z',
+        legal_version: '2026-08-20',
+        legal_accepted_at: '2026-08-21T00:00:00.000Z',
+        age_attested_at: '2026-08-21T00:00:00.000Z',
+        xp_total: 0,
+      },
+      loaded: true,
+      loading: false,
+      error: null,
+    });
+    mockFrom.mockReturnValue(
+      createQuery({
+        data: {
+          id: 'user-1',
+          username: 'liam',
+          avatar_url: null,
+          bio: null,
+          updated_at: '2026-08-21T00:00:00.000Z',
+        },
+        error: null,
+      })
+    );
+    fetchMock.mockResolvedValue(
+      mockResponse({
+        profile: {
+          id: 'user-1',
+          username: 'liam',
+          avatar_url: null,
+          bio: null,
+          updated_at: '2026-08-21T00:00:00.000Z',
+          legal_version: null,
+          legal_accepted_at: null,
+          age_attested_at: null,
+          xp_total: 0,
+        },
+      })
+    );
+
+    await useProfileStore.getState().fetchProfile('user-1', 'token');
+
+    expect(useProfileStore.getState().profile).toMatchObject({
+      legal_version: '2026-08-20',
+      legal_accepted_at: '2026-08-21T00:00:00.000Z',
+    });
+  });
+
+  it('keeps cached legal acceptance when the legal route is down', async () => {
+    useProfileStore.setState({
+      profile: {
+        id: 'user-1',
+        username: 'liam',
+        avatar_url: null,
+        bio: null,
+        updated_at: '2026-08-21T00:00:00.000Z',
+        legal_version: '2026-08-20',
+        legal_accepted_at: '2026-08-21T00:00:00.000Z',
+        age_attested_at: '2026-08-21T00:00:00.000Z',
+        xp_total: 0,
+      },
+      loaded: true,
+      loading: false,
+      error: null,
+    });
+    mockFrom.mockReturnValue(
+      createQuery({
+        data: {
+          id: 'user-1',
+          username: 'liam',
+          avatar_url: null,
+          bio: null,
+          updated_at: '2026-08-21T00:00:00.000Z',
+        },
+        error: null,
+      })
+    );
+    fetchMock.mockResolvedValue(mockResponse({ error: 'down' }, false));
+
+    await useProfileStore.getState().fetchProfile('user-1', 'token');
+
+    expect(useProfileStore.getState().profile).toMatchObject({
+      id: 'user-1',
+      username: 'liam',
+      legal_version: '2026-08-20',
+      legal_accepted_at: '2026-08-21T00:00:00.000Z',
+    });
+  });
 });
 
 describe('profileStore.username', () => {
@@ -319,7 +452,7 @@ describe('profileStore.acceptLegal', () => {
     expect(useProfileStore.getState().loaded).toBe(true);
   });
 
-  it('throws when agreement cannot be saved', async () => {
+  it('throws when agreement cannot be saved and no profile is cached', async () => {
     fetchMock.mockResolvedValueOnce(mockResponse({ error: 'nope' }, false));
     await expect(useProfileStore.getState().acceptLegal('token')).rejects.toThrow('nope');
 
@@ -333,6 +466,35 @@ describe('profileStore.acceptLegal', () => {
     fetchMock.mockRejectedValueOnce(abort);
     await expect(useProfileStore.getState().acceptLegal('token')).rejects.toThrow(
       'Saving your agreement timed out. Please try again.'
+    );
+  });
+
+  it('keeps the user moving when agreement cannot be saved but a profile is cached', async () => {
+    useProfileStore.setState({
+      profile: {
+        id: 'user-1',
+        username: 'liam',
+        avatar_url: null,
+        bio: null,
+        updated_at: '2026-08-21T00:00:00.000Z',
+        legal_version: null,
+        legal_accepted_at: null,
+        age_attested_at: null,
+        xp_total: 0,
+      },
+      loaded: true,
+      loading: false,
+      error: null,
+    });
+    fetchMock.mockResolvedValue(mockResponse({ error: 'nope' }, false));
+
+    await useProfileStore.getState().acceptLegal('token');
+
+    expect(useProfileStore.getState().profile?.legal_accepted_at).toEqual(
+      expect.any(String)
+    );
+    expect(useProfileStore.getState().profile?.age_attested_at).toEqual(
+      expect.any(String)
     );
   });
 
@@ -539,6 +701,34 @@ describe('profileStore.updateBio', () => {
     ).resolves.toEqual({
       ok: false,
       message: 'Let’s keep this one school-friendly and try again.',
+    });
+  });
+
+  it('falls back when PostgREST reports a missing xp_total column', async () => {
+    const first = createQuery({
+      data: null,
+      error: {
+        message:
+          "Could not find the 'xp_total' column of 'profiles' in the schema cache",
+      },
+    });
+    const second = createQuery({
+      data: {
+        id: 'user-1',
+        username: 'liam',
+        avatar_url: null,
+        bio: null,
+        updated_at: '2026-08-21T00:00:00.000Z',
+      },
+      error: null,
+    });
+    mockFrom.mockReturnValueOnce(first).mockReturnValueOnce(second);
+
+    await useProfileStore.getState().fetchProfile('user-1');
+    expect(useProfileStore.getState().profile).toMatchObject({
+      id: 'user-1',
+      username: 'liam',
+      xp_total: 0,
     });
   });
 

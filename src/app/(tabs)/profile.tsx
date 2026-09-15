@@ -93,12 +93,12 @@ function SubmittingDraftRow({
         accessibilityLabel={`${title} is submitting`}
         accessibilityState={{ busy: true }}
       >
-        <Text className="font-outfit-bold text-base text-ink" numberOfLines={1}>
+        <Text className="font-outfit-bold text-base text-ink" numberOfLines={2}>
           {title}
         </Text>
         <Text
           className="mt-0.5 font-outfit-semibold text-xs text-muted-soft"
-          numberOfLines={1}
+          numberOfLines={2}
         >
           {draft.schoolName || 'Campus map'}
         </Text>
@@ -529,7 +529,7 @@ export default function ProfileScreen() {
                   router.push('/signup');
                 })
               }
-              className="mt-6 h-12 w-full items-center justify-center rounded-2xl bg-accent"
+              className="mt-6 min-h-12 w-full items-center justify-center rounded-2xl bg-accent py-3"
               accessibilityRole="button"
               accessibilityLabel="Sign up"
             >
@@ -542,7 +542,7 @@ export default function ProfileScreen() {
                   router.push('/login');
                 })
               }
-              className="mt-3 h-12 w-full items-center justify-center rounded-2xl bg-surface-soft"
+              className="mt-3 min-h-12 w-full items-center justify-center rounded-2xl bg-surface-soft py-3"
               accessibilityRole="button"
               accessibilityLabel="Log in"
             >
@@ -676,7 +676,7 @@ export default function ProfileScreen() {
               className={`font-outfit-bold text-xs ${
                 spotTab === 'created' ? 'text-brand' : 'text-muted'
               }`}
-              numberOfLines={1}
+              numberOfLines={2}
             >
               Yours {mySpots.length > 0 ? `(${mySpots.length})` : ''}
             </Text>
@@ -692,7 +692,7 @@ export default function ProfileScreen() {
               className={`font-outfit-bold text-xs ${
                 showingLikedSpots ? 'text-brand' : 'text-muted'
               }`}
-              numberOfLines={1}
+              numberOfLines={2}
             >
               Liked {likedSpots.length > 0 ? `(${likedSpots.length})` : ''}
             </Text>
@@ -712,7 +712,7 @@ export default function ProfileScreen() {
               className={`font-outfit-bold text-xs ${
                 showingDrafts ? 'text-brand' : 'text-muted'
               }`}
-              numberOfLines={1}
+              numberOfLines={2}
             >
               Drafts{' '}
               {drafts.length + submittingDrafts.length > 0
@@ -793,13 +793,13 @@ export default function ProfileScreen() {
                     >
                       <Text
                         className="font-outfit-bold text-base text-ink"
-                        numberOfLines={1}
+                        numberOfLines={2}
                       >
                         {title}
                       </Text>
                       <Text
                         className="mt-0.5 font-outfit-semibold text-xs text-muted-soft"
-                        numberOfLines={1}
+                        numberOfLines={2}
                       >
                         {draft.schoolName || 'Campus map'}
                         {updatedLabel ? ` · ${updatedLabel}` : ''}

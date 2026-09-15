@@ -32,7 +32,6 @@ export default function AgeGatePrompt({
         >
           <Text
             className="font-outfit-bold text-2xl text-white"
-            numberOfLines={1}
           >
             One question
           </Text>

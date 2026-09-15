@@ -6,9 +6,11 @@ import {
   milesToMeters,
   NEARBY_REFETCH_METERS,
   parseCoordinate,
+  isUsableGpsOrigin,
   parseNearbyOrigin,
   schoolDistanceMeters,
   shouldRefetchNearby,
+  shouldUseNearbyCache,
   sortSchoolsByDistance,
   type NearbyOrigin,
 } from '../nearbySchools';
@@ -178,6 +180,32 @@ describe('sortSchoolsByDistance', () => {
     const rows = [{ id: 'a', lat: 30.3, lng: -97.8, numspots: 4 }];
 
     expect(sortSchoolsByDistance(AUSTIN, rows)[0]?.numspots).toBe(4);
+  });
+});
+
+describe('isUsableGpsOrigin', () => {
+  it('rejects missing and null-island coordinates', () => {
+    expect(isUsableGpsOrigin(null)).toBe(false);
+    expect(isUsableGpsOrigin({ latitude: 0, longitude: 0 })).toBe(false);
+    expect(isUsableGpsOrigin({ latitude: 0.1, longitude: -0.2 })).toBe(false);
+  });
+
+  it('accepts a real campus coordinate', () => {
+    expect(isUsableGpsOrigin(AUSTIN)).toBe(true);
+  });
+});
+
+describe('shouldUseNearbyCache', () => {
+  it('refetches when the cached feed is empty', () => {
+    expect(shouldUseNearbyCache('all', 'all', AUSTIN, AUSTIN, 0)).toBe(false);
+  });
+
+  it('refetches when the filter no longer matches', () => {
+    expect(shouldUseNearbyCache('k12', 'all', AUSTIN, AUSTIN, 4)).toBe(false);
+  });
+
+  it('reuses a matching non-empty feed while the user stays put', () => {
+    expect(shouldUseNearbyCache('all', 'all', AUSTIN, AUSTIN, 4)).toBe(true);
   });
 });
 

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { getApiUrl } from '../lib/api';
-import { HOME_SPOTS_PAGE_SIZE } from '../lib/homeFeed';
+import { hasMoreFeedPage } from '../lib/homeFeed';
 import { toUserFacingError } from '../lib/userFacingError';
 import type { Spot } from '../types/spot';
 import { useSpotsStore } from './spotsStore';
@@ -29,6 +29,8 @@ type RecentFeedState = {
 let abortController: AbortController | null = null;
 let fetchGeneration = 0;
 let loadMoreLock = false;
+let pendingLoadMore = false;
+let nextOffset = 0;
 
 export const useRecentFeedStore = create<RecentFeedState>((set, get) => ({
   isLoading: true,
@@ -48,6 +50,8 @@ export const useRecentFeedStore = create<RecentFeedState>((set, get) => ({
     abortController = controller;
     const generation = ++fetchGeneration;
     loadMoreLock = false;
+    pendingLoadMore = false;
+    nextOffset = 0;
     set({ isLoading: true, isLoadingMore: false, hasMore: true });
 
     try {
@@ -73,8 +77,9 @@ export const useRecentFeedStore = create<RecentFeedState>((set, get) => ({
       }
 
       useSpotsStore.getState().setRecentFeed('all', page);
+      nextOffset = page.length;
       set({
-        hasMore: page.length === HOME_SPOTS_PAGE_SIZE,
+        hasMore: hasMoreFeedPage(page.length),
         error: '',
       });
     } catch (error) {
@@ -92,18 +97,27 @@ export const useRecentFeedStore = create<RecentFeedState>((set, get) => ({
     } finally {
       if (generation === fetchGeneration) {
         set({ isLoading: false });
+        if (pendingLoadMore) {
+          pendingLoadMore = false;
+          void get().loadMore(accessToken);
+        }
       }
     }
   },
   loadMore: async (accessToken) => {
     const { isLoading, isLoadingMore, hasMore } = get();
-    if (loadMoreLock || isLoading || isLoadingMore || !hasMore) {
+    if (isLoading) {
+      pendingLoadMore = true;
+      return;
+    }
+    if (loadMoreLock || isLoadingMore || !hasMore) {
       return;
     }
 
-    const controller = abortController;
+    let controller = abortController;
     if (!controller || controller.signal.aborted) {
-      return;
+      controller = new AbortController();
+      abortController = controller;
     }
 
     loadMoreLock = true;
@@ -112,7 +126,7 @@ export const useRecentFeedStore = create<RecentFeedState>((set, get) => ({
     try {
       const current = useSpotsStore.getState().recentSpots;
       const response = await fetch(
-        getApiUrl(`/api/spots?recent=1&offset=${current.length}`),
+        getApiUrl(`/api/spots?recent=1&offset=${nextOffset}`),
         {
           signal: controller.signal,
           headers: recentSpotsAuthHeaders(accessToken),
@@ -131,12 +145,14 @@ export const useRecentFeedStore = create<RecentFeedState>((set, get) => ({
       }
 
       const seen = new Set(current.map((spot) => spot.id));
+      const uniqueNew = page.filter((spot) => !seen.has(spot.id));
       useSpotsStore.getState().setRecentFeed('all', [
         ...current,
-        ...page.filter((spot) => !seen.has(spot.id)),
+        ...uniqueNew,
       ]);
+      nextOffset += page.length;
       set({
-        hasMore: page.length === HOME_SPOTS_PAGE_SIZE,
+        hasMore: hasMoreFeedPage(page.length),
         error: '',
       });
     } catch (error) {
@@ -146,6 +162,7 @@ export const useRecentFeedStore = create<RecentFeedState>((set, get) => ({
 
       if (!controller.signal.aborted) {
         set({
+          hasMore: false,
           error: toUserFacingError(
             error,
             'Couldn’t load more recent spots right now.'
@@ -154,9 +171,7 @@ export const useRecentFeedStore = create<RecentFeedState>((set, get) => ({
       }
     } finally {
       loadMoreLock = false;
-      if (!controller.signal.aborted) {
-        set({ isLoadingMore: false });
-      }
+      set({ isLoadingMore: false });
     }
   },
 }));

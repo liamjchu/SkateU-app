@@ -60,7 +60,7 @@ Optional product analytics: set `EXPO_PUBLIC_POSTHOG_API_KEY` on the native buil
 
 ## Release checklist
 
-1. Apply and verify the Supabase setup in [backend setup](backend-setup.md), plus every pending file in `supabase/migrations/` (nearest-school and notification-type updates included), before a reviewer uses the production binary.
+1. Apply and verify the Supabase setup in [backend setup](backend-setup.md), plus every pending file in `supabase/migrations/` (XP totals, nearest-school, and notification-type updates included), before a reviewer uses the production binary. Confirm `profiles.xp_total` exists and matches `compute_user_xp(id)` for a known account. XP is stored on that row, not in the IPA.
 2. Confirm production API routes can reach Supabase and OpenAI without exposing credentials.
 3. Confirm the production EAS environment has `EXPO_PUBLIC_API_URL` (HTTPS origin, no trailing path), public Supabase values, and that the API deployment has the server-only secrets listed above.
 4. Build a preview artifact and validate authentication (email, Google, Apple), password recovery deep links, map browsing, spot creation, image uploads, edits, likes, follows, saved-school sync, Help & Support, comment and profile reports, blocking, and account deletion.

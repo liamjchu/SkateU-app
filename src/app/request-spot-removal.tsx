@@ -14,6 +14,7 @@ import FeedbackPressable from '../components/FeedbackPressable';
 import KeyboardShiftView from '../components/keyboard-shift-view';
 import ScreenHeader from '../components/screen-header';
 import { colors } from '../constants/colors';
+import { useFontScale } from '../hooks/useFontScale';
 import { triggerHaptic } from '../lib/haptics';
 import {
   SPOT_REMOVAL_DETAILS_MAX,
@@ -27,6 +28,7 @@ import type { SpotRemovalReason } from '../types/spotRemovalRequest';
 
 export default function RequestSpotRemovalScreen() {
   const router = useGuardedRouter();
+  const { isLarge } = useFontScale();
   const searchParams = useLocalSearchParams();
   const spotId = Array.isArray(searchParams.spotId)
     ? searchParams.spotId[0]
@@ -163,15 +165,17 @@ export default function RequestSpotRemovalScreen() {
                       setReason(option.value);
                       setShowReasonError(false);
                     }}
-                    className={`min-h-14 flex-row items-center px-4 py-3 ${
-                      index > 0 ? 'border-t border-border-soft' : ''
-                    }`}
+                    className={`min-h-14 flex-row px-4 py-3 ${
+                      isLarge ? 'items-start' : 'items-center'
+                    } ${index > 0 ? 'border-t border-border-soft' : ''}`}
                     accessibilityRole="radio"
                     accessibilityState={{ selected }}
                     accessibilityLabel={option.label}
                   >
                     <View
-                      className={`h-5 w-5 items-center justify-center rounded-full border ${
+                      className={`h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
+                        isLarge ? 'mt-0.5' : ''
+                      } ${
                         selected
                           ? 'border-accent bg-accent'
                           : 'border-border-soft bg-field'
@@ -181,7 +185,7 @@ export default function RequestSpotRemovalScreen() {
                         <View className="h-2 w-2 rounded-full bg-brand" />
                       ) : null}
                     </View>
-                    <Text className="ml-3 flex-1 font-outfit-semibold text-base text-ink">
+                    <Text className="ml-3 min-w-0 flex-1 font-outfit-semibold text-base text-ink">
                       {option.label}
                     </Text>
                   </FeedbackPressable>

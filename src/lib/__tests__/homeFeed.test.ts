@@ -6,6 +6,8 @@ import {
   FEED_CANDIDATE_LIMIT,
   parseOffset,
   shouldPrefetchMoreItems,
+  isNearFeedEnd,
+  hasMoreFeedPage,
 } from '../homeFeed';
 
 describe('home feed page sizes', () => {
@@ -24,6 +26,22 @@ describe('shouldPrefetchMoreItems', () => {
     expect(shouldPrefetchMoreItems(2, 6)).toBe(false);
     expect(shouldPrefetchMoreItems(-1, 6)).toBe(false);
     expect(shouldPrefetchMoreItems(0, 0)).toBe(false);
+  });
+});
+
+describe('isNearFeedEnd', () => {
+  it('loads more before the last screen of spots', () => {
+    expect(isNearFeedEnd(4000, 800, 2300)).toBe(true);
+    expect(isNearFeedEnd(4000, 800, 200)).toBe(false);
+    expect(isNearFeedEnd(0, 800, 0)).toBe(false);
+  });
+});
+
+describe('hasMoreFeedPage', () => {
+  it('treats a full page as a signal to keep paging', () => {
+    expect(hasMoreFeedPage(HOME_SPOTS_PAGE_SIZE)).toBe(true);
+    expect(hasMoreFeedPage(HOME_SPOTS_PAGE_SIZE - 1)).toBe(false);
+    expect(hasMoreFeedPage(0)).toBe(false);
   });
 });
 

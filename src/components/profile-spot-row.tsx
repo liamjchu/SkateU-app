@@ -30,7 +30,7 @@ export default function ProfileSpotRow({
 
   return (
     <View
-      className="mb-4 flex-row items-center rounded-2xl bg-field p-4"
+      className="mb-4 flex-row items-start rounded-2xl bg-field p-4"
       accessibilityState={busy ? { busy: true } : undefined}
     >
       <FeedbackPressable

@@ -20,15 +20,16 @@ import { colors } from '../../constants/colors';
 import { useRecentSpotsFeed } from '../../hooks/useRecentSpotsFeed';
 import { useFeedPrefetch } from '../../hooks/useFeedPrefetch';
 import { captureAnalyticsEvent } from '../../lib/analytics';
-import { feedPageHeight } from '../../lib/feedPaging';
+import { FEED_DECELERATION_RATE, feedPageHeight } from '../../lib/feedPaging';
 import {
-  excludeSeenSpots,
+  extendFeedSession,
+  startFeedSession,
   syncFeedSessionSpots,
   unseenSpotCount,
 } from '../../lib/feedSeen';
 import { openSpotOnMap } from '../../lib/mapNavigation';
 import { STALE_SPOTS_MESSAGE } from '../../lib/readCache';
-import { HOME_SPOTS_PAGE_SIZE } from '../../lib/homeFeed';
+import { HOME_SPOTS_PAGE_SIZE, shouldPrefetchMoreItems } from '../../lib/homeFeed';
 import { toMutationError } from '../../lib/userFacingError';
 import { guardedNavigate, useGuardedRouter } from '../../lib/navigationGuard';
 import { useAuthStore } from '../../store/authStore';
@@ -56,13 +57,17 @@ export default function FeedScreen() {
     loadMore,
     retry,
   } = useRecentSpotsFeed();
-  const listRef = useRef<FlatList<Spot>>(null);
   const seenSpotIdsRef = useRef(seenSpotIds);
   seenSpotIdsRef.current = seenSpotIds;
   const recentSpotsRef = useRef(recentSpots);
   recentSpotsRef.current = recentSpots;
+  const hasMoreRef = useRef(hasMore);
+  hasMoreRef.current = hasMore;
+  const visibleIndexRef = useRef(0);
+  const sessionCountRef = useRef(0);
+  const feedNearEndRef = useRef(false);
   const [sessionSpots, setSessionSpots] = useState<Spot[]>(() =>
-    excludeSeenSpots(recentSpots, useFeedSeenStore.getState().seenSpotIds)
+    startFeedSession(recentSpots, useFeedSeenStore.getState().seenSpotIds)
   );
   const [listHeight, setListHeight] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -73,50 +78,102 @@ export default function FeedScreen() {
 
   const pageHeight =
     listHeight > 0 ? listHeight : feedPageHeight(windowHeight, insets.bottom);
+  sessionCountRef.current = sessionSpots.length;
+
+  const refillSession = useCallback((current: Spot[]) => {
+    const pool = recentSpotsRef.current;
+    const seenIds = seenSpotIdsRef.current;
+    const base =
+      current.length === 0 ? startFeedSession(pool, seenIds) : current;
+    const next = extendFeedSession(
+      base,
+      pool,
+      seenIds,
+      hasMoreRef.current,
+      visibleIndexRef.current
+    );
+    if (
+      next.length === current.length &&
+      next.every((spot, index) => spot === current[index])
+    ) {
+      return current;
+    }
+    return next;
+  }, []);
+
+  const handleNeedMore = useCallback(() => {
+    setSessionSpots((current) => refillSession(current));
+
+    if (hasMoreRef.current) {
+      loadMore();
+    }
+  }, [loadMore, refillSession]);
+
+  const noteVisibleIndex = useCallback(
+    (index: number) => {
+      visibleIndexRef.current = index;
+      const nearEnd = shouldPrefetchMoreItems(index, sessionCountRef.current);
+      if (nearEnd && !feedNearEndRef.current) {
+        handleNeedMore();
+      }
+      feedNearEndRef.current = nearEnd;
+    },
+    [handleNeedMore]
+  );
 
   const handleVisibleItems = useCallback(
-    (items: { item?: Spot; isViewable?: boolean }[]) => {
+    (items: { item?: Spot; isViewable?: boolean; index?: number | null }[]) => {
       for (const token of items) {
         if (token.isViewable && token.item?.id) {
           markSeen(token.item.id);
+          if (typeof token.index === 'number') {
+            noteVisibleIndex(token.index);
+          }
         }
       }
     },
-    [markSeen]
+    [markSeen, noteVisibleIndex]
   );
 
   const { onViewableItemsChanged, viewabilityConfig } = useFeedPrefetch(
     sessionSpots.length,
-    loadMore,
+    handleNeedMore,
     handleVisibleItems
   );
 
   useEffect(() => {
     setSessionSpots((current) =>
-      syncFeedSessionSpots(current, recentSpots, seenSpotIdsRef.current)
+      refillSession(
+        syncFeedSessionSpots(current, recentSpots, seenSpotIdsRef.current)
+      )
     );
-  }, [recentSpots]);
+    feedNearEndRef.current = false;
+  }, [hasMore, recentSpots, refillSession]);
+
+  useEffect(() => {
+    setSessionSpots((current) => refillSession(current));
+    feedNearEndRef.current = false;
+  }, [refillSession, sessionSpots.length]);
 
   useEffect(() => {
     if (!hasHydratedSeen) {
       return;
     }
 
-    setSessionSpots(
-      excludeSeenSpots(recentSpotsRef.current, seenSpotIdsRef.current)
-    );
-  }, [hasHydratedSeen]);
+    setSessionSpots((current) => {
+      if (visibleIndexRef.current > 0 && current.length > 0) {
+        return refillSession(current);
+      }
+
+      return refillSession(
+        startFeedSession(recentSpotsRef.current, seenSpotIdsRef.current)
+      );
+    });
+  }, [hasHydratedSeen, refillSession]);
 
   useFocusEffect(
     useCallback(() => {
       setCommentsCoveringViewer(false);
-      setSessionSpots(
-        excludeSeenSpots(recentSpotsRef.current, seenSpotIdsRef.current)
-      );
-      const frame = requestAnimationFrame(() => {
-        listRef.current?.scrollToOffset({ offset: 0, animated: false });
-      });
-      return () => cancelAnimationFrame(frame);
     }, [])
   );
 
@@ -225,7 +282,7 @@ export default function FeedScreen() {
       />
     ) : error && recentSpots.length === 0 ? (
       <View className="flex-1 px-4 pt-4" style={{ paddingTop: insets.top + 16 }}>
-        <View className="flex-row items-center rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2.5">
+        <View className="flex-row items-start rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2.5">
           <Text className="flex-1 pr-2 font-outfit-medium text-sm text-errorText">
             {error}
           </Text>
@@ -247,7 +304,7 @@ export default function FeedScreen() {
       >
         <ActivityIndicator color={colors.accent} />
       </View>
-    ) : recentSpots.length === 0 ? (
+    ) : (
       <View
         className="flex-1 items-center justify-center px-6"
         style={{ paddingTop: insets.top }}
@@ -258,23 +315,8 @@ export default function FeedScreen() {
         <Text className="mt-3 font-outfit-bold text-lg text-ink">
           No spots yet
         </Text>
-        <Text className="mt-1 text-center font-outfit-medium text-base leading-5 text-muted">
+        <Text className="mt-1 text-center font-outfit-medium text-base text-muted">
           When someone adds a spot, it’ll show up here.
-        </Text>
-      </View>
-    ) : (
-      <View
-        className="flex-1 items-center justify-center px-6"
-        style={{ paddingTop: insets.top }}
-      >
-        <View className="h-14 w-14 items-center justify-center rounded-2xl bg-accent">
-          <Feather name="check" size={26} color={colors.brand} />
-        </View>
-        <Text className="mt-3 font-outfit-bold text-lg text-ink">
-          You’re all caught up
-        </Text>
-        <Text className="mt-1 text-center font-outfit-medium text-base leading-5 text-muted">
-          New spots will show up here when they’re added.
         </Text>
       </View>
     );
@@ -285,11 +327,10 @@ export default function FeedScreen() {
         emptyState
       ) : (
         <FlatList
-          ref={listRef}
           className="min-h-0 flex-1"
           data={sessionSpots}
-          keyExtractor={(spot) => spot.id}
-          extraData={{ commentCounts, pageHeight }}
+          keyExtractor={(spot, index) => `${spot.id}:${index}`}
+          extraData={{ commentCounts, pageHeight, length: sessionSpots.length }}
           renderItem={({ item }) => (
             <HomeSpotPost
               layout="immersive"
@@ -316,9 +357,10 @@ export default function FeedScreen() {
           showsVerticalScrollIndicator={false}
           pagingEnabled
           disableIntervalMomentum
+          overScrollMode="never"
           snapToInterval={pageHeight}
           snapToAlignment="start"
-          decelerationRate="fast"
+          decelerationRate={FEED_DECELERATION_RATE}
           getItemLayout={(_data, index) => ({
             length: pageHeight,
             offset: pageHeight * index,
@@ -330,14 +372,23 @@ export default function FeedScreen() {
               setListHeight(nextHeight);
             }
           }}
-          onEndReached={loadMore}
+          onEndReached={handleNeedMore}
           onEndReachedThreshold={0.6}
+          onMomentumScrollEnd={(event) => {
+            if (pageHeight <= 0) {
+              return;
+            }
+
+            noteVisibleIndex(
+              Math.round(event.nativeEvent.contentOffset.y / pageHeight)
+            );
+          }}
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
           initialNumToRender={2}
           maxToRenderPerBatch={2}
           windowSize={5}
-          removeClippedSubviews
+          removeClippedSubviews={false}
         />
       )}
 
@@ -351,11 +402,6 @@ export default function FeedScreen() {
         </View>
       ) : null}
 
-      {isLoadingMore ? (
-        <View className="absolute bottom-6 left-0 right-0 items-center">
-          <ActivityIndicator color={colors.accent} />
-        </View>
-      ) : null}
 
       <SpotFullscreenViewer
         visible={fullscreenSpotId !== null && !commentsCoveringViewer}
@@ -367,7 +413,7 @@ export default function FeedScreen() {
         onLike={handleLikeSpot}
         onOpenComments={handleOpenComments}
         onViewMap={handleViewMapFromFullscreen}
-        onNearEnd={loadMore}
+        onNearEnd={handleNeedMore}
       />
       <LoginRequiredModal
         visible={showLoginRequired}

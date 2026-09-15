@@ -118,6 +118,73 @@ describe('POST /api/accept-legal', () => {
     expect(payload.profile.username).toBe('liam');
   });
 
+  it('writes legal columns on profiles when PostgREST has not loaded profile_legal', async () => {
+    setConfigured();
+    const fetchMock: FetchMock = jest.fn(async (input, init) => {
+      const url = String(input);
+      if (url.includes('/auth/v1/user')) {
+        return jsonResponse({ id: 'user-1' });
+      }
+
+      if (url.includes('/rest/v1/profile_legal') && init?.method === 'POST') {
+        return jsonResponse(
+          {
+            code: 'PGRST205',
+            message: "Could not find the table 'public.profile_legal' in the schema cache",
+          },
+          400
+        );
+      }
+
+      if (url.includes('/rest/v1/profiles?') && init?.method === 'PATCH') {
+        return new Response(null, { status: 204 });
+      }
+
+      if (url.includes('/rest/v1/profile_legal?')) {
+        return jsonResponse(
+          {
+            code: 'PGRST205',
+            message: "Could not find the table 'public.profile_legal' in the schema cache",
+          },
+          400
+        );
+      }
+
+      if (url.includes('/rest/v1/profiles?')) {
+        if (decodeURIComponent(url).includes('legal_version')) {
+          return jsonResponse([
+            {
+              id: 'user-1',
+              legal_version: LEGAL_VERSION,
+              legal_accepted_at: '2026-08-20T00:00:00.000Z',
+              age_attested_at: '2026-08-20T00:00:00.000Z',
+            },
+          ]);
+        }
+        return jsonResponse([
+          {
+            id: 'user-1',
+            username: 'liam',
+            avatar_url: null,
+            updated_at: '2026-08-20T00:00:00.000Z',
+          },
+        ]);
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await POST(
+      postRequest({ Authorization: 'Bearer good-token' })
+    );
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      profile: { id: string; legal_version: string };
+    };
+    expect(payload.profile.legal_version).toBe(LEGAL_VERSION);
+  });
+
   it('writes legal columns on profiles when profile_legal is missing', async () => {
     setConfigured();
     const fetchMock: FetchMock = jest.fn(async (input, init) => {

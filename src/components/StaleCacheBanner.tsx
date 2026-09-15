@@ -13,7 +13,7 @@ export default function StaleCacheBanner({
   retryAccessibilityLabel,
 }: StaleCacheBannerProps) {
   return (
-    <View className="flex-row items-center rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2.5">
+    <View className="flex-row items-start rounded-2xl border border-errorBorder bg-errorSurface px-3 py-2.5">
       <Text
         accessibilityRole="alert"
         accessibilityLiveRegion="polite"

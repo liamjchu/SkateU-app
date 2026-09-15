@@ -4,6 +4,7 @@ import { Alert, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FeedbackPressable from '../../components/FeedbackPressable';
 import { colors } from '../../constants/colors';
+import { useFontScale } from '../../hooks/useFontScale';
 import { userCanSignInWithPassword } from '../../lib/authAccount';
 import { LEGAL_APP_ROUTES } from '../../lib/legalAcceptance';
 import { guardedNavigate, useGuardedRouter } from '../../lib/navigationGuard';
@@ -31,6 +32,7 @@ function SettingsRow({
   busy = false,
   showChevron = false,
 }: SettingsRowProps) {
+  const { isLarge } = useFontScale();
   const iconColor = destructive ? colors.errorText : colors.ink;
   const labelClass = destructive
     ? 'font-outfit-semibold text-base text-errorText'
@@ -42,22 +44,29 @@ function SettingsRow({
       onPress={onPress}
       disabled={disabled}
       pressLockMs={700}
-      className="min-h-14 flex-row items-center px-4 py-3"
+      className={`min-h-14 flex-row px-4 py-3 ${
+        isLarge ? 'items-start' : 'items-center'
+      }`}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled, busy }}
     >
       <View
-        className={`h-9 w-9 items-center justify-center rounded-full ${
-          destructive ? 'bg-field' : 'bg-surface-soft'
-        }`}
+        className={`h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+          isLarge ? 'mt-0.5' : ''
+        } ${destructive ? 'bg-field' : 'bg-surface-soft'}`}
       >
         <Feather name={icon} size={16} color={iconColor} />
       </View>
-      <Text className={`ml-3 flex-1 ${labelClass}`}>{label}</Text>
+      <Text className={`ml-3 min-w-0 flex-1 ${labelClass}`}>{label}</Text>
       {showChevron ? (
-        <Feather name="chevron-right" size={18} color={colors.muted} />
+        <Feather
+          name="chevron-right"
+          size={18}
+          color={colors.muted}
+          style={isLarge ? { marginTop: 8 } : undefined}
+        />
       ) : null}
     </FeedbackPressable>
   );

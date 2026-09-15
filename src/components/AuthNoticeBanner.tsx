@@ -65,7 +65,7 @@ export default function AuthNoticeBanner() {
           <Text className="font-outfit-bold text-base text-ink">
             {notice.title}
           </Text>
-          <Text className="mt-0.5 font-outfit-medium text-sm leading-5 text-muted">
+          <Text className="mt-0.5 font-outfit-medium text-sm text-muted">
             {notice.message}
           </Text>
 

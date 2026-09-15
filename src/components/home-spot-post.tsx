@@ -3,6 +3,7 @@ import { useGuardedRouter } from '../lib/navigationGuard';
 import { Text, View, useWindowDimensions } from 'react-native';
 import { useState } from 'react';
 import { colors } from '../constants/colors';
+import { useFontScale } from '../hooks/useFontScale';
 import { formatCompactRelativeTime } from '../lib/relativeTime';
 import { openUserProfile } from '../lib/userProfileNavigation';
 import { useAuthStore } from '../store/authStore';
@@ -54,6 +55,7 @@ export default function HomeSpotPost({
   const router = useGuardedRouter();
   const currentUserId = useAuthStore((state) => state.user?.id ?? null);
   const { width } = useWindowDimensions();
+  const { isLarge } = useFontScale();
   const [mediaBoxHeight, setMediaBoxHeight] = useState(0);
   const immersive = layout === 'immersive';
   const fillPage =
@@ -119,7 +121,7 @@ export default function HomeSpotPost({
               username={spot.creatorUsername}
               fallback="A skater"
               suffix={spotAttributionSuffix(spot)}
-              numberOfLines={1}
+              numberOfLines={2}
               className="ml-2 min-w-0 flex-1 font-outfit-semibold text-sm text-ink"
             />
           </View>
@@ -209,7 +211,7 @@ export default function HomeSpotPost({
               username={spot.creatorUsername}
               fallback="A skater"
               suffix={spotAttributionSuffix(spot)}
-              numberOfLines={1}
+              numberOfLines={2}
               className="ml-1.5 min-w-0 flex-1 font-outfit-medium text-sm text-muted"
             />
           </View>
@@ -223,7 +225,7 @@ export default function HomeSpotPost({
         >
           <View className={`${immersive ? 'mt-0' : 'mt-1'} flex-row items-center`}>
             <Text
-              numberOfLines={1}
+              numberOfLines={2}
               className="min-w-0 flex-1 font-outfit-bold text-lg text-ink"
             >
               {spot.name}
@@ -231,15 +233,15 @@ export default function HomeSpotPost({
             <Feather name="chevron-right" size={18} color={colors.mutedSoft} />
           </View>
           <Text
-            numberOfLines={1}
+            numberOfLines={2}
             className="mt-0.5 font-outfit-medium text-sm text-muted-soft"
           >
             {spotPlace(spot)}
           </Text>
           {spot.description.trim().length > 0 ? (
             <Text
-              numberOfLines={immersive ? 3 : 2}
-              className="mt-2 font-outfit-medium text-sm leading-5 text-ink"
+              numberOfLines={immersive ? 4 : 3}
+              className="mt-2 font-outfit-medium text-sm text-ink"
             >
               {spot.description.trim()}
             </Text>
@@ -248,14 +250,14 @@ export default function HomeSpotPost({
       </View>
 
       <View
-        className={`flex-row items-center px-4 ${
+        className={`flex-row flex-wrap items-center gap-y-2 px-4 ${
           fillPage ? 'pb-4 pt-3' : immersive ? 'pb-5 pt-3' : 'pb-4 pt-3'
         }`}
       >
         <FeedbackPressable
           haptic="light"
           onPress={() => onLike(spot)}
-          className={`min-h-11 flex-row items-center rounded-xl px-3.5 ${
+          className={`min-h-11 flex-row items-center rounded-xl px-3.5 py-2 ${
             liked ? 'bg-accent' : 'bg-surface-soft'
           }`}
           accessibilityRole="button"
@@ -281,7 +283,7 @@ export default function HomeSpotPost({
         <FeedbackPressable
           haptic="light"
           onPress={() => onOpenComments(spot)}
-          className="ml-2 min-h-11 flex-row items-center rounded-xl bg-surface-soft px-3.5"
+          className="ml-2 min-h-11 flex-row items-center rounded-xl bg-surface-soft px-3.5 py-2"
           accessibilityRole="button"
           accessibilityLabel={`Comments on ${spot.name}`}
           accessibilityHint="Opens comments for this spot"
@@ -295,7 +297,7 @@ export default function HomeSpotPost({
         <FeedbackPressable
           haptic="light"
           onPress={() => onViewMap(spot)}
-          className="ml-2 min-h-11 flex-1 flex-row items-center justify-center rounded-xl bg-surface-soft px-3.5"
+          className={`${isLarge ? 'ml-0 mt-1 w-full' : 'ml-2 flex-1'} min-h-11 flex-row items-center justify-center rounded-xl bg-surface-soft px-3.5 py-2`}
           accessibilityRole="button"
           accessibilityLabel={`View ${spot.name} on the campus map`}
           accessibilityHint="Opens the map with this spot selected"

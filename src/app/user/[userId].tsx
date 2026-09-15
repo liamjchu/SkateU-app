@@ -356,7 +356,7 @@ export default function UserProfileScreen() {
                     void handleFollowPress();
                   }}
                   disabled={followBusy}
-                  className={`mt-4 h-12 w-full items-center justify-center rounded-2xl ${
+                  className={`mt-4 min-h-12 w-full items-center justify-center rounded-2xl py-3 ${
                     profile.isFollowing ? 'bg-surface-soft' : 'bg-brand'
                   }`}
                   accessibilityRole="button"
@@ -380,11 +380,11 @@ export default function UserProfileScreen() {
                     </Text>
                   )}
                 </FeedbackPressable>
-                <View className="mt-3 flex-row gap-3">
+                <View className="mt-3 flex-row flex-wrap gap-3">
                   <FeedbackPressable
                     haptic="selection"
                     onPress={handleReportPress}
-                    className="h-12 flex-1 items-center justify-center rounded-2xl bg-surface-soft"
+                    className="min-h-12 min-w-[140px] flex-1 items-center justify-center rounded-2xl bg-surface-soft px-3 py-3"
                     accessibilityRole="button"
                     accessibilityLabel="Report profile"
                   >
@@ -396,7 +396,7 @@ export default function UserProfileScreen() {
                     haptic="warning"
                     onPress={handleBlockPress}
                     disabled={blocked}
-                    className="h-12 flex-1 items-center justify-center rounded-2xl bg-surface-soft"
+                    className="min-h-12 min-w-[140px] flex-1 items-center justify-center rounded-2xl bg-surface-soft px-3 py-3"
                     accessibilityRole="button"
                     accessibilityLabel={blocked ? 'Account blocked' : 'Block account'}
                     accessibilityState={{ disabled: blocked }}
