@@ -274,7 +274,7 @@ export default function SpotCommentsScreen() {
         style={{ flex: 1, backgroundColor: colors.surface }}
       >
         <ScreenHeader title="Comments" onBack={() => router.back()} />
-        <View className="px-6 pt-8">
+        <View className="w-full max-w-[720px] self-center px-6 pt-8">
           <Text className="font-outfit-medium text-base text-muted">
             We couldn’t load this spot. Please try again.
           </Text>
@@ -295,14 +295,15 @@ export default function SpotCommentsScreen() {
       />
 
       <KeyboardShiftView closedBottomPadding={closedBottomPadding}>
-        {spotName ? (
-          <Text
-            className="px-6 pt-3 font-outfit-semibold text-sm text-muted"
-            numberOfLines={2}
-          >
-            {spotName}
-          </Text>
-        ) : null}
+        <View className="w-full max-w-[720px] flex-1 self-center">
+          {spotName ? (
+            <Text
+              className="px-6 pt-3 font-outfit-semibold text-sm text-muted"
+              numberOfLines={2}
+            >
+              {spotName}
+            </Text>
+          ) : null}
 
         {error && comments.length > 0 ? (
           <View className="mx-6 mt-3">
@@ -319,6 +320,7 @@ export default function SpotCommentsScreen() {
         <FlatList
           data={comments}
           keyExtractor={(item) => item.id}
+          className="min-h-0 flex-1"
           contentContainerClassName="px-6 pb-4 pt-4"
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
@@ -439,6 +441,7 @@ export default function SpotCommentsScreen() {
               {submitError}
             </Text>
           ) : null}
+        </View>
         </View>
       </KeyboardShiftView>
 

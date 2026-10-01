@@ -126,7 +126,7 @@ export default function NotificationsScreen() {
     <View className="flex-1 bg-surface">
       <ScreenHeader title="Notifications" onBack={goBack} />
       {!accessToken ? (
-        <View className="px-6 pt-8">
+        <View className="w-full max-w-[720px] self-center px-6 pt-8">
           <Text className="font-outfit-medium text-base text-muted">
             Sign in to see likes, comments, and new followers.
           </Text>
@@ -135,6 +135,7 @@ export default function NotificationsScreen() {
         <FlatList
           data={items}
           keyExtractor={(item) => item.id}
+          className="flex-1"
           renderItem={({ item, index }) => (
             <NotificationRow
               notification={item}
@@ -194,7 +195,7 @@ export default function NotificationsScreen() {
               </View>
             )
           }
-          contentContainerClassName="pb-8 pt-2"
+          contentContainerClassName="w-full max-w-[720px] self-center pb-8 pt-2"
           showsVerticalScrollIndicator={false}
         />
       )}
