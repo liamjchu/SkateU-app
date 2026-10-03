@@ -30,7 +30,7 @@ export default function ShopPage() {
               Shop
             </h1>
             <p className="mx-auto mt-6 max-w-xl text-pretty text-base leading-7 text-muted sm:mt-7 sm:text-lg">
-              Stickers are live. Clothing, griptape, and boards are next.
+              Stickers, clothing, griptape, and boards are coming soon.
             </p>
 
             <nav

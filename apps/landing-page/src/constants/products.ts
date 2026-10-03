@@ -1,15 +1,21 @@
 import { IMAGES } from "./images";
 
-export const SHOP_CATEGORIES = [
-  { id: "stickers", label: "Stickers", status: "live" },
+export type ProductStatus = "live" | "coming_soon";
+
+const SHOP_CATEGORY_LIST = [
+  { id: "stickers", label: "Stickers", status: "coming_soon" },
   { id: "clothing", label: "Clothing", status: "coming_soon" },
   { id: "griptape", label: "Griptape", status: "coming_soon" },
   { id: "boards", label: "Boards", status: "coming_soon" },
 ] as const;
 
-export type ShopCategoryId = (typeof SHOP_CATEGORIES)[number]["id"];
+export type ShopCategoryId = (typeof SHOP_CATEGORY_LIST)[number]["id"];
 
-export type ProductStatus = "live" | "coming_soon";
+export const SHOP_CATEGORIES: readonly {
+  id: ShopCategoryId;
+  label: string;
+  status: ProductStatus;
+}[] = SHOP_CATEGORY_LIST;
 
 export type Product = {
   slug: string;
@@ -25,7 +31,7 @@ export const PRODUCTS: Product[] = [
     slug: "skateu-sticker",
     name: "SkateU Sticker",
     category: "stickers",
-    status: "live",
+    status: "coming_soon",
     description:
       "The SkateU logo as a sticker. Stick it on a laptop, board, or bottle.",
     image: IMAGES.sticker,

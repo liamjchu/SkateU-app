@@ -117,25 +117,8 @@ describe("createShopCheckoutUrl", () => {
     expect(create).not.toHaveBeenCalled();
   });
 
-  it("creates a hosted session for the live sticker", async () => {
-    create.mockResolvedValue({ url: "https://checkout.stripe.com/c/pay/cs_test" });
-
-    await expect(createShopCheckoutUrl("skateu-sticker")).resolves.toBe(
-      "https://checkout.stripe.com/c/pay/cs_test"
-    );
-    expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        mode: "payment",
-        metadata: { product_slug: "skateu-sticker" },
-      })
-    );
-  });
-
-  it("throws when Stripe omits the hosted URL", async () => {
-    create.mockResolvedValue({ url: null });
-
-    await expect(createShopCheckoutUrl("skateu-sticker")).rejects.toThrow(
-      "Checkout session is missing a hosted URL."
-    );
+  it("returns null for the coming-soon sticker without calling Stripe", async () => {
+    await expect(createShopCheckoutUrl("skateu-sticker")).resolves.toBeNull();
+    expect(create).not.toHaveBeenCalled();
   });
 });

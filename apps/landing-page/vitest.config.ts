@@ -17,6 +17,12 @@ export default defineConfig({
       include: [
         "src/app/page.tsx",
         "src/app/_components/**/*.tsx",
+        "src/app/school/**/*.tsx",
+        "src/app/map/page.tsx",
+        "src/app/api/schools/search/route.ts",
+        "src/app/api/spots/route.ts",
+        "src/lib/campus.ts",
+        "src/lib/campus-data.ts",
         "src/app/api/subscribe/route.ts",
         "src/app/api/checkout/route.ts",
         "src/app/api/webhooks/stripe/route.ts",

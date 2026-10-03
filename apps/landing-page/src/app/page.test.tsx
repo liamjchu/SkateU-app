@@ -19,14 +19,15 @@ describe("Home", () => {
 
     expect(skipLink?.textContent).toBe("Skip to content");
     expect(container.querySelector('a[aria-label="SkateU home"]')?.getAttribute("href")).toBe("/");
+    expect(container.querySelector('header a[href="/map"]')?.textContent).toBe("Map");
     expect(container.querySelector('header a[href="/shop"]')?.textContent).toBe("Shop");
-    expect(container.textContent).toContain("Locals know the spots,");
-    expect(container.textContent).toContain("Now you do too");
-    expect(container.textContent).toContain("finding, liking, and sharing");
-    expect(container.textContent).not.toContain("finding, rating, and sharing");
-    expect(container.textContent).toContain("Beta is open");
-    expect(container.textContent).toContain("Install with TestFlight");
-    expect(container.textContent).toContain("Send your Play email");
+    expect(
+      [...container.querySelectorAll('a[href="/map"]')].some((link) => link.textContent === "Open the map")
+    ).toBe(true);
+    expect(container.textContent).toContain("Find skate spots on your campus.");
+    expect(container.querySelector('input[placeholder="Search all schools..."]')).not.toBeNull();
+    expect(container.textContent).toContain("Get SkateU on your phone");
+    expect(container.textContent).toContain("Android beta");
     expect(
       container.querySelector('a[href="https://testflight.apple.com/join/GPHRqSmN"]')
         ?.textContent
