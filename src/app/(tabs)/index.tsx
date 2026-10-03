@@ -628,34 +628,36 @@ export default function HomeScreen() {
     <View className="flex-1 bg-surface">
       <View className="bg-brand">
         <View
-          className="px-6 pb-5"
+          className="pb-5"
           style={{
             paddingTop: insets.top + 24,
           }}
         >
-          <View className="min-h-11 flex-row items-center justify-between">
-            <FeedbackPressable
-              haptic="light"
-              disablePressScale
-              onPress={handleHomeLogoPress}
-              className="h-11 justify-center"
-              accessibilityRole="button"
-              accessibilityLabel="SkateU"
-              accessibilityHint={getHomeLogoTapHint(homeLogoTapAction)}
-            >
-              <Image
-                source={IMAGES.brandLockup}
-                style={{
-                  width: HEADER_LOGO_WIDTH,
-                  height: HEADER_LOGO_HEIGHT,
-                }}
-                resizeMode="contain"
-                accessible={false}
+          <View className="w-full max-w-[760px] self-center px-6">
+            <View className="min-h-11 flex-row items-center justify-between">
+              <FeedbackPressable
+                haptic="light"
+                disablePressScale
+                onPress={handleHomeLogoPress}
+                className="h-11 justify-center"
+                accessibilityRole="button"
+                accessibilityLabel="SkateU"
+                accessibilityHint={getHomeLogoTapHint(homeLogoTapAction)}
+              >
+                <Image
+                  source={IMAGES.brandLockup}
+                  style={{
+                    width: HEADER_LOGO_WIDTH,
+                    height: HEADER_LOGO_HEIGHT,
+                  }}
+                  resizeMode="contain"
+                  accessible={false}
+                />
+              </FeedbackPressable>
+              <HomeNotificationsButton
+                accessToken={session?.access_token ?? null}
               />
-            </FeedbackPressable>
-            <HomeNotificationsButton
-              accessToken={session?.access_token ?? null}
-            />
+            </View>
           </View>
         </View>
         <StickerStripe />

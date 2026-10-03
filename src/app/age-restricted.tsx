@@ -12,16 +12,16 @@ export default function AgeRestrictedScreen() {
     <View className="flex-1 bg-surface">
       <View className="bg-brand">
         <View
-          className="px-6 pb-4"
+          className="pb-4"
           style={{
             paddingTop: insets.top + 16,
           }}
         >
-          <Text
-            className="font-outfit-bold text-2xl text-white"
-          >
-            Age restriction
-          </Text>
+          <View className="w-full max-w-[640px] self-center px-6">
+            <Text className="font-outfit-bold text-2xl text-white">
+              Age restriction
+            </Text>
+          </View>
         </View>
         <StickerStripe />
       </View>

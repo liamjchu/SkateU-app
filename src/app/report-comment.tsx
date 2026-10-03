@@ -130,7 +130,7 @@ export default function ReportCommentScreen() {
       <ScreenHeader title="Report comment" onBack={goBack} />
       <KeyboardShiftView>
         {submitted ? (
-          <View className="flex-1 items-center justify-center px-6">
+          <View className="w-full max-w-[720px] flex-1 self-center items-center justify-center px-6">
             <Text className="text-center font-outfit-black text-2xl text-ink">
               Report sent
             </Text>
@@ -150,7 +150,7 @@ export default function ReportCommentScreen() {
         ) : (
           <ScrollView
             className="flex-1"
-            contentContainerClassName="px-6 pb-8 pt-6"
+            contentContainerClassName="w-full max-w-[720px] self-center px-6 pb-8 pt-6"
             keyboardShouldPersistTaps="handled"
             automaticallyAdjustKeyboardInsets={false}
           >

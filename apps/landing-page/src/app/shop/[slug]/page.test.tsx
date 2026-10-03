@@ -60,41 +60,28 @@ describe("generateMetadata", () => {
 });
 
 describe("Product page", () => {
-  it("renders the sticker with a buy now form and price", async () => {
-    getProductPriceDisplay.mockResolvedValue("$5.00");
+  it("renders the sticker as coming soon without a buy button", async () => {
     const container = render(
       await ProductPage({ params: Promise.resolve({ slug: "skateu-sticker" }) })
     );
-    const form = container.querySelector('form[action="/api/checkout"]');
-    const checkout = form?.querySelector("button[type='submit']");
+    const checkout = container.querySelector("button");
 
     expect(container.querySelector("#product-title")?.textContent).toBe("SkateU Sticker");
-    expect(container.textContent).toContain("Available now");
-    expect(container.textContent).toContain("$5.00");
-    expect(container.textContent).not.toContain("Checkout coming soon");
+    expect(container.textContent).toContain("Coming soon");
+    expect(container.textContent).not.toContain("Available now");
+    expect(container.textContent).not.toContain("Buy now");
+    expect(container.textContent).not.toMatch(/\$/);
     expect(
       [...container.querySelectorAll('a[href="/shop"]')].some((link) =>
         link.textContent?.includes("Back to shop")
       )
     ).toBe(true);
-    expect(form).not.toBeNull();
-    expect(
-      (form?.querySelector('input[name="slug"]') as HTMLInputElement | null)?.value
-    ).toBe("skateu-sticker");
+    expect(container.querySelector('form[action="/api/checkout"]')).toBeNull();
     expect(checkout).toBeInstanceOf(HTMLButtonElement);
-    expect(checkout?.textContent).toBe("Buy now");
-    expect(checkout instanceof HTMLButtonElement && checkout.disabled).toBe(false);
+    expect(checkout?.textContent).toBe("Checkout coming soon");
+    expect(checkout instanceof HTMLButtonElement && checkout.disabled).toBe(true);
+    expect(getProductPriceDisplay).not.toHaveBeenCalled();
     expect(notFound).not.toHaveBeenCalled();
-  });
-
-  it("still offers buy now when the Stripe price cannot be loaded", async () => {
-    getProductPriceDisplay.mockResolvedValue(null);
-    const container = render(
-      await ProductPage({ params: Promise.resolve({ slug: "skateu-sticker" }) })
-    );
-
-    expect(container.querySelector('form[action="/api/checkout"]')).not.toBeNull();
-    expect(container.textContent).not.toMatch(/\$/);
   });
 
   it("calls notFound when the slug is unknown", async () => {

@@ -191,7 +191,7 @@ export function WaitlistForm() {
             autoComplete="email"
             inputMode="email"
             placeholder="Your email address"
-            className="min-h-14 min-w-0 flex-1 rounded-2xl bg-field px-4 text-sm font-medium text-ink outline-none placeholder:text-muted focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-surface"
+            className="min-h-14 min-w-0 flex-1 rounded-2xl bg-field px-4 text-base font-medium text-ink outline-none placeholder:text-muted focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-surface"
             value={email}
             onChange={(event) => {
               setEmail(event.target.value);

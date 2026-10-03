@@ -3,9 +3,19 @@ import type { ReactNode } from "react";
 
 import { IMAGES } from "../../constants/images";
 
-export function SiteShell({ children }: { children: ReactNode }) {
+export function SiteShell({
+  children,
+  variant = "page",
+}: {
+  children: ReactNode;
+  variant?: "page" | "campus";
+}) {
+  const campus = variant === "campus";
+
   return (
-    <div className="relative flex min-h-screen flex-col overflow-hidden bg-surface text-ink">
+    <div
+      className={`relative flex flex-col bg-surface text-ink ${campus ? "h-dvh overflow-hidden" : "min-h-screen overflow-hidden"}`}
+    >
       <a
         href="#main-content"
         className="fixed left-4 top-4 z-50 -translate-y-24 rounded-xl bg-field px-4 py-3 text-sm font-bold text-brand transition-transform focus:translate-y-0 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 motion-reduce:transition-none"
@@ -13,19 +23,25 @@ export function SiteShell({ children }: { children: ReactNode }) {
         Skip to content
       </a>
 
-      <Image
-        aria-hidden
-        src={IMAGES.campusMap}
-        alt=""
-        fill
-        priority
-        sizes="100vw"
-        className="pointer-events-none object-cover object-[58%_center] opacity-80"
-      />
-      <div aria-hidden className="absolute inset-0 bg-surface/80" />
+      {campus ? null : (
+        <>
+          <Image
+            aria-hidden
+            src={IMAGES.campusMap}
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+            className="pointer-events-none object-cover object-[58%_center] opacity-80"
+          />
+          <div aria-hidden className="absolute inset-0 bg-surface/80" />
+        </>
+      )}
 
       <header className="relative z-10 bg-brand">
-        <div className="mx-auto flex h-20 w-full max-w-7xl items-center justify-between gap-2 px-5 sm:h-24 sm:px-10 lg:px-16">
+        <div
+          className={`mx-auto flex w-full max-w-7xl items-center justify-between gap-2 px-5 sm:px-10 lg:px-16 ${campus ? "h-16" : "h-20 sm:h-24"}`}
+        >
           <a
             href="/"
             className="flex h-7 shrink-0 items-center rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand"
@@ -38,7 +54,23 @@ export function SiteShell({ children }: { children: ReactNode }) {
               priority
             />
           </a>
-          <nav aria-label="Site">
+          <nav aria-label="Site" className="flex items-center gap-1">
+            {campus ? (
+              <a
+                href="/"
+                className="rounded-xl px-3 py-2 text-sm font-bold uppercase tracking-[0.16em] text-white transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand motion-reduce:transition-none"
+              >
+                Search
+              </a>
+            ) : null}
+            {campus ? null : (
+              <a
+                href="/map"
+                className="rounded-xl px-3 py-2 text-sm font-bold uppercase tracking-[0.16em] text-white transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand motion-reduce:transition-none"
+              >
+                Map
+              </a>
+            )}
             <a
               href="/shop"
               className="rounded-xl px-3 py-2 text-sm font-bold uppercase tracking-[0.16em] text-white transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand motion-reduce:transition-none"
@@ -50,9 +82,13 @@ export function SiteShell({ children }: { children: ReactNode }) {
         <div aria-hidden className="h-1 bg-accent" />
       </header>
 
-      <div className="relative z-10 flex flex-1 flex-col [&>*]:flex-1">{children}</div>
+      <div className={`relative z-10 flex min-h-0 flex-1 flex-col ${campus ? "" : "[&>*]:flex-1"}`}>
+        {children}
+      </div>
 
-      <footer className="relative z-10 mt-auto border-t border-white/40 bg-brand text-white">
+      <footer
+        className={`relative z-10 mt-auto border-t border-white/40 bg-brand text-white ${campus ? "hidden md:block" : ""}`}
+      >
         <div className="mx-auto flex w-full max-w-7xl flex-col items-center gap-3 px-5 py-5 text-center text-[11px] font-bold uppercase tracking-[0.12em] sm:flex-row sm:justify-between sm:px-10 sm:text-left sm:tracking-[0.16em] lg:px-16">
           <span>© 2026 SkateU</span>
           <nav

@@ -10,22 +10,22 @@ import {
 } from "./products";
 
 describe("shop catalog", () => {
-  it("lists stickers as live and the rest as coming soon", () => {
+  it("lists every category as coming soon until checkout is open", () => {
     expect(SHOP_CATEGORIES).toEqual([
-      { id: "stickers", label: "Stickers", status: "live" },
+      { id: "stickers", label: "Stickers", status: "coming_soon" },
       { id: "clothing", label: "Clothing", status: "coming_soon" },
       { id: "griptape", label: "Griptape", status: "coming_soon" },
       { id: "boards", label: "Boards", status: "coming_soon" },
     ]);
   });
 
-  it("has one live sticker without a hardcoded dollar amount", () => {
+  it("has one coming-soon sticker without a hardcoded dollar amount", () => {
     expect(PRODUCTS).toHaveLength(1);
     expect(PRODUCTS[0]).toMatchObject({
       slug: STICKER_SLUG,
       name: "SkateU Sticker",
       category: "stickers",
-      status: "live",
+      status: "coming_soon",
     });
     expect(JSON.stringify(PRODUCTS)).not.toMatch(/\$/);
   });
@@ -43,8 +43,8 @@ describe("productBySlug", () => {
 });
 
 describe("liveProductBySlug", () => {
-  it("returns the live sticker", () => {
-    expect(liveProductBySlug(STICKER_SLUG)?.status).toBe("live");
+  it("returns null while the sticker is coming soon", () => {
+    expect(liveProductBySlug(STICKER_SLUG)).toBeNull();
   });
 
   it("returns null when the slug is unknown", () => {

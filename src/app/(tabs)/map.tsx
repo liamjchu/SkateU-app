@@ -83,6 +83,11 @@ import { STALE_SPOTS_MESSAGE } from '../../lib/readCache';
 import { toMutationError } from '../../lib/userFacingError';
 import { guardedNavigate, releaseNavigationLock, useGuardedRouter } from '../../lib/navigationGuard';
 import { draftsForSchool } from '../../lib/spotDraft';
+import {
+    getTabletSheetWidth,
+    TABLET_SHEET_INSET,
+    useIsTabletLayout,
+} from '../../hooks/useIsTabletLayout';
 import { useUserLocation } from '../../hooks/useUserLocation';
 import { useAuthStore } from '../../store/authStore';
 import { useBlocksStore } from '../../store/blocksStore';
@@ -121,10 +126,10 @@ export default function MapScreen() {
     ? searchParams.spotId[0]
     : searchParams.spotId;
   const insets = useSafeAreaInsets();
-  const { height, width, fontScale } = useWindowDimensions();
+  const { width, fontScale } = useWindowDimensions();
   const exploreChromeHeight = mapExploreChromeContentHeight(fontScale);
-  const isTabletLayout = width >= 768 && height >= 600;
-  const tabletSheetWidth = Math.min(width - 48, 520);
+  const isTabletLayout = useIsTabletLayout();
+  const tabletSheetWidth = getTabletSheetWidth(width);
   const session = useAuthStore((state) => state.session);
   const userId = useAuthStore((state) => state.user?.id);
   const draftSpots = useDraftSpotsStore((state) => state.drafts);
@@ -1799,7 +1804,7 @@ export default function MapScreen() {
           style={[
             styles.sheet,
             isTabletLayout && {
-              left: 24,
+              left: TABLET_SHEET_INSET,
               right: undefined,
               width: tabletSheetWidth,
             },

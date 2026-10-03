@@ -9,10 +9,16 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { colors } from '../constants/colors';
 import { useFontScale } from '../hooks/useFontScale';
 import { useHydrateFavoriteSchools } from '../hooks/useHydrateFavoriteSchools';
+import {
+  getTabletSheetWidth,
+  TABLET_SHEET_INSET,
+  useIsTabletLayout,
+} from '../hooks/useIsTabletLayout';
 import { getApiUrl } from '../lib/api';
 import {
   getSchoolSearchCopy,
@@ -54,6 +60,9 @@ export default function MapExploreChrome({
   onToggleSaveResult,
   onSearchActiveChange,
 }: MapExploreChromeProps) {
+  const { width } = useWindowDimensions();
+  const isTabletLayout = useIsTabletLayout();
+  const tabletSheetWidth = getTabletSheetWidth(width);
   const { isLarge } = useFontScale();
   const searchInputRef = useRef<TextInput>(null);
   const schools = useSchools((state) => state.schools);
@@ -230,8 +239,15 @@ export default function MapExploreChrome({
 
       <View
         pointerEvents="box-none"
-        className="absolute left-0 right-0 px-4"
-        style={{ top: topInset + 8 }}
+        className={
+          isTabletLayout ? 'absolute' : 'absolute left-0 right-0 px-4'
+        }
+        style={{
+          top: topInset + 8,
+          ...(isTabletLayout
+            ? { left: TABLET_SHEET_INSET, width: tabletSheetWidth }
+            : {}),
+        }}
       >
       <View className={isLarge ? 'gap-2' : 'flex-row items-center'}>
         <View className="min-w-0 flex-1 overflow-hidden rounded-full bg-field">

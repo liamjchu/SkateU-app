@@ -14,6 +14,16 @@ export function render(ui: ReactNode): HTMLDivElement {
   return container;
 }
 
+export function rerender(ui: ReactNode): void {
+  const current = renderedRoots.at(-1);
+
+  if (!current) {
+    throw new Error("Nothing to rerender.");
+  }
+
+  act(() => current.root.render(ui));
+}
+
 export function cleanup(): void {
   for (const { container, root } of renderedRoots.splice(0)) {
     act(() => root.unmount());
