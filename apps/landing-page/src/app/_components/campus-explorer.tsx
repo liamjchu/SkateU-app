@@ -207,6 +207,9 @@ export function CampusExplorer({
           <a href="/support" className="text-muted underline-offset-2 hover:underline">
             Support
           </a>
+          <a href="/delete-account" className="text-muted underline-offset-2 hover:underline">
+            Delete account
+          </a>
         </nav>
       </section>
     </div>

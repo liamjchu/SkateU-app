@@ -37,7 +37,7 @@ describe("Home", () => {
     ).not.toBeNull();
     const legalNav = container.querySelector('nav[aria-label="Legal"]');
     expect(legalNav).not.toBeNull();
-    expect(legalNav?.querySelectorAll("a")).toHaveLength(3);
+    expect(legalNav?.querySelectorAll("a")).toHaveLength(4);
     const privacyLink = legalNav?.querySelector('a[href="/privacy"]');
     expect(privacyLink?.textContent).toBe("Privacy Policy");
     expect(legalNav?.querySelector('a[href="/terms"]')?.textContent).toBe(
@@ -45,6 +45,9 @@ describe("Home", () => {
     );
     expect(legalNav?.querySelector('a[href="/support"]')?.textContent).toBe(
       "Support"
+    );
+    expect(legalNav?.querySelector('a[href="/delete-account"]')?.textContent).toBe(
+      "Delete account"
     );
     expect(legalNav?.querySelector('a[href="/community-guidelines"]')).toBeNull();
     const socialLinks = [

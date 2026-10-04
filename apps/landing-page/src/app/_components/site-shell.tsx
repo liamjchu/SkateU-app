@@ -113,6 +113,12 @@ export function SiteShell({
             >
               Support
             </a>
+            <a
+              href="/delete-account"
+              className="text-white/90 underline-offset-2 transition-colors hover:text-white hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand"
+            >
+              Delete account
+            </a>
           </nav>
           <div className="flex items-center gap-2" aria-label="Follow SkateU on social media">
             <a

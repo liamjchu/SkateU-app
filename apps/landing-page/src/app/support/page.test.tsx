@@ -19,6 +19,9 @@ describe("Support page", () => {
     expect(
       container.querySelector('a[href="mailto:support@skateu.app"]')?.textContent
     ).toBe("support@skateu.app");
+    expect(container.querySelector('a[href="/delete-account"]')?.textContent).toBe(
+      "delete account"
+    );
     expect(container.firstElementChild?.className).toContain("min-h-screen");
     expect(container.firstElementChild?.className).toContain("flex-col");
   });

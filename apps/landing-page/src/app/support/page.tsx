@@ -31,8 +31,17 @@ export default function SupportPage() {
           </p>
           <p className="mt-4 text-pretty text-base leading-7 text-ink sm:text-lg">
             In the app, signed-in users can also open Settings → Help & Support,
-            report a comment or profile, request that a spot be removed, or
-            delete their account.
+            report a comment or profile, or request that a spot be removed.
+          </p>
+          <p className="mt-4 text-pretty text-base leading-7 text-ink sm:text-lg">
+            To delete your account and associated data, use the{" "}
+            <a
+              href="/delete-account"
+              className="font-semibold text-ink underline underline-offset-2"
+            >
+              delete account
+            </a>{" "}
+            page.
           </p>
         </article>
       </main>
