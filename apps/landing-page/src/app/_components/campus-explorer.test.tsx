@@ -180,6 +180,9 @@ describe("CampusExplorer", () => {
     expect(container.textContent).toContain("0 spots");
     expect(container.textContent).toContain("No spots at this school yet.");
     expect(container.querySelector('a[href="/privacy"]')?.textContent).toBe("Privacy Policy");
+    expect(container.querySelector('a[href="/delete-account"]')?.textContent).toBe(
+      "Delete account"
+    );
   });
 
   it("loads every spot once, then returns to this school", async () => {
