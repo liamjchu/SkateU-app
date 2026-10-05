@@ -16,8 +16,10 @@ jest.mock('expo-image', () => {
   const React = require('react');
   const { Image } = require('react-native');
   return {
-    Image: (props: Record<string, unknown>) =>
-      React.createElement(Image, props),
+    Image: Object.assign(
+      (props: Record<string, unknown>) => React.createElement(Image, props),
+      { prefetch: jest.fn(async () => true) }
+    ),
   };
 });
 

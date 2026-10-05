@@ -1,6 +1,7 @@
 import { Image as ExpoImage } from 'expo-image';
-import { useCallback, useEffect, useRef } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { colors } from '../constants/colors';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
     runOnJS,
@@ -49,6 +50,7 @@ export default function ZoomablePhoto({
   const reportZoom = useCallback((zoomed: boolean) => {
     onZoomChangeRef.current(zoomed);
   }, []);
+  const [ready, setReady] = useState(false);
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
   const translateX = useSharedValue(0);
@@ -64,6 +66,7 @@ export default function ZoomablePhoto({
     savedTranslateX.value = 0;
     savedTranslateY.value = 0;
     reportZoom(false);
+    setReady(false);
   }, [
     reportZoom,
     savedScale,
@@ -220,11 +223,21 @@ export default function ZoomablePhoto({
           {uri.length > 0 ? (
             <AnimatedImage
               source={{ uri }}
+              recyclingKey={uri}
               contentFit="contain"
-              cachePolicy="disk"
+              cachePolicy="memory-disk"
               style={[{ width, height }, imageStyle]}
               accessible={false}
+              onLoad={() => setReady(true)}
             />
+          ) : null}
+          {uri.length > 0 && !ready ? (
+            <View pointerEvents="none" style={styles.loading}>
+              <ActivityIndicator
+                color={colors.white}
+                accessibilityLabel="Loading photo"
+              />
+            </View>
           ) : null}
         </Animated.View>
       </GestureDetector>
@@ -239,6 +252,11 @@ const styles = StyleSheet.create({
   },
   stage: {
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loading: {
+    ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
   },

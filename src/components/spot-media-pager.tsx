@@ -1,10 +1,13 @@
+import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
 import {
+    ActivityIndicator,
     NativeScrollEvent,
     NativeSyntheticEvent,
     ScrollView,
     View,
 } from 'react-native';
+import { colors } from '../constants/colors';
 import { shouldMountPagerImage } from '../lib/spotMediaPager';
 import CachedRemoteImage from './CachedRemoteImage';
 import FeedbackPressable from './FeedbackPressable';
@@ -32,6 +35,14 @@ export default function SpotMediaPager({
       Math.min(current, Math.max(uris.length - 1, 0))
     );
   }, [uris.length]);
+
+  const prefetchKey = uris.join('\n');
+  useEffect(() => {
+    if (!prefetchKey) {
+      return;
+    }
+    void Image.prefetch(prefetchKey.split('\n'), 'memory-disk');
+  }, [prefetchKey]);
 
   if (uris.length === 0) {
     return null;
@@ -61,7 +72,17 @@ export default function SpotMediaPager({
       className="overflow-hidden"
       onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
     >
-      {uris.length === 1 ? (
+      {width === 0 ? (
+        <View
+          style={{ height }}
+          className="items-center justify-center bg-surface-soft"
+        >
+          <ActivityIndicator
+            color={colors.accent}
+            accessibilityLabel="Loading photo"
+          />
+        </View>
+      ) : uris.length === 1 ? (
         <FeedbackPressable
           haptic="light"
           disablePressScale
@@ -72,13 +93,12 @@ export default function SpotMediaPager({
         >
           <CachedRemoteImage
             uri={firstUri}
-            style={{ height }}
-            className={`w-full bg-surface-soft ${imageClassName ?? ''}`}
+            priority="high"
+            style={{ width, height }}
+            className={`bg-surface-soft ${imageClassName ?? ''}`}
             accessible={false}
           />
         </FeedbackPressable>
-      ) : width === 0 ? (
-        <View style={{ height }} className="bg-surface-soft" />
       ) : (
         <View style={{ height }}>
           <ScrollView
@@ -106,6 +126,7 @@ export default function SpotMediaPager({
                 {shouldMountPagerImage(photoIndex, index) ? (
                   <CachedRemoteImage
                     uri={uri}
+                    priority={photoIndex === index ? 'high' : 'low'}
                     style={{ width: pageWidth, height }}
                     className={`bg-surface-soft ${imageClassName ?? ''}`}
                     accessible={false}
